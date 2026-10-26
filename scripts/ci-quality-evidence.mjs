@@ -1,3 +1,9 @@
+import {
+  collectBackendEvidence,
+  captureBackendProof,
+  validateBackendEvidence,
+  backendExecutionEnvironment,
+} from './ci-backend-equivalence.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -249,6 +255,21 @@ export function verifyEngineeringEvidence(scope, metadata, identity) {
   );
 }
 
+export function verifyBackendEvidence(metadata, reports, directory, root = process.cwd()) {
+  validateReusedMetadata(metadata);
+  assert.equal(metadata.status, 'success', 'Backend execution did not finish successfully');
+  if (metadata.backendEvidence) validateBackendEvidence(directory, metadata.backendEvidence, root);
+  if (metadata.reusedFrom) assert.ok(metadata.backendEvidence, 'Complete reused backend evidence missing');
+  assert.ok(metadata.phases.some((phase) => phase.name === 'backend-quality' && phase.exitCode === 0));
+  assert.ok(
+    metadata.phases.every((phase) => phase.exitCode === 0),
+    'A backend phase failed',
+  );
+  assert.ok(reports.tests > 0 && reports.classes > 0, 'Backend tests were not executed');
+  for (const key of ['failures', 'errors', 'skipped']) assert.equal(reports[key], 0);
+  return reports;
+}
+
 function loadMetadata(directory) {
   const file = path.join(directory, 'metadata.json');
   if (existsSync(file)) return readJson(file);
@@ -304,14 +325,7 @@ function main(args) {
       const metadata = readJson(path.join(name, 'ci-backend-full', 'metadata.json'));
       const reports = readJson(path.join(name, 'ci-backend-full', 'backend-tests.json'));
       verifyScope(scope, metadata);
-      assert.equal(metadata.status, 'success', 'Backend execution did not finish successfully');
-      assert.ok(metadata.phases.some((phase) => phase.name === 'backend-quality' && phase.exitCode === 0));
-      assert.ok(
-        metadata.phases.every((phase) => phase.exitCode === 0),
-        'A backend phase failed',
-      );
-      assert.ok(reports.tests > 0 && reports.classes > 0, 'Backend tests were not executed');
-      for (const key of ['failures', 'errors', 'skipped']) assert.equal(reports[key], 0);
+      verifyBackendEvidence(metadata, reports, path.join(name, 'ci-backend-full'));
       result = { status: 'success', identity: metadata, reports };
     }
     saveJson(path.join(directory, `${domain}-aggregate.json`), result);
@@ -322,7 +336,21 @@ function main(args) {
   }
   const metadata = loadMetadata(directory);
   const file = path.join(directory, 'metadata.json');
+  if (mode === 'init') {
+    saveJson(file, metadata);
+    return;
+  }
   if (mode === 'finish') {
+    if (metadata.job === 'backend_full' && !metadata.reusedFrom && process.env.JOB_STATUS === 'success') {
+      metadata.backendEvidence = collectBackendEvidence(directory);
+      try {
+        metadata.environmentProof = captureBackendProof(directory);
+      } catch (error) {
+        metadata.equivalenceUnavailable =
+          'Backend environment closure unavailable: ' + error.message.split('\n')[0].slice(0, 200);
+        console.log(metadata.equivalenceUnavailable);
+      }
+    }
     if (metadata.environmentProof)
       assert.deepEqual(environmentProof(), metadata.environmentProof, 'Execution inputs changed during CI');
     validateReusedMetadata(metadata);
@@ -345,7 +373,12 @@ function main(args) {
   if (name === 'engineering-tests') metadata.engineeringTests = scriptTestFiles(process.cwd(), 'engineering');
   const frontendKind = { 'frontend-unit': 'unit', 'frontend-source-guards': 'source-guards' }[name];
   const runId = name === 'engineering-tests' || frontendKind ? randomUUID() : null;
-  const executionEnv = process.env.CI_EQUIVALENCE_ELIGIBLE === 'true' ? executionEnvironment(process.env) : process.env;
+  const executionEnv =
+    process.env.CI_EQUIVALENCE_ELIGIBLE === 'true'
+      ? metadata.job === 'backend_full'
+        ? backendExecutionEnvironment(process.env)
+        : executionEnvironment(process.env)
+      : process.env;
   const result = spawnSync(command, childArgs, {
     stdio: 'inherit',
     env: runId
