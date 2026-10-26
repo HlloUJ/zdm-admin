@@ -14,7 +14,8 @@ import {
 } from './completion-session.mjs';
 import { assertCompletionQuality, verifyCompletionEvidence, evidenceIdentity } from './completion-ci-evidence.mjs';
 import { readActiveBatch, closeBatch, planBatchDelivery } from './task-batch.mjs';
-import { waitRemoteQuality } from './wait-quality.mjs';
+import { waitRemoteQuality, selectQualityRun } from './wait-quality.mjs';
+import { finalHandoffPlan, finalHandoff } from './completion-handoff.mjs';
 import { parseWorktreePorcelain } from './git-workflow-core.mjs';
 import {
   integrationBackendSnapshot,
@@ -47,6 +48,8 @@ export async function completionCommand(
 ) {
   const limits = {
     begin: [0, 1],
+    'handoff-plan': [1, 1],
+    'final-handoff': [1, 1],
     report: [1, 1],
     settle: [3, 3],
     wait: [2, 2],
@@ -90,6 +93,7 @@ export async function completionCommand(
     [batch.worktree, batch.repository.anchor].map((p) => path.resolve(p)).includes(path.resolve(root)),
     'Use the registered task or retained main anchor',
   );
+  if (mode === 'handoff-plan') return finalHandoffPlan(root, batch, rest[0], { execute });
   const state = openCompletion(directory, batch.id, {
       requestedAt: mode === 'begin' ? rest[0] : undefined,
       formal: mode === 'begin',
@@ -104,10 +108,16 @@ export async function completionCommand(
     save(state);
     return { batch: batch.id, startedAt: new Date(state.startedAt).toISOString(), clockSource: state.clockSource };
   }
+  if (mode === 'final-handoff') {
+    const options = { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common };
+    return finalHandoff(root, batch, rest[0], options);
+  }
   if (mode === 'measure') {
     const [label, separator, command, ...commandArgs] = rest;
     assert.ok(
-      ['prepare', 'handoff', 'review', 'repair'].includes(label) && separator === '--' && command,
+      ['prepare', 'handoff', 'review', 'repair', 'push', 'pr', 'merge', 'sync'].includes(label) &&
+        separator === '--' &&
+        command,
       'measure <stage> -- <command> [args]',
     );
     return completionStage(
@@ -140,9 +150,53 @@ export async function completionCommand(
     return { repair: rest[0], status: 'verified' };
   }
   if (mode === 'wait') {
-    const [runId, head] = rest;
-    return (await completionStage(state, 'ci', `${head}:${runId}`, () => waitQuality(root, runId, head), { save }))
-      .result;
+    let [runId, head] = rest;
+    if (['pr', 'main'].includes(runId)) {
+      const selector = runId,
+        branch = selector === 'pr' ? batch.branch : 'main';
+      const runs = JSON.parse(
+        execute(root, 'gh', [
+          'run',
+          'list',
+          '--workflow',
+          'quality.yml',
+          '--branch',
+          branch,
+          '--event',
+          selector === 'pr' ? 'pull_request' : 'push',
+          '--commit',
+          head,
+          '--limit',
+          '20',
+          '--json',
+          'databaseId,headSha,event,headBranch',
+        ]),
+      );
+      runId = selectQualityRun(runs, { selector, branch, head });
+    }
+    const result = (
+      await completionStage(state, 'ci', `${head}:${runId}`, () => waitQuality(root, runId, head), { save })
+    ).result;
+    return {
+      runId: result.runId,
+      headSha: result.headSha,
+      conclusion: result.conclusion,
+      attempt: result.attempt,
+      gatesFinishedAt: result.gatesFinishedAt,
+      elapsedMs: result.elapsedMs,
+      jobs: result.jobs.map(({ name, status, conclusion }) => ({ name, status, conclusion })),
+      next: {
+        phase: result.eventName === 'push' && result.branch === 'main' ? 'final-handoff' : 'merge',
+        head: result.headSha,
+        runId: String(runId),
+        ...(result.eventName === 'push' && result.branch === 'main'
+          ? {
+              handoff: ['npm', 'run', 'task:completion', '--', 'final-handoff', head],
+              settle: ['npm', 'run', 'task:completion', '--', 'settle', batch.id, head, String(runId)],
+            }
+          : {}),
+      },
+    };
   }
   if (mode !== 'settle') throw Error('Unknown completion command');
   assert.ok(state.startedAt !== null, 'Begin formal completion before settle');

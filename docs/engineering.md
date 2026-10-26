@@ -43,3 +43,5 @@ CI Chrome 准备与系统依赖分开，合格预装浏览器可复用，独立�
 后端 PR/main 去重使用 `backend-maven-testcontainers-v1`：PR 原完整 Maven 门禁、main 精确核验实际工具链/依赖/测试镜像及完整原始测试与覆盖报告后才复用，无法证明即原门禁。见 [后端独立等价契约](task-completion.md#后端独立等价契约)，不新增后端镜像或变更数据保护。
 
 报告采集、回放和上传共用 `scripts/ci-report-contract.mjs`；`test:ci-reuse` 同时检查四种完整链路、真实独立CLI及隔离Git收尾，不启动Maven/Docker或重复工程全套。正式收尾使用阶段索引及 `begin / wait / settle / report`，门禁、运行交接、精确指纹和数据保护不变；总耗时和补修成本按 [任务完成流程](task-completion.md) 报告。
+
+普通串行交付以 `task:completion -- final-handoff <main-sha>` 在main门禁通过后一次完成目标版本对齐与运行交接；`wait <run-id|pr|main> <head>`同时提供变化进度和后续参数，push/pr/merge/sync分别计时。提前组合验收仍使用原同步入口，完整流程见[任务完成流程](task-completion.md)。

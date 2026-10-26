@@ -9,13 +9,17 @@ export async function waitQuality({
   wait,
   report = console.log,
   deadlineMs = 3600000,
+  now = Date.now,
+  progressIntervalMs = 60000,
 }) {
   assert.match(String(runId), /^\d+$/);
   assert.match(expectedHead, /^[a-f0-9]{40}$/);
-  const start = Date.now();
+  const start = now();
+  let lastProgress = -Infinity,
+    previousJobs;
   let previous;
   let transportFailures = 0;
-  while (Date.now() - start < deadlineMs) {
+  while (now() - start < deadlineMs) {
     let run;
     try {
       run = await readRun();
@@ -77,8 +81,30 @@ export async function waitQuality({
         attempt: 1,
         conclusion: 'success',
         jobs,
-        elapsedMs: Date.now() - start,
+        elapsedMs: now() - start,
       };
+    }
+    if (now() - lastProgress >= progressIntervalMs) {
+      lastProgress = now();
+      try {
+        const jobs = await readJobs();
+        const summary = jobs
+          .map((j) => ({
+            name: j.name,
+            status: j.status,
+            conclusion: j.conclusion,
+            active: j.steps?.filter((s) => s.status === 'in_progress').map((s) => s.name) ?? [],
+          }))
+          .sort((a, b) => a.name.localeCompare(b.name));
+        const key = JSON.stringify(summary);
+        if (key !== previousJobs) {
+          report(`CI ${runId} jobs: ${key}`);
+          previousJobs = key;
+        }
+      } catch {
+        // Progress is advisory. The final required-gate query above remains mandatory.
+        report(`CI ${runId} progress unavailable; retain the same run and verify final gates.`);
+      }
     }
     await wait(20000);
   }
@@ -99,4 +125,15 @@ export async function waitRemoteQuality(root, runId, expectedHead) {
     readJobs: () => api('/jobs?filter=all&per_page=100').jobs,
     wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
   });
+}
+
+// Do not guess among multiple runs or let branch/head filters select an unrelated candidate.
+export function selectQualityRun(runs, { selector, branch, head }) {
+  assert.match(head, /^[a-f0-9]{40}$/);
+  assert.ok(['pr', 'main'].includes(selector));
+  const event = selector === 'pr' ? 'pull_request' : 'push';
+  const matches = runs.filter((r) => r.headSha === head && r.headBranch === branch && r.event === event);
+  assert.equal(matches.length, 1, 'Exact CI run unavailable or ambiguous; retain candidate and specify its run ID');
+  assert.match(String(matches[0].databaseId), /^\d+$/);
+  return String(matches[0].databaseId);
 }
