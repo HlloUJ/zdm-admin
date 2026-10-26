@@ -14,6 +14,8 @@ export const ENGINEERING_EXTRA_INPUTS = [
   '.codex/zdm-project-workflow.yaml',
   '.github/workflows/quality.yml',
   'playwright.config.ts',
+  'vite.e2e.config.mjs',
+  'ci/e2e-app.json',
   'ci/e2e-shards.json',
   '.github/workflows/browser-image.yml',
   'ci/browser-image.lock.json',

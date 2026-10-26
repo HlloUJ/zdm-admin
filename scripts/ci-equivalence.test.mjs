@@ -39,7 +39,10 @@ function snapshot() {
     hardware: { logicalCpus: 4, cpuModel: 'AMD', totalMemoryBytes: 16_766_414_848 },
     node: ['v22.23.3', 'a'.repeat(64)],
     ...Object.fromEntries(
-      ['inputs', 'environment', 'packages', 'systemFiles', 'browser', 'sharding'].map((k) => [k, 'a'.repeat(64)]),
+      ['inputs', 'environment', 'packages', 'systemFiles', 'browser', 'sharding', 'application'].map((k) => [
+        k,
+        'a'.repeat(64),
+      ]),
     ),
   };
 }
@@ -66,7 +69,7 @@ function fixture() {
     workflowRunId: '123',
     environmentProof: proof,
     job: 'frontend_e2e_1',
-    phases: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-1'].map((name) => ({
+    phases: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-app', 'e2e-1'].map((name) => ({
       name,
       exitCode: 0,
     })),
@@ -672,8 +675,8 @@ test('all four job contracts acquire and replay original reports, then pass the 
         'frontend-build',
         'frontend-test-list',
       ],
-      frontend_e2e_1: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-1'],
-      frontend_e2e_2: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-2'],
+      frontend_e2e_1: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-app', 'e2e-1'],
+      frontend_e2e_2: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-app', 'e2e-2'],
     }[job];
     f.original.phases = names.map((name) => ({
       name,

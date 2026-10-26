@@ -1,3 +1,12 @@
+import {
+  assertDependencyFreeSource,
+  DIAGNOSTIC_FILES,
+  diagnosticEnvironment,
+  diagnosticIdentity,
+  sealDiagnosticPacket,
+  loadDiagnosticPacket,
+  mergeDiagnosticReport,
+} from './ci-diagnostic-evidence.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -34,9 +43,16 @@ export function parseNodeTestSummary(tap) {
 }
 
 export function runScriptTests(mode, args = [], { root = process.cwd(), env = process.env } = {}) {
-  assert.ok(['--engineering', '--all', '--files'].includes(mode), 'Expected --engineering, --all or --files');
+  assert.ok(
+    ['--engineering', '--all', '--files', '--diagnostic'].includes(mode),
+    'Expected --engineering, --all or --files',
+  );
+  const requestedRunId = env.ENGINEERING_RUN_ID;
   let files;
-  if (mode === '--files') {
+  if (mode === '--diagnostic') {
+    assert.equal(args.length, 0);
+    files = DIAGNOSTIC_FILES;
+  } else if (mode === '--files') {
     assert.ok(args.length, 'File-targeted script tests require explicit files');
     files = args.map((file) => {
       const relative = path.relative(root, path.resolve(root, file));
@@ -56,8 +72,32 @@ export function runScriptTests(mode, args = [], { root = process.cwd(), env = pr
     files = scriptTestFiles(root, mode === '--engineering' ? 'engineering' : 'all');
   }
   assert.ok(files.length, 'Script test inventory is empty');
+  const allFiles = [...files];
+  let identity = null,
+    packet = null;
+  if (['--engineering', '--diagnostic'].includes(mode)) {
+    try {
+      if (mode === '--diagnostic') {
+        assert.equal(env.CI_DIAGNOSTIC_CAPSULE, 'true');
+        assertDependencyFreeSource(root);
+      }
+      identity = diagnosticIdentity(root, env);
+    } catch {
+      /* No equivalence proof: retain original execution. */
+    }
+    if (mode === '--engineering' && identity && env.CI_DIAGNOSTIC_DIRECTORY)
+      packet = loadDiagnosticPacket(env.CI_DIAGNOSTIC_DIRECTORY, identity);
+    if (packet) files = files.filter((file) => !DIAGNOSTIC_FILES.includes(file));
+    if (mode === '--engineering')
+      console.log(
+        packet
+          ? `Reused complete same-run diagnostics: ${DIAGNOSTIC_FILES.length} files`
+          : 'Diagnostic equivalence unavailable: executing original full engineering inventory',
+      );
+    env = diagnosticEnvironment(env);
+  }
   const kind = mode === '--engineering' ? 'engineering' : 'scripts';
-  const runId = (kind === 'engineering' ? env.ENGINEERING_RUN_ID : undefined) ?? randomUUID();
+  const runId = (kind === 'engineering' ? requestedRunId : undefined) ?? randomUUID();
   const directory = path.resolve(root, env.CI_EVIDENCE_DIR ?? `.task-verification/script-tests/${runId}`);
   mkdirSync(directory, { recursive: true });
   const rawFile = path.join(directory, `${kind}-${runId}-raw.json`);
@@ -80,7 +120,16 @@ export function runScriptTests(mode, args = [], { root = process.cwd(), env = pr
   );
   if (result.status !== 0) return result.status ?? 1;
   const raw = JSON.parse(readFileSync(rawFile, 'utf8'));
-  const report = nodeTestReport(raw, files, root, kind);
+  let report = nodeTestReport(raw, files, root, kind);
+  if (packet) {
+    assert.deepEqual(diagnosticIdentity(root, process.env), identity, 'Engineering inputs changed');
+    report = mergeDiagnosticReport(report, packet, identity);
+  }
+  if (mode === '--diagnostic' && identity) {
+    assert.deepEqual(diagnosticIdentity(root, process.env), identity, 'Diagnostic inputs changed');
+    sealDiagnosticPacket(directory, identity, report, raw, root);
+  }
+  assert.deepEqual(report.files, allFiles, 'Incomplete combined engineering inventory');
   const counts = validateFrontendTestReport(report, { kind, runId });
   const summary = validateNodeTestSummary({
     tests: counts.tests,

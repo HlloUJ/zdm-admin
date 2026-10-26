@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "entries": [
+    "index.html",
+    "tests/fixtures/mock-origin.html",
+    "tests/fixtures/official-ui/attachment-scheme-two.html",
+    "tests/fixtures/official-ui/dialog-validation.html",
+    "tests/fixtures/official-ui/examples.html",
+    "tests/fixtures/official-ui/feedback-layout.html",
+    "tests/fixtures/official-ui/reference.html",
+    "tests/fixtures/official-ui/scheme-one.html",
+    "tests/fixtures/official-ui/textarea-count.html"
+  ],
+  "developmentCases": [
+    {
+      "file": "native-style-isolation.spec.ts",
+      "title": "pure native Dialog and Form reproduce last-field error overflow without application styles",
+      "movedFrom": "dialog-validation-space.spec.ts"
+    }
+  ]
+}
