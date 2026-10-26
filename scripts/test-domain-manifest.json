@@ -13,7 +13,7 @@
       "dynamicImports": 1
     },
     ".github/workflows/quality.yml": {
-      "digest": "31a9e20ee6896caef13c61a5b18e132a60caff1e8a003ca011d1b98f52e95291",
+      "digest": "b09387f279081bca95edcd860b5ae4381eb710573445e6ca1878cc42a4a42cb9",
       "imports": [],
       "dynamicImports": 0
     },
@@ -32,8 +32,13 @@
       "imports": [],
       "dynamicImports": 0
     },
+    "ci/e2e-app.json": {
+      "digest": "70cf9f0d1991fe7e47fa97ea815da8a6fe7711608e4861c534462a81a78ae404",
+      "imports": [],
+      "dynamicImports": 0
+    },
     "ci/e2e-shards.json": {
-      "digest": "f81c3da9f3eae0d9341664cf86b5a873ef38f618f81fbe4b2348d045a645ba39",
+      "digest": "794fd816fdc8ee6a38dda2a326b3bcdaf1d72e310d1eaddbae23362bd2d76808",
       "imports": [],
       "dynamicImports": 0
     },
@@ -53,13 +58,13 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "3126ae0e77ce7e17498b7131a1e1cf6b882930fe957ad487bf8a5f85e7870204",
+      "digest": "92bb8c6becf06fe1540b5cacbf4009ea7e77e2fa5b3967c347a371428caaaa73",
       "imports": [],
       "dynamicImports": 0
     },
     "playwright.config.ts": {
-      "digest": "87e1f9dfdd55a94ee5c28b305cc83b639c11298cceddae52f7a766fc3989c64d",
-      "imports": [],
+      "digest": "8dba517383128d692e5f05ec7563fe158371cecb51973c77e4d9a79db4f71a6a",
+      "imports": ["scripts/e2e-app.mjs"],
       "dynamicImports": 0
     },
     "scripts/affected-test-inputs.mjs": {
@@ -174,7 +179,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-browser-image.test.mjs": {
-      "digest": "3e9037bdb146e5f0c7566431819b460f897048aa082cdc3a00a2d668df8669b9",
+      "digest": "13aad7d417080c7a3f144ce6e2591132e65b4ca0a38d94bacc504a6fcc8bc370",
       "imports": ["scripts/ci-browser-image.mjs", "scripts/ci-equivalence-environment.mjs"],
       "dynamicImports": 0
     },
@@ -184,22 +189,43 @@
       "dynamicImports": 1
     },
     "scripts/ci-chrome-preparation.test.mjs": {
-      "digest": "2092dfbbb355fd8c9fa6653b3b15a93e7f2d21fd100cafecc71817b89247f761",
+      "digest": "6c2a64a184512726a34f046f1cd95ff9b0404e90d5b5a3e59e39a100ed4843b7",
       "imports": ["scripts/ci-chrome-preparation.mjs"],
       "dynamicImports": 0
     },
+    "scripts/ci-diagnostic-evidence.mjs": {
+      "digest": "4d741be4d52bf69b9ad1962067a7c0541f650aa7477e7276a8257b2a72973c53",
+      "imports": [
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/node-test-evidence.mjs",
+        "scripts/verification-evidence.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/ci-diagnostic-evidence.test.mjs": {
+      "digest": "766d0e56bb29bdfb2075a2320640adae1a7c4729f8bb6f2468d426b72280602e",
+      "imports": [
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/remaining.test.mjs",
+        "scripts/run-ci-diagnostics.mjs",
+        "scripts/run-script-tests.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/ci-equivalence-environment.mjs": {
-      "digest": "038b0c793f21a115f06a5702c336d6a6696140daf82beba24f670550eb87efaa",
+      "digest": "fc0f822bac156091044dc0e399ef3fc026820354bd79f47c3082468aafb4cfaf",
       "imports": [
         "scripts/ci-backend-equivalence.mjs",
         "scripts/ci-browser-image.mjs",
+        "scripts/e2e-app.mjs",
         "scripts/e2e-shards.mjs",
         "scripts/verification-evidence.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.mjs": {
-      "digest": "2f01dc4a2e42eea403ba609bde8f3f9dd251694fee26f1bdc90c2d489840e67f",
+      "digest": "d73d91922c7fe61d4ee60803b8ee94067ae28c4ef612987e71cbbcb42e4f6c42",
       "imports": [
         "scripts/ci-backend-equivalence.mjs",
         "scripts/ci-equivalence-environment.mjs",
@@ -209,7 +235,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.test.mjs": {
-      "digest": "ff51840f929bd5485268a42574b144f799b4caf0e29c8977fd17ecd41a13cdcb",
+      "digest": "12dbcf0f38b86fb624fcb66ec032d734c2d648699cc9127090bfd338d46b4e49",
       "imports": [
         "scripts/ci-equivalence-environment.mjs",
         "scripts/ci-equivalence.mjs",
@@ -222,10 +248,11 @@
       "dynamicImports": 1
     },
     "scripts/ci-quality-evidence.mjs": {
-      "digest": "0ddb775f43061307a2d3bb76d9c6458bd7cb50371ca7ff928eac0d5ef3ac8c40",
+      "digest": "566ee8d8be090ed5f9a51bce9bc49635fa0eff72d1db7f3430b144713b76f612",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/ci-backend-equivalence.mjs",
+        "scripts/ci-diagnostic-evidence.mjs",
         "scripts/ci-equivalence.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/run-script-tests.mjs",
@@ -406,8 +433,28 @@
       "imports": [],
       "dynamicImports": 0
     },
+    "scripts/e2e-app.d.mts": {
+      "digest": "d0274dcb9e0aca3e21eb3ef73fb559ccbeb07b67432b799a41fca77f0f7c93f8",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/e2e-app.mjs": {
+      "digest": "43be4592e267ce46388e9f52aae93b8b4ab1c2ef7389f09e21b2bc2211d0d842",
+      "imports": ["scripts/verification-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/e2e-app.test.mjs": {
+      "digest": "daa02ca398e63a78402b36d3a08d702baf936cc323709e46e268f32008f0eced",
+      "imports": ["scripts/e2e-app.mjs", "scripts/e2e-resources.mjs", "scripts/verification-evidence.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/e2e-performance.mjs": {
       "digest": "bd011dd48fd3206186d9a298db0ebe1b973d7eba416160ac3517bef4ea04e847",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/e2e-resources.mjs": {
+      "digest": "08627a2ecd7b26df03206375c373cf9652e2284eae8714031b2f3d5b86c4f670",
       "imports": [],
       "dynamicImports": 0
     },
@@ -524,8 +571,8 @@
       "dynamicImports": 0
     },
     "scripts/playwright-evidence-reporter.mjs": {
-      "digest": "e2c7cfffce43d8fcd4899bf0cd4c49c76c01d8d5b1fda44df48b080b83744fe8",
-      "imports": ["scripts/e2e-performance.mjs", "scripts/playwright-test-evidence.mjs"],
+      "digest": "598843cbf8a26d7831045a434d939ce3872879c58175684681f174f11794b0cf",
+      "imports": ["scripts/e2e-performance.mjs", "scripts/e2e-resources.mjs", "scripts/playwright-test-evidence.mjs"],
       "dynamicImports": 0
     },
     "scripts/playwright-test-evidence.mjs": {
@@ -541,6 +588,11 @@
     "scripts/rollback-code.sh": {
       "digest": "25993423753c5453b9c1ebfe58bbfa5990a20898e8a2aef850c9a7ebf0a5426a",
       "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/run-ci-diagnostics.mjs": {
+      "digest": "6648816e67dab008fd35f4041d7ef6f15bcd9e35fc736f15cdc59233248677d3",
+      "imports": ["scripts/run-script-tests.mjs"],
       "dynamicImports": 0
     },
     "scripts/run-frontend-tests.mjs": {
@@ -569,8 +621,9 @@
       "dynamicImports": 0
     },
     "scripts/run-script-tests.mjs": {
-      "digest": "0c08efab3b36f72bf51f4f28ff74473375394b229afe495512fe6893f596552e",
+      "digest": "a386c72116721a1bd5538d92c6e82d312e5009790989ed169ee6a92dc60be50d",
       "imports": [
+        "scripts/ci-diagnostic-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/node-source-evidence-reporter.mjs",
         "scripts/node-test-evidence.mjs",
@@ -584,7 +637,7 @@
       "dynamicImports": 0
     },
     "scripts/script-test-plan.mjs": {
-      "digest": "cce64a883aefa4633176323316685682cec52451d6b47d3532b0c9ae6fc12b9a",
+      "digest": "b916d5effe5c71fad031c122d97732b976d761c3094ecca6dff5870468c3292d",
       "imports": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
       "dynamicImports": 0
     },
@@ -763,6 +816,23 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/verification-policy.mjs": {
+      "digest": "054f4060c3079464306dff2a34b48dc44301438e01f03c2beb59db97b774ba77",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/verification-policy.test.mjs": {
+      "digest": "6f4884e43464c5be0b9fc781dba2b217d5f764f283faf14cace924a6ae66ef58",
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/e2e-shards.mjs",
+        "scripts/playwright-evidence-reporter.mjs",
+        "scripts/verification-policy.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/verification-runner.mjs": {
       "digest": "e4240562d0c886184d62f86329da79ed21d45435dc8044d0fbad8796e6fefead",
       "imports": [
@@ -782,12 +852,13 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "b87fe85466d5c8baa99a45f9db75de4b2a8bac1fb876f0b1164811de26669114",
+      "digest": "e223b0af36ba745ddd89f0e508f12b54571558d3e4246f8c863b19f566f1d2cb",
       "imports": [
         "scripts/check-changed-plan.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/verification-evidence.mjs",
         "scripts/verification-impact.mjs",
+        "scripts/verification-policy.mjs",
         "scripts/verification-runner.mjs"
       ],
       "dynamicImports": 0
@@ -810,6 +881,11 @@
     "vite.config.js": {
       "digest": "711d47ec9e7eacd01d4a3da4043bf144f5ff7004baa772e7e6971a3fdfe16ee3",
       "imports": [],
+      "dynamicImports": 0
+    },
+    "vite.e2e.config.mjs": {
+      "digest": "63bf7811ae45bde932675d5992835c8025354966443b620e02f67f1888ce0ef4",
+      "imports": ["scripts/e2e-app.mjs", "vite.config.js"],
       "dynamicImports": 0
     }
   }

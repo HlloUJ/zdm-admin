@@ -46,7 +46,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: ci-validation-scope
-          path: coverage/ci-evidence/scope.json
+          path: coverage/ci-evidence/
           if-no-files-found: error
           retention-days: 14
 
@@ -93,7 +93,13 @@ jobs:
           node-version: 22
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-validation-scope
+          path: coverage/preflight-diagnostics
       - run: node scripts/ci-quality-evidence.mjs run engineering-tests -- npm run test:engineering
+        env:
+          CI_DIAGNOSTIC_DIRECTORY: ${{ github.workspace }}/coverage/preflight-diagnostics
       - if: always()
         run: node scripts/ci-quality-evidence.mjs finish
         env:
@@ -183,6 +189,7 @@ jobs:
       - run: node scripts/ci-quality-evidence.mjs run browser-image -- node scripts/ci-browser-image.mjs verify
       - run: node scripts/ci-quality-evidence.mjs run chrome-browser -- node scripts/ci-chrome-preparation.mjs browser
       - run: node scripts/ci-quality-evidence.mjs run chrome-dependencies -- node scripts/ci-chrome-preparation.mjs dependencies
+      - run: node scripts/ci-quality-evidence.mjs run e2e-app -- npm run test:e2e:prepare
       - id: equivalent
         run: node scripts/ci-equivalence.mjs
         env:
@@ -242,6 +249,7 @@ jobs:
       - run: node scripts/ci-quality-evidence.mjs run browser-image -- node scripts/ci-browser-image.mjs verify
       - run: node scripts/ci-quality-evidence.mjs run chrome-browser -- node scripts/ci-chrome-preparation.mjs browser
       - run: node scripts/ci-quality-evidence.mjs run chrome-dependencies -- node scripts/ci-chrome-preparation.mjs dependencies
+      - run: node scripts/ci-quality-evidence.mjs run e2e-app -- npm run test:e2e:prepare
       - id: equivalent
         run: node scripts/ci-equivalence.mjs
         env:

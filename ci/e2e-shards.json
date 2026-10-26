@@ -57,7 +57,7 @@
     {
       "file": "dialog-validation-space.spec.ts",
       "shard": 1,
-      "estimatedMs": 10524
+      "estimatedMs": 9824
     },
     {
       "file": "feedback-foundation.spec.ts",
@@ -93,6 +93,11 @@
       "file": "media-upload-standard.spec.ts",
       "shard": 2,
       "estimatedMs": 9901
+    },
+    {
+      "file": "native-style-isolation.spec.ts",
+      "shard": 1,
+      "estimatedMs": 700
     },
     {
       "file": "pagination-responsive.spec.ts",

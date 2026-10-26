@@ -221,7 +221,13 @@ test('both workflow shards prepare browser and all dependencies before equivalen
     const browser = commands.findIndex((x) => x.includes('run chrome-browser --')),
       dependencies = commands.findIndex((x) => x.includes('run chrome-dependencies --')),
       equivalence = commands.indexOf('equivalent');
-    assert.ok(browser > 0 && dependencies === browser + 1 && equivalence === dependencies + 1);
+    const application = commands.findIndex((command) => command.includes('run e2e-app -- npm run test:e2e:prepare'));
+    assert.ok(
+      browser > 0 &&
+        dependencies === browser + 1 &&
+        application === dependencies + 1 &&
+        equivalence === application + 1,
+    );
     assert.match(commands[browser], /ci-chrome-preparation\.mjs browser$/);
     assert.match(commands[dependencies], /ci-chrome-preparation\.mjs dependencies$/);
     assert.ok(job.includes(`--shard=${index + 1}/2 --workers=1 --reporter=list,json`));

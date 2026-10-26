@@ -1,3 +1,4 @@
+import { readApplicationProof } from './e2e-app.mjs';
 import { validateBackendProof, currentBackendProof } from './ci-backend-equivalence.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -17,8 +18,8 @@ import { hashPaths } from './verification-evidence.mjs';
 export const JOB_ENVIRONMENT_CONTRACTS = {
   formatting: 'formatting-node-v2',
   frontend_static: 'frontend-static-linux-v2',
-  frontend_e2e_1: 'browser-functional-container-v4',
-  frontend_e2e_2: 'browser-functional-container-v4',
+  frontend_e2e_1: 'browser-functional-container-v5',
+  frontend_e2e_2: 'browser-functional-container-v5',
 };
 const RESOURCE_PROFILE = 'github-hosted-linux-x64-4cpu-16gb-functional-v1';
 const sha = (value) => createHash('sha256').update(value).digest('hex');
@@ -47,7 +48,7 @@ export function validateEnvironmentProof(proof, job) {
   assert.ok(JOB_ENVIRONMENT_CONTRACTS[job], 'Unsupported environment contract');
   assert.equal(
     proof?.version,
-    job.startsWith('frontend_e2e') ? 4 : 2,
+    job.startsWith('frontend_e2e') ? 5 : 2,
     'Old or unknown environment contract cannot grant reuse',
   );
   assert.equal(proof.contract, JOB_ENVIRONMENT_CONTRACTS[job]);
@@ -66,7 +67,7 @@ export function validateEnvironmentProof(proof, job) {
     'inputs',
     'environment',
     ...(system ? ['image', 'kernel', 'packages', 'systemFiles'] : []),
-    ...(browser ? ['browser', 'container', 'sharding'] : []),
+    ...(browser ? ['browser', 'container', 'sharding', 'application'] : []),
   ];
   assert.deepEqual(Object.keys(proof).sort(), keys.sort(), 'Missing or unreviewed proof fields');
   assert.ok(Array.isArray(proof.node) && proof.node.length === 2);
@@ -76,7 +77,7 @@ export function validateEnvironmentProof(proof, job) {
     proof.inputs,
     proof.environment,
     ...(system ? [proof.packages, proof.systemFiles] : []),
-    ...(browser ? [proof.browser, proof.sharding] : []),
+    ...(browser ? [proof.browser, proof.sharding, proof.application] : []),
   ])
     assert.match(value ?? '', /^[a-f0-9]{64}$/);
   if (browser) {
@@ -109,7 +110,7 @@ export function environmentProofFromSnapshot(job, snapshot) {
   const system = job !== 'formatting';
   const browser = job.startsWith('frontend_e2e');
   const proof = {
-    version: browser ? 4 : 2,
+    version: browser ? 5 : 2,
     contract: JOB_ENVIRONMENT_CONTRACTS[job],
     job,
     platform: [snapshot.platform, snapshot.arch, snapshot.imageOS],
@@ -125,7 +126,14 @@ export function environmentProofFromSnapshot(job, snapshot) {
           systemFiles: snapshot.systemFiles,
         }
       : {}),
-    ...(browser ? { browser: snapshot.browser, container: snapshot.container, sharding: snapshot.sharding } : {}),
+    ...(browser
+      ? {
+          browser: snapshot.browser,
+          container: snapshot.container,
+          sharding: snapshot.sharding,
+          application: snapshot.application,
+        }
+      : {}),
   };
   validateEnvironmentProof(proof, job);
   return proof;
@@ -171,7 +179,12 @@ export function environmentProof(env = process.env) {
         }
       : {}),
     ...(browser
-      ? { browser: hashPaths('/', ['/opt/google/chrome']), container, sharding: readShardPlan(process.cwd()).digest }
+      ? {
+          browser: hashPaths('/', ['/opt/google/chrome']),
+          container,
+          sharding: readShardPlan(process.cwd()).digest,
+          application: sha(JSON.stringify(readApplicationProof())),
+        }
       : {}),
   });
 }
