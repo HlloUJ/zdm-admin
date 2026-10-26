@@ -114,6 +114,9 @@ verification:
     force: npm run verify:local -- --force
 
 delivery:
+  completion:
+    cwd: task_worktree
+    run: 'npm run task:completion -- deliver "{batch_slug}" "{task_head}"'
   plan:
     cwd: task_worktree
     run: npm run task:completion -- plan

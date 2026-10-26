@@ -1,16 +1,24 @@
 import { createHash } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const SOURCE_GUARD_TESTS = ['scripts/feedback-foundation.test.mjs', 'scripts/ui-template-policy.test.mjs'];
 const MANIFEST = 'scripts/test-domain-manifest.json';
-const EXTRA_INPUTS = [
+export const ENGINEERING_EXTRA_INPUTS = [
   'package.json',
   'package-lock.json',
   'vite.config.js',
   'docker-compose.yml',
   'docker-compose.task.yml',
   '.codex/zdm-project-workflow.yaml',
+  '.github/workflows/quality.yml',
+  'playwright.config.ts',
+  'ci/e2e-shards.json',
+  '.github/workflows/browser-image.yml',
+  'ci/browser-image.lock.json',
+  'ci/browser-image/package-lock.json',
+  'ci/browser-image/package.json',
 ];
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 function filesBelow(root, directory) {
@@ -46,7 +54,10 @@ function importsFor(file, source) {
 // Updating this snapshot is a review action: inspect actual filesystem readers and imports first.
 // A changed/new/unreviewed engineering input forces full engineering CI until that review occurs.
 export function captureReviewedScriptInputs(root) {
-  const files = [...filesBelow(root, 'scripts').filter((file) => file !== MANIFEST), ...EXTRA_INPUTS].sort();
+  const files = [
+    ...filesBelow(root, 'scripts').filter((file) => file !== MANIFEST),
+    ...ENGINEERING_EXTRA_INPUTS,
+  ].sort();
   return {
     version: 1,
     sourceGuards: SOURCE_GUARD_TESTS,
@@ -134,4 +145,24 @@ export function createScriptTestPlan(files, root) {
   } catch {
     return full('Cannot prove script dependency closure.');
   }
+}
+
+export function reviewedInputDifferences(root) {
+  const expected = JSON.parse(readFileSync(path.join(root, MANIFEST), 'utf8'));
+  const actual = captureReviewedScriptInputs(root);
+  return [...new Set([...Object.keys(expected.files), ...Object.keys(actual.files)])]
+    .sort()
+    .filter((file) => JSON.stringify(expected.files[file]) !== JSON.stringify(actual.files[file]))
+    .map((file) => ({ file, before: expected.files[file] ?? null, after: actual.files[file] ?? null }));
+}
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  if (process.argv.length !== 3 || process.argv[2] !== '--check-reviewed')
+    throw new Error('Use --check-reviewed; no automatic snapshot refresh');
+  const differences = reviewedInputDifferences(process.cwd());
+  if (differences.length) {
+    console.error(
+      'Engineering inputs need explicit reader/consumer review: ' + differences.map((d) => d.file).join(', '),
+    );
+    process.exitCode = 1;
+  } else console.log('Reviewed engineering inputs match the candidate.');
 }

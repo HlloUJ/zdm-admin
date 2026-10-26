@@ -1,4 +1,7 @@
 import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -6,6 +9,7 @@ import test from 'node:test';
 import { createVerificationPlan } from './verify.mjs';
 import {
   captureReviewedScriptInputs,
+  ENGINEERING_EXTRA_INPUTS,
   createScriptTestPlan,
   engineeringDomainProof,
   scriptTestFiles,
@@ -18,15 +22,7 @@ function fixture(t) {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
     writeFileSync(path.join(root, file), value);
   };
-  for (const file of [
-    'package.json',
-    'package-lock.json',
-    'vite.config.js',
-    'docker-compose.yml',
-    'docker-compose.task.yml',
-    '.codex/zdm-project-workflow.yaml',
-  ])
-    write(file, '{}');
+  for (const file of ENGINEERING_EXTRA_INPUTS) write(file, '{}');
   write('scripts/helper.mjs', 'export const value = 1;');
   write('scripts/consumer.mjs', "import { value } from './helper.mjs';\nexport const result = value;");
   write('scripts/helper.test.mjs', "import './helper.mjs';");
@@ -112,4 +108,16 @@ test('affected verification keeps one engineering pipeline and retains source gu
       .length,
     0,
   );
+});
+
+test('review guard rejects stale inputs without refreshing them, then accepts explicit reviewed snapshot', (t) => {
+  const f = fixture(t),
+    cli = fileURLToPath(new URL('./script-test-plan.mjs', import.meta.url));
+  const before = readFileSync(path.join(f.root, 'scripts/test-domain-manifest.json'), 'utf8');
+  f.write('scripts/helper.mjs', 'export const value=2;');
+  const run = () => spawnSync(process.execPath, [cli, '--check-reviewed'], { cwd: f.root, encoding: 'utf8' });
+  assert.equal(run().status, 1);
+  assert.equal(readFileSync(path.join(f.root, 'scripts/test-domain-manifest.json'), 'utf8'), before);
+  f.seal();
+  assert.equal(run().status, 0);
 });

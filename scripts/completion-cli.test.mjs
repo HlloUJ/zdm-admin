@@ -384,3 +384,178 @@ test('handoff target plan does not create a completion session or mutate any car
   );
   assert.equal(f.launches(), 0);
 });
+
+test('completed archive restores a missing receipt without downloading reports or rerunning CI', async (t) => {
+  const f = fixture(t);
+  await prepare(f);
+  await completionCommand(f.task, ['settle', 'example', f.main, '42'], f.options);
+  rmSync(path.join(f.common, 'task-delivery/example/completion-receipt.json'));
+  const result = await completionCommand(f.anchor, ['deliver', 'example', f.head], f.options);
+  assert.equal(result.historical, true);
+  assert.equal(f.downloads(), 1);
+  assert.ok(existsSync(path.join(f.common, 'task-delivery/example/completion-receipt.json')));
+});
+test('partial evidence downloads remain preserved while a new isolated download is verified before cleanup', async (t) => {
+  const f = fixture(t);
+  await prepare(f);
+  const execute = f.options.execute;
+  let calls = 0;
+  f.options.execute = (root, cmd, args) => {
+    if (cmd === 'gh' && args[0] === 'run' && args[1] === 'download' && ++calls === 1) {
+      writeFileSync(path.join(args.at(-1), 'partial'), 'keep');
+      throw Error('transport');
+    }
+    return execute(root, cmd, args);
+  };
+  await assert.rejects(completionCommand(f.task, ['settle', 'example', f.main, '42'], f.options), /transport/);
+  assert.ok(existsSync(f.task));
+  const result = await completionCommand(f.task, ['settle', 'example', f.main, '42'], f.options);
+  assert.equal(calls, 2);
+  assert.ok(result.summary.repairs.some((r) => r.failureName === 'evidence' && r.finishedAt));
+});
+test('pending integration push resumes only the exact owned local commit without another merge', async (t) => {
+  const f = handoffFixture(t);
+  await prepare(f);
+  const execute = f.options.execute;
+  let failed = false;
+  f.options.execute = (root, cmd, args) => {
+    if (cmd === 'git' && args[0] === 'push' && args.includes('codex/integration-current') && !failed) {
+      failed = true;
+      throw Error('push transport');
+    }
+    return execute(root, cmd, args);
+  };
+  await assert.rejects(completionCommand(f.task, ['final-handoff', f.main], f.options), /push transport/);
+  const head = f.git(f.integration, 'rev-parse', 'HEAD');
+  assert.equal(head, f.main);
+  await completionCommand(f.task, ['final-handoff', f.main], f.options);
+  assert.equal(f.git(f.integration, 'rev-parse', 'HEAD'), head);
+  assert.equal(f.git(f.integration, 'rev-parse', 'origin/codex/integration-current'), head);
+  assert.equal(f.launches(), 1);
+});
+test('authorized delivery chain directly awaits CI and finishes handoff/cleanup without an extra watcher', async (t) => {
+  const f = fixture(t),
+    execute = f.options.execute;
+  const waits = [];
+  const pull = {
+    number: 7,
+    url: 'https://example.invalid/pr/7',
+    state: 'MERGED',
+    headRefOid: f.head,
+    baseRefOid: f.main,
+    mergeCommit: { oid: f.main },
+  };
+  f.options.execute = (root, cmd, args) => {
+    if (cmd === 'gh') {
+      if (args[0] === 'api' && args[1].includes('/branches/main/protection'))
+        return JSON.stringify({
+          enforce_admins: { enabled: true },
+          required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+        });
+      if (args[0] === 'pr' && args[1] === 'list') return JSON.stringify([pull]);
+      if (args[0] === 'pr' && args[1] === 'view') return JSON.stringify(pull);
+      if (args[0] === 'run' && args[1] === 'list')
+        return JSON.stringify([
+          {
+            databaseId: args.includes('pull_request') ? 41 : 42,
+            headSha: args.includes('pull_request') ? f.head : f.main,
+            event: args.includes('pull_request') ? 'pull_request' : 'push',
+            headBranch: args.includes('pull_request') ? 'codex/task' : 'main',
+          },
+        ]);
+    }
+    return execute(root, cmd, args);
+  };
+  f.options.waitQuality = async (_root, run, head) => {
+    waits.push(String(run));
+    return {
+      ...f.ci,
+      runId: String(run),
+      headSha: head,
+      eventName: run === '41' ? 'pull_request' : 'push',
+      branch: run === '41' ? 'codex/task' : 'main',
+    };
+  };
+  const result = await completionCommand(f.task, ['deliver', 'example', f.head], f.options);
+  assert.deepEqual(waits, ['41', '42']);
+  assert.equal(result.results.cleanup.result.worktreeRemoved, true);
+  assert.deepEqual(
+    result.summary.stages.filter((s) => ['push', 'pr', 'merge'].includes(s.name)).map((s) => s.name),
+    ['push', 'pr', 'merge'],
+  );
+});
+
+test('closed registry can reconstruct receipt when the close-stage completion write was interrupted', async (t) => {
+  const f = fixture(t);
+  await prepare(f);
+  await completionCommand(f.task, ['settle', 'example', f.main, '42'], f.options);
+  const file = path.join(f.common, 'task-delivery/example/completion-session.json'),
+    state = JSON.parse(readFileSync(file));
+  state.events = state.events.filter((e) => e.name !== 'close');
+  writeFileSync(file, JSON.stringify(state));
+  rmSync(path.join(f.common, 'task-delivery/example/completion-receipt.json'));
+  await completionCommand(f.anchor, ['deliver', 'example', f.head], f.options);
+  const receipt = JSON.parse(readFileSync(path.join(f.common, 'task-delivery/example/completion-receipt.json')));
+  assert.equal(receipt.results.close.result.recoveredFrom, 'closed-registry-proof');
+  assert.equal(f.downloads(), 1);
+});
+
+test('delivery preflight blocks private assets before any push, PR write or CI wait', async (t) => {
+  const f = fixture(t),
+    execute = f.options.execute;
+  let writes = 0,
+    waits = 0;
+  writeFileSync(path.join(f.task, '.env'), 'retain-private-value');
+  f.options.execute = (root, cmd, args) => {
+    if ((cmd === 'git' && args[0] === 'push') || (cmd === 'gh' && args[0] === 'pr')) writes++;
+    return execute(root, cmd, args);
+  };
+  f.options.waitQuality = async () => {
+    waits++;
+    return f.ci;
+  };
+  await assert.rejects(completionCommand(f.task, ['deliver', 'example', f.head], f.options), /private asset/);
+  assert.equal(writes, 0);
+  assert.equal(waits, 0);
+  assert.ok(existsSync(f.task));
+  assert.equal(
+    readFileSync(path.join(f.common, 'task-delivery/example/completion-session.json'), 'utf8').includes(
+      'retain-private-value',
+    ),
+    false,
+  );
+});
+test('delivery stops on actual CI failure without merge, handoff, cleanup or automatic workflow retry', async (t) => {
+  const f = fixture(t),
+    execute = f.options.execute;
+  let waits = 0;
+  f.options.execute = (root, cmd, args) => {
+    if (cmd === 'gh') {
+      if (args[0] === 'api' && args[1].includes('/branches/main/protection'))
+        return JSON.stringify({
+          enforce_admins: { enabled: true },
+          required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+        });
+      if (args[0] === 'pr' && args[1] === 'list')
+        return JSON.stringify([{ number: 7, url: 'https://example.invalid/pr/7', state: 'OPEN', headRefOid: f.head }]);
+      if (args[0] === 'run' && args[1] === 'list')
+        return JSON.stringify([{ databaseId: 41, headSha: f.head, event: 'pull_request', headBranch: 'codex/task' }]);
+      assert.ok(!(args[0] === 'pr' && args[1] === 'merge'), 'must not merge after failed CI');
+    }
+    return execute(root, cmd, args);
+  };
+  f.options.waitQuality = async () => {
+    waits++;
+    throw Object.assign(new Error('CI failed'), {
+      ciFailure: { runId: '41', headSha: f.head, attempt: 1, conclusion: 'failure', status: 'completed' },
+    });
+  };
+  await assert.rejects(completionCommand(f.task, ['deliver', 'example', f.head], f.options), /CI failed/);
+  const state = JSON.parse(readFileSync(path.join(f.common, 'task-delivery/example/completion-session.json')));
+  assert.equal(waits, 1);
+  assert.ok(existsSync(f.task));
+  assert.equal(
+    state.events.some((e) => ['merge', 'handoff', 'cleanup'].includes(e.name)),
+    false,
+  );
+});

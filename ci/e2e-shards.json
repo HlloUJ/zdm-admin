@@ -1,0 +1,228 @@
+{
+  "version": 1,
+  "total": 2,
+  "strategy": "whole-file-duration-v1",
+  "sources": [
+    {
+      "runId": "40282950803",
+      "reports": [
+        "de607cbc97e772fb68923e59d784aff969f0252090d9514982fbb0eb7362263f",
+        "1c900552bada945cba832dac331524d63bc32fca0da3c0376cb3b69832d17c02"
+      ]
+    },
+    {
+      "runId": "40286415576",
+      "reports": [
+        "7f9d02750497211d8566886175f4ba063064c709777ed2239746770488c316d9",
+        "9fa9b488fe9e4968b72930e634c4769c1563f883f5120bda46cde6d4d195f296"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "file": "accessory-management.spec.ts",
+      "shard": 1,
+      "estimatedMs": 167470
+    },
+    {
+      "file": "accessory-markup-configuration.spec.ts",
+      "shard": 1,
+      "estimatedMs": 10666
+    },
+    {
+      "file": "accessory-permissions.spec.ts",
+      "shard": 1,
+      "estimatedMs": 59277
+    },
+    {
+      "file": "admin-foundation.spec.ts",
+      "shard": 2,
+      "estimatedMs": 79596
+    },
+    {
+      "file": "category-attribute-template.spec.ts",
+      "shard": 1,
+      "estimatedMs": 79196
+    },
+    {
+      "file": "collapsed-menu-hover.spec.ts",
+      "shard": 2,
+      "estimatedMs": 17804
+    },
+    {
+      "file": "customer-management.spec.ts",
+      "shard": 2,
+      "estimatedMs": 142888
+    },
+    {
+      "file": "dialog-validation-space.spec.ts",
+      "shard": 1,
+      "estimatedMs": 10524
+    },
+    {
+      "file": "feedback-foundation.spec.ts",
+      "shard": 2,
+      "estimatedMs": 72302
+    },
+    {
+      "file": "finished-stock-permissions.spec.ts",
+      "shard": 2,
+      "estimatedMs": 57438
+    },
+    {
+      "file": "finished-stock.spec.ts",
+      "shard": 2,
+      "estimatedMs": 163696
+    },
+    {
+      "file": "form-feedback-layout.spec.ts",
+      "shard": 1,
+      "estimatedMs": 10065
+    },
+    {
+      "file": "login.spec.ts",
+      "shard": 2,
+      "estimatedMs": 23133
+    },
+    {
+      "file": "markup-configuration.spec.ts",
+      "shard": 2,
+      "estimatedMs": 13552
+    },
+    {
+      "file": "media-upload-standard.spec.ts",
+      "shard": 2,
+      "estimatedMs": 9901
+    },
+    {
+      "file": "pagination-responsive.spec.ts",
+      "shard": 2,
+      "estimatedMs": 18552
+    },
+    {
+      "file": "permission-center.spec.ts",
+      "shard": 1,
+      "estimatedMs": 72274
+    },
+    {
+      "file": "product-category-drag.spec.ts",
+      "shard": 1,
+      "estimatedMs": 8906
+    },
+    {
+      "file": "product-state-activity.spec.ts",
+      "shard": 2,
+      "estimatedMs": 8083
+    },
+    {
+      "file": "query-responsive.spec.ts",
+      "shard": 2,
+      "estimatedMs": 34354
+    },
+    {
+      "file": "retired-unit.spec.ts",
+      "shard": 1,
+      "estimatedMs": 1688
+    },
+    {
+      "file": "sidebar-scroll-position.spec.ts",
+      "shard": 1,
+      "estimatedMs": 1220
+    },
+    {
+      "file": "single-column-form-width.spec.ts",
+      "shard": 1,
+      "estimatedMs": 17242
+    },
+    {
+      "file": "slab-collaboration.spec.ts",
+      "shard": 2,
+      "estimatedMs": 67884
+    },
+    {
+      "file": "slab-color.spec.ts",
+      "shard": 1,
+      "estimatedMs": 4266
+    },
+    {
+      "file": "slab-grade.spec.ts",
+      "shard": 1,
+      "estimatedMs": 3724
+    },
+    {
+      "file": "slab-origin.spec.ts",
+      "shard": 2,
+      "estimatedMs": 4043
+    },
+    {
+      "file": "slab-price-editor.spec.ts",
+      "shard": 1,
+      "estimatedMs": 20872
+    },
+    {
+      "file": "slab-publish-layout.spec.ts",
+      "shard": 1,
+      "estimatedMs": 12936
+    },
+    {
+      "file": "slab-texture.spec.ts",
+      "shard": 2,
+      "estimatedMs": 5467
+    },
+    {
+      "file": "store-accessory-management.spec.ts",
+      "shard": 1,
+      "estimatedMs": 101578
+    },
+    {
+      "file": "store-category-management.spec.ts",
+      "shard": 2,
+      "estimatedMs": 11877
+    },
+    {
+      "file": "store-finished-stock.spec.ts",
+      "shard": 1,
+      "estimatedMs": 95699
+    },
+    {
+      "file": "store-level.spec.ts",
+      "shard": 1,
+      "estimatedMs": 6395
+    },
+    {
+      "file": "store-order-prototype.spec.ts",
+      "shard": 1,
+      "estimatedMs": 27272
+    },
+    {
+      "file": "store-price-rules.spec.ts",
+      "shard": 1,
+      "estimatedMs": 37500
+    },
+    {
+      "file": "store-product-menu.spec.ts",
+      "shard": 2,
+      "estimatedMs": 4466
+    },
+    {
+      "file": "submit-failure-feedback.spec.ts",
+      "shard": 2,
+      "estimatedMs": 2286
+    },
+    {
+      "file": "supplier-supply-type.spec.ts",
+      "shard": 2,
+      "estimatedMs": 3125
+    },
+    {
+      "file": "textarea-count.spec.ts",
+      "shard": 1,
+      "estimatedMs": 3023
+    },
+    {
+      "file": "ui-template-reuse.spec.ts",
+      "shard": 2,
+      "estimatedMs": 10524
+    }
+  ]
+}

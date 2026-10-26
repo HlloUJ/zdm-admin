@@ -1,18 +1,29 @@
+import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { selectShardArgs } from './e2e-shards.mjs';
 import { validatePlaywrightTestReport } from './playwright-test-evidence.mjs';
 
 export function runPlaywrightTests(args, { root = process.cwd(), env = process.env } = {}) {
   const cli = path.join(root, 'node_modules/@playwright/test/cli.js');
+  const directory = path.resolve(root, env.CI_EVIDENCE_DIR ?? `.task-verification/playwright-tests/${randomUUID()}`);
+  const balanced = args.includes('--balanced');
+  args = args.filter((arg) => arg !== '--balanced');
+  if (balanced) {
+    assert.ok(
+      existsSync(path.join(root, '.codex/zdm-project-workflow.yaml')),
+      'Managed project required for balanced shards',
+    );
+    args = selectShardArgs(root, args, directory).args;
+  }
   if (args.includes('--list') || args.includes('--help') || args.includes('-h')) {
     // Listing is discovery only; preserve the CLI output without claiming tests executed.
     return spawnSync(process.execPath, [cli, 'test', ...args], { cwd: root, env, stdio: 'inherit' }).status ?? 1;
   }
   const runId = randomUUID();
-  const directory = path.resolve(root, env.CI_EVIDENCE_DIR ?? `.task-verification/playwright-tests/${runId}`);
   mkdirSync(directory, { recursive: true });
   const reportFile = path.join(directory, `playwright-${runId}.json`);
   const result = spawnSync(process.execPath, [cli, 'test', ...args, '--forbid-only'], {

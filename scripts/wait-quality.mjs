@@ -17,6 +17,8 @@ export async function waitQuality({
   const start = now();
   let lastProgress = -Infinity,
     previousJobs;
+  const networkObservations = [];
+  let interruptedAt = null;
   let previous;
   let transportFailures = 0;
   while (now() - start < deadlineMs) {
@@ -24,12 +26,37 @@ export async function waitQuality({
     try {
       run = await readRun();
       transportFailures = 0;
+      if (interruptedAt !== null) {
+        networkObservations.push({
+          kind: 'run-status-reconnect',
+          startedAt: interruptedAt,
+          finishedAt: now(),
+          durationMs: now() - interruptedAt,
+          recovered: true,
+        });
+        interruptedAt = null;
+      }
     } catch (error) {
+      interruptedAt ??= now();
       transportFailures++;
       if (transportFailures > 3)
-        throw new Error(`CI status transport unavailable; preserve run ${runId}, never rerun tests: ${error.message}`, {
-          cause: error,
-        });
+        throw Object.assign(
+          new Error(`CI status transport unavailable; preserve run ${runId}, never rerun tests: ${error.message}`, {
+            cause: error,
+          }),
+          {
+            networkObservations: [
+              ...networkObservations,
+              {
+                kind: 'run-status-reconnect',
+                startedAt: interruptedAt,
+                finishedAt: now(),
+                durationMs: now() - interruptedAt,
+                recovered: false,
+              },
+            ],
+          },
+        );
       report(`CI status connection interrupted; reconnect ${transportFailures}/3 for the same run.`);
       await wait(10000);
       continue;
@@ -45,6 +72,7 @@ export async function waitQuality({
     if (run.status === 'completed') {
       if (run.conclusion !== 'success')
         throw Object.assign(new Error(`CI ${runId} failed; diagnose before a new candidate`), {
+          networkObservations,
           ciFailure: {
             runId: String(runId),
             headSha: run.head_sha,
@@ -54,13 +82,26 @@ export async function waitQuality({
           },
         });
       let jobs;
+      let jobsInterruptedAt = null;
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
           jobs = await readJobs();
+          if (jobsInterruptedAt !== null)
+            networkObservations.push({
+              kind: 'required-gates-reconnect',
+              startedAt: jobsInterruptedAt,
+              finishedAt: now(),
+              durationMs: now() - jobsInterruptedAt,
+              recovered: true,
+            });
           break;
         } catch (error) {
+          jobsInterruptedAt ??= now();
           if (attempt === 3)
-            throw new Error('Required gate status transport unavailable; preserve the same CI run', { cause: error });
+            throw Object.assign(
+              new Error('Required gate status transport unavailable; preserve the same CI run', { cause: error }),
+              { networkObservations },
+            );
           report(`CI required gate connection interrupted; reconnect ${attempt + 1}/3 for the same run.`);
           await wait(10000);
         }
@@ -82,6 +123,7 @@ export async function waitQuality({
         conclusion: 'success',
         jobs,
         elapsedMs: now() - start,
+        networkObservations,
       };
     }
     if (now() - lastProgress >= progressIntervalMs) {
@@ -102,6 +144,7 @@ export async function waitQuality({
           previousJobs = key;
         }
       } catch {
+        networkObservations.push({ kind: 'progress-unavailable', observedAt: now(), recovered: null });
         // Progress is advisory. The final required-gate query above remains mandatory.
         report(`CI ${runId} progress unavailable; retain the same run and verify final gates.`);
       }
@@ -133,6 +176,10 @@ export function selectQualityRun(runs, { selector, branch, head }) {
   assert.ok(['pr', 'main'].includes(selector));
   const event = selector === 'pr' ? 'pull_request' : 'push';
   const matches = runs.filter((r) => r.headSha === head && r.headBranch === branch && r.event === event);
+  if (!matches.length)
+    throw Object.assign(new Error('Exact CI run unavailable; preserve candidate while the event appears'), {
+      code: 'CI_RUN_MISSING',
+    });
   assert.equal(matches.length, 1, 'Exact CI run unavailable or ambiguous; retain candidate and specify its run ID');
   assert.match(String(matches[0].databaseId), /^\d+$/);
   return String(matches[0].databaseId);
