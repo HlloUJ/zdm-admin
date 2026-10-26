@@ -41,3 +41,5 @@ CI等价契约调整先执行 `npm run test:ci-reuse`，定向诊断通过后再
 CI Chrome 准备与系统依赖分开，合格预装浏览器可复用，独立预构建镜像准备完整字体依赖，普通 CI 按当前 Playwright 清单及完整来源记录验证。版本基线、软件源保护和计时规则见 [任务完成流程](task-completion.md#chrome-与系统依赖准备)；不得通过降级浏览器、删依赖或放宽适用版本的精确指纹换取提速。
 
 后端 PR/main 去重使用 `backend-maven-testcontainers-v1`：PR 原完整 Maven 门禁、main 精确核验实际工具链/依赖/测试镜像及完整原始测试与覆盖报告后才复用，无法证明即原门禁。见 [后端独立等价契约](task-completion.md#后端独立等价契约)，不新增后端镜像或变更数据保护。
+
+报告采集、回放和上传共用 `scripts/ci-report-contract.mjs`；`test:ci-reuse` 同时检查四种完整链路、真实独立CLI及隔离Git收尾，不启动Maven/Docker或重复工程全套。正式收尾使用阶段索引及 `begin / wait / settle / report`，门禁、运行交接、精确指纹和数据保护不变；总耗时和补修成本按 [任务完成流程](task-completion.md) 报告。

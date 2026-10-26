@@ -5,7 +5,6 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, writeFile
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectDeliveryChanges, createVerificationPlan } from './verify.mjs';
-import { waitRemoteQuality } from './wait-quality.mjs';
 import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
@@ -102,13 +101,40 @@ export function previewContract(record, commonDir) {
     unavailablePolicy: '503-no-integration-fallback',
   };
 }
+export async function checkCompletionRuntime(root, commonDir) {
+  const file = path.join(commonDir, 'preview-environment/environment.json');
+  assert.ok(lstatSync(file).isFile() && !lstatSync(file).isSymbolicLink(), 'Unsafe preview registration');
+  const result = previewContract(JSON.parse(readFileSync(file, 'utf8')), commonDir);
+  for (const url of [
+    'http://127.0.0.1:5173',
+    'http://127.0.0.1:8080/actuator/health',
+    'http://127.0.0.1:5175/__zdm_task_preview_api_health__',
+  ]) {
+    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
+    assert.equal(response.status, 200, `Runtime unavailable: ${url}`);
+    if (url.includes('health')) assert.equal((await response.json()).status, 'UP');
+  }
+  return { ...result, runtimeHealthy: true, servicesChanged: false };
+}
+
 async function main(args) {
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']);
   const commonDir = path.resolve(root, git(root, ['rev-parse', '--git-common-dir']));
+  if (['begin', 'measure', 'repair-start', 'repair-finish', 'report', 'settle', 'wait'].includes(args[0])) {
+    const { completionCommand } = await import('./completion-cli.mjs');
+    console.log(
+      JSON.stringify(
+        await completionCommand(root, args, { preserveAssets, checkRuntime: checkCompletionRuntime }),
+        null,
+        2,
+      ),
+    );
+    return;
+  }
   const batch = readActiveBatch(root);
   assert.ok(batch && path.resolve(batch.worktree) === root, 'Run inside the exact registered batch worktree');
   const [command = 'plan'] = args;
-  assert.equal(args.length <= (command === 'wait' ? 3 : 1), true, 'Unexpected options');
+  assert.equal(args.length <= 1, true, 'Unexpected options');
   if (command === 'plan') {
     const assets = inventoryAssets(root);
     let delivery;
@@ -159,22 +185,11 @@ async function main(args) {
   } else if (command === 'preserve') {
     console.log(JSON.stringify(preserveAssets(root, path.join(commonDir, 'task-assets', batch.id)), null, 2));
   } else if (command === 'runtime') {
-    const file = path.join(commonDir, 'preview-environment/environment.json');
-    assert.ok(lstatSync(file).isFile() && !lstatSync(file).isSymbolicLink(), 'Unsafe preview registration');
-    const result = previewContract(JSON.parse(readFileSync(file, 'utf8')), commonDir);
-    for (const url of [
-      'http://127.0.0.1:5173',
-      'http://127.0.0.1:8080/actuator/health',
-      'http://127.0.0.1:5175/__zdm_task_preview_api_health__',
-    ]) {
-      const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
-      assert.equal(response.status, 200, `Runtime unavailable: ${url}`);
-      if (url.includes('health')) assert.equal((await response.json()).status, 'UP');
-    }
-    console.log(JSON.stringify({ ...result, runtimeHealthy: true, servicesChanged: false }, null, 2));
-  } else if (command === 'wait') {
-    console.log(JSON.stringify(await waitRemoteQuality(root, args[1], args[2]), null, 2));
-  } else throw new Error('Usage: task:completion -- plan|preserve|runtime|wait <run-id> <expected-head>');
+    console.log(JSON.stringify(await checkCompletionRuntime(root, commonDir), null, 2));
+  } else
+    throw new Error(
+      'Usage: task:completion -- begin [requested-at] | plan | wait <run> <head> | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> | repair-finish <id> | settle <batch> <main> <run> | report <batch> | preserve | runtime',
+    );
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   main(process.argv.slice(2)).catch((error) => {

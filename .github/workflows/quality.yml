@@ -334,18 +334,21 @@ jobs:
         run: node scripts/ci-quality-evidence.mjs finish
         env:
           JOB_STATUS: ${{ job.status }}
+      - id: report_sources
+        if: always()
+        run: node scripts/ci-report-contract.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ci-backend-full
-          path: coverage/ci-evidence/
+          path: ${{ steps.report_sources.outputs.backend_full_path }}
           if-no-files-found: error
           retention-days: 14
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: ci-backend-reports
-          path: ${{ steps.equivalent.outputs.reused == 'true' && 'coverage/ci-evidence/reports/surefire/' || 'backend/target/surefire-reports/' }}
+          path: ${{ steps.report_sources.outputs.backend_reports_path }}
           if-no-files-found: error
           retention-days: 14
 

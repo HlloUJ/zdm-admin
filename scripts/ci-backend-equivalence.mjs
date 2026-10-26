@@ -1,3 +1,4 @@
+import { BACKEND_REPORTS, backendCollectedPath } from './ci-report-contract.mjs';
 // CI-only backend contract. Never reads a project database or a developer Maven credential file into artifacts.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -244,20 +245,13 @@ export function collectBackendEvidence(directory, root = process.cwd()) {
   const phase = read(path.join(directory, 'metadata.json')).phases.find((p) => p.name === 'backend-quality');
   assert.deepEqual(phase?.command, BACKEND_COMMAND);
   assert.equal(phase.exitCode, 0);
-  const reports = {
-    surefire: 'surefire-reports',
-    jacoco: 'site/jacoco',
-    execution: 'jacoco.exec',
-    checkstyle: 'checkstyle-result.xml',
-    spotbugs: 'spotbugsXml.xml',
-  };
-  for (const [to, from] of Object.entries(reports)) {
+  for (const [to, from] of Object.entries(BACKEND_REPORTS)) {
     const src = path.join(root, 'backend/target', from);
     assert.ok(existsSync(src), `Missing backend report: ${from}`);
     assert.ok(!lstatSync(src).isSymbolicLink());
     for (const p of lstatSync(src).isDirectory() ? files(src) : [src])
       assert.ok(lstatSync(p).mtimeMs >= Date.parse(phase.startedAt) - 1000, 'Stale backend evidence');
-    cpSync(src, path.join(directory, 'reports', to), { recursive: true });
+    cpSync(src, path.join(directory, backendCollectedPath(to)), { recursive: true });
   }
   const payload = files(path.join(directory, 'reports')).map((p) => ({
     path: path.relative(directory, p).split(path.sep).join('/'),
@@ -314,12 +308,14 @@ export function validateBackendEvidence(directory, evidence, root = process.cwd(
     [...seen].sort(),
     'Report inventory differs',
   );
-  const summary = validateBackendReports(root, { reportsDirectory: path.join(directory, 'reports/surefire') });
+  const summary = validateBackendReports(root, {
+    reportsDirectory: path.join(directory, backendCollectedPath('surefire')),
+  });
   assert.deepEqual(summary, evidence.summary);
   assert.deepEqual(read(path.join(directory, 'backend-tests.json')), summary);
-  const checkstyle = readFileSync(path.join(directory, 'reports/checkstyle'), 'utf8'),
-    spotbugs = readFileSync(path.join(directory, 'reports/spotbugs'), 'utf8'),
-    jacoco = readFileSync(path.join(directory, 'reports/jacoco/jacoco.xml'), 'utf8');
+  const checkstyle = readFileSync(path.join(directory, backendCollectedPath('checkstyle')), 'utf8'),
+    spotbugs = readFileSync(path.join(directory, backendCollectedPath('spotbugs')), 'utf8'),
+    jacoco = readFileSync(path.join(directory, backendCollectedPath('jacoco'), 'jacoco.xml'), 'utf8');
   assert.match(checkstyle, /<checkstyle\b/);
   assert.ok(!/<error\b/.test(checkstyle), 'Checkstyle violation');
   assert.match(spotbugs, /<BugCollection\b/);
@@ -327,10 +323,10 @@ export function validateBackendEvidence(directory, evidence, root = process.cwd(
   assert.match(jacoco, /<report\b/);
   assert.match(jacoco, /<class\b/);
   assert.match(jacoco, /<counter type="(?:INSTRUCTION|LINE)"/);
-  assert.ok(lstatSync(path.join(directory, 'reports/execution')).size > 0);
+  assert.ok(lstatSync(path.join(directory, backendCollectedPath('execution'))).size > 0);
   assert.ok(
-    existsSync(path.join(directory, 'reports/jacoco/index.html')) &&
-      existsSync(path.join(directory, 'reports/jacoco/jacoco.csv')),
+    existsSync(path.join(directory, backendCollectedPath('jacoco'), 'index.html')) &&
+      existsSync(path.join(directory, backendCollectedPath('jacoco'), 'jacoco.csv')),
     'Incomplete coverage reports',
   );
   return summary;
