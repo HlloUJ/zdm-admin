@@ -345,7 +345,7 @@ jobs:
         if: always()
         with:
           name: ci-backend-reports
-          path: backend/target/surefire-reports/
+          path: ${{ steps.equivalent.outputs.reused == 'true' && 'coverage/ci-evidence/reports/surefire/' || 'backend/target/surefire-reports/' }}
           if-no-files-found: error
           retention-days: 14
 
