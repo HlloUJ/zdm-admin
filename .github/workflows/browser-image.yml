@@ -1,0 +1,104 @@
+name: Publish browser test image
+
+# Independent maintenance, never called by Quality Gate or task completion.
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, codex/ci-prebuilt-browser]
+    paths:
+      - ci/browser-image/**
+      - .github/workflows/browser-image.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-image-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.publish.outputs.image }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build isolated amd64 toolchain
+        env:
+          SOURCE_RUN: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          set -euo pipefail
+          image="ghcr.io/hllouj/zdm-admin-browser:${GITHUB_SHA}-${GITHUB_RUN_ID}"
+          docker buildx build --platform linux/amd64 --load --provenance=false \
+            --build-arg SOURCE_REVISION="$GITHUB_SHA" --build-arg SOURCE_RUN="$SOURCE_RUN" \
+            --label org.opencontainers.image.source=https://github.com/HlloUJ/zdm-admin \
+            --tag "$image" ci/browser-image
+          echo "BUILD_IMAGE=$image" >> "$GITHUB_ENV"
+          docker run --rm "$image" node /opt/zdm-tools/inventory.mjs verify > origin.json
+          docker run --rm --workdir /opt/zdm-tools "$image" bash -euc '
+            npx --no-install playwright install-deps chrome --dry-run
+            node --input-type=module -e '\''import {chromium} from "playwright"; const b = await chromium.launch({channel:"chrome"}); await b.close();'\''
+          '
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: publish
+        name: Publish immutable image and release record
+        run: |
+          set -euo pipefail
+          docker push "$BUILD_IMAGE"
+          image=$(docker image inspect "$BUILD_IMAGE" --format '{{index .RepoDigests 0}}')
+          IMAGE="$image" node --input-type=module <<'NODE'
+          import {readFileSync, writeFileSync, appendFileSync} from 'node:fs';
+          import assert from 'node:assert/strict';
+          assert.match(process.env.IMAGE, /^ghcr\.io\/hllouj\/zdm-admin-browser@sha256:[a-f0-9]{64}$/);
+          const origin = JSON.parse(readFileSync('origin.json'));
+          writeFileSync('browser-image-release.json', JSON.stringify({version:1, image:process.env.IMAGE, origin}, null, 2)+'\n');
+          appendFileSync(process.env.GITHUB_OUTPUT, `image=${process.env.IMAGE}\n`);
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: browser-image-release
+          path: browser-image-release.json
+          if-no-files-found: error
+          retention-days: 90
+  cold_pull:
+    needs: publish
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: read
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Measure fresh hosted runner pull and runtime verification
+        env:
+          IMAGE: ${{ needs.publish.outputs.image }}
+        run: |
+          set -euo pipefail
+          start=$(date +%s%3N)
+          docker pull "$IMAGE"
+          end=$(date +%s%3N)
+          PULL_MS=$((end-start)) node -e 'require("fs").writeFileSync("pull-timing.json",JSON.stringify({image:process.env.IMAGE,platform:"linux/amd64",coldHostedRunner:true,pullMs:Number(process.env.PULL_MS)}))'
+          docker run --rm "$IMAGE" node /opt/zdm-tools/inventory.mjs verify > origin.json
+          docker run --rm --workdir /opt/zdm-tools "$IMAGE" bash -euc '
+            npx --no-install playwright install-deps chrome --dry-run
+            node --input-type=module -e '\''import {chromium} from "playwright"; const b = await chromium.launch({channel:"chrome"}); await b.close();'\''
+          '
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-image-cold-pull
+          path: |
+            pull-timing.json
+            origin.json
+          if-no-files-found: error
+          retention-days: 90
