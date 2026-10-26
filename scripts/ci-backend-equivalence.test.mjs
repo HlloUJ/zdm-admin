@@ -344,3 +344,15 @@ test('Testcontainers first-run strategy cache is exactly the known clean Linux d
     assert.throws(() => testcontainersConfiguration(file), /External/);
   }
 });
+
+test('standalone backend report upload preserves fresh failure reports and verified replay reports', () => {
+  const workflow = readFileSync('.github/workflows/quality.yml', 'utf8');
+  const standalone = workflow.split('name: ci-backend-reports')[1].split('\n  backend:')[0];
+  assert.ok(
+    standalone.includes(
+      "steps.equivalent.outputs.reused == 'true' && 'coverage/ci-evidence/reports/surefire/' || 'backend/target/surefire-reports/'",
+    ),
+  );
+  assert.match(standalone, /if-no-files-found: error/);
+  assert.match(standalone, /retention-days: 14/);
+});

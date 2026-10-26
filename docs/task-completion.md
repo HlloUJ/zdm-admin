@@ -72,7 +72,7 @@ Linux、跨平台矩阵、模拟器仅用于真实失败诊断；先最小复现
 - 前置记录和执行后闭包必须证明实际 Java 21 JDK 内容、Maven 安装内容及版本、用户/全局 settings 和 toolchains 内容指纹、Node、Ubuntu24/x64、现有四核至少16GB资源类、内核和系统包、Docker引擎及运行配置、后端/验证器相关源码与环境一致。CPU型号及内存字节仍仅作诊断。原始配置及敏感环境只记哈希，不复制配置内容；测试子进程不继承GitHub事件身份和API令牌。
 - 成功源运行保存 Maven 仓库实际 JAR/POM 清单及逐文件内容哈希。它是保守依赖闭包，不使用整个跨项目缓存目录的时间戳或缓存键作为成功证明。main 检查同一清单的实际内容，缺失项仅从 Maven Central 无凭据下载并按源哈希验证，已有内容不符不覆盖；私有来源、SNAPSHOT、动态版本、未知 Maven 扩展/配置及外部 Testcontainers 配置无法证明时回原门禁。Testcontainers 首次连接自动保存的 `docker.client.strategy=org.testcontainers.dockerclient.UnixSocketClientProviderStrategy` 只在值完全匹配且没有其他配置键时，按已验证的干净 Linux Unix socket 默认策略记录；生成注释/时间不属于运行输入，其他 provider、远程 Docker、镜像替换或检查豁免均拒绝。不归档整个 Maven 缓存或凭据文件。
 - 测试声明的 MySQL 镜像及 Testcontainers 辅助镜像记录实际 image ID 与 RepoDigests。main 解析同名镜像并精确比较；标签相同不代表等价，变化即回原门禁。仅 CI 临时 Runner 拉取镜像，不连接持久预览或集成数据库，不启动复用测试容器。
-- 源运行保留 Surefire 全部原始报告、JaCoCo 原始执行数据与 XML/CSV/HTML、Checkstyle及SpotBugs结果，绑定实际编译类内容指纹、完整文件清单和哈希。源执行仍检查报告新鲜度、测试类覆盖、零失败/跳过/重试；归档回放验证可信原始身份和字节，不修改时间冒充新执行。完整报告和依赖清单进入 `ci-backend-full`，原 `ci-backend-reports` 保持。
+- 源运行保留 Surefire 全部原始报告、JaCoCo 原始执行数据与 XML/CSV/HTML、Checkstyle及SpotBugs结果，绑定实际编译类内容指纹、完整文件清单和哈希。源执行仍检查报告新鲜度、测试类覆盖、零失败/跳过/重试；归档回放验证可信原始身份和字节，不修改时间冒充新执行。完整报告和依赖清单进入 `ci-backend-full`，原 `ci-backend-reports` 名称、保留期和缺失阻断保持：真实执行（含失败）从原 target 目录上传，复用时从已验证共享证据目录上传，不能要求未重新执行的 target 报告或忽略缺失。
 - main 汇总重新校验原始报告完整性、当前同树测试清单和原始结果，不仅看汇总数字或绿色状态。输入采集、API、下载或等价证明缺失时运行原完整门禁；真实失败、损坏或遗漏不能成为成功。`CI_EQUIVALENCE_DISABLED=true` 仍可回退原执行。
 - 前置 `test:ci-reuse` 包含后端允许、拒绝、Maven内容补齐、报告回放与最终汇总诊断；无需 Maven、Docker、服务或 `node_modules` 即可执行。定向通过后固定候选，由 PR 负责一次完整适用 CI，不在此前叠加本地相同全量。新契约必须产生真实新格式源证据，旧报告不补写指纹。
 - 发布后分别记录 PR 实际执行、main 探测/依赖及镜像准备、命中或回退原因、源报告及当前身份和总关键路径。镜像/依赖准备存在成本，不预承诺固定命中率或分钟数。真实API、迁移、持久数据备份和运行交接按原规则单独验收，测试证据不能替代。
