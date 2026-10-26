@@ -1,3 +1,4 @@
+import { validateDiagnosticComposition } from './ci-diagnostic-evidence.mjs';
 import {
   collectBackendEvidence,
   captureBackendProof,
@@ -235,6 +236,14 @@ export function verifyEngineeringEvidence(scope, metadata, identity) {
   verifyScope(scope, metadata);
   assert.equal(metadata.status, 'success', 'Engineering job did not finish successfully');
   validateNodeTestSummary(metadata.engineeringResults?.summary);
+  validateDiagnosticComposition(metadata.engineeringResults);
+  if (metadata.engineeringResults.diagnosticReuse) {
+    const proof = metadata.engineeringResults.diagnosticReuse.currentIdentity;
+    assert.equal(proof.candidate, metadata.candidateSha);
+    assert.equal(proof.tree, metadata.treeSha);
+    assert.equal(proof.run, metadata.workflowRunId);
+    assert.equal(proof.attempt, Number(metadata.attempt));
+  }
   assert.deepEqual(
     metadata.engineeringResults.files,
     metadata.engineeringTests,

@@ -87,13 +87,17 @@ test('container contracts reject VM evidence and changes to digest, origin, pack
     systemFiles: hash,
     browser: hash,
     sharding: hash,
+    application: hash,
   };
   const proof = environmentProofFromSnapshot('frontend_e2e_1', base);
-  assert.equal(proof.version, 4);
+  assert.equal(proof.version, 5);
+  assert.throws(() =>
+    validateEnvironmentProof({ ...proof, version: 4, contract: 'browser-functional-container-v4' }, 'frontend_e2e_1'),
+  );
   assert.throws(() =>
     validateEnvironmentProof({ ...proof, version: 2, contract: 'browser-functional-linux-v2' }, 'frontend_e2e_1'),
   );
-  for (const key of ['packages', 'systemFiles', 'browser', 'kernel']) {
+  for (const key of ['packages', 'systemFiles', 'browser', 'application', 'kernel']) {
     const changed = { ...base, [key]: key === 'kernel' ? 'other' : 'b'.repeat(64) };
     assert.notDeepEqual(environmentProofFromSnapshot('frontend_e2e_1', changed), proof);
   }

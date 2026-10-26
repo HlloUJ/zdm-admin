@@ -1,3 +1,9 @@
+import {
+  needsContractPreflight,
+  deliveryCiCapability,
+  localReadinessTasks,
+  requiresLocalRiskGate,
+} from './verification-policy.mjs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -36,6 +42,7 @@ export function createVerificationPlan({
   browser,
   env = process.env,
   affected = false,
+  ciCapability = null,
   files = [],
   impact = classifyChangedFiles(files, { engineeringProof: engineeringDomainProof(root) }),
   runtime = false,
@@ -47,12 +54,7 @@ export function createVerificationPlan({
   const plan = {
     preflight: task('format check', 'format:check', { reuse: false }),
     contractPreflight:
-      !affected ||
-      files.some((file) =>
-        /^(?:scripts\/(?:ci-|verify|verification-|frontend-test-evidence)|\.github\/workflows\/quality\.yml)/.test(
-          file,
-        ),
-      )
+      !affected || needsContractPreflight(files)
         ? task('CI reuse contract preflight', 'test:ci-reuse', { reuse: false })
         : null,
     frontend: [
@@ -79,6 +81,32 @@ export function createVerificationPlan({
     impact,
     plannedCandidate,
   };
+  if (affected && ciCapability?.verified === false) {
+    plan.affected = false;
+    plan.ciFallback = true;
+    plan.contractPreflight = task('CI reuse contract preflight', 'test:ci-reuse', { reuse: false });
+    return plan;
+  }
+  if (affected && ciCapability?.verified && !requiresLocalRiskGate(files)) {
+    const existing = files.filter((file) => existsSync(path.resolve(root, file)));
+    plan.preflight = existing.length
+      ? task('changed format check', 'format:changed', {
+          args: ['run', 'format:changed', '--', ...existing],
+          reuse: false,
+        })
+      : { root, name: 'diff check', command: 'git', args: ['diff', '--check'], env, reuse: false };
+    plan.frontend = localReadinessTasks(root, files, env);
+    plan.backend = [];
+    plan.engineering = [];
+    plan.ciCapability = ciCapability;
+    plan.deferredToCi = {
+      frontend: impact.frontend,
+      backend: impact.backend,
+      engineering: impact.engineering,
+      full: impact.full,
+    };
+    return plan;
+  }
   if (affected && !impact.full) {
     const selected = createValidationPlan(files, (file) => existsSync(path.resolve(root, file)), { root });
     const existing = files.filter((file) => existsSync(path.resolve(root, file)));
@@ -158,6 +186,10 @@ export async function executeVerification(
   const stable = ['digest', 'baseline', 'mergeBase', 'mutationStamp'].every((key) => before[key] === after[key]);
   if (!stable) report('Candidate changed across verification stages; rerun the affected gate.');
   const code = results.some(Boolean) || !stable ? 1 : 0;
+  if (plan.ciCapability)
+    report(
+      `Local readiness only; required final CI domains: ${JSON.stringify(plan.deferredToCi)}. No CI gate has been waived.`,
+    );
   report(
     `Local ${plan.affected ? 'affected' : 'full'} checks ${code ? 'failed' : 'passed'} in ${((performance.now() - started) / 1000).toFixed(1)}s. Runtime ${plan.runtime ? 'checked' : 'not required by this plan'}; local evidence is disabled in CI.`,
   );
@@ -192,12 +224,22 @@ export async function main(args = process.argv.slice(2)) {
     browser,
     affected,
     ...changes,
+    ciCapability: affected
+      ? args.includes('--list')
+        ? { verified: false, reason: 'Read-only plan: CI not queried' }
+        : deliveryCiCapability(process.cwd())
+      : null,
     runtime: args.includes('--runtime'),
     plannedCandidate,
   });
   if (args.includes('--list')) {
     console.log(`Mode: ${affected ? 'affected delivery checks; final CI still required' : 'full automated checks'}`);
-    if (affected) console.log(`Impact: ${JSON.stringify(plan.impact)}`);
+    if (affected) {
+      console.log(`Impact: ${JSON.stringify(plan.impact)}`);
+      console.log(
+        'Read-only plan: live CI capability is not queried; this shows the conservative full fallback. Execution probes required protection before choosing local readiness.',
+      );
+    }
     console.log(`Preflight: ${plan.preflight.command} ${plan.preflight.args.join(' ')}`);
     if (plan.contractPreflight)
       console.log(`Contract preflight: ${plan.contractPreflight.command} ${plan.contractPreflight.args.join(' ')}`);

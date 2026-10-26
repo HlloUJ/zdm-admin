@@ -1,3 +1,4 @@
+import { createResourceCollector } from './e2e-resources.mjs';
 import path from 'node:path';
 import { resourceObservation, performanceSummary } from './e2e-performance.mjs';
 import { writeFileSync } from 'node:fs';
@@ -20,6 +21,7 @@ export default class PlaywrightEvidenceReporter {
 
   onBegin(_config, suite) {
     this.before = resourceObservation();
+    this.resources = createResourceCollector();
     // onBegin receives exactly the chosen files/projects/grep/shard, not other shards' cases.
     this.selected = suite.allTests().map(identity);
     const visit = (entry) => {
@@ -78,7 +80,10 @@ export default class PlaywrightEvidenceReporter {
     writeFileSync(
       path.join(path.dirname(process.env.PLAYWRIGHT_TEST_REPORT), 'e2e-performance.json'),
       JSON.stringify(
-        performanceSummary(this.observations, this.before ?? resourceObservation(), resourceObservation()),
+        {
+          ...performanceSummary(this.observations, this.before ?? resourceObservation(), resourceObservation()),
+          processResources: this.resources?.stop(),
+        },
         null,
         2,
       ) + '\n',

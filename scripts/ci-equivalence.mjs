@@ -52,8 +52,8 @@ export function validateProvenance({ current, original, run, pull, commit, repos
       'frontend-build',
       'frontend-test-list',
     ],
-    frontend_e2e_1: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-1'],
-    frontend_e2e_2: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-2'],
+    frontend_e2e_1: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-app', 'e2e-1'],
+    frontend_e2e_2: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-app', 'e2e-2'],
   }[original.job];
   assert.deepEqual(
     original.phases?.map((phase) => phase.name),
