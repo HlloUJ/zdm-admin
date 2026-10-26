@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "image": "ghcr.io/hllouj/zdm-admin-browser@sha256:16a0d137efcdea1ae26be06862ca339532090ac10d6e8a67656e2347f1bbf47b",
+  "origin": {
+    "version": 1,
+    "sourceRevision": "48ab9fb45e3d735d30a9230f0ee750b7c1f3468b",
+    "sourceRun": "https://github.com/HlloUJ/zdm-admin/actions/runs/40258151577",
+    "ubuntuBase": "ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac",
+    "nodeBase": "node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d",
+    "inventory": {
+      "os": "ubuntu-24.04",
+      "platform": "linux/amd64",
+      "node": "v22.23.4",
+      "nodeSha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
+      "chrome": "Google Chrome 156.0.8078.47",
+      "chromePackage": "install ok installed|156.0.8078.47-1",
+      "playwright": "1.62.0",
+      "packages": "ab7df661e55e15cbf56a9605343e8cee440b8c83ff7f601806898cd508d8ad18",
+      "osRelease": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
+      "fonts": "d506338be3caed21ff28b6f5d6fb275fe39a78adc95b9aba3e3a615cff25d94e",
+      "fontConfig": "309c42cac588d8524c3e261cc05a6143334668e7e6b18d924cd6fa3905f80518",
+      "browser": "c244aa276ab0b3060969eaccc24f63935f76b635c9adc9b139102a9da14b4b91"
+    }
+  }
+}

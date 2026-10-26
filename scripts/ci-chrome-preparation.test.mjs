@@ -229,3 +229,20 @@ test('both workflow shards prepare browser and all dependencies before equivalen
   assert.match(sections.backend, /name: Backend quality/);
   assert.match(sections.scope, /npm run test:ci-reuse/);
 });
+test('prebuilt dependency verification retains complete dry-run and launch without installing or configuring apt', async () => {
+  const f = fixture();
+  f.system.prebuilt = true;
+  const browser = await prepareBrowser(f.system);
+  const result = await prepareDependencies(f.system, browser);
+  assert.equal(result.action, 'verified-prebuilt');
+  assert.deepEqual(f.calls, [
+    ['npx', ['--no-install', 'playwright', 'install-deps', 'chrome', '--dry-run'], true],
+    'launch',
+  ]);
+});
+test('stale prebuilt Chrome fails without downloads or environment mutation', async () => {
+  const f = fixture(MINIMUM_CHROME_VERSION);
+  f.system.prebuilt = true;
+  await assert.rejects(prepareBrowser(f.system), /update the independent image/);
+  assert.deepEqual(f.calls, []);
+});

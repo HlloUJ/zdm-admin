@@ -46,6 +46,11 @@ export async function prepareBrowser(system) {
   const before = system.inspect();
   const reused = before !== null && compareVersions(before, baseline) >= 0;
   if (!reused) {
+    assert.notEqual(
+      system.prebuilt,
+      true,
+      'Prebuilt Chrome is stale; update the independent image, never mutate the test environment',
+    );
     system.configureNetwork();
     system.run('npx', ['--no-install', 'playwright', 'install', 'chrome']);
   }
@@ -102,9 +107,9 @@ export async function prepareDependencies(system, browser) {
   assert.equal(browser.baselineSource, BASELINE_URL);
   assert.ok(compareVersions(browser.baseline, MINIMUM_CHROME_VERSION) >= 0);
   assert.ok(compareVersions(browser.after, browser.baseline) >= 0);
-  system.configureNetwork();
+  if (!system.prebuilt) system.configureNetwork();
   // Same complete dependency group as the former `install --with-deps chrome`.
-  system.run('npx', dependencyArgs);
+  if (!system.prebuilt) system.run('npx', dependencyArgs);
   const verification = system.run('npx', [...dependencyArgs, '--dry-run'], true);
   assert.ok(
     verification.split('\n').some((line) => line.trim() === 'All system dependencies are installed.'),
@@ -112,7 +117,13 @@ export async function prepareDependencies(system, browser) {
   );
   assert.equal(system.inspect(), browser.after, 'Browser changed during dependency preparation');
   await system.launch();
-  return { version: 1, browserVersion: browser.after, completeDependencies: true, launchVerified: true };
+  return {
+    version: 1,
+    browserVersion: browser.after,
+    completeDependencies: true,
+    launchVerified: true,
+    action: system.prebuilt ? 'verified-prebuilt' : 'prepared',
+  };
 }
 function run(program, args, capture = false) {
   const result = spawnSync(program, args, {
@@ -143,6 +154,7 @@ export async function main(args) {
   assert.ok(['browser', 'dependencies'].includes(args[0]));
   assert.ok(process.env.CI_EVIDENCE_DIR, 'Missing CI evidence destination');
   const system = {
+    prebuilt: Boolean(process.env.CI_BROWSER_IMAGE),
     fetch,
     inspect: () =>
       existsSync(CHROME)

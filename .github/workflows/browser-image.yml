@@ -1,13 +1,8 @@
 name: Publish browser test image
 
-# Independent maintenance, never called by Quality Gate or task completion.
+# Explicit independent maintenance; never invoked by Quality Gate or task completion.
 on:
   workflow_dispatch:
-  push:
-    branches: [main, codex/ci-prebuilt-browser]
-    paths:
-      - ci/browser-image/**
-      - .github/workflows/browser-image.yml
 
 permissions:
   contents: read

@@ -44,8 +44,8 @@ export function validateProvenance({ current, original, run, pull, commit, repos
       'frontend-build',
       'frontend-test-list',
     ],
-    frontend_e2e_1: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-1'],
-    frontend_e2e_2: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-2'],
+    frontend_e2e_1: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-1'],
+    frontend_e2e_2: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-2'],
   }[original.job];
   assert.deepEqual(
     original.phases?.map((phase) => phase.name),
@@ -146,6 +146,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
     const observedMetadata = json(currentFile);
     observedMetadata.environmentObservation = observation;
     const preparationFiles = ['chrome-browser.json', 'chrome-dependencies.json'];
+    if (existsSync(path.join(directory, 'browser-image.json'))) preparationFiles.push('browser-image.json');
     if (job?.startsWith('frontend_e2e') && preparationFiles.every((file) => existsSync(path.join(directory, file))))
       observedMetadata.preparationObservation = Object.fromEntries(
         preparationFiles.map((file) => [file, json(path.join(directory, file))]),

@@ -75,7 +75,7 @@
     "test:engineering": "node scripts/run-script-tests.mjs --engineering",
     "test:scripts:files": "node scripts/run-script-tests.mjs --files",
     "check:ui-templates": "node --test scripts/ui-template-policy.test.mjs",
-    "test:ci-reuse": "node scripts/run-script-tests.mjs --files scripts/ci-equivalence.test.mjs scripts/ci-quality-evidence.test.mjs scripts/ci-chrome-preparation.test.mjs"
+    "test:ci-reuse": "node scripts/run-script-tests.mjs --files scripts/ci-equivalence.test.mjs scripts/ci-quality-evidence.test.mjs scripts/ci-chrome-preparation.test.mjs scripts/ci-browser-image.test.mjs"
   },
   "lint-staged": {
     "*.{js,ts,vue}": [
