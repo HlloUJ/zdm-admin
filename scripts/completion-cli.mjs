@@ -1,0 +1,312 @@
+import { createHash } from 'node:crypto';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import path from 'node:path';
+import {
+  openCompletion,
+  saveCompletion,
+  completionStage,
+  completionSummary,
+  recordRepair,
+  finishRepair,
+  settleCompletion,
+} from './completion-session.mjs';
+import { assertCompletionQuality, verifyCompletionEvidence, evidenceIdentity } from './completion-ci-evidence.mjs';
+import { readActiveBatch, closeBatch, planBatchDelivery } from './task-batch.mjs';
+import { waitRemoteQuality } from './wait-quality.mjs';
+import { parseWorktreePorcelain } from './git-workflow-core.mjs';
+import {
+  integrationBackendSnapshot,
+  integrationProofMatches,
+  readIntegrationProof,
+} from './integration-handoff-state.mjs';
+import { retainedPublishedPreview } from './start-micro-task.mjs';
+
+function run(root, command, args) {
+  const r = spawnSync(command, args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+  if (r.status !== 0) {
+    if (r.stderr) process.stderr.write(r.stderr.slice(-4000));
+    throw new Error(command + ' failed; preserve state and inspect its original output');
+  }
+  return r.stdout.trim();
+}
+const read = (p) => JSON.parse(readFileSync(p, 'utf8'));
+export async function completionCommand(
+  root,
+  args,
+  {
+    preserveAssets,
+    checkRuntime,
+    execute = run,
+    runtimeSnapshot = integrationBackendSnapshot,
+    runtimeProof = readIntegrationProof,
+    waitQuality = waitRemoteQuality,
+    verifyEvidence = verifyCompletionEvidence,
+  },
+) {
+  const limits = {
+    begin: [0, 1],
+    report: [1, 1],
+    settle: [3, 3],
+    wait: [2, 2],
+    'repair-start': [4, 4],
+    'repair-finish': [1, 1],
+    measure: [3, Infinity],
+  };
+  const command = args[0],
+    count = args.length - 1;
+  assert.ok(
+    limits[command] && count >= limits[command][0] && count <= limits[command][1],
+    'Unexpected completion arguments',
+  );
+  const [mode, ...rest] = args,
+    git = (...a) => execute(existsSync(root) ? root : process.cwd(), 'git', a),
+    common = path.resolve(root, git('rev-parse', '--git-common-dir'));
+  const batch = readActiveBatch(root),
+    requestedBatch = ['report', 'settle'].includes(mode) ? rest[0] : batch?.id;
+  assert.match(requestedBatch ?? '', /^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Exact completion batch required');
+  const directory = path.join(common, 'task-delivery', requestedBatch);
+  if (mode === 'report') {
+    assert.ok(existsSync(path.join(directory, 'completion-session.json')), 'No recorded completion interval');
+    return completionSummary(openCompletion(directory, requestedBatch, { formal: false }));
+  }
+  if (mode === 'settle' && !batch && existsSync(path.join(common, 'task-batches/archive', requestedBatch + '.json'))) {
+    const archived = read(path.join(common, 'task-batches/archive', requestedBatch + '.json'));
+    assert.equal(archived.main.local, rest[1]);
+    const old = read(path.join(directory, 'completion-session.json'));
+    assert.ok(
+      old.events.some((e) => e.name === 'cleanup' && e.status === 'success'),
+      'No owned completed cleanup',
+    );
+    if (!old.closedAt) {
+      old.closedAt = Date.parse(archived.closedAt);
+      saveCompletion(directory, old);
+    }
+    return { alreadyClosed: true, historical: true, summary: completionSummary(old) };
+  }
+  assert.ok(batch && batch.id === requestedBatch, 'Exact active batch required');
+  assert.ok(
+    [batch.worktree, batch.repository.anchor].map((p) => path.resolve(p)).includes(path.resolve(root)),
+    'Use the registered task or retained main anchor',
+  );
+  const state = openCompletion(directory, batch.id, {
+      requestedAt: mode === 'begin' ? rest[0] : undefined,
+      formal: mode === 'begin',
+    }),
+    save = (s) => saveCompletion(directory, s);
+  if (mode === 'begin') {
+    const profile = path.join(common, 'preview-environment/environment.json');
+    if (!state.previewFingerprint && existsSync(profile))
+      state.previewFingerprint = createHash('sha256')
+        .update(JSON.stringify(read(profile).profile))
+        .digest('hex');
+    save(state);
+    return { batch: batch.id, startedAt: new Date(state.startedAt).toISOString(), clockSource: state.clockSource };
+  }
+  if (mode === 'measure') {
+    const [label, separator, command, ...commandArgs] = rest;
+    assert.ok(
+      ['prepare', 'handoff', 'review', 'repair'].includes(label) && separator === '--' && command,
+      'measure <stage> -- <command> [args]',
+    );
+    return completionStage(
+      state,
+      label,
+      git('rev-parse', 'HEAD'),
+      () => {
+        const r = spawnSync(command, commandArgs, { cwd: root, stdio: 'inherit' });
+        assert.equal(r.status, 0, 'Measured stage failed; retain its original output');
+        return { exitCode: 0 };
+      },
+      { save },
+    );
+  }
+  if (mode === 'repair-start') {
+    const [id, failureRun, category, file] = rest,
+      evidence = path.resolve(root, file ?? '');
+    assert.ok(
+      evidence.startsWith(directory + path.sep) ||
+        evidence.startsWith(path.join(batch.worktree, '.task-verification') + path.sep),
+      'Diagnostic evidence must belong to this batch',
+    );
+    recordRepair(state, { id, failureRun, category, evidence });
+    save(state);
+    return { repair: id, status: 'open' };
+  }
+  if (mode === 'repair-finish') {
+    finishRepair(state, rest[0]);
+    save(state);
+    return { repair: rest[0], status: 'verified' };
+  }
+  if (mode === 'wait') {
+    const [runId, head] = rest;
+    return (await completionStage(state, 'ci', `${head}:${runId}`, () => waitQuality(root, runId, head), { save }))
+      .result;
+  }
+  if (mode !== 'settle') throw Error('Unknown completion command');
+  assert.ok(state.startedAt !== null, 'Begin formal completion before settle');
+  assert.ok(
+    state.events.every((e) => e.status !== 'running'),
+    'A recorded stage is still running; preserve its process and evidence',
+  );
+  assert.ok(
+    state.events
+      .filter((e) => e.failure?.ci)
+      .every((e) => state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId))),
+    'Record diagnosed repair cost for each failed CI before closing',
+  );
+  const [, expectedMain, runId] = rest;
+  assert.match(expectedMain ?? '', /^[a-f0-9]{40}$/);
+  assert.match(runId ?? '', /^\d+$/);
+  const entries = parseWorktreePorcelain(git('worktree', 'list', '--porcelain')),
+    anchor = entries.find((e) => e.branch === 'main')?.path,
+    integration = entries.find((e) => e.branch === 'codex/integration-current')?.path,
+    preview = entries.find((e) => e.branch === 'codex/preview-current')?.path;
+  assert.ok(anchor && integration && preview, 'Required retained worktrees missing');
+  const key = expectedMain + ':' + runId;
+  for (const repair of state.repairs.filter((r) => !r.finishedAt)) finishRepair(state, repair.id);
+  save(state);
+  const cleanupStarted = state.events.some((e) => e.name === 'cleanup' && e.key === key);
+  const preserved = [...state.events]
+    .reverse()
+    .find((e) => e.name === 'preserve' && e.key === key && e.status === 'success');
+  const taskExists = existsSync(batch.worktree);
+  assert.ok(taskExists || (cleanupStarted && preserved), 'Missing task without owned cleanup proof');
+  if (!taskExists) verifyPreservation(preserved.result.manifest, path.join(common, 'task-assets', batch.id));
+  // One fresh remote snapshot before destructive steps; no force/reset, never infer a different batch.
+  git('fetch', 'origin');
+  assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), expectedMain);
+  assert.equal(git('rev-parse', 'origin/main'), expectedMain);
+  const local = git('for-each-ref', '--format=%(objectname)', 'refs/heads/' + batch.branch);
+  const remote = git('ls-remote', 'origin', 'refs/heads/' + batch.branch);
+  assert.ok(local === batch.recordedHead || (!local && cleanupStarted), 'Task local ref changed');
+  assert.ok(remote.startsWith(batch.recordedHead + '\t') || (!remote && cleanupStarted), 'Task remote ref changed');
+  if (taskExists) {
+    assert.equal(execute(batch.worktree, 'git', ['status', '--porcelain']), '');
+    planBatchDelivery(batch.worktree);
+  }
+  assert.equal(execute(anchor, 'git', ['status', '--porcelain']), '');
+  git('merge-base', '--is-ancestor', batch.recordedHead, expectedMain);
+  assert.equal(
+    git('rev-parse', batch.recordedHead + '^{tree}'),
+    git('rev-parse', expectedMain + '^{tree}'),
+    'Candidate tree changed',
+  );
+  const ciEvent = [...state.events].reverse().find((e) => e.name === 'ci' && e.key === key && e.status === 'success');
+  assert.ok(ciEvent, 'Use the single wait entry before settle');
+  assertCompletionQuality(ciEvent.result, expectedMain, runId);
+  const repository = execute(root, 'gh', ['repo', 'view', '--json', 'nameWithOwner']);
+  const name = JSON.parse(repository).nameWithOwner;
+  const live = JSON.parse(execute(root, 'gh', ['api', `repos/${name}/actions/runs/${runId}`]));
+  assert.equal(live.head_sha, expectedMain);
+  assert.equal(live.run_attempt, 1);
+  assert.equal(live.conclusion, 'success');
+  assert.equal(live.status, 'completed');
+  assert.equal(live.path, '.github/workflows/quality.yml');
+  assert.equal(live.event, 'push');
+  assert.equal(live.head_branch, 'main');
+  const evidence = path.join(directory, 'ci-' + runId),
+    proofFile = path.join(directory, 'ci-' + runId + '-proof.json');
+  const result = await settleCompletion(
+    state,
+    key,
+    {
+      evidence: {
+        run: () => {
+          if (!existsSync(proofFile)) {
+            mkdirSync(evidence, { recursive: true, mode: 0o700 });
+            execute(root, 'gh', ['run', 'download', runId, '--dir', evidence]);
+          }
+          const identity = evidenceIdentity(anchor, evidence);
+          if (existsSync(proofFile)) {
+            const prior = read(proofFile);
+            if (prior.identity === identity) return prior.result;
+          }
+          const result = verifyEvidence(anchor, evidence, ciEvent.result);
+          writeFileSync(proofFile, JSON.stringify({ identity, result }, null, 2) + '\n', { mode: 0o600 });
+          return result;
+        },
+        reuse: () => false,
+      },
+      handoff: {
+        run: async () => {
+          const snapshot = runtimeSnapshot(integration),
+            proof = runtimeProof(integration);
+          assert.ok(
+            integrationProofMatches(proof, snapshot) && snapshot.worktreeClean,
+            'Published runtime handoff must be completed first',
+          );
+          assert.equal(proof.taskHead, batch.recordedHead);
+          assert.equal(proof.integrationHead, snapshot.integrationHead);
+          git('merge-base', '--is-ancestor', expectedMain, snapshot.integrationHead);
+          assert.ok(retainedPublishedPreview(root, preview), 'Retained preview must already match published main');
+          assert.equal(
+            existsSync(path.join(integration, 'backups/task-preview/active-database-task.json')),
+            false,
+            'Database task lock remains',
+          );
+          const runtime = await checkRuntime(root, common);
+          assert.equal(runtime.runtimeHealthy, true);
+          assert.equal(runtime.backupRetained, true);
+          if (state.previewFingerprint)
+            assert.equal(runtime.profileFingerprint, state.previewFingerprint, 'Persistent data profile changed');
+          return runtime;
+        },
+      },
+      preserve: {
+        run: () =>
+          existsSync(batch.worktree)
+            ? preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id))
+            : preserved.result,
+      },
+      cleanup: {
+        run: () => {
+          if (existsSync(batch.worktree)) assert.equal(execute(batch.worktree, 'git', ['status', '--porcelain']), '');
+          process.chdir(anchor);
+          if (existsSync(batch.worktree)) execute(anchor, 'git', ['worktree', 'remove', batch.worktree]);
+          if (git('for-each-ref', '--format=%(objectname)', 'refs/heads/' + batch.branch))
+            execute(anchor, 'git', ['branch', '-d', batch.branch]);
+          if (git('ls-remote', 'origin', 'refs/heads/' + batch.branch))
+            execute(anchor, 'git', ['push', 'origin', '--delete', batch.branch]);
+          else execute(anchor, 'git', ['update-ref', '-d', 'refs/remotes/origin/' + batch.branch]);
+          assert.equal(existsSync(batch.worktree), false);
+          assert.equal(execute(anchor, 'git', ['ls-remote', 'origin', 'refs/heads/' + batch.branch]), '');
+          assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), expectedMain);
+          return { worktreeRemoved: true, branchRemoved: true };
+        },
+      },
+      close: {
+        run: () => {
+          const result = closeBatch(anchor);
+          return { batch: result.id, main: result.main };
+        },
+      },
+    },
+    { save },
+  );
+  writeFileSync(path.join(directory, 'completion-receipt.json'), JSON.stringify(result, null, 2) + '\n', {
+    mode: 0o600,
+  });
+  return result;
+}
+
+export function verifyPreservation(file, directory) {
+  assert.equal(path.dirname(file), directory);
+  assert.match(path.basename(file), /^assets-[a-f0-9]{64}\.json$/);
+  const bytes = readFileSync(file);
+  assert.equal(
+    'assets-' + createHash('sha256').update(bytes).digest('hex') + '.json',
+    path.basename(file),
+    'Preservation manifest changed',
+  );
+  for (const e of JSON.parse(bytes))
+    if (e.kind !== 'external-dependency-retained') {
+      assert.equal(e.kind, 'generated-output');
+      assert.match(e.digest, /^[a-f0-9]{64}$/);
+      const blob = path.join(directory, 'blobs', e.digest);
+      assert.ok(!lstatSync(blob).isSymbolicLink());
+      assert.equal(createHash('sha256').update(readFileSync(blob)).digest('hex'), e.digest, 'Preserved blob changed');
+    }
+  return true;
+}

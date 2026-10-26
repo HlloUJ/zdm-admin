@@ -1,0 +1,249 @@
+import { createHash, randomUUID } from 'node:crypto';
+import assert from 'node:assert/strict';
+import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync, unlinkSync } from 'node:fs';
+import path from 'node:path';
+
+export function openCompletion(directory, batch, { now = Date.now(), requestedAt, formal = true } = {}) {
+  assert.match(batch, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  for (const p of [directory, path.join(directory, 'completion-session.json')])
+    assert.ok(!existsSync(p) || !lstatSync(p).isSymbolicLink(), 'Linked completion state');
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  assert.equal(lstatSync(directory).mode & 0o077, 0, 'Completion state must be owner-only');
+  const file = path.join(directory, 'completion-session.json');
+  if (existsSync(file)) {
+    const state = JSON.parse(readFileSync(file, 'utf8'));
+    assert.equal(state.version, 1);
+    assert.equal(state.batch, batch);
+    if (formal && state.startedAt === null) {
+      const start = requestedAt ? Date.parse(requestedAt) : now;
+      assert.ok(Number.isFinite(start) && start <= now);
+      state.startedAt = start;
+      state.clockSource = requestedAt ? 'request-timestamp' : 'first-completion-command';
+      saveCompletion(directory, state);
+    }
+    return state;
+  }
+  const startedAt = requestedAt ? Date.parse(requestedAt) : now;
+  assert.ok(Number.isFinite(startedAt) && startedAt <= now, 'Invalid completion start');
+  const state = {
+    version: 1,
+    batch,
+    recordingStartedAt: now,
+    startedAt: formal ? startedAt : null,
+    clockSource: !formal ? 'not-started' : requestedAt ? 'request-timestamp' : 'first-completion-command',
+    events: [],
+    repairs: [],
+  };
+  saveCompletion(directory, state);
+  return state;
+}
+export function saveCompletion(directory, state) {
+  const file = path.join(directory, 'completion-session.json'),
+    lock = file + '.lock';
+  assert.ok(!existsSync(file) || !lstatSync(file).isSymbolicLink(), 'Linked completion state');
+  let held = false;
+  for (let attempt = 0; attempt < 100; attempt++) {
+    try {
+      writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 });
+      held = true;
+      break;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+    }
+  }
+  assert.ok(held, 'Completion state writer busy; retain lock and retry, never seize it');
+  try {
+    if (existsSync(file)) {
+      const disk = JSON.parse(readFileSync(file, 'utf8'));
+      assert.equal(disk.batch, state.batch);
+      assert.equal(disk.version, state.version);
+      const merge = (old, incoming, key) => {
+        const map = new Map(old.map((e) => [key(e), e]));
+        for (const e of incoming) {
+          const prior = map.get(key(e));
+          if (prior?.finishedAt && e.finishedAt)
+            assert.equal(e.status, prior.status, 'Completed event status is immutable');
+          if (prior?.finishedAt && (!e.finishedAt || prior.finishedAt > e.finishedAt)) continue;
+          map.set(key(e), e);
+        }
+        return [...map.values()];
+      };
+      state.events = merge(disk.events, state.events, (e) => e.id ?? `${e.name}:${e.key}:${e.startedAt}`);
+      state.repairs = merge(disk.repairs, state.repairs, (r) => r.id);
+      if (disk.startedAt !== null) {
+        if (state.startedAt !== null) assert.equal(state.startedAt, disk.startedAt, 'Completion start cannot be reset');
+        state.startedAt = disk.startedAt;
+        state.clockSource = disk.clockSource;
+      }
+      state.previewFingerprint ??= disk.previewFingerprint;
+      state.closedAt ??= disk.closedAt;
+    }
+    const pending = file + '.' + randomUUID() + '.tmp';
+    writeFileSync(pending, JSON.stringify(state, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
+    renameSync(pending, file);
+  } finally {
+    unlinkSync(lock);
+  }
+}
+
+export async function completionStage(state, name, key, run, { now = Date.now, save = () => {}, reuse } = {}) {
+  assert.ok(
+    ['ci', 'evidence', 'handoff', 'preserve', 'cleanup', 'close', 'prepare', 'review', 'repair'].includes(name),
+    'Unknown completion stage',
+  );
+  assert.ok(typeof key === 'string' && key.length > 0);
+  const prior = [...state.events].reverse().find((e) => e.name === name && e.key === key && e.status === 'success');
+  if (prior && reuse && (await reuse(prior.result))) {
+    return { result: prior.result, reused: true };
+  }
+  const event = { id: randomUUID(), name, key, startedAt: now(), status: 'running' };
+  state.events.push(event);
+  save(state);
+  try {
+    const result = await run();
+    event.result = result;
+    event.status = 'success';
+    return { result, reused: false };
+  } catch (error) {
+    event.status = 'failure';
+    event.failure = {
+      category: error.ciFailure ? 'ci-failed-unclassified' : 'stage-failure',
+      ...(error.ciFailure ? { ci: error.ciFailure } : {}),
+    };
+    throw error;
+  } finally {
+    event.finishedAt = now();
+    assert.ok(event.finishedAt >= event.startedAt, 'Clock moved backwards');
+    save(state);
+  }
+}
+export function recordRepair(state, { id, failureRun, evidence, category, now = Date.now() }) {
+  assert.ok(state.startedAt !== null, 'Begin formal completion before recording repair');
+  assert.match(id, /^[a-z0-9-]+$/);
+  assert.ok(['test', 'equivalence', 'upload', 'environment', 'transport', 'other-verified'].includes(category));
+  const failure = state.events.find(
+    (e) => e.status === 'failure' && String(e.failure?.ci?.runId) === String(failureRun),
+  );
+  assert.ok(failure, 'Repair requires a recorded real failed CI run');
+  assert.ok(
+    evidence && existsSync(evidence) && lstatSync(evidence).isFile() && !lstatSync(evidence).isSymbolicLink(),
+    'Missing diagnostic evidence',
+  );
+  assert.ok(!state.repairs.some((r) => r.id === id), 'Repair already recorded');
+  state.repairs.push({
+    id,
+    failureRun: String(failureRun),
+    failureHead: failure.failure.ci.headSha,
+    category,
+    evidence,
+    evidenceDigest: createHash('sha256').update(readFileSync(evidence)).digest('hex'),
+    startedAt: now,
+  });
+}
+export function finishRepair(state, id, { now = Date.now() } = {}) {
+  const repair = state.repairs.find((r) => r.id === id);
+  assert.ok(repair && !repair.finishedAt, 'Unknown or finished repair');
+  assert.ok(
+    state.events.some(
+      (e) =>
+        e.name === 'ci' &&
+        e.status === 'success' &&
+        e.startedAt >= repair.startedAt &&
+        e.result?.headSha !== repair.failureHead &&
+        e.result?.eventName === 'push' &&
+        e.result?.branch === 'main',
+    ),
+    'Repair needs successful new-candidate CI',
+  );
+  assert.equal(
+    createHash('sha256').update(readFileSync(repair.evidence)).digest('hex'),
+    repair.evidenceDigest,
+    'Diagnostic evidence changed',
+  );
+  repair.finishedAt = now;
+}
+function union(intervals) {
+  let total = 0,
+    end = -Infinity;
+  for (const [a, b] of intervals.sort((x, y) => x[0] - y[0])) {
+    assert.ok(b >= a);
+    total += Math.max(0, b - Math.max(a, end));
+    end = Math.max(end, b);
+  }
+  return total;
+}
+export function completionSummary(state, now = Date.now()) {
+  if (state.startedAt === null)
+    return { batch: state.batch, status: 'not-started', recordedEvents: state.events.length };
+  const clip = (pairs) => pairs.map(([a, b]) => [Math.max(a, state.startedAt), b]).filter(([a, b]) => b >= a);
+  const end = state.closedAt ?? now,
+    intervals = state.events.map((e) => [e.startedAt, e.finishedAt ?? end]);
+  const wallMs = end - state.startedAt;
+  assert.ok(wallMs >= 0);
+  const measuredMs = union(clip(intervals)),
+    ci = state.events.filter((e) => e.name === 'ci' && e.status === 'success').at(-1);
+  const repairMs = union(clip(state.repairs.map((r) => [r.startedAt, r.finishedAt ?? end])));
+  return {
+    batch: state.batch,
+    startedAt: new Date(state.startedAt).toISOString(),
+    finishedAt: new Date(end).toISOString(),
+    clockSource: state.clockSource,
+    wallMs,
+    measuredStageMs: measuredMs,
+    unattributedMs: Math.max(0, wallMs - measuredMs),
+    postFinalCiMs: ci
+      ? Math.max(
+          0,
+          end -
+            Math.max(
+              Number.isFinite(Date.parse(ci.result?.gatesFinishedAt))
+                ? Date.parse(ci.result.gatesFinishedAt)
+                : ci.finishedAt,
+              state.startedAt,
+            ),
+        )
+      : null,
+    ciCompletionSource: ci?.result?.gatesFinishedAt ? 'github-job-completed-at' : 'observed-wait-end',
+    ciWaitMs: union(clip(state.events.filter((e) => e.name === 'ci').map((e) => [e.startedAt, e.finishedAt ?? end]))),
+    ciJobWindowMs: union(
+      clip(
+        state.events
+          .filter((e) => e.name === 'ci' && e.result?.jobs)
+          .flatMap((e) =>
+            e.result.jobs
+              .filter((j) => j.started_at && j.completed_at)
+              .map((j) => [Date.parse(j.started_at), Date.parse(j.completed_at)])
+              .filter(([a, b]) => Number.isFinite(a) && Number.isFinite(b) && b >= a),
+          ),
+      ),
+    ),
+    repairMs,
+    unrecordedFailedRuns: state.events
+      .filter((e) => e.failure?.ci && !state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)))
+      .map((e) => e.failure.ci.runId),
+    repairs: state.repairs.map((r) => ({ ...r, durationMs: (r.finishedAt ?? end) - r.startedAt })),
+    failedStages: state.events
+      .filter((e) => e.status === 'failure')
+      .map((e) => ({ name: e.name, key: e.key, failure: e.failure })),
+    overlapPolicy: 'Union intervals; repair is a subset, never add it to wall time',
+    stages: state.events.map((e) => ({
+      name: e.name,
+      key: e.key,
+      status: e.status,
+      durationMs: (e.finishedAt ?? end) - e.startedAt,
+    })),
+  };
+}
+// Ordered post-CI stages: no destructive callback can run after missing/failed evidence.
+export async function settleCompletion(state, identity, stages, options = {}) {
+  const results = {};
+  for (const name of ['evidence', 'handoff', 'preserve', 'cleanup', 'close']) {
+    const stage = stages[name];
+    assert.ok(typeof stage?.run === 'function', 'Missing stage ' + name);
+    results[name] = await completionStage(state, name, identity, stage.run, { ...options, reuse: stage.reuse });
+  }
+  state.closedAt = (options.now ?? Date.now)();
+  options.save?.(state);
+  return { results, summary: completionSummary(state, state.closedAt) };
+}
