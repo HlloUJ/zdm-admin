@@ -304,6 +304,12 @@ jobs:
 
   backend_full:
     name: Backend full checks
+    env:
+      CI_EQUIVALENCE_ELIGIBLE: 'true'
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
     needs: scope
     if: ${{ needs.scope.outputs.backend == 'true' }}
     runs-on: ubuntu-latest
@@ -317,7 +323,12 @@ jobs:
           distribution: temurin
           java-version: 21
           cache: maven
-      - working-directory: backend
+      - id: equivalent
+        run: node scripts/ci-quality-evidence.mjs init && node scripts/ci-equivalence.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}
+      - if: steps.equivalent.outputs.reused != 'true'
+        working-directory: backend
         run: node ../scripts/ci-quality-evidence.mjs run backend-quality -- mvn -B test checkstyle:check spotbugs:check jacoco:report
       - if: always()
         run: node scripts/ci-quality-evidence.mjs finish
