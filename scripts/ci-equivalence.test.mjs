@@ -39,7 +39,7 @@ function snapshot() {
     hardware: { logicalCpus: 4, cpuModel: 'AMD', totalMemoryBytes: 16_766_414_848 },
     node: ['v22.23.3', 'a'.repeat(64)],
     ...Object.fromEntries(
-      ['inputs', 'environment', 'packages', 'systemFiles', 'browser'].map((k) => [k, 'a'.repeat(64)]),
+      ['inputs', 'environment', 'packages', 'systemFiles', 'browser', 'sharding'].map((k) => [k, 'a'.repeat(64)]),
     ),
   };
 }

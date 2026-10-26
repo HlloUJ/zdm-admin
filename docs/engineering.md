@@ -45,3 +45,5 @@ CI Chrome 准备与系统依赖分开，合格预装浏览器可复用，独立�
 报告采集、回放和上传共用 `scripts/ci-report-contract.mjs`；`test:ci-reuse` 同时检查四种完整链路、真实独立CLI及隔离Git收尾，不启动Maven/Docker或重复工程全套。正式收尾使用阶段索引及 `begin / wait / settle / report`，门禁、运行交接、精确指纹和数据保护不变；总耗时和补修成本按 [任务完成流程](task-completion.md) 报告。
 
 普通串行交付以 `task:completion -- final-handoff <main-sha>` 在main门禁通过后一次完成目标版本对齐与运行交接；`wait <run-id|pr|main> <head>`同时提供变化进度和后续参数，push/pr/merge/sync分别计时。提前组合验收仍使用原同步入口，完整流程见[任务完成流程](task-completion.md)。
+
+收尾可靠性入口与异常恢复见[任务完成流程](task-completion.md)：准确批次授权后deliver直接串行接续原门禁与交接；两分片使用经审查的整文件耗时计划，并纳入v4精确指纹。工程输入索引由规划前守卫核对，禁止自动刷新；性能观察只定位原因，不改变断言或隔离。

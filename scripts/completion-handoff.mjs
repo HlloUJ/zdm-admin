@@ -8,7 +8,7 @@ import { planBatchDelivery } from './task-batch.mjs';
 import { completionStage } from './completion-session.mjs';
 
 // Local, read-only target plan. The executing entry refreshes origin before planning.
-export function finalHandoffPlan(root, batch, main, { execute }) {
+export function finalHandoffPlan(root, batch, main, { execute, state }) {
   assert.match(main, /^[a-f0-9]{40}$/);
   planBatchDelivery(root);
   const git = (cwd, ...args) => execute(cwd, 'git', args);
@@ -43,11 +43,19 @@ export function finalHandoffPlan(root, batch, main, { execute }) {
   );
   const integrationHead = git(integration, 'rev-parse', 'HEAD'),
     previewHead = git(preview, 'rev-parse', 'HEAD');
-  assert.equal(
-    git(integration, 'rev-parse', 'origin/codex/integration-current'),
-    integrationHead,
-    'Integration remote differs',
-  );
+  const remoteHead = git(integration, 'rev-parse', 'origin/codex/integration-current');
+  const pending = state?.integrationPush;
+  const ownedPending =
+    pending?.main === main &&
+    pending.taskHead === batch.recordedHead &&
+    pending.localHead === integrationHead &&
+    path.resolve(pending.worktree) === path.resolve(integration) &&
+    [pending.oldRemote, pending.localHead].includes(remoteHead);
+  if (integrationHead !== remoteHead) {
+    assert.ok(ownedPending, 'Integration remote differs without this batch pending-push proof');
+    git(root, 'merge-base', '--is-ancestor', remoteHead, integrationHead);
+    git(root, 'merge-base', '--is-ancestor', main, integrationHead);
+  }
   assert.equal(
     existsSync(path.join(integration, 'backups/task-preview/active-database-task.json')),
     false,
@@ -65,6 +73,8 @@ export function finalHandoffPlan(root, batch, main, { execute }) {
     integrationHead,
     previewHead,
     integrationNeedsMerge: base !== main,
+    integrationNeedsPush: integrationHead !== remoteHead || (ownedPending && pending.status !== 'done'),
+    remoteHead,
     previewNeedsAdvance: previewHead !== main,
     remoteEvidence: 'local-tracking-reference-only',
   };
@@ -96,22 +106,39 @@ export async function finalHandoff(root, batch, main, options) {
         assert.ok(before.runtimeHealthy && before.backupRetained, 'Persistent runtime or backup unavailable');
         if (state.previewFingerprint)
           assert.equal(before.profileFingerprint, state.previewFingerprint, 'Persistent data profile changed');
-        if (plan.integrationNeedsMerge) {
+        if (plan.integrationNeedsMerge || plan.integrationNeedsPush) {
           await completionStage(
             state,
             'sync',
             main + ':integration',
             () => {
               try {
-                execute(plan.integration, 'git', ['merge', '--no-edit', main]);
+                if (plan.integrationNeedsMerge) execute(plan.integration, 'git', ['merge', '--no-edit', main]);
               } catch (error) {
                 const merge = execute(plan.integration, 'git', ['rev-parse', '--git-path', 'MERGE_HEAD']);
                 if (existsSync(path.resolve(plan.integration, merge)))
                   execute(plan.integration, 'git', ['merge', '--abort']);
                 throw error;
               }
-              execute(plan.integration, 'git', ['push', 'origin', 'codex/integration-current']);
-              return { main };
+              const localHead = execute(plan.integration, 'git', ['rev-parse', 'HEAD']);
+              state.integrationPush = {
+                main,
+                taskHead: batch.recordedHead,
+                worktree: plan.integration,
+                oldRemote: plan.remoteHead,
+                localHead,
+                status: 'pending',
+              };
+              save(state);
+              if (plan.integrationNeedsMerge || plan.integrationHead !== plan.remoteHead)
+                execute(plan.integration, 'git', ['push', 'origin', 'codex/integration-current']);
+              assert.equal(
+                execute(plan.integration, 'git', ['rev-parse', 'origin/codex/integration-current']),
+                localHead,
+              );
+              state.integrationPush.status = 'done';
+              save(state);
+              return { main, localHead };
             },
             { save },
           );
