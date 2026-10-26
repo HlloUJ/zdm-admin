@@ -1,3 +1,4 @@
+import { BACKEND_REPORTS } from './ci-report-contract.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import path from 'node:path';
@@ -11,7 +12,10 @@ function filesBelow(directory) {
   });
 }
 
-export function backendReportState(root, reportsDirectory = path.join(root, 'backend/target/surefire-reports')) {
+export function backendReportState(
+  root,
+  reportsDirectory = path.join(root, 'backend/target', BACKEND_REPORTS.surefire),
+) {
   return Object.fromEntries(
     filesBelow(reportsDirectory)
       .filter((file) => file.endsWith('.xml'))
@@ -28,7 +32,7 @@ export function validateBackendReports(
     startedAt,
     selector,
     previousReports = {},
-    reportsDirectory = path.join(root, 'backend/target/surefire-reports'),
+    reportsDirectory = path.join(root, 'backend/target', BACKEND_REPORTS.surefire),
   } = {},
 ) {
   const sourceRoot = path.join(root, 'backend/src/test/java');

@@ -39,7 +39,16 @@ export async function waitQuality({
       previous = run.status;
     }
     if (run.status === 'completed') {
-      assert.equal(run.conclusion, 'success', `CI ${runId} failed; diagnose before a new candidate`);
+      if (run.conclusion !== 'success')
+        throw Object.assign(new Error(`CI ${runId} failed; diagnose before a new candidate`), {
+          ciFailure: {
+            runId: String(runId),
+            headSha: run.head_sha,
+            attempt: run.run_attempt,
+            conclusion: run.conclusion,
+            status: run.status,
+          },
+        });
       let jobs;
       for (let attempt = 0; attempt < 4; attempt++) {
         try {
@@ -58,7 +67,18 @@ export async function waitQuality({
           1,
           `Missing required ${name}`,
         );
-      return { runId, headSha: expectedHead, attempt: 1, conclusion: 'success', jobs, elapsedMs: Date.now() - start };
+      const completedJobs = jobs.map((job) => Date.parse(job.completed_at)).filter(Number.isFinite);
+      return {
+        gatesFinishedAt: completedJobs.length ? new Date(Math.max(...completedJobs)).toISOString() : undefined,
+        runId,
+        headSha: expectedHead,
+        eventName: run.event,
+        branch: run.head_branch,
+        attempt: 1,
+        conclusion: 'success',
+        jobs,
+        elapsedMs: Date.now() - start,
+      };
     }
     await wait(20000);
   }
