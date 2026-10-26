@@ -2,7 +2,7 @@
 // Every uncertainty is a miss: the unchanged normal CI commands then run.
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { cpSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -44,8 +44,8 @@ export function validateProvenance({ current, original, run, pull, commit, repos
       'frontend-build',
       'frontend-test-list',
     ],
-    frontend_e2e_1: ['npm-ci', 'chrome-install', 'e2e-1'],
-    frontend_e2e_2: ['npm-ci', 'chrome-install', 'e2e-2'],
+    frontend_e2e_1: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-1'],
+    frontend_e2e_2: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-2'],
   }[original.job];
   assert.deepEqual(
     original.phases?.map((phase) => phase.name),
@@ -145,6 +145,11 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
     const currentFile = path.join(directory, 'metadata.json');
     const observedMetadata = json(currentFile);
     observedMetadata.environmentObservation = observation;
+    const preparationFiles = ['chrome-browser.json', 'chrome-dependencies.json'];
+    if (job?.startsWith('frontend_e2e') && preparationFiles.every((file) => existsSync(path.join(directory, file))))
+      observedMetadata.preparationObservation = Object.fromEntries(
+        preparationFiles.map((file) => [file, json(path.join(directory, file))]),
+      );
     writeFileSync(currentFile, JSON.stringify(observedMetadata));
     if (env.GITHUB_EVENT_NAME !== 'push' || env.GITHUB_REF !== 'refs/heads/main')
       throw new Error('Fresh PR/dev execution');
@@ -222,6 +227,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
       execution: 'reused',
       environmentProof: proof,
       environmentObservation: current.environmentObservation,
+      preparationObservation: current.preparationObservation,
       reusedFrom: provenance,
     };
     validateReusedMetadata(replay);
