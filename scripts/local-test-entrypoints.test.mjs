@@ -106,6 +106,9 @@ test('Playwright validates selected cases while preserving explicit JSON reporte
     const report = JSON.parse(readFileSync(path.join(f.env.CI_EVIDENCE_DIR, 'playwright-results.json'), 'utf8'));
     assert.equal(report.tests.length, args.length ? 1 : 2);
     validatePlaywrightTestReport(report, report.runId);
+    const performance = JSON.parse(readFileSync(path.join(f.env.CI_EVIDENCE_DIR, 'e2e-performance.json'), 'utf8'));
+    assert.equal(performance.tests.length, report.tests.length);
+    assert.ok(performance.tests.every((entry) => entry.durationMs >= 0));
   }
   assert.equal(JSON.parse(readFileSync(f.env.PLAYWRIGHT_JSON_OUTPUT_NAME, 'utf8')).stats.expected, 1);
 });

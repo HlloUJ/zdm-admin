@@ -266,3 +266,32 @@ test('single CI wait reports changed job steps at bounded cadence and still quer
   assert.ok(messages.some((m) => m.includes('prepare')));
   assert.ok(messages.some((m) => m.includes('test')));
 });
+
+test('connection recovery is timed separately and never becomes a test retry', async () => {
+  let clock = 0,
+    reads = 0;
+  const result = await waitQuality({
+    runId: 1,
+    expectedHead: 'a'.repeat(40),
+    now: () => clock,
+    readRun: async () => {
+      if (++reads === 1) throw Error('connection');
+      return {
+        id: 1,
+        head_sha: 'a'.repeat(40),
+        run_attempt: 1,
+        path: '.github/workflows/quality.yml',
+        status: 'completed',
+        conclusion: 'success',
+      };
+    },
+    readJobs: async () => ['Frontend quality', 'Backend quality'].map((name) => ({ name, conclusion: 'success' })),
+    wait: async (ms) => {
+      clock += ms;
+    },
+    report: () => {},
+  });
+  assert.equal(result.attempt, 1);
+  assert.equal(result.networkObservations[0].durationMs, 10000);
+  assert.equal(result.networkObservations[0].recovered, true);
+});
