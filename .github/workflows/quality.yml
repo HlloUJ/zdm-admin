@@ -163,7 +163,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
-      - run: node scripts/ci-quality-evidence.mjs run chrome-install -- npx playwright install --with-deps chrome
+      - run: node scripts/ci-quality-evidence.mjs run chrome-browser -- node scripts/ci-chrome-preparation.mjs browser
+      - run: node scripts/ci-quality-evidence.mjs run chrome-dependencies -- node scripts/ci-chrome-preparation.mjs dependencies
       - id: equivalent
         run: node scripts/ci-equivalence.mjs
         env:
@@ -207,7 +208,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
-      - run: node scripts/ci-quality-evidence.mjs run chrome-install -- npx playwright install --with-deps chrome
+      - run: node scripts/ci-quality-evidence.mjs run chrome-browser -- node scripts/ci-chrome-preparation.mjs browser
+      - run: node scripts/ci-quality-evidence.mjs run chrome-dependencies -- node scripts/ci-chrome-preparation.mjs dependencies
       - id: equivalent
         run: node scripts/ci-equivalence.mjs
         env:
