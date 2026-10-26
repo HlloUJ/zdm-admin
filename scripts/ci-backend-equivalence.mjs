@@ -101,10 +101,7 @@ export function backendRuntime(env = process.env, root = process.cwd()) {
   const java = realpathSync(env.JAVA_HOME);
   const mvn = realpathSync(command('which', ['mvn'])),
     mavenHome = path.dirname(path.dirname(mvn));
-  assert.ok(
-    !existsSync(path.join(os.homedir(), '.testcontainers.properties')),
-    'External Testcontainers configuration',
-  );
+  const testcontainers = testcontainersConfiguration(path.join(os.homedir(), '.testcontainers.properties'));
   const settings = [
     path.join(os.homedir(), '.m2/settings.xml'),
     path.join(mavenHome, 'conf/settings.xml'),
@@ -158,6 +155,7 @@ export function backendRuntime(env = process.env, root = process.cwd()) {
         .join('\n'),
     ),
     docker: {
+      testcontainers,
       version: JSON.parse(command('docker', ['version', '--format', '{{json .}}'])),
       configuration: command('docker', [
         'info',
@@ -412,4 +410,19 @@ function safeChild(root, file) {
     p = path.join(p, part);
     assert.ok(!existsSync(p) || !lstatSync(p).isSymbolicLink(), 'Linked artifact path');
   }
+}
+
+// Testcontainers persists its discovered Unix socket strategy on first connection.
+// Only that exact known provider is equivalent to the clean Linux runner default;
+// timestamps/comments are not runtime inputs. Every other key/provider remains unsupported.
+export function testcontainersConfiguration(file) {
+  const strategy = 'org.testcontainers.dockerclient.UnixSocketClientProviderStrategy';
+  if (!existsSync(file)) return { strategy };
+  assert.ok(!lstatSync(file).isSymbolicLink(), 'Linked Testcontainers configuration');
+  const lines = readFileSync(file, 'utf8')
+    .split(/\r?\n/)
+    .map((s) => s.trim())
+    .filter((s) => s && !s.startsWith('#') && !s.startsWith('!'));
+  assert.deepEqual(lines, ['docker.client.strategy=' + strategy], 'External Testcontainers configuration');
+  return { strategy };
 }

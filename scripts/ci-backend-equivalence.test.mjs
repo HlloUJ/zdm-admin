@@ -7,6 +7,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   BACKEND_CONTRACT,
+  testcontainersConfiguration,
   BACKEND_COMMAND,
   backendExecutionEnvironment,
   validateMavenEntries,
@@ -322,4 +323,24 @@ test('workflow retains backend gate, exact Maven command and source-only complet
   assert.ok(w.includes('mvn -B test checkstyle:check spotbugs:check jacoco:report'));
   assert.match(w, /node scripts\/ci-quality-evidence.mjs init && node scripts\/ci-equivalence.mjs/);
   assert.ok(!w.includes('container:'));
+});
+
+test('Testcontainers first-run strategy cache is exactly the known clean Linux default', (t) => {
+  const { root } = fixture(t),
+    file = path.join(root, 'testcontainers.properties');
+  const clean = testcontainersConfiguration(file);
+  writeFileSync(
+    file,
+    '#Modified by Testcontainers\n#Mon Oct 26 11:00:00 CST 2026\ndocker.client.strategy=org.testcontainers.dockerclient.UnixSocketClientProviderStrategy\n',
+  );
+  assert.deepEqual(testcontainersConfiguration(file), clean);
+  for (const v of [
+    'docker.client.strategy=unknown',
+    'docker.host=tcp://external:2375',
+    'hub.image.name.prefix=external/',
+    'docker.client.strategy=org.testcontainers.dockerclient.UnixSocketClientProviderStrategy\nchecks.disable=true',
+  ]) {
+    writeFileSync(file, v);
+    assert.throws(() => testcontainersConfiguration(file), /External/);
+  }
 });
