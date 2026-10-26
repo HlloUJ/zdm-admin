@@ -46,6 +46,11 @@ export async function prepareBrowser(system) {
   const before = system.inspect();
   const reused = before !== null && compareVersions(before, baseline) >= 0;
   if (!reused) {
+    assert.notEqual(
+      system.prebuilt,
+      true,
+      'Prebuilt Chrome is stale; update the independent image, never mutate the test environment',
+    );
     system.configureNetwork();
     system.run('npx', ['--no-install', 'playwright', 'install', 'chrome']);
   }
@@ -102,17 +107,25 @@ export async function prepareDependencies(system, browser) {
   assert.equal(browser.baselineSource, BASELINE_URL);
   assert.ok(compareVersions(browser.baseline, MINIMUM_CHROME_VERSION) >= 0);
   assert.ok(compareVersions(browser.after, browser.baseline) >= 0);
-  system.configureNetwork();
+  if (!system.prebuilt) system.configureNetwork();
   // Same complete dependency group as the former `install --with-deps chrome`.
-  system.run('npx', dependencyArgs);
+  if (!system.prebuilt) system.run('npx', dependencyArgs);
   const verification = system.run('npx', [...dependencyArgs, '--dry-run'], true);
   assert.ok(
     verification.split('\n').some((line) => line.trim() === 'All system dependencies are installed.'),
     'Playwright did not confirm the complete dependency inventory',
   );
   assert.equal(system.inspect(), browser.after, 'Browser changed during dependency preparation');
-  await system.launch();
-  return { version: 1, browserVersion: browser.after, completeDependencies: true, launchVerified: true };
+  const runtime = await system.launch();
+  assert.equal(runtime?.unicodeFilenameVerified, true, 'Chrome Unicode filename capability was not verified');
+  return {
+    version: 1,
+    browserVersion: browser.after,
+    completeDependencies: true,
+    launchVerified: true,
+    unicodeFilenameVerified: true,
+    action: system.prebuilt ? 'verified-prebuilt' : 'prepared',
+  };
 }
 function run(program, args, capture = false) {
   const result = spawnSync(program, args, {
@@ -142,7 +155,13 @@ export async function main(args) {
   }
   assert.ok(['browser', 'dependencies'].includes(args[0]));
   assert.ok(process.env.CI_EVIDENCE_DIR, 'Missing CI evidence destination');
+  if (process.env.CI_BROWSER_IMAGE) {
+    assert.equal(process.env.LANG, 'C.UTF-8');
+    assert.equal(process.env.LC_ALL, 'C.UTF-8');
+    assert.equal(run('locale', ['charmap'], true), 'UTF-8');
+  }
   const system = {
+    prebuilt: Boolean(process.env.CI_BROWSER_IMAGE),
     fetch,
     inspect: () =>
       existsSync(CHROME)
@@ -163,7 +182,25 @@ export async function main(args) {
     launch: async () => {
       const { chromium } = await import('@playwright/test');
       const browser = await chromium.launch({ channel: 'chrome' });
-      await browser.close();
+      try {
+        const page = await browser.newPage();
+        const [download] = await Promise.all([
+          page.waitForEvent('download', { timeout: 5000 }),
+          page.evaluate(() => {
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(new Blob(['locale verification'], { type: 'text/plain' }));
+            link.download = '中文文件.txt';
+            document.body.append(link);
+            link.click();
+          }),
+        ]);
+        assert.equal(download.suggestedFilename(), '中文文件.txt', 'Chrome requires a working UTF-8 locale');
+        assert.equal(await download.failure(), null);
+        await download.delete();
+        return { unicodeFilenameVerified: true };
+      } finally {
+        await browser.close();
+      }
     },
   };
   const browserFile = path.join(process.env.CI_EVIDENCE_DIR, 'chrome-browser.json');

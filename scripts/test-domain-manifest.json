@@ -23,7 +23,7 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "aa2d96644f9bb4edce282c09a54c673a659336d25c29305dd4d71bce8f645277",
+      "digest": "42aa7e4856f31326115a02153b555ca6c1d6fc64bbddc621bea46b1ae778c9b5",
       "imports": [],
       "dynamicImports": 0
     },
@@ -115,23 +115,33 @@
       "imports": ["scripts/git-workflow-core.mjs"],
       "dynamicImports": 0
     },
+    "scripts/ci-browser-image.mjs": {
+      "digest": "33ab3a6917c579ab7c271be8e38202deb670b5652157b14874e4b97aa4ea0d22",
+      "imports": ["scripts/ci-chrome-preparation.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/ci-browser-image.test.mjs": {
+      "digest": "21f8b2e2f82e5d87809b03f0bec9763132524d53778802b7bb584fc19598b539",
+      "imports": ["scripts/ci-browser-image.mjs", "scripts/ci-equivalence-environment.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/ci-chrome-preparation.mjs": {
-      "digest": "855ee75b2a48f94f4a9abf38c65f90642b2c2c6702d74fcf70c5c665eca01620",
+      "digest": "c275a419fb36854a10ed8b6454e7ef54bdb7c9e67836882a0111107b3b7305d7",
       "imports": [],
       "dynamicImports": 1
     },
     "scripts/ci-chrome-preparation.test.mjs": {
-      "digest": "e6eee20b96cbd7dad17d408fc7c12ad209d9101d6822114a920a7f9e88b67d3f",
+      "digest": "2092dfbbb355fd8c9fa6653b3b15a93e7f2d21fd100cafecc71817b89247f761",
       "imports": ["scripts/ci-chrome-preparation.mjs"],
       "dynamicImports": 0
     },
     "scripts/ci-equivalence-environment.mjs": {
-      "digest": "4aeeb6508b995d5ae0d5fe87167a04c96f90cc39da48ae07b03898f1b5c92485",
-      "imports": ["scripts/verification-evidence.mjs"],
+      "digest": "08e7ac3871b4a17d0d013814b022774d67ff40da0b52bbc97074ad39ff4c2e58",
+      "imports": ["scripts/ci-browser-image.mjs", "scripts/verification-evidence.mjs"],
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.mjs": {
-      "digest": "abc79610df26ec0237de276fa832e582a7c06e87d637a17b6d42d954721bd90d",
+      "digest": "5073ea1d1d0559baf104952ccab15683752165c943234c091beb416c237ca9af",
       "imports": [
         "scripts/ci-equivalence-environment.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -140,7 +150,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.test.mjs": {
-      "digest": "21ad7397673d390e48c4fccd0224848af4fffcf6c825cb47544c82b9dc495103",
+      "digest": "b50d012e946c96b6e38f0ab8687c3c4337981d45394e0312de1e9d39de734d53",
       "imports": [
         "scripts/ci-equivalence-environment.mjs",
         "scripts/ci-equivalence.mjs",

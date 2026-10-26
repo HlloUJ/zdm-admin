@@ -3,13 +3,20 @@ import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { existsSync, readFileSync } from 'node:fs';
 import os from 'node:os';
+import {
+  imageIdentity,
+  readImageLock,
+  verifyImageRuntime,
+  runtimeIsolation,
+  validateIsolation,
+} from './ci-browser-image.mjs';
 import { hashPaths } from './verification-evidence.mjs';
 
 export const JOB_ENVIRONMENT_CONTRACTS = {
   formatting: 'formatting-node-v2',
   frontend_static: 'frontend-static-linux-v2',
-  frontend_e2e_1: 'browser-functional-linux-v2',
-  frontend_e2e_2: 'browser-functional-linux-v2',
+  frontend_e2e_1: 'browser-functional-container-v3',
+  frontend_e2e_2: 'browser-functional-container-v3',
 };
 const RESOURCE_PROFILE = 'github-hosted-linux-x64-4cpu-16gb-functional-v1';
 const sha = (value) => createHash('sha256').update(value).digest('hex');
@@ -18,7 +25,7 @@ export function executionEnvironment(env) {
   return Object.fromEntries(
     Object.entries(env)
       .filter(([key]) =>
-        /^(?:PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TMP|TEMP|LANG|LC_ALL|TZ|DISPLAY|CI|GITHUB_ACTIONS|CI_EVIDENCE_DIR|XDG_.*|PLAYWRIGHT_.*|VITE_.*|VITEST_.*|NODE_.*|NPM_CONFIG_.*)$/.test(
+        /^(?:PATH|HOME|USER|LOGNAME|SHELL|TMPDIR|TMP|TEMP|LANG|LC_ALL|TZ|DISPLAY|CI|CI_BROWSER_IMAGE|GITHUB_ACTIONS|CI_EVIDENCE_DIR|XDG_.*|PLAYWRIGHT_.*|VITE_.*|VITEST_.*|NODE_.*|NPM_CONFIG_.*)$/.test(
           key,
         ),
       )
@@ -35,7 +42,11 @@ export function environmentObservation() {
 }
 export function validateEnvironmentProof(proof, job) {
   assert.ok(JOB_ENVIRONMENT_CONTRACTS[job], 'Unsupported environment contract');
-  assert.equal(proof?.version, 2, 'Old or unknown environment contract cannot grant reuse');
+  assert.equal(
+    proof?.version,
+    job.startsWith('frontend_e2e') ? 3 : 2,
+    'Old or unknown environment contract cannot grant reuse',
+  );
   assert.equal(proof.contract, JOB_ENVIRONMENT_CONTRACTS[job]);
   assert.equal(proof.job, job);
   assert.deepEqual(proof.platform, ['linux', 'x64', 'ubuntu24']);
@@ -52,7 +63,7 @@ export function validateEnvironmentProof(proof, job) {
     'inputs',
     'environment',
     ...(system ? ['image', 'kernel', 'packages', 'systemFiles'] : []),
-    ...(browser ? ['browser'] : []),
+    ...(browser ? ['browser', 'container'] : []),
   ];
   assert.deepEqual(Object.keys(proof).sort(), keys.sort(), 'Missing or unreviewed proof fields');
   assert.ok(Array.isArray(proof.node) && proof.node.length === 2);
@@ -65,6 +76,12 @@ export function validateEnvironmentProof(proof, job) {
     ...(browser ? [proof.browser] : []),
   ])
     assert.match(value ?? '', /^[a-f0-9]{64}$/);
+  if (browser) {
+    assert.deepEqual(Object.keys(proof.container).sort(), ['image', 'origin']);
+    assert.match(proof.container.image, /^ghcr\.io\/hllouj\/zdm-admin-browser@sha256:[a-f0-9]{64}$/);
+    assert.match(proof.container.origin, /^[a-f0-9]{64}$/);
+    assert.equal(proof.image[1], proof.container.image);
+  }
   if (system) {
     assert.ok(Array.isArray(proof.image) && proof.image.length === 2 && proof.image.every(Boolean));
     assert.equal(proof.image[0], 'ubuntu24');
@@ -89,7 +106,7 @@ export function environmentProofFromSnapshot(job, snapshot) {
   const system = job !== 'formatting';
   const browser = job.startsWith('frontend_e2e');
   const proof = {
-    version: 2,
+    version: browser ? 3 : 2,
     contract: JOB_ENVIRONMENT_CONTRACTS[job],
     job,
     platform: [snapshot.platform, snapshot.arch, snapshot.imageOS],
@@ -105,7 +122,7 @@ export function environmentProofFromSnapshot(job, snapshot) {
           systemFiles: snapshot.systemFiles,
         }
       : {}),
-    ...(browser ? { browser: snapshot.browser } : {}),
+    ...(browser ? { browser: snapshot.browser, container: snapshot.container } : {}),
   };
   validateEnvironmentProof(proof, job);
   return proof;
@@ -121,13 +138,20 @@ export function environmentProof(env = process.env) {
   );
   const system = job !== 'formatting';
   const browser = job.startsWith('frontend_e2e');
-  if (browser) assert.ok(existsSync('/opt/google/chrome/chrome'), 'Actual Chrome runtime cannot be proven');
+  let container;
+  if (browser) {
+    assert.ok(existsSync('/opt/google/chrome/chrome'), 'Actual Chrome runtime cannot be proven');
+    const lock = readImageLock();
+    validateIsolation(runtimeIsolation());
+    verifyImageRuntime(lock, env);
+    container = imageIdentity(lock);
+  }
   return environmentProofFromSnapshot(job, {
     runnerEnvironment: env.RUNNER_ENVIRONMENT,
     platform: process.platform,
     arch: process.arch,
-    imageOS: env.ImageOS,
-    imageVersion: env.ImageVersion,
+    imageOS: browser ? 'ubuntu24' : env.ImageOS,
+    imageVersion: browser ? container.image : env.ImageVersion,
     hardware: environmentObservation(),
     node: [process.version, sha(readFileSync(process.execPath))],
     inputs: hashPaths(process.cwd(), ['node_modules'], { dependency: true }),
@@ -142,6 +166,6 @@ export function environmentProof(env = process.env) {
           ),
         }
       : {}),
-    ...(browser ? { browser: hashPaths('/', ['/opt/google/chrome']) } : {}),
+    ...(browser ? { browser: hashPaths('/', ['/opt/google/chrome']), container } : {}),
   });
 }
