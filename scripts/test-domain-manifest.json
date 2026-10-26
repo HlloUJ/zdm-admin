@@ -265,11 +265,12 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "7257f2c962762919960afca608d9f54478774861da0c4ffe43636f2e887e62f4",
+      "digest": "bf17af9196f4dc690c7ab4b5ff9313357b2b2d52ec1702e88db6cba153b65d2e",
       "imports": [
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
+        "scripts/completion-process.mjs",
         "scripts/completion-recovery.mjs",
         "scripts/completion-session.mjs",
         "scripts/git-workflow-core.mjs",
@@ -303,19 +304,32 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/completion-process.mjs": {
+      "digest": "b5cbcc97a62e5ad94efb60185285a9fe04accb67358d1728b640981e91200399",
+      "imports": [],
+      "dynamicImports": 0
+    },
     "scripts/completion-recovery.mjs": {
-      "digest": "a8785209ef95647858bf2f5b493f1ed9d9f54df0d0a27409338600dd6420a30c",
-      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs"],
+      "digest": "25028a3975cf28e74f33c4f95bb1875151624942f019ba10690e64cfd7cab401",
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-process.mjs",
+        "scripts/completion-session.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-recovery.test.mjs": {
-      "digest": "5f5159ba48d2305010e34bc56799c59209e7d5dbe65c5ac8551b94b97d860a7f",
-      "imports": ["scripts/completion-recovery.mjs", "scripts/completion-session.mjs"],
-      "dynamicImports": 0
+      "digest": "62bf48e30221444a315b7de06c694afc1a918c9c27bd01ae0a58db10ed4dd090",
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/completion-recovery.mjs",
+        "scripts/completion-session.mjs"
+      ],
+      "dynamicImports": 1
     },
     "scripts/completion-session.mjs": {
-      "digest": "c05552b44aa9fc60c2bd13a046ee5917e63971d21b226cce67447e64a2747d26",
-      "imports": [],
+      "digest": "72ae419ce71bdbeceb60bbbb7ac6b5ca4afb98e3527d072db4619556d6e364a4",
+      "imports": ["scripts/completion-process.mjs"],
       "dynamicImports": 0
     },
     "scripts/completion-session.test.mjs": {
