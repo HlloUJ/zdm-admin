@@ -120,7 +120,19 @@ export async function checkCompletionRuntime(root, commonDir) {
 async function main(args) {
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']);
   const commonDir = path.resolve(root, git(root, ['rev-parse', '--git-common-dir']));
-  if (['begin', 'measure', 'repair-start', 'repair-finish', 'report', 'settle', 'wait'].includes(args[0])) {
+  if (
+    [
+      'handoff-plan',
+      'final-handoff',
+      'begin',
+      'measure',
+      'repair-start',
+      'repair-finish',
+      'report',
+      'settle',
+      'wait',
+    ].includes(args[0])
+  ) {
     const { completionCommand } = await import('./completion-cli.mjs');
     console.log(
       JSON.stringify(
@@ -188,7 +200,7 @@ async function main(args) {
     console.log(JSON.stringify(await checkCompletionRuntime(root, commonDir), null, 2));
   } else
     throw new Error(
-      'Usage: task:completion -- begin [requested-at] | plan | wait <run> <head> | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> | repair-finish <id> | settle <batch> <main> <run> | report <batch> | preserve | runtime',
+      'Usage: task:completion -- begin [requested-at] | plan | wait <run|pr|main> <head> | handoff-plan <main> | final-handoff <main> | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> | repair-finish <id> | settle <batch> <main> <run> | report <batch> | preserve | runtime',
     );
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

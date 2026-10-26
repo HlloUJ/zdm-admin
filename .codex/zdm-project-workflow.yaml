@@ -128,6 +128,11 @@ delivery:
       - release_owned_database_lock
       - retain_database_backup
     block_completion_on_failure: true
+  # main_head is the exact merged main SHA returned by the successful main CI wait.
+  final_handoff:
+    cwd: task_worktree
+    run: 'npm run task:completion -- final-handoff "{main_head}"'
+  # Early combination acceptance only; ordinary serial delivery uses final_handoff.
   sync_integration:
     cwd: integration_worktree
     run: 'node scripts/delivery-launcher.mjs sync --task "{task_branch}"'
