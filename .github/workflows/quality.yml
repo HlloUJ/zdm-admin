@@ -28,6 +28,7 @@ jobs:
       frontend: ${{ steps.scope.outputs.frontend }}
       backend: ${{ steps.scope.outputs.backend }}
       engineering: ${{ steps.scope.outputs.engineering }}
+      browser_image: ${{ steps.browser_image.outputs.browser_image }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,6 +38,8 @@ jobs:
           node-version: 22
       # Pure Node/Git diagnostics run before any costly quality jobs; no npm install or services.
       - run: npm run test:ci-reuse
+      - id: browser_image
+        run: node scripts/ci-browser-image.mjs resolve
       - id: scope
         run: node scripts/ci-quality-evidence.mjs scope
       - uses: actions/upload-artifact@v4
@@ -151,18 +154,32 @@ jobs:
     name: Frontend E2E 1/2
     needs: scope
     if: ${{ needs.scope.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.scope.outputs.browser_image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --shm-size=2g --user 1001:1001 --cap-drop=ALL --security-opt=no-new-privileges
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      packages: read
+    defaults:
+      run:
+        shell: bash
     env:
       CI_EQUIVALENCE_ELIGIBLE: 'true'
+      CI_BROWSER_IMAGE: ${{ needs.scope.outputs.browser_image }}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
       PLAYWRIGHT_CHANNEL: chrome
       PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - run: node scripts/ci-quality-evidence.mjs run browser-image -- node scripts/ci-browser-image.mjs verify
       - run: node scripts/ci-quality-evidence.mjs run chrome-browser -- node scripts/ci-chrome-preparation.mjs browser
       - run: node scripts/ci-quality-evidence.mjs run chrome-dependencies -- node scripts/ci-chrome-preparation.mjs dependencies
       - id: equivalent
@@ -196,18 +213,32 @@ jobs:
     name: Frontend E2E 2/2
     needs: scope
     if: ${{ needs.scope.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.scope.outputs.browser_image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --shm-size=2g --user 1001:1001 --cap-drop=ALL --security-opt=no-new-privileges
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      packages: read
+    defaults:
+      run:
+        shell: bash
     env:
       CI_EQUIVALENCE_ELIGIBLE: 'true'
+      CI_BROWSER_IMAGE: ${{ needs.scope.outputs.browser_image }}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
       PLAYWRIGHT_CHANNEL: chrome
       PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/report.json
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - run: node scripts/ci-quality-evidence.mjs run browser-image -- node scripts/ci-browser-image.mjs verify
       - run: node scripts/ci-quality-evidence.mjs run chrome-browser -- node scripts/ci-chrome-preparation.mjs browser
       - run: node scripts/ci-quality-evidence.mjs run chrome-dependencies -- node scripts/ci-chrome-preparation.mjs dependencies
       - id: equivalent

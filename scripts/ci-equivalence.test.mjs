@@ -33,7 +33,8 @@ function snapshot() {
     platform: 'linux',
     arch: 'x64',
     imageOS: 'ubuntu24',
-    imageVersion: '20261012.334.1',
+    imageVersion: 'ghcr.io/hllouj/zdm-admin-browser@sha256:' + 'c'.repeat(64),
+    container: { image: 'ghcr.io/hllouj/zdm-admin-browser@sha256:' + 'c'.repeat(64), origin: 'd'.repeat(64) },
     kernel: 'kernel',
     hardware: { logicalCpus: 4, cpuModel: 'AMD', totalMemoryBytes: 16_766_414_848 },
     node: ['v22.23.3', 'a'.repeat(64)],
@@ -65,7 +66,10 @@ function fixture() {
     workflowRunId: '123',
     environmentProof: proof,
     job: 'frontend_e2e_1',
-    phases: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-1'].map((name) => ({ name, exitCode: 0 })),
+    phases: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-1'].map((name) => ({
+      name,
+      exitCode: 0,
+    })),
   };
   const run = {
     id: 123,
@@ -580,7 +584,9 @@ for (const job of ['formatting', 'frontend_static', 'frontend_e2e_1', 'frontend_
     assert.notDeepEqual(environmentProofFromSnapshot(job, node), proof);
     for (const field of ['imageVersion', 'kernel', 'packages', 'systemFiles', 'browser']) {
       const b = structuredClone(a);
-      b[field] = ['packages', 'systemFiles', 'browser'].includes(field) ? 'b'.repeat(64) : 'other';
+      if (field === 'imageVersion' && job.startsWith('frontend_e2e')) {
+        b.container.image = b.imageVersion = 'ghcr.io/hllouj/zdm-admin-browser@sha256:' + 'e'.repeat(64);
+      } else b[field] = ['packages', 'systemFiles', 'browser'].includes(field) ? 'b'.repeat(64) : 'other';
       const affected = job !== 'formatting' && (field !== 'browser' || job.startsWith('frontend_e2e'));
       assert.equal(JSON.stringify(environmentProofFromSnapshot(job, b)) !== JSON.stringify(proof), affected, field);
     }
@@ -666,8 +672,8 @@ test('all four job contracts acquire and replay original reports, then pass the 
         'frontend-build',
         'frontend-test-list',
       ],
-      frontend_e2e_1: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-1'],
-      frontend_e2e_2: ['npm-ci', 'chrome-browser', 'chrome-dependencies', 'e2e-2'],
+      frontend_e2e_1: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-1'],
+      frontend_e2e_2: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-2'],
     }[job];
     f.original.phases = names.map((name) => ({
       name,
