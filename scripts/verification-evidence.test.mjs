@@ -797,3 +797,34 @@ test('changing an invocation trace cannot retry a failed check', async (t) => {
   assert.equal(record(second).executed, false);
   assert.equal(record(second).firstFailure.attemptId, record(first).attemptId);
 });
+
+test('changing only local diagnostic run and output directory cannot clear a failed engineering execution', async (t) => {
+  const { root } = fixture(t);
+  writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({ scripts: { 'test:engineering': 'node failing-engineering.cjs' } }),
+  );
+  writeFileSync(
+    path.join(root, 'failing-engineering.cjs'),
+    `const fs=require('node:fs');const p='.task-verification/nonce-count';const n=fs.existsSync(p)?Number(fs.readFileSync(p)):0;fs.writeFileSync(p,String(n+1));process.exit(n===0?1:0);`,
+  );
+  const step = {
+    root,
+    name: 'nonce engineering',
+    command: 'npm',
+    args: ['run', 'test:engineering'],
+    env: { PATH: process.env.PATH, HOME: os.homedir() },
+    reuse: false,
+  };
+  const coordinate = (run) => ({
+    ...step,
+    localDiagnostics: { run, directory: path.join(root, '.task-verification/local-diagnostics', run) },
+  });
+  const first = await runVerificationTask(coordinate('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), silent);
+  assert.equal(first.exitCode, 1);
+  const second = await runVerificationTask(coordinate('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'), silent);
+  assert.equal(second.exitCode, 1);
+  assert.equal(record(second).executed, false);
+  assert.equal(record(second).firstFailure.attemptId, record(first).attemptId);
+  assert.equal(readFileSync(path.join(root, '.task-verification/nonce-count'), 'utf8'), '1');
+});

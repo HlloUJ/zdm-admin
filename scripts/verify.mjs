@@ -15,7 +15,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { runVerificationTask } from './verification-runner.mjs';
 import { captureSource } from './verification-evidence.mjs';
 import { createValidationPlan } from './check-changed-plan.mjs';
@@ -170,6 +170,22 @@ export async function executeVerification(
   const started = performance.now();
   const phases = [];
   const before = capture(plan.preflight.root);
+  // One UUID per executor, never inherited from a previous run or sent to CI.
+  const localDiagnostics =
+    plan.contractPreflight &&
+    plan.engineering?.some((task) => task.args.includes('test:engineering')) &&
+    !(plan.preflight.env?.CI || plan.preflight.env?.GITHUB_ACTIONS === 'true') &&
+    existsSync(plan.preflight.root)
+      ? { run: randomUUID() }
+      : null;
+  if (localDiagnostics) {
+    localDiagnostics.directory = path.join(
+      plan.preflight.root,
+      '.task-verification/local-diagnostics',
+      localDiagnostics.run,
+    );
+    mkdirSync(localDiagnostics.directory, { recursive: true });
+  }
   const finish = (code) => {
     if (!existsSync(plan.preflight.root)) return code;
     try {
@@ -198,7 +214,11 @@ export async function executeVerification(
   }
   const execute = async (task) => {
     const phaseStart = performance.now();
-    const result = await run(task, { force, report });
+    const diagnosticTask =
+      localDiagnostics && (task === plan.contractPreflight || task.args.includes('test:engineering'))
+        ? { ...task, localDiagnostics: localDiagnostics }
+        : task;
+    const result = await run(diagnosticTask, { force, report });
     phases.push({
       name: task.name,
       startMs: Math.round(phaseStart - started),

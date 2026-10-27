@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process';
+import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, createWriteStream } from 'node:fs';
 import path from 'node:path';
@@ -65,8 +66,27 @@ function sameCandidate(attempt, candidate) {
   );
 }
 
+// Only this executor's output coordination varies; it must not clear an unchanged test failure.
+function diagnosticExecutionEnv(task) {
+  if (!task.localDiagnostics) return task.env ?? process.env;
+  const env = task.env ?? process.env;
+  const { run, directory } = task.localDiagnostics;
+  assert.ok(!env.CI && env.GITHUB_ACTIONS !== 'true', 'Local diagnostics cannot enter CI');
+  assert.ok(
+    /npm(?:\.cmd)?$/.test(task.command) &&
+      task.args.length === 2 &&
+      task.args[0] === 'run' &&
+      ['test:ci-reuse', 'test:engineering'].includes(task.args[1]),
+    'Unsupported diagnostic coordination command',
+  );
+  assert.match(run, /^[a-f0-9-]{36}$/);
+  assert.equal(directory, path.join(task.root, '.task-verification/local-diagnostics', run));
+  return { ...env, LOCAL_DIAGNOSTIC_RUN: run, LOCAL_DIAGNOSTIC_DIRECTORY: directory, CI_EVIDENCE_DIR: directory };
+}
+
 export async function runVerificationTask(task, options = {}) {
   const { root, name, command, args = [], env = process.env } = task;
+  const executionEnv = diagnosticExecutionEnv(task);
   const inspect = options.captureIdentity ?? captureIdentity;
   const artifacts = options.captureArtifacts ?? captureArtifacts;
   const report = options.report ?? console.log;
@@ -240,8 +260,8 @@ export async function runVerificationTask(task, options = {}) {
     const relatedRunId = args.includes('test:related') ? randomUUID() : null;
     const relatedResult = relatedRunId ? path.join(directory, `related-${relatedRunId}.json`) : null;
     const childEnv = relatedRunId
-      ? { ...env, FRONTEND_TEST_RUN_ID: relatedRunId, FRONTEND_TEST_RESULT_PATH: relatedResult }
-      : env;
+      ? { ...executionEnv, FRONTEND_TEST_RUN_ID: relatedRunId, FRONTEND_TEST_RESULT_PATH: relatedResult }
+      : executionEnv;
     let tail = '';
     const append = (chunk) => {
       stream.write(chunk);

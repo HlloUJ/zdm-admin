@@ -216,7 +216,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-diagnostic-evidence.mjs": {
-      "digest": "4d741be4d52bf69b9ad1962067a7c0541f650aa7477e7276a8257b2a72973c53",
+      "digest": "208cb10771ff4e73302737129c46eb33840044785ba4e177d2f52c85dd90fceb",
       "imports": [
         "scripts/frontend-test-evidence.mjs",
         "scripts/node-test-evidence.mjs",
@@ -558,6 +558,26 @@
       "imports": [],
       "dynamicImports": 0
     },
+    "scripts/local-diagnostic-evidence.mjs": {
+      "digest": "59d1feaa81967bf4328296e0dd032b1478b7458b7567e240b87a85906fed5ef9",
+      "imports": [
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/node-test-evidence.mjs",
+        "scripts/verification-evidence.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/local-diagnostic-evidence.test.mjs": {
+      "digest": "b96b6fde52ce0c4fa621c471e278723779d96fbcdd78c5ae554777382561ab19",
+      "imports": [
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/local-diagnostic-evidence.mjs",
+        "scripts/remaining.test.mjs",
+        "scripts/run-script-tests.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/local-test-entrypoints.test.mjs": {
       "digest": "e372ca0c9ffe4b26cfc170dcbd0d62a721e189042ba3af32bf5f97d181606f78",
       "imports": [
@@ -661,10 +681,11 @@
       "dynamicImports": 0
     },
     "scripts/run-script-tests.mjs": {
-      "digest": "a386c72116721a1bd5538d92c6e82d312e5009790989ed169ee6a92dc60be50d",
+      "digest": "b3a1c22c3a48b5fcd779186ff33063d77bcc4d5992b482746a0200ac397ee8df",
       "imports": [
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
+        "scripts/local-diagnostic-evidence.mjs",
         "scripts/node-source-evidence-reporter.mjs",
         "scripts/node-test-evidence.mjs",
         "scripts/script-test-plan.mjs"
@@ -795,7 +816,7 @@
       "dynamicImports": 4
     },
     "scripts/verification-early-checks.test.mjs": {
-      "digest": "7ae52c6c2d3c423f985cd34bf7057a94e43f83db18fcfe9580435e55105758d0",
+      "digest": "06251bc670a41e73fa4367ab187305302e00e0f2a2c9c485f51651af9a29a4d7",
       "imports": ["scripts/backend-test-evidence.mjs", "scripts/verify.mjs"],
       "dynamicImports": 0
     },
@@ -810,14 +831,14 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "b10229a1f49e23560566c19a97d54b7a5ceb12cc9a2a7700fb9efdeeb6ed829c",
+      "digest": "2ce98b06c12d165a2def70c12e2eb46f6965f1d1b692beea7f61bafa804701bb",
       "imports": [
         "scripts/run-frontend-tests.mjs",
         "scripts/verification-evidence.mjs",
         "scripts/verification-runner.mjs",
         "scripts/verify.mjs"
       ],
-      "dynamicImports": 9
+      "dynamicImports": 10
     },
     "scripts/verification-impact.mjs": {
       "digest": "0cbf0215d3744ffe25eb123eeb5d360bae4e4e78cabe57faee10c21cf6103fde",
@@ -891,7 +912,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "056ccf362f88d1285c5dea2c60ea1c69755c3af5a851ca6b2a499f3422cb3180",
+      "digest": "a32ec0e43aea3546041fc90370a041dfda124c0a1968096c4c8a1e61ca3aa7dd",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -909,7 +930,7 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "7e181cc889380a6e9b32f4f2c87d7e3abe2ac332523a556f92c354a6506500b8",
+      "digest": "bb817e5c437d3fc20dd790650c963ed810cf0cf71d0d200bf8b44bec1f54e816",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/business-regression.mjs",

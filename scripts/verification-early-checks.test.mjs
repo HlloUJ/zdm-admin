@@ -55,3 +55,36 @@ test('test-discovery naming fault stops before contract diagnostics, runtime and
   assert.equal(result, 1);
   assert.deepEqual(calls, ['format', 'backend test discovery', 'contract', 'runtime']);
 });
+
+test('each verifier run shares one local diagnostic identity across its phases and never reuses a prior run', async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'local-diagnostic-orchestration-'));
+  t.after(() => rmSync(root, { recursive: true }));
+  const task = (name, args) => ({ root, name, args, env: { PATH: process.env.PATH } });
+  const plan = {
+    preflight: task('format', []),
+    contractPreflight: task('contract', ['test:ci-reuse']),
+    backend: [],
+    frontend: [],
+    engineering: [task('engineering', ['test:engineering'])],
+  };
+  const runs = [];
+  for (let i = 0; i < 2; i++) {
+    const phases = [];
+    assert.equal(
+      await executeVerification(plan, {
+        capture: () => ({}),
+        report: () => {},
+        run: async (step) => {
+          if (['contract', 'engineering'].includes(step.name)) phases.push(step.localDiagnostics);
+          return { exitCode: 0 };
+        },
+      }),
+      0,
+    );
+    assert.equal(phases.length, 2);
+    assert.equal(phases[0].run, phases[1].run);
+    assert.equal(phases[0].directory, phases[1].directory);
+    runs.push(phases[0].run);
+  }
+  assert.notEqual(runs[0], runs[1]);
+});

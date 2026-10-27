@@ -168,6 +168,7 @@ export function mergeDiagnosticReport(report, packet, currentIdentity) {
   };
 }
 export function validateDiagnosticComposition(report) {
+  assert.ok(!report.localDiagnosticReuse, 'Local diagnostic proof cannot authorize CI');
   if (!report.diagnosticReuse) return;
   const { currentIdentity, packet } = report.diagnosticReuse;
   const original = validateDiagnosticPacket(packet, currentIdentity);
