@@ -368,7 +368,13 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     fixture("warehouse", "selling", false, 1L);
     identity("supply-chain", "all", "all");
     jdbc.update("UPDATE slab_inventory SET length_mm=2000,width_mm=1800,thickness_mm=20,area_square_meter=3.6 WHERE id=99601");
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99552,'日志缺价级别',1)");
     var snapshot = logs.arrivalSnapshot(99601L);
+    var captured = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().valueToTree(snapshot);
+    assertThat(captured.path("价格层级").path("complete").asBoolean()).isTrue();
+    assertThat(captured.path("价格层级").path("after").findValuesAsText("missingReason"))
+        .contains("未配置价格系数，未生成价格");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_prices WHERE slab_id=99601 AND store_level_id=99552", Long.class)).isZero();
     logs.record(slabs.getById(99601L), "CREATE", null, "warehouse", null, null, "MANUAL", snapshot);
     assertThat(jdbc.queryForObject("SELECT operation_summary FROM slab_operation_logs WHERE slab_id=99601 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("发布商品");
     identity("admin", "all", "all");

@@ -258,3 +258,24 @@ it.each([
     '0',
   ]);
 });
+
+it('keeps missing tier columns and shows the recorded reason for each SKU', () => {
+  const wrapper = mount(FinishedSalesLogTable, {
+    shallow: true,
+    props: {
+      snapshot: {
+        销售规格: [{ skuId: 1, variantLabel: '规格1', stock: 2 }],
+        层级价格: [
+          { skuId: 1, storeLevelId: 25, storeLevelName: '华东中心店', missingReason: '未配置价格系数，未生成价格' },
+        ],
+      },
+      other: {},
+    },
+  });
+  const vm = wrapper.vm as unknown as { rows: any[]; columns: any[] };
+  const column = vm.columns.find((item) => item.colKey === 'level_25');
+  expect(column.title).toBe('华东中心店');
+  const content = column.cell(null, { row: vm.rows[0] });
+  expect(content.children).toEqual(['未配置价格系数，未生成价格']);
+  expect(vm.rows[0].level_25.price).toBeUndefined();
+});

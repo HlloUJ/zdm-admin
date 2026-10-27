@@ -2569,13 +2569,39 @@
     },
     "src/pages/finished-stock/management/components/FinishedOperationLogs.test.ts": {
       "content": "e4455e787acbcf4a6a2fe0ae165bc9fc7e741b7beb4243b29fd6d68794f2d507",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "    expect(wrapper.text()).toContain('库存：0');\n  });\n});\n",
+          "after": "    expect(wrapper.text()).toContain('库存：0');\n  });\n});\n\nit('warns for legacy arrival logs and hides the warning for complete snapshots', async () => {\n  vi.mocked(getLoginUser).mockReturnValue({ clientCode: 'admin' } as ReturnType<typeof getLoginUser>);\n  const log = { id: 5, productName: '历史商品', operationType: 'SOURCE_SHELF', changeDetails: '{}' };\n  vi.mocked(getFinishedOperationLog).mockResolvedValueOnce(log as any);\n  const wrapper = mount(FinishedOperationLogs, { props: { visible: false }, shallow: true });\n  const vm = wrapper.vm as unknown as { showDetail: (id: number) => Promise<void>; legacyArrivalPrices: boolean };\n  await vm.showDetail(5);\n  expect(vm.legacyArrivalPrices).toBe(true);\n  vi.mocked(getFinishedOperationLog).mockResolvedValueOnce({\n    ...log,\n    changeDetails: JSON.stringify({ 层级价格: { before: null, after: [], complete: true } }),\n  } as any);\n  await vm.showDetail(5);\n  expect(vm.legacyArrivalPrices).toBe(false);\n  vi.mocked(getFinishedOperationLog).mockResolvedValueOnce({ ...log, beforeStatus: 'warehouse' } as any);\n  await vm.showDetail(5);\n  expect(vm.legacyArrivalPrices).toBe(false);\n});\n"
+        }
+      ]
     },
     "src/pages/finished-stock/management/components/FinishedOperationLogs.vue": {
       "script": "25b8c58b362e281f05e9d437f4273d903ea75290ab32026111c905df6767bef2",
       "template": "0226fd57225b2078eec996ce39bc88ffb3d63a4d39fc6975499848203db19073",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "    @open-detail=\"showDetail\"\n  >\n    <template #detail>\n      <SalesLogFullscreen v-if=\"initialWarehousePrice\" title=\"入仓价格\">\n        <FinishedSalesLogTable :snapshot=\"priceLogSnapshot(changes['入仓价格'].after)\" :other=\"{}\" price-only />\n      </SalesLogFullscreen>\n",
+          "after": "    @open-detail=\"showDetail\"\n  >\n    <template #detail>\n      <t-alert v-if=\"legacyArrivalPrices\" theme=\"info\" message=\"历史日志仅记录已生成的价格，未记录完整价格层级\" />\n      <SalesLogFullscreen v-if=\"initialWarehousePrice\" title=\"入仓价格\">\n        <FinishedSalesLogTable :snapshot=\"priceLogSnapshot(changes['入仓价格'].after)\" :other=\"{}\" price-only />\n      </SalesLogFullscreen>\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "    if (visible) void load();\n  },\n);\nconst changes = computed<Record<string, { before: unknown; after: unknown; hint?: string }>>(() => {\n  try {\n    return JSON.parse(detail.value?.changeDetails || '{}');\n  } catch {\n",
+          "after": "    if (visible) void load();\n  },\n);\nconst changes = computed<Record<string, { before: unknown; after: unknown; hint?: string; complete?: boolean }>>(() => {\n  try {\n    return JSON.parse(detail.value?.changeDetails || '{}');\n  } catch {\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "  () =>\n    detail.value?.operationType === 'CREATE' ||\n    (detail.value?.operationType === 'SOURCE_SHELF' && !!changes.value['商品ID'] && !!changes.value['销售规格']),\n);\nconst initialWarehousePrice = computed(\n  () =>\n",
+          "after": "  () =>\n    detail.value?.operationType === 'CREATE' ||\n    (detail.value?.operationType === 'SOURCE_SHELF' && !!changes.value['商品ID'] && !!changes.value['销售规格']),\n);\nconst legacyArrivalPrices = computed(\n  () =>\n    getLoginUser().clientCode === 'admin' &&\n    detail.value?.operationType === 'SOURCE_SHELF' &&\n    !detail.value.beforeStatus &&\n    !changes.value['层级价格']?.complete,\n);\nconst initialWarehousePrice = computed(\n  () =>\n"
+        },
         {
           "before": "    <template v-if=\"preview\"\n      ><t-alert v-if=\"preview.message\" :message=\"preview.message\" /><video\n        v-if=\"preview.mediaType === 'video'\"\n        :src=\"preview.url\"\n        controls\n        class=\"history-large-media\" /><img v-else :src=\"preview.url\" alt=\"历史图片\" style=\"max-width: 100%\"\n    /></template>\n  </AdminDialog>\n</template>\n<script setup lang=\"ts\">\nimport { computed, reactive, ref, watch } from 'vue';\nimport DOMPurify from 'dompurify';\nimport { formatProductDateTime } from '@/utils/formatProductDateTime';\nimport { getLoginUser } from '@/services/auth';\nimport { AdminDialog, adminFeedback } from '@/components/foundation';\nimport ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';\nimport {\n  finishedProductOperationSummary,\n  productLogFilterOptions,\n  type ProductOperationLogRow,\n} from '@/services/productOperationLog';\nimport {\n  listFinishedOperationLogs,\n  getFinishedOperationLog,\n  finishedLogStates,\n  type FinishedOperationLog,\n} from '@/services/finishedOperationLogs';\nimport SalesLogFullscreen from './SalesLogFullscreen.vue';\nimport FinishedSalesLogTable from './FinishedSalesLogTable.vue';\nimport { priceLogSnapshot } from '../priceLogSnapshot';\nimport FinishedEditChanges from './FinishedEditChanges.vue';\nimport FinishedCreationSnapshot from './FinishedCreationSnapshot.vue';\nconst props = defineProps<{ visible: boolean }>();\nconst emit = defineEmits<{ 'update:visible': [value: boolean] }>();\nconst visibleProxy = computed({\n  get: () => props.visible,\n  set: (value: boolean) => emit('update:visible', value),\n",
           "after": "    <template v-if=\"preview\"\n      ><t-alert v-if=\"preview.message\" :message=\"preview.message\" /><video\n        v-if=\"preview.mediaType === 'video'\"\n        :src=\"preview.url\"\n        controls\n        class=\"history-large-media\" /><img v-else :src=\"preview.url\" alt=\"历史图片\" style=\"max-width: 100%\"\n    /></template>\n  </AdminDialog>\n</template>\n<script setup lang=\"ts\">\nimport { useCommodityModule } from '@/composables/useCommodityModule';\nconst commodity = useCommodityModule();\n\nimport { computed, reactive, ref, watch } from 'vue';\nimport DOMPurify from 'dompurify';\nimport { formatProductDateTime } from '@/utils/formatProductDateTime';\nimport { getLoginUser } from '@/services/auth';\nimport { AdminDialog, adminFeedback } from '@/components/foundation';\nimport ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';\nimport {\n  finishedProductOperationSummary,\n  productLogFilterOptions,\n  type ProductOperationLogRow,\n} from '@/services/productOperationLog';\nimport { type FinishedOperationLog } from '@/services/finishedOperationLogs';\nconst { listFinishedOperationLogs, getFinishedOperationLog, finishedLogStates } = commodity.logs;\nimport SalesLogFullscreen from './SalesLogFullscreen.vue';\nimport FinishedSalesLogTable from './FinishedSalesLogTable.vue';\nimport { priceLogSnapshot } from '../priceLogSnapshot';\nimport FinishedEditChanges from './FinishedEditChanges.vue';\nimport FinishedCreationSnapshot from './FinishedCreationSnapshot.vue';\nconst props = defineProps<{ visible: boolean }>();\nconst emit = defineEmits<{ 'update:visible': [value: boolean] }>();\nconst visibleProxy = computed({\n  get: () => props.visible,\n  set: (value: boolean) => emit('update:visible', value),\n",
@@ -2615,12 +2641,26 @@
     },
     "src/pages/finished-stock/management/components/FinishedSalesLogTable.test.ts": {
       "content": "94930854935a81234903837f01de221469958d698abf11f58cba68d9e4e1a314",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "    '0',\n  ]);\n});\n",
+          "after": "    '0',\n  ]);\n});\n\nit('keeps missing tier columns and shows the recorded reason for each SKU', () => {\n  const wrapper = mount(FinishedSalesLogTable, {\n    shallow: true,\n    props: {\n      snapshot: {\n        销售规格: [{ skuId: 1, variantLabel: '规格1', stock: 2 }],\n        层级价格: [\n          { skuId: 1, storeLevelId: 25, storeLevelName: '华东中心店', missingReason: '未配置价格系数，未生成价格' },\n        ],\n      },\n      other: {},\n    },\n  });\n  const vm = wrapper.vm as unknown as { rows: any[]; columns: any[] };\n  const column = vm.columns.find((item) => item.colKey === 'level_25');\n  expect(column.title).toBe('华东中心店');\n  const content = column.cell(null, { row: vm.rows[0] });\n  expect(content.children).toEqual(['未配置价格系数，未生成价格']);\n  expect(vm.rows[0].level_25.price).toBeUndefined();\n});\n"
+        }
+      ]
     },
     "src/pages/finished-stock/management/components/FinishedSalesLogTable.vue": {
       "script": "8dde40e7e781e74f6b6ef2648e1240870be85b183e2fdaa8925dae6ad0e45eb0",
       "template": "e1c3c75dd26a35f84d110982fa0f5eab7a7eaaf827f6c2a5ad9af8753399af06",
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "    title: props.storeMode ? `${name}价` : name,\n    minWidth: 170,\n    cell: (_h: unknown, { row }: { row: TableRowData }) =>\n      priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),\n  })),\n  ...(props.storeMode &&\n",
+          "after": "    title: props.storeMode ? `${name}价` : name,\n    minWidth: 170,\n    cell: (_h: unknown, { row }: { row: TableRowData }) =>\n      row[`level_${id}`]?.missingReason ||\n      priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),\n  })),\n  ...(props.storeMode &&\n"
+        },
         {
           "reason": "2026-10-15 user requested fixing log table initial alignment without changing data or interactions; refresh native sticky measurements after the containing dialog zoom animation ends and remove the listener on unmount.",
           "before": "  <div>\n    <t-table",
@@ -7710,6 +7750,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "                    {{ row.after }}\n                  </t-descriptions-item>\n                </t-descriptions>\n                <t-table\n                  class=\"operation-log-detail__prices\"\n                  row-key=\"label\"\n",
+          "after": "                    {{ row.after }}\n                  </t-descriptions-item>\n                </t-descriptions>\n                <t-alert\n                  v-if=\"legacyArrivalPrices\"\n                  theme=\"info\"\n                  message=\"历史日志仅记录已生成的价格，未记录完整价格层级\"\n                />\n                <t-table\n                  class=\"operation-log-detail__prices\"\n                  row-key=\"label\"\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "  () => markupConfigurations.value,\n  () => operationStatusLabels,\n);\nconst creationLogPriceColumns = computed(() => [\n  { colKey: 'label', title: '价格层级' },\n  { colKey: 'coefficient', title: '价格系数' },\n",
+          "after": "  () => markupConfigurations.value,\n  () => operationStatusLabels,\n);\nconst legacyArrivalPrices = computed(() => {\n  if (operationLogDetail.value?.operationType !== 'SOURCE_SHELF') return false;\n  try {\n    return JSON.parse(operationLogDetail.value.changeDetails || '{}')['价格层级']?.complete !== true;\n  } catch {\n    return true;\n  }\n});\nconst creationLogPriceColumns = computed(() => [\n  { colKey: 'label', title: '价格层级' },\n  { colKey: 'coefficient', title: '价格系数' },\n"
+        },
+        {
           "reason": "2026-10-23 current batch delivery fixes classic-scrollbar viewport overflow using the actual Drawer container width; retain dynamic label-based maximum.",
           "stage": "before-migrations",
           "before": "  return `min(${Math.max(620, longestLabelLength * 16 + 430)}px, 100vw)`;",
@@ -8363,11 +8415,33 @@
     },
     "src/pages/slab/shared/operationLogPriceTiers.test.ts": {
       "content": "29f5e3d1033d9fb0216a8ef76bf88bdb92a0aaee2ee5a6d0bd189ad17a6c8313",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "    ]);\n  });\n});\n",
+          "after": "    ]);\n  });\n});\n\nit('shows missing prices with the saved reason and name without adding current levels', () => {\n  const rows = buildSlabPriceTierComparison(\n    null,\n    [{ storeLevelId: 25, storeLevelName: '华东中心店', missingReason: '价格配置已停用，未生成价格' }],\n    [{ storeLevelId: 99, name: '后来新增的级别' }],\n  );\n  expect(rows).toHaveLength(1);\n  expect(rows[0]).toMatchObject({\n    label: '华东中心店',\n    afterCoefficient: '未填写',\n    afterPrice: '价格配置已停用，未生成价格',\n  });\n});\n"
+        }
+      ]
     },
     "src/pages/slab/shared/operationLogPriceTiers.ts": {
       "content": "9c5639fbf6b671606d37a8b2c8c4887726ceca5e09d43b62f4cf9d74479e3be4",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "      markupRate?: number;\n      price?: number;\n      priceSource?: 'auto' | 'manual';\n    };\n    const levelId = price.storeLevelId ?? price.configurationId;\n    const key = String(levelId ?? 'unknown');\n",
+          "after": "      markupRate?: number;\n      price?: number;\n      priceSource?: 'auto' | 'manual';\n      missingReason?: string;\n    };\n    const levelId = price.storeLevelId ?? price.configurationId;\n    const key = String(levelId ?? 'unknown');\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
+          "stage": "before-migrations",
+          "before": "              ? '未填写'\n              : (1 + Number(price.markupRate) / 100).toFixed(2)\n            : Number(price.priceCoefficient).toFixed(2),\n        price: price.price == null ? '未填写' : Number(price.price).toFixed(2),\n      },\n    ];\n  });\n",
+          "after": "              ? '未填写'\n              : (1 + Number(price.markupRate) / 100).toFixed(2)\n            : Number(price.priceCoefficient).toFixed(2),\n        price: price.missingReason || (price.price == null ? '未填写' : Number(price.price).toFixed(2)),\n      },\n    ];\n  });\n"
+        }
+      ]
     },
     "src/pages/slab/shared/slabFormRules.ts": {
       "content": "a3f74dc3041c39125c0181b39f14eb99a39862555e8404aa72b26cbec40624df",

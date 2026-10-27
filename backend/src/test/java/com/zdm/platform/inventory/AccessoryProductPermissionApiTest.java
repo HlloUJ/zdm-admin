@@ -366,7 +366,7 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
   @org.junit.jupiter.params.ParameterizedTest
   @org.junit.jupiter.params.provider.ValueSource(strings = {"warehouse", "selling"})
   void arrivalRetainsCompleteSnapshotAndMediaAfterProductChanges(String initialStatus) throws Exception {
-    ObjectNode created = sourceFixture("平台发布", initialStatus);
+    ObjectNode created = sourceFixture("平台发布", initialStatus, true, true);
     long id = created.path("id").asLong();
     if ("warehouse".equals(initialStatus)) { sourceStatus(id, "selling"); }
     long logId = jdbc.queryForObject("SELECT id FROM accessory_operation_logs WHERE product_id=? AND business_client_code='admin' AND operation_type='SOURCE_SHELF'", Long.class, id);
@@ -380,6 +380,10 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
         .isEqualTo(created.path("variants").get(0).path("id").asLong());
     assertThat(snapshot.path("指导价").path("after").get(0).path("price").asInt()).isEqualTo(20);
     assertThat(snapshot.has("层级价格")).isTrue();
+    assertThat(snapshot.path("层级价格").path("complete").asBoolean()).isTrue();
+    assertThat(snapshot.path("层级价格").path("after").findValuesAsText("missingReason"))
+        .contains("未配置价格系数，未生成价格");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM accessory_product_prices WHERE accessory_product_id=? AND store_level_id=99552", Long.class, id)).isZero();
     assertThat(snapshot.path("状态").path("after").asText()).isEqualTo("warehouse");
     assertThat(snapshot.path("媒体").path("after").size()).isEqualTo(2);
     assertThat(snapshot.has("入仓价格")).isFalse();
@@ -589,11 +593,17 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     return sourceFixture(publisher, status, true);
   }
   private ObjectNode sourceFixture(String publisher,String status,boolean configureGuide) throws Exception {
+    return sourceFixture(publisher, status, configureGuide, false);
+  }
+  private ObjectNode sourceFixture(String publisher,String status,boolean configureGuide,boolean missingTier) throws Exception {
     jdbc.update("INSERT INTO product_categories (id,name,scope,created_by_account_id) VALUES (99010,'跨端测试分类','accessory',1)");
     jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id,created_by_account_id) VALUES (99010,'跨端测试供应商','platform',0,1)");
     jdbc.update("INSERT INTO supplier_supply_type_links (supplier_id,supply_type_id) VALUES (99010,3)");
     jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");
+    if (missingTier) {
+      jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99552,'日志缺价级别',1)");
+    }
     if (configureGuide) {
       jdbc.update("INSERT INTO accessory_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
     } else {

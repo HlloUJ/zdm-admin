@@ -150,7 +150,14 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     }
     List<Map<String,Object>> prices = jdbcTemplate.queryForList("SELECT * FROM slab_prices WHERE slab_id=? ORDER BY store_level_id",id);
     applyArrivalPrices(values, prices);
-    return creationSnapshot(values);
+    List<Map<String, Object>> tiers = objectMapper.convertValue(values.get("价格层级"),
+        new TypeReference<List<Map<String, Object>>>() {});
+    values.put("价格层级", ArrivalLogPriceTiers.complete(jdbcTemplate, "slab", tiers, List.of()));
+    Map<String, Object> snapshot = creationSnapshot(values);
+    @SuppressWarnings("unchecked")
+    Map<String, Object> tierChange = (Map<String, Object>) snapshot.get("价格层级");
+    tierChange.put("complete", true);
+    return snapshot;
   }
 
   private void applyArrivalPrices(Map<String,Object> values, List<Map<String,Object>> prices) {

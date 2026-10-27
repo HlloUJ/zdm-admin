@@ -45,3 +45,17 @@ describe('slab operation log price tiers', () => {
     ]);
   });
 });
+
+it('shows missing prices with the saved reason and name without adding current levels', () => {
+  const rows = buildSlabPriceTierComparison(
+    null,
+    [{ storeLevelId: 25, storeLevelName: '华东中心店', missingReason: '价格配置已停用，未生成价格' }],
+    [{ storeLevelId: 99, name: '后来新增的级别' }],
+  );
+  expect(rows).toHaveLength(1);
+  expect(rows[0]).toMatchObject({
+    label: '华东中心店',
+    afterCoefficient: '未填写',
+    afterPrice: '价格配置已停用，未生成价格',
+  });
+});

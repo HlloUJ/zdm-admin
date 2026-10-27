@@ -132,3 +132,22 @@ describe('finished operation logs', () => {
     expect(wrapper.text()).toContain('库存：0');
   });
 });
+
+it('warns for legacy arrival logs and hides the warning for complete snapshots', async () => {
+  vi.mocked(getLoginUser).mockReturnValue({ clientCode: 'admin' } as ReturnType<typeof getLoginUser>);
+  const log = { id: 5, productName: '历史商品', operationType: 'SOURCE_SHELF', changeDetails: '{}' };
+  vi.mocked(getFinishedOperationLog).mockResolvedValueOnce(log as any);
+  const wrapper = mount(FinishedOperationLogs, { props: { visible: false }, shallow: true });
+  const vm = wrapper.vm as unknown as { showDetail: (id: number) => Promise<void>; legacyArrivalPrices: boolean };
+  await vm.showDetail(5);
+  expect(vm.legacyArrivalPrices).toBe(true);
+  vi.mocked(getFinishedOperationLog).mockResolvedValueOnce({
+    ...log,
+    changeDetails: JSON.stringify({ 层级价格: { before: null, after: [], complete: true } }),
+  } as any);
+  await vm.showDetail(5);
+  expect(vm.legacyArrivalPrices).toBe(false);
+  vi.mocked(getFinishedOperationLog).mockResolvedValueOnce({ ...log, beforeStatus: 'warehouse' } as any);
+  await vm.showDetail(5);
+  expect(vm.legacyArrivalPrices).toBe(false);
+});

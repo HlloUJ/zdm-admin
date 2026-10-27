@@ -865,6 +865,11 @@
                     {{ row.after }}
                   </t-descriptions-item>
                 </t-descriptions>
+                <t-alert
+                  v-if="legacyArrivalPrices"
+                  theme="info"
+                  message="历史日志仅记录已生成的价格，未记录完整价格层级"
+                />
                 <t-table
                   class="operation-log-detail__prices"
                   row-key="label"
@@ -1400,6 +1405,14 @@ const {
   () => markupConfigurations.value,
   () => operationStatusLabels,
 );
+const legacyArrivalPrices = computed(() => {
+  if (operationLogDetail.value?.operationType !== 'SOURCE_SHELF') return false;
+  try {
+    return JSON.parse(operationLogDetail.value.changeDetails || '{}')['价格层级']?.complete !== true;
+  } catch {
+    return true;
+  }
+});
 const creationLogPriceColumns = computed(() => [
   { colKey: 'label', title: '价格层级' },
   { colKey: 'coefficient', title: '价格系数' },

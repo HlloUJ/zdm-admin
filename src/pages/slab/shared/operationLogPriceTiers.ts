@@ -56,6 +56,7 @@ const normalizePriceTierChanges = (value: unknown, configurations: PriceLevelNam
       markupRate?: number;
       price?: number;
       priceSource?: 'auto' | 'manual';
+      missingReason?: string;
     };
     const levelId = price.storeLevelId ?? price.configurationId;
     const key = String(levelId ?? 'unknown');
@@ -73,7 +74,7 @@ const normalizePriceTierChanges = (value: unknown, configurations: PriceLevelNam
               ? '未填写'
               : (1 + Number(price.markupRate) / 100).toFixed(2)
             : Number(price.priceCoefficient).toFixed(2),
-        price: price.price == null ? '未填写' : Number(price.price).toFixed(2),
+        price: price.missingReason || (price.price == null ? '未填写' : Number(price.price).toFixed(2)),
       },
     ];
   });

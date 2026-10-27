@@ -254,6 +254,7 @@ const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
     title: props.storeMode ? `${name}价` : name,
     minWidth: 170,
     cell: (_h: unknown, { row }: { row: TableRowData }) =>
+      row[`level_${id}`]?.missingReason ||
       priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),
   })),
   ...(props.storeMode &&

@@ -239,6 +239,10 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
   @Transactional
   public void recordArrival(FinishedProduct product, String sourceStatus) {
     Map<String, Object> snapshot = snapshot(product, false);
+    List<Map<String, Object>> prices = json.convertValue(snapshot.get("层级价格"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+    snapshot.put("层级价格", ArrivalLogPriceTiers.complete(jdbc, "finished", prices,
+        product.getVariants().stream().map(FinishedProductVariant::getId).toList()));
     Map<String, Object> changes = new LinkedHashMap<>();
     snapshot.forEach((key, value) -> {
       Map<String, Object> change = new LinkedHashMap<>();
@@ -247,6 +251,9 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       if ("商品分类".equals(key)) { change.put("pathRecorded", true); }
       changes.put(key, change);
     });
+    @SuppressWarnings("unchecked")
+    Map<String, Object> tierChange = (Map<String, Object>) changes.get("层级价格");
+    tierChange.put("complete", true);
     changes.put("来源状态", Map.of("before", sourceStatus, "after", product.getSourceStatus()));
     var identity = identities.require();
     FinishedOperationLog log = new FinishedOperationLog();
