@@ -188,8 +188,8 @@
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "b012b948e88160c81032d66dfef3762858383810da891a28682a8462eb575449",
-        "tests/e2e/finished-stock.spec.ts": "7d06f638e767839a77ff86bb39d14e898895b7b07929525147f164bc628e9c01",
-        "tests/e2e/accessory-management.spec.ts": "1b04452dfe807e203f3dedd268e54b8ff6a1c80bfcb8ee979066c2bee8d547e4",
+        "tests/e2e/finished-stock.spec.ts": "71f18a2f430aa51df9cc0cf9773f08584502ed14177331b91335e15336f42d50",
+        "tests/e2e/accessory-management.spec.ts": "572a2937b59cd5a01fb0706751f853ccee772f5022ee370a37348f9fdb641903",
         "tests/e2e/slab-collaboration.spec.ts": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
         "tests/e2e/store-finished-stock.spec.ts": "922ff10f1c9f988a9a9259faed91513f02578ee56df7baba49dbfd46dfdcc94a",
         "tests/e2e/store-accessory-management.spec.ts": "573eb6f864dbeba824a3b0f413be0b06159d2c0eb538b5820aa21c9ba505b6df",
@@ -259,6 +259,18 @@
           "before": "b681bc6072243b3eac4cf24271e8cf0aa81c24c68283ef89eaac9198841e9f11",
           "after": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
           "reason": "用户授权性能优化：仅替换独立测试数据库初始化入口，业务用例及断言逐字保持"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "1b04452dfe807e203f3dedd268e54b8ff6a1c80bfcb8ee979066c2bee8d547e4",
+          "after": "572a2937b59cd5a01fb0706751f853ccee772f5022ee370a37348f9fdb641903",
+          "reason": "用户确认单独排查并修复此项失败：同版本编辑器对照证实工具栏CSS禁用状态异步更新；仅等待加粗按钮可用，保留全部富文本行为断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "7d06f638e767839a77ff86bb39d14e898895b7b07929525147f164bc628e9c01",
+          "after": "71f18a2f430aa51df9cc0cf9773f08584502ed14177331b91335e15336f42d50",
+          "reason": "用户确认同步修复成品现货测试：与配件共用编辑器且同样过早点击CSS禁用的加粗按钮；仅等待按钮可用，保留全部富文本断言、原超时与零重试。"
         }
       ],
       "routes": [

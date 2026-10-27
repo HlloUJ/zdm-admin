@@ -358,7 +358,11 @@ test('edits an initially empty rich product description with real toolbar action
   // Use the editor's native select-all key handling, not a DOM Range that can
   // race wangEditor's throttled selectionchange -> Slate synchronization.
   await editable.press('ControlOrMeta+A');
-  await rich.locator('.w-e-toolbar button[data-menu-key="bold"]').click();
+  // Toolbar readiness is asynchronous and uses a CSS class, not native disabled.
+  // Wait for that state before clicking; keep the resulting rich-text assertion.
+  const bold = rich.locator('.w-e-toolbar button[data-menu-key="bold"]');
+  await expect(bold).not.toHaveClass(/disabled/);
+  await bold.click();
   await expect(editable.locator('strong')).toHaveText('商品详情测试');
   await rich.locator('.w-e-toolbar button[data-menu-key="fontFamily"]').click();
   await rich.getByText('Arial', { exact: true }).click();
