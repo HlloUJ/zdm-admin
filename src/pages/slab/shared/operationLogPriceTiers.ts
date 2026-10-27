@@ -12,6 +12,7 @@ export interface OperationLogPriceTierRow {
   afterPrice: string;
   beforeSource?: 'auto' | 'manual';
   afterSource?: 'auto' | 'manual';
+  afterMissingReason?: string;
 }
 
 export const formatSlabPriceTierChanges = (value: unknown, configurations: PriceLevelName[]): string | null => {
@@ -63,6 +64,7 @@ const normalizePriceTierChanges = (value: unknown, configurations: PriceLevelNam
     return [
       {
         key,
+        missingReason: price.missingReason,
         source: price.priceSource,
         label:
           price.storeLevelName ||
@@ -99,6 +101,7 @@ export const buildSlabPriceTierComparison = (
       afterPrice: afterTier?.price || '未填写',
       beforeSource: beforeTier?.source,
       afterSource: afterTier?.source,
+      ...(afterTier?.missingReason ? { afterMissingReason: afterTier.missingReason } : {}),
     };
   });
 };

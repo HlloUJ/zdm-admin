@@ -2644,6 +2644,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "  const column = vm.columns.find((item) => item.colKey === 'level_25');\n  expect(column.title).toBe('华东中心店');\n  const content = column.cell(null, { row: vm.rows[0] });\n  expect(content.children).toEqual(['未配置价格系数，未生成价格']);\n  expect(vm.rows[0].level_25.price).toBeUndefined();\n});\n",
+          "after": "  const column = vm.columns.find((item) => item.colKey === 'level_25');\n  expect(column.title).toBe('华东中心店');\n  const content = column.cell(null, { row: vm.rows[0] });\n  expect(content.children[0].props.theme).toBe('error');\n  expect(content.children[0].children.default()).toBe('未配置价格系数，未生成价格');\n  expect(vm.rows[0].level_25.price).toBeUndefined();\n});\n"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
           "stage": "before-migrations",
           "before": "    '0',\n  ]);\n});\n",
@@ -2655,6 +2661,18 @@
       "script": "8dde40e7e781e74f6b6ef2648e1240870be85b183e2fdaa8925dae6ad0e45eb0",
       "template": "e1c3c75dd26a35f84d110982fa0f5eab7a7eaaf827f6c2a5ad9af8753399af06",
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';\nimport { getLoginUser } from '@/services/auth';\nimport PriceSourceToggle from './PriceSourceToggle.vue';\nimport type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport { layeredCellSpan, orderLayeredRows } from '../layeredSpecs';\nimport type {\n  FinishedSpecDimension,\n",
+          "after": "import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';\nimport { getLoginUser } from '@/services/auth';\nimport PriceSourceToggle from './PriceSourceToggle.vue';\nimport { Text as TypographyText, type PrimaryTableCol, type TableRowData } from 'tdesign-vue-next';\nimport { layeredCellSpan, orderLayeredRows } from '../layeredSpecs';\nimport type {\n  FinishedSpecDimension,\n"
+        },
+        {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "    title: props.storeMode ? `${name}价` : name,\n    minWidth: 170,\n    cell: (_h: unknown, { row }: { row: TableRowData }) =>\n      row[`level_${id}`]?.missingReason ||\n      priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),\n  })),\n  ...(props.storeMode &&\n  [...variants.value, ...(props.supplyEdit ? [] : otherList<LoggedVariant>('销售规格'))].some(\n",
+          "after": "    title: props.storeMode ? `${name}价` : name,\n    minWidth: 170,\n    cell: (_h: unknown, { row }: { row: TableRowData }) =>\n      row[`level_${id}`]?.missingReason\n        ? h(TypographyText, { theme: 'error' }, () => row[`level_${id}`].missingReason)\n        : priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),\n  })),\n  ...(props.storeMode &&\n  [...variants.value, ...(props.supplyEdit ? [] : otherList<LoggedVariant>('销售规格'))].some(\n"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
           "stage": "before-migrations",
@@ -7750,6 +7768,24 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户要求大板日志缺价行的价格系数未填写也使用官方错误色，其他字段保持原样。",
+          "stage": "before-migrations",
+          "before": "                  <template #price=\"{ row }\">\n",
+          "after": "                  <template #coefficient=\"{ row }\">\n                    <t-typography-text v-if=\"row.missingReason && row.coefficient === '未填写'\" theme=\"error\">\n                      {{ row.coefficient }}\n                    </t-typography-text>\n                    <span v-else>{{ row.coefficient }}</span>\n                  </template>\n                  <template #price=\"{ row }\">\n"
+        },
+        {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "                >\n                  <template #price=\"{ row }\">\n                    <t-space align=\"center\" size=\"small\">\n                      <span>{{ row.price }}</span>\n                      <PriceSourceToggle v-if=\"row.priceSource\" :source=\"row.priceSource\" :available=\"false\" readonly />\n                    </t-space>\n                  </template>\n",
+          "after": "                >\n                  <template #price=\"{ row }\">\n                    <t-space align=\"center\" size=\"small\">\n                      <t-typography-text v-if=\"row.missingReason\" theme=\"error\">{{ row.price }}</t-typography-text>\n                      <span v-else>{{ row.price }}</span>\n                      <PriceSourceToggle v-if=\"row.priceSource\" :source=\"row.priceSource\" :available=\"false\" readonly />\n                    </t-space>\n                  </template>\n"
+        },
+        {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "      label: tier.label,\n      coefficient: tier.afterCoefficient,\n      price: tier.afterPrice,\n      priceSource:\n        value(`${tier.label}价格来源`) === '跟随配置'\n          ? ('auto' as const)\n",
+          "after": "      label: tier.label,\n      coefficient: tier.afterCoefficient,\n      price: tier.afterPrice,\n      missingReason: tier.afterMissingReason,\n      priceSource:\n        value(`${tier.label}价格来源`) === '跟随配置'\n          ? ('auto' as const)\n"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
           "stage": "before-migrations",
           "before": "                    {{ row.after }}\n                  </t-descriptions-item>\n                </t-descriptions>\n                <t-table\n                  class=\"operation-log-detail__prices\"\n                  row-key=\"label\"\n",
@@ -8418,6 +8454,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "    label: '华东中心店',\n    afterCoefficient: '未填写',\n    afterPrice: '价格配置已停用，未生成价格',\n  });\n});\n",
+          "after": "    label: '华东中心店',\n    afterCoefficient: '未填写',\n    afterPrice: '价格配置已停用，未生成价格',\n    afterMissingReason: '价格配置已停用，未生成价格',\n  });\n});\n"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
           "stage": "before-migrations",
           "before": "    ]);\n  });\n});\n",
@@ -8429,6 +8471,24 @@
       "content": "9c5639fbf6b671606d37a8b2c8c4887726ceca5e09d43b62f4cf9d74479e3be4",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "  afterPrice: string;\n  beforeSource?: 'auto' | 'manual';\n  afterSource?: 'auto' | 'manual';\n}\n\nexport const formatSlabPriceTierChanges = (value: unknown, configurations: PriceLevelName[]): string | null => {\n",
+          "after": "  afterPrice: string;\n  beforeSource?: 'auto' | 'manual';\n  afterSource?: 'auto' | 'manual';\n  afterMissingReason?: string;\n}\n\nexport const formatSlabPriceTierChanges = (value: unknown, configurations: PriceLevelName[]): string | null => {\n"
+        },
+        {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "    return [\n      {\n        key,\n        source: price.priceSource,\n        label:\n          price.storeLevelName ||\n",
+          "after": "    return [\n      {\n        key,\n        missingReason: price.missingReason,\n        source: price.priceSource,\n        label:\n          price.storeLevelName ||\n"
+        },
+        {
+          "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
+          "stage": "before-migrations",
+          "before": "      afterPrice: afterTier?.price || '未填写',\n      beforeSource: beforeTier?.source,\n      afterSource: afterTier?.source,\n    };\n  });\n};\n",
+          "after": "      afterPrice: afterTier?.price || '未填写',\n      beforeSource: beforeTier?.source,\n      afterSource: afterTier?.source,\n      ...(afterTier?.missingReason ? { afterMissingReason: afterTier.missingReason } : {}),\n    };\n  });\n};\n"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
           "stage": "before-migrations",

@@ -276,6 +276,7 @@ it('keeps missing tier columns and shows the recorded reason for each SKU', () =
   const column = vm.columns.find((item) => item.colKey === 'level_25');
   expect(column.title).toBe('华东中心店');
   const content = column.cell(null, { row: vm.rows[0] });
-  expect(content.children).toEqual(['未配置价格系数，未生成价格']);
+  expect(content.children[0].props.theme).toBe('error');
+  expect(content.children[0].children.default()).toBe('未配置价格系数，未生成价格');
   expect(vm.rows[0].level_25.price).toBeUndefined();
 });

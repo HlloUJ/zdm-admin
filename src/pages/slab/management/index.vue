@@ -877,9 +877,16 @@
                   :columns="creationLogPriceColumns"
                   bordered
                 >
+                  <template #coefficient="{ row }">
+                    <t-typography-text v-if="row.missingReason && row.coefficient === '未填写'" theme="error">
+                      {{ row.coefficient }}
+                    </t-typography-text>
+                    <span v-else>{{ row.coefficient }}</span>
+                  </template>
                   <template #price="{ row }">
                     <t-space align="center" size="small">
-                      <span>{{ row.price }}</span>
+                      <t-typography-text v-if="row.missingReason" theme="error">{{ row.price }}</t-typography-text>
+                      <span v-else>{{ row.price }}</span>
                       <PriceSourceToggle v-if="row.priceSource" :source="row.priceSource" :available="false" readonly />
                     </t-space>
                   </template>
@@ -1429,6 +1436,7 @@ const creationLogPrices = computed(() => {
       label: tier.label,
       coefficient: tier.afterCoefficient,
       price: tier.afterPrice,
+      missingReason: tier.afterMissingReason,
       priceSource:
         value(`${tier.label}价格来源`) === '跟随配置'
           ? ('auto' as const)

@@ -57,5 +57,6 @@ it('shows missing prices with the saved reason and name without adding current l
     label: '华东中心店',
     afterCoefficient: '未填写',
     afterPrice: '价格配置已停用，未生成价格',
+    afterMissingReason: '价格配置已停用，未生成价格',
   });
 });
