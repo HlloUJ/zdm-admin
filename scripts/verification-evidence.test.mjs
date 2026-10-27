@@ -604,7 +604,12 @@ test('format failure stops early; runtime is sequential; two pipelines preserve 
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(calls.slice(0, 3), ['format check', 'CI reuse contract preflight', 'task runtime identity']);
+  assert.deepEqual(calls.slice(0, 4), [
+    'format check',
+    'backend test discovery',
+    'CI reuse contract preflight',
+    'task runtime identity',
+  ]);
   assert.equal(calls.includes('backend static quality'), false);
   assert.equal(calls.includes('browser tests'), true);
 });
@@ -754,7 +759,7 @@ test('failed CI contract preflight prevents expensive checks and runtime actions
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(called, ['format check', 'CI reuse contract preflight']);
+  assert.deepEqual(called, ['format check', 'backend test discovery', 'CI reuse contract preflight']);
   const ordinary = createVerificationPlan({ root: '/fixture', affected: true, files: ['src/views/ExampleView.vue'] });
   assert.equal(ordinary.contractPreflight, null);
 });

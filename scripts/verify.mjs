@@ -210,8 +210,22 @@ export async function executeVerification(
     return result;
   };
   if ((await execute(plan.preflight)).exitCode !== 0) return finish(1);
+  if (
+    plan.backend.some((task) => task.args.includes('backend:test')) &&
+    (
+      await execute({
+        root: plan.preflight.root,
+        name: 'backend test discovery',
+        command: process.execPath,
+        args: ['scripts/backend-test-evidence.mjs', '--inventory'],
+        env: plan.preflight.env,
+        reuse: false,
+      })
+    ).exitCode !== 0
+  )
+    return finish(1);
   if (plan.contractPreflight && (await execute(plan.contractPreflight)).exitCode !== 0) return finish(1);
-  // Mock browser / isolated Testcontainers checks do not start or reconfigure the shared backend.
+  // Only explicitly required runtime checks run; isolated tests never start a shared backend.
   if (plan.runtime && (await execute(plan.runtime)).exitCode !== 0) return finish(1);
   const pipeline = async (tasks) => {
     for (const task of tasks) if ((await execute(task)).exitCode !== 0) return 1;
@@ -284,6 +298,8 @@ export async function main(args = process.argv.slice(2)) {
         'Read-only plan: live CI capability is not queried; this shows the conservative full fallback. Execution probes required protection before choosing local readiness.',
       );
     }
+    if (plan.backend.some((task) => task.args.includes('backend:test')))
+      console.log('Early static check: backend test discovery (before contract/runtime pipelines)');
     console.log(`Preflight: ${plan.preflight.command} ${plan.preflight.args.join(' ')}`);
     if (plan.contractPreflight)
       console.log(`Contract preflight: ${plan.contractPreflight.command} ${plan.contractPreflight.args.join(' ')}`);

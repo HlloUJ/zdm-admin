@@ -625,11 +625,11 @@ function composeRun(context, args) {
   run('docker', [...context.args, ...args], context);
 }
 
-function requestResponse(url, timeoutMs = 1_000) {
+export function requestResponse(url, timeoutMs = 1_000) {
   return new Promise((resolve) => {
     const target = new URL(url);
     const client = target.protocol === 'https:' ? https : http;
-    const request = client.get(target, { timeout: timeoutMs }, (response) => {
+    const request = client.get(target, { timeout: timeoutMs, agent: false }, (response) => {
       const chunks = [];
       response.on('data', (chunk) => chunks.push(chunk));
       response.on('end', () => {
@@ -641,9 +641,9 @@ function requestResponse(url, timeoutMs = 1_000) {
     });
     request.once('timeout', () => {
       request.destroy();
-      resolve({ statusCode: 0, body: '' });
+      resolve({ statusCode: 0, body: '', errorCode: 'ETIMEDOUT' });
     });
-    request.once('error', () => resolve({ statusCode: 0, body: '' }));
+    request.once('error', (error) => resolve({ statusCode: 0, body: '', errorCode: error.code ?? 'NETWORK_ERROR' }));
   });
 }
 
@@ -651,7 +651,7 @@ async function requestStatus(url, timeoutMs = 1_000) {
   return (await requestResponse(url, timeoutMs)).statusCode;
 }
 
-function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
+export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
   return new Promise((resolve) => {
     const request = http.request(
       {
@@ -661,6 +661,7 @@ function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
         method,
         headers: method === 'DELETE' ? { [TASK_PREVIEW_CONTROL_HEADER]: TASK_PREVIEW_CONTROL_VALUE } : undefined,
         timeout: timeoutMs,
+        agent: false,
       },
       (response) => {
         const chunks = [];
@@ -672,9 +673,9 @@ function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
     );
     request.once('timeout', () => {
       request.destroy();
-      resolve({ statusCode: 0, body: '' });
+      resolve({ statusCode: 0, body: '', errorCode: 'ETIMEDOUT' });
     });
-    request.once('error', () => resolve({ statusCode: 0, body: '' }));
+    request.once('error', (error) => resolve({ statusCode: 0, body: '', errorCode: error.code ?? 'NETWORK_ERROR' }));
     request.end();
   });
 }
@@ -757,19 +758,26 @@ export async function stopSupervisedPreview(root, { request = previewServiceRequ
   return true;
 }
 
+export function previewProbeFailure(response) {
+  if (response.errorCode) return `身份探针连接失败：${response.errorCode}`;
+  if (response.statusCode !== 200) return `身份探针返回 HTTP ${response.statusCode}`;
+  return '身份探针响应不是有效的任务预览元数据';
+}
+
 async function currentManagedPreview(port = CURRENT_TASK_FRONTEND_PORT) {
   const response = await taskPreviewControlRequest(port);
   return response.statusCode === 200 ? parseTaskPreviewMetadata(response.body) : null;
 }
 
-async function inspectManagedPreview({
+export async function inspectManagedPreview({
   port = CURRENT_TASK_FRONTEND_PORT,
   expectedWorkspaceRoot = null,
   expectedBranch = null,
   expectedMode = null,
   expectedApiTarget = null,
 }) {
-  const metadata = await currentManagedPreview(port);
+  const response = await taskPreviewControlRequest(port);
+  const metadata = response.statusCode === 200 ? parseTaskPreviewMetadata(response.body) : null;
   let health = { statusCode: 0, body: '' };
   if (typeof metadata?.mode === 'string' && typeof metadata?.apiTarget === 'string') {
     health = await requestResponse(`http://127.0.0.1:${port}${TASK_PREVIEW_API_HEALTH_PATH}`, 3_000);
@@ -783,6 +791,8 @@ async function inspectManagedPreview({
     healthStatus: health.statusCode,
     healthBody: health.body,
   });
+  if (!metadata) errors.push(previewProbeFailure(response));
+  else if (health.errorCode) errors.push(`健康探针连接失败：${health.errorCode}`);
   return { metadata, errors };
 }
 
@@ -1419,7 +1429,9 @@ export async function main(args = process.argv.slice(2)) {
     if (expectedWorkspaceRoot) {
       const branch = gitCapture(expectedWorkspaceRoot, ['branch', '--show-current']);
       const files = taskPreviewChangedFiles(expectedWorkspaceRoot);
-      const current = await currentManagedPreview(port);
+      const response = await taskPreviewControlRequest(port);
+      const current = response.statusCode === 200 ? parseTaskPreviewMetadata(response.body) : null;
+      if (!current) throw new Error(previewProbeFailure(response));
       let registeredBackendPort = null;
       let registeredApiTarget = null;
       if (

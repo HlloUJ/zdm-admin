@@ -88,7 +88,7 @@
       "dynamicImports": 0
     },
     "scripts/backend-test-evidence.mjs": {
-      "digest": "cededd9fa2f19c1bb4902beca7b7ed3ae35e012ccbc43b4d670e915d564799e9",
+      "digest": "44e7ee7142bceb0323b80a8786de21e9b2dc601854a96e4a78d05720e4a41e77",
       "imports": ["scripts/business-regression.mjs", "scripts/ci-report-contract.mjs"],
       "dynamicImports": 0
     },
@@ -438,7 +438,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "8c61e9c89829c6f1877a129354e0a24a912edbbf1534e0c2036ad8bb85b8fc84",
+      "digest": "bca74ea153986507be2990c5458ebcd0b3221fd172f5864216fe01b1e9775904",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
@@ -612,6 +612,11 @@
     "scripts/playwright-test-evidence.mjs": {
       "digest": "f287567ceb940f8817556ec2a9e3b158d59c2620cecf42705ad8518a35e0a3fd",
       "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/preview-probe.test.mjs": {
+      "digest": "9879e75cbf5a8cc48032a9005b1e71aac7d6225be2eeba8165b76643918847a3",
+      "imports": ["scripts/dev-task.mjs"],
       "dynamicImports": 0
     },
     "scripts/restore-db.sh": {
@@ -789,6 +794,11 @@
       ],
       "dynamicImports": 4
     },
+    "scripts/verification-early-checks.test.mjs": {
+      "digest": "7ae52c6c2d3c423f985cd34bf7057a94e43f83db18fcfe9580435e55105758d0",
+      "imports": ["scripts/backend-test-evidence.mjs", "scripts/verify.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/verification-evidence.mjs": {
       "digest": "2cb68ed446e5768f5f89afdbfc3acc5d5feca23431c9a639eb79348e88c1ebde",
       "imports": [
@@ -800,7 +810,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "7f25e3cd3f9ad3286da0e068b7ce6346852bf8636f12be264f8d539f7c62fcf6",
+      "digest": "b10229a1f49e23560566c19a97d54b7a5ceb12cc9a2a7700fb9efdeeb6ed829c",
       "imports": [
         "scripts/run-frontend-tests.mjs",
         "scripts/verification-evidence.mjs",
@@ -899,8 +909,9 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "78f1d8e04804569d160d520ceac9d1db5e595231ba7613be3c9fff5b5574907f",
+      "digest": "7e181cc889380a6e9b32f4f2c87d7e3abe2ac332523a556f92c354a6506500b8",
       "imports": [
+        "scripts/backend-test-evidence.mjs",
         "scripts/business-regression.mjs",
         "scripts/check-changed-plan.mjs",
         "scripts/script-test-plan.mjs",
