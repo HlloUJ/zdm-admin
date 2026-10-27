@@ -58,7 +58,7 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "4aae48859d6a3002d8106ddbed5e2c0edc6ea98f0004def2e729ce5658f13b9a",
+      "digest": "24a1b104337151f14da464bb94768b39a4b9f920bb981a9cdb9cb6c6c55eaabc",
       "imports": [],
       "dynamicImports": 0
     },
@@ -158,10 +158,11 @@
       "dynamicImports": 0
     },
     "scripts/check-changed.mjs": {
-      "digest": "b53bc3197de5d82487abe8e3d3b7905b09c16f45828aee478f7d25c4366ccacb",
+      "digest": "536fb07a25bad97de56fb43b74a267c8b4929edc0885485816f4bdc84ffca0ce",
       "imports": [
         "scripts/business-regression.mjs",
         "scripts/check-changed-plan.mjs",
+        "scripts/task-timing.mjs",
         "scripts/verification-evidence.mjs",
         "scripts/verification-runner.mjs"
       ],
@@ -792,6 +793,16 @@
       "imports": ["scripts/task-runtime-state.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-timing.mjs": {
+      "digest": "3037e3cbbc7346891f100e2f75aafb0f3af26bef0b0b97bc90efb2188d6e1cae",
+      "imports": ["scripts/completion-session.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-timing.test.mjs": {
+      "digest": "b39b2cff24b759fe0678dbff0bed979eb3cf5fa0b97090fbe74740881e448677",
+      "imports": ["scripts/check-changed.mjs", "scripts/task-timing.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/typography-policy.mjs": {
       "digest": "68c241c4f3efda675f896eb7f328afe384234dbd7e5c113889432a4f2cb64854",
       "imports": [],
@@ -930,12 +941,13 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "bb817e5c437d3fc20dd790650c963ed810cf0cf71d0d200bf8b44bec1f54e816",
+      "digest": "4666d1e58fd6426a60baeaf77ccb8f50cb5b6ebaa8dff222d7b422e4382632a4",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/business-regression.mjs",
         "scripts/check-changed-plan.mjs",
         "scripts/script-test-plan.mjs",
+        "scripts/task-timing.mjs",
         "scripts/verification-evidence.mjs",
         "scripts/verification-impact.mjs",
         "scripts/verification-performance.mjs",

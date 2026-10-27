@@ -78,7 +78,8 @@
     "test:scripts:files": "node scripts/run-script-tests.mjs --files",
     "check:ui-templates": "node --test scripts/ui-template-policy.test.mjs",
     "test:ci-reuse": "node scripts/run-ci-diagnostics.mjs",
-    "check:business-regressions": "node scripts/business-regression.mjs"
+    "check:business-regressions": "node scripts/business-regression.mjs",
+    "task:timing": "node scripts/task-timing.mjs"
   },
   "lint-staged": {
     "*.{js,ts,vue}": [

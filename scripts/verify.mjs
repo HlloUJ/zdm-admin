@@ -1,3 +1,4 @@
+import { observeTaskTiming } from './task-timing.mjs';
 import { randomUUID } from 'node:crypto';
 import { performanceSummary, savePerformanceSummary, phaseEvidence } from './verification-performance.mjs';
 import {
@@ -186,7 +187,7 @@ export async function executeVerification(
     );
     mkdirSync(localDiagnostics.directory, { recursive: true });
   }
-  const finish = (code) => {
+  const finish = async (code) => {
     if (!existsSync(plan.preflight.root)) return code;
     try {
       const file = savePerformanceSummary(
@@ -203,6 +204,7 @@ export async function executeVerification(
     } catch (error) {
       report(`Performance recording unavailable: ${error.message}`);
     }
+    if (run === runVerificationTask) await observeTaskTiming(plan.preflight.root, report);
     return code;
   };
   if (
