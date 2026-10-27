@@ -559,3 +559,34 @@ test('delivery stops on actual CI failure without merge, handoff, cleanup or aut
     false,
   );
 });
+
+test('pause boundary commands record intent without CI, process, Git delivery or runtime actions', async (t) => {
+  const f = fixture(t);
+  const calls = [];
+  const options = {
+    ...f.options,
+    execute: (root, command, args) => {
+      calls.push([command, ...args]);
+      return f.options.execute(root, command, args);
+    },
+  };
+  await completionCommand(f.task, ['begin'], options);
+  const paused = await completionCommand(f.task, ['pause-record', 'example'], options);
+  assert.equal(paused.recordOnly, true);
+  const duplicate = await completionCommand(f.task, ['pause-record', 'example'], options);
+  assert.equal(duplicate.marker.id, paused.marker.id);
+  const report = await completionCommand(f.task, ['report', 'example'], options);
+  assert.equal(report.deliveryStatus.phase, 'paused');
+  const resumed = await completionCommand(f.task, ['resume-record', 'example'], options);
+  assert.equal(resumed.marker.id, paused.marker.id);
+  const status = await completionCommand(f.task, ['status', 'example'], options);
+  assert.equal(status.formalDeliveryComplete, false);
+  assert.equal(status.phase, 'delivery-in-progress');
+  assert.equal(f.downloads(), 0);
+  assert.ok(
+    !calls.some(
+      ([command, ...args]) =>
+        command === 'gh' || (command === 'git' && ['push', 'merge', 'commit', 'worktree'].includes(args[0])),
+    ),
+  );
+});

@@ -292,7 +292,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "bf17af9196f4dc690c7ab4b5ff9313357b2b2d52ec1702e88db6cba153b65d2e",
+      "digest": "76d15a9f86cf742705acb3c50969b23298af54a707957984d6e6e10236c15411",
       "imports": [
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-flow.mjs",
@@ -300,6 +300,7 @@
         "scripts/completion-process.mjs",
         "scripts/completion-recovery.mjs",
         "scripts/completion-session.mjs",
+        "scripts/completion-status.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
         "scripts/start-micro-task.mjs",
@@ -310,7 +311,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.test.mjs": {
-      "digest": "5e2311b1ef35ef46719a141c550006c028f9485162f842c39f2ced5b5aee5e9c",
+      "digest": "e060d68245b9b94ee4fe2428f3797e00aab44ef8cf02e672c6153a8aa764c63d",
       "imports": ["scripts/completion-cli.mjs", "scripts/task-batch.mjs", "scripts/task-completion.mjs"],
       "dynamicImports": 0
     },
@@ -355,13 +356,23 @@
       "dynamicImports": 1
     },
     "scripts/completion-session.mjs": {
-      "digest": "72ae419ce71bdbeceb60bbbb7ac6b5ca4afb98e3527d072db4619556d6e364a4",
+      "digest": "d164ddf1261b87726727e442a8835fc006062470e6f54acefc31b2323b28717d",
       "imports": ["scripts/completion-process.mjs"],
       "dynamicImports": 0
     },
     "scripts/completion-session.test.mjs": {
-      "digest": "b322f00e9c16a9baedd4847c90281bd223b11ac654af8afb5742ccb8577ee714",
+      "digest": "41d89be283e6f258c14ec6c248367a70192c3eb533b5d29ff1ca63a32eb7dc3c",
       "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-status.mjs": {
+      "digest": "2bdf7886d73eee11c11431f2890db0afdb2795501a4c52f954c26e0d6d43256c",
+      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-status.test.mjs": {
+      "digest": "553b4239b04159544044d3daff18a6fb7e7cf5a6da31f4b580feeb64ed1b6e2c",
+      "imports": ["scripts/completion-session.mjs", "scripts/completion-status.mjs"],
       "dynamicImports": 0
     },
     "scripts/confirmation-policy.mjs": {
@@ -697,7 +708,7 @@
       "dynamicImports": 0
     },
     "scripts/task-completion.mjs": {
-      "digest": "a0a74f70c55b5105af2db8c2575296a3f0eb10792f5cf9e72e812a17eabd737f",
+      "digest": "1ad62fc78e99d71dec536465d45474783210df0994d799ad5edab8e8fd731cef",
       "imports": ["scripts/completion-cli.mjs", "scripts/task-batch.mjs", "scripts/verify.mjs"],
       "dynamicImports": 1
     },
