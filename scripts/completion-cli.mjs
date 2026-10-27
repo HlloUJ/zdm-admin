@@ -1,3 +1,4 @@
+import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { runCompletionProcess } from './completion-process.mjs';
@@ -8,6 +9,8 @@ import {
   saveCompletion,
   completionStage,
   completionSummary,
+  pauseCompletion,
+  resumeCompletion,
   recordRepair,
   finishRepair,
   settleCompletion,
@@ -61,12 +64,16 @@ export async function completionCommand(
     begin: [0, 1],
     deliver: [2, 2],
     recover: [0, 0],
+    status: [1, 1],
+    backfill: [1, 1],
+    'pause-record': [1, 1],
+    'resume-record': [1, 1],
     'handoff-plan': [1, 1],
     'final-handoff': [1, 1],
     report: [1, 1],
     settle: [3, 3],
     wait: [2, 2],
-    'repair-start': [4, 4],
+    'repair-start': [4, 5],
     'repair-finish': [1, 1],
     measure: [3, Infinity],
   };
@@ -80,12 +87,23 @@ export async function completionCommand(
     git = (...a) => execute(existsSync(root) ? root : process.cwd(), 'git', a),
     common = path.resolve(root, git('rev-parse', '--git-common-dir'));
   const batch = readActiveBatch(root),
-    requestedBatch = ['report', 'settle', 'deliver'].includes(mode) ? rest[0] : batch?.id;
+    requestedBatch = ['report', 'settle', 'deliver', 'status', 'backfill', 'pause-record', 'resume-record'].includes(
+      mode,
+    )
+      ? rest[0]
+      : batch?.id;
   assert.match(requestedBatch ?? '', /^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Exact completion batch required');
   const directory = path.join(common, 'task-delivery', requestedBatch);
+  const archiveFile = path.join(common, 'task-batches/archive', requestedBatch + '.json');
+  const registry = existsSync(archiveFile) ? read(archiveFile) : batch?.id === requestedBatch ? batch : null;
+  if (mode === 'status') return deliveryStatus(directory, requestedBatch, registry);
+  if (mode === 'backfill') return backfillDeliveryStatus(directory, requestedBatch, registry);
   if (mode === 'report') {
     assert.ok(existsSync(path.join(directory, 'completion-session.json')), 'No recorded completion interval');
-    return completionSummary(openCompletion(directory, requestedBatch, { formal: false }));
+    return {
+      ...completionSummary(openCompletion(directory, requestedBatch, { formal: false })),
+      deliveryStatus: deliveryStatus(directory, requestedBatch, registry),
+    };
   }
   if (
     ['settle', 'deliver'].includes(mode) &&
@@ -109,6 +127,7 @@ export async function completionCommand(
       .reverse()
       .find((e) => e.name === 'ci' && e.status === 'success' && e.result?.headSha === archived.main.local);
     assert.ok(ci, 'No retained main CI proof');
+    let receiptRestored = false;
     if (!existsSync(path.join(directory, 'completion-receipt.json'))) {
       if (!old.events.some((e) => e.name === 'close' && e.key === ci.key && e.status === 'success')) {
         trackStageRestoration(old, directory);
@@ -122,8 +141,14 @@ export async function completionCommand(
         finishStageRestorations(old, directory);
       }
       restoreReceipt(directory, old, ci.key, archived);
+      receiptRestored = true;
     }
-    return { alreadyClosed: true, historical: true, summary: completionSummary(old) };
+    return {
+      alreadyClosed: true,
+      historical: true,
+      summary: completionSummary(old),
+      deliveryStatus: backfillDeliveryStatus(directory, requestedBatch, archived, { receiptRestored }),
+    };
   }
   assert.ok(batch && batch.id === requestedBatch, 'Exact active batch required');
   assert.ok(
@@ -143,6 +168,17 @@ export async function completionCommand(
       saveCompletion(directory, s);
       finishStageRestorations(s, directory);
     };
+  if (mode === 'pause-record' || mode === 'resume-record') {
+    const marker = mode === 'pause-record' ? pauseCompletion(state) : resumeCompletion(state);
+    save(state);
+    return {
+      batch: batch.id,
+      marker,
+      recordOnly: true,
+      note: 'Only records user-request boundaries. It does not stop processes, CI, Git or services.',
+    };
+  }
+  if (mode === 'deliver' && resumeCompletion(state)) save(state);
   if (['recover', 'deliver'].includes(mode)) recoverInterrupted(state, directory);
   trackStageRestoration(state, directory);
   if (mode === 'recover') return { batch: batch.id, summary: completionSummary(state) };
@@ -210,14 +246,14 @@ export async function completionCommand(
     );
   }
   if (mode === 'repair-start') {
-    const [id, failureRun, category, file] = rest,
+    const [id, failureRun, category, file, kind] = rest,
       evidence = path.resolve(root, file ?? '');
     assert.ok(
       evidence.startsWith(directory + path.sep) ||
         evidence.startsWith(path.join(batch.worktree, '.task-verification') + path.sep),
       'Diagnostic evidence must belong to this batch',
     );
-    recordRepair(state, { id, failureRun, category, evidence });
+    recordRepair(state, { id, failureRun, category, evidence, kind });
     save(state);
     return { repair: id, status: 'open' };
   }
@@ -429,6 +465,11 @@ export async function completionCommand(
     source: 'fetch-and-exact-live-ci-identity',
   };
   writeReceipt(path.join(directory, 'completion-receipt.json'), result);
+  result.deliveryStatus = backfillDeliveryStatus(
+    directory,
+    batch.id,
+    read(path.join(common, 'task-batches/archive', batch.id + '.json')),
+  );
   return result;
 }
 

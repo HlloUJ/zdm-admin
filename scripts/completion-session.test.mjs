@@ -11,6 +11,9 @@ import {
   settleCompletion,
   recordRepair,
   finishRepair,
+  pauseCompletion,
+  resumeCompletion,
+  completionPhase,
 } from './completion-session.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
 import { waitQuality } from './wait-quality.mjs';
@@ -102,7 +105,10 @@ test('wall time, overlapping CI waits and repairs use interval union; gaps remai
   assert.equal(r.measuredStageMs, 80);
   assert.equal(r.ciWaitMs, 80);
   assert.equal(r.unattributedMs, 20);
-  assert.equal(r.repairMs, 55);
+  assert.equal(r.repairWindowMs, 55);
+  assert.equal(r.repairMs, 5);
+  assert.equal(r.codeRepairMs, 0);
+  assert.equal(r.unclassifiedRepairMs, 5);
   assert.equal(r.postFinalCiMs, 10);
 });
 test('failed CI identity is recorded from remote evidence and retained through a verified repair', async (t) => {
@@ -294,4 +300,68 @@ test('connection recovery is timed separately and never becomes a test retry', a
   assert.equal(result.attempt, 1);
   assert.equal(result.networkObservations[0].durationMs, 10000);
   assert.equal(result.networkObservations[0].recovered, true);
+});
+
+test('pause, CI wait, restoration window and explicit code remediation remain separate without adding overlaps', () => {
+  const s = state();
+  s.pauseTrackingSince = 0;
+  s.pauses = [];
+  s.events = [{ id: 'wait', name: 'ci', startedAt: 10, finishedAt: 90, status: 'success' }];
+  s.repairs = [
+    { id: 'restore', category: 'stage-restoration', startedAt: 20, finishedAt: 95 },
+    { id: 'code', category: 'upload', kind: 'code', startedAt: 20, finishedAt: 96 },
+  ];
+  const pause = pauseCompletion(s, { now: 30 });
+  assert.equal(pauseCompletion(s, { now: 40 }).id, pause.id);
+  resumeCompletion(s, { now: 70 });
+  assert.equal(resumeCompletion(s, { now: 80 }), null);
+  const r = completionSummary(s, 100);
+  assert.equal(r.wallMs, 100);
+  assert.equal(r.pauseMs, 40);
+  assert.equal(r.ciWaitMs, 80);
+  assert.equal(r.activeCiWaitMs, 40);
+  assert.equal(r.restorationWindowMs, 75);
+  assert.equal(r.recoveryMs, 5);
+  assert.equal(r.repairWindowMs, 76);
+  assert.equal(r.repairMs, 6);
+  assert.equal(r.codeRepairMs, 6);
+  assert.equal(s.events[0].status, 'success');
+  assert.equal(s.repairs[0].category, 'stage-restoration');
+});
+test('legacy interruption never becomes a guessed pause or code repair and original times stay unchanged', () => {
+  const s = state();
+  s.events = [
+    {
+      id: 'old',
+      name: 'ci',
+      startedAt: 10,
+      finishedAt: 50,
+      status: 'failure',
+      failure: { category: 'interrupted' },
+      durationBasis: 'upper-bound-until-recovery; execution-stop-time-unknown',
+    },
+  ];
+  s.repairs = [{ category: 'stage-restoration', startedAt: 50, finishedAt: 95 }];
+  const before = structuredClone(s);
+  const r = completionSummary(s, 100);
+  assert.equal(r.pauseMs, null);
+  assert.equal(r.activeCiWaitMs, null);
+  assert.equal(r.repairMs, 0);
+  assert.equal(r.restorationWindowMs, 45);
+  assert.deepEqual(s, before);
+});
+test('closed phase requires successful main CI and every final stage; local ready is never delivered', () => {
+  const s = state();
+  s.startedAt = null;
+  assert.equal(completionPhase(s), 'local-validation');
+  s.startedAt = 0;
+  s.events = [{ name: 'ci', key: 'main:1', status: 'success', result: { branch: 'main', headSha: 'main' } }];
+  assert.equal(completionPhase(s), 'main-verified-awaiting-handoff');
+  for (const name of ['evidence', 'handoff', 'preserve', 'cleanup'])
+    s.events.push({ name, key: 'main:1', status: 'success' });
+  s.closedAt = 100;
+  assert.equal(completionPhase(s), 'handoff-verified-awaiting-settlement');
+  s.events.push({ name: 'close', key: 'main:1', status: 'success' });
+  assert.equal(completionPhase(s), 'delivered');
+  assert.throws(() => pauseCompletion(s, { now: 101 }), /Closed/);
 });
