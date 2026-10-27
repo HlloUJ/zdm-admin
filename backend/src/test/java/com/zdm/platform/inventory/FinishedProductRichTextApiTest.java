@@ -36,7 +36,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class FinishedProductRichTextApiTest extends SpringContainerTestSupport {
   @Container
-  private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("zdm_finished_rich_test").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   @Autowired private MockMvc mvc;
   @Autowired private JdbcTemplate jdbc;

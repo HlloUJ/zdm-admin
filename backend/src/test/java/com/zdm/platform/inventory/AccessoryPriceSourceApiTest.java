@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
 class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("accessory_price_source").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   @Autowired private JdbcTemplate jdbc;
   @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;

@@ -42,7 +42,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
   private static final String PREFIX = "admin.finished-stock-management.";
   @Container
-  private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("finished_permission_test").withUsername("test").withPassword("test");
   @DynamicPropertySource
   static void database(DynamicPropertyRegistry registry) {

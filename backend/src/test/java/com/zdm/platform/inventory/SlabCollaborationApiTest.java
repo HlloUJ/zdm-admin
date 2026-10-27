@@ -36,7 +36,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
 class SlabCollaborationApiTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("slab_collaboration").withUsername("test").withPassword("test");
   @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);

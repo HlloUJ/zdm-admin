@@ -37,7 +37,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
 class ProductStateActivityApiTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("state_activity_api").withUsername("test").withPassword("test");
   @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);

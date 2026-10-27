@@ -39,7 +39,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Transactional
 class CustomerApiTest extends SpringContainerTestSupport {
   private static final String BASE="/api/admin/store-customers";
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("customer_test").withUsername("test").withPassword("test")
       .withUrlParam("serverTimezone", "Asia/Shanghai");
   @DynamicPropertySource

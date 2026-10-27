@@ -758,3 +758,37 @@ test('failed CI contract preflight prevents expensive checks and runtime actions
   const ordinary = createVerificationPlan({ root: '/fixture', affected: true, files: ['src/views/ExampleView.vue'] });
   assert.equal(ordinary.contractPreflight, null);
 });
+
+test('tool trace changes reuse success; sandbox, unknown variables and failed runs still invalidate or block', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root);
+  const env = {
+    ...step.env,
+    CODEX_TOOL_CALL_ID: 'first',
+    CODEX_SANDBOX: 'restricted',
+    PRIVATE_VALUE: 'never-print-this',
+  };
+  const first = await runVerificationTask({ ...step, env }, silent);
+  const second = await runVerificationTask({ ...step, env: { ...env, CODEX_TOOL_CALL_ID: 'second' } }, silent);
+  assert.equal(second.reused, true);
+  const secretRecord = readFileSync(first.evidence, 'utf8');
+  assert.ok(!secretRecord.includes('never-print-this'));
+  const changed = await runVerificationTask({ ...step, env: { ...env, CODEX_SANDBOX: 'unrestricted' } }, silent);
+  assert.equal(changed.reused, false);
+  assert.match(record(changed).cacheMissReason, /CODEX_SANDBOX/);
+  assert.equal(
+    (await runVerificationTask({ ...step, env: { ...env, UNKNOWN_BUSINESS_SETTING: 'new' } }, silent)).reused,
+    false,
+  );
+});
+
+test('changing an invocation trace cannot retry a failed check', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root, failFirstScript);
+  const first = await runVerificationTask({ ...step, env: { ...step.env, CODEX_TOOL_CALL_ID: 'first' } }, silent);
+  assert.equal(first.exitCode, 1);
+  const second = await runVerificationTask({ ...step, env: { ...step.env, CODEX_TOOL_CALL_ID: 'second' } }, silent);
+  assert.equal(second.exitCode, 1);
+  assert.equal(record(second).executed, false);
+  assert.equal(record(second).firstFailure.attemptId, record(first).attemptId);
+});

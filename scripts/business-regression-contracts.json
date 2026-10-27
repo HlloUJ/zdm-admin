@@ -193,12 +193,12 @@
         "tests/e2e/slab-collaboration.spec.ts": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
         "tests/e2e/store-finished-stock.spec.ts": "922ff10f1c9f988a9a9259faed91513f02578ee56df7baba49dbfd46dfdcc94a",
         "tests/e2e/store-accessory-management.spec.ts": "573eb6f864dbeba824a3b0f413be0b06159d2c0eb538b5820aa21c9ba505b6df",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "e810ed52963267e15b2fcc972c6768a55732dd844a76b5fee1f8416fc46e06bd",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "d9daa109f6b13a61927f5ab32785ed895d1bde441c6aeda6088a05d0f44ae44c",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "855afd7e65ecc783b7547c962b90ac77640865d1bd7d1ec9fb614fa7205539f6",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "db301d9d8f7eea3913bf904d36fbcb197b5620365a97dff988609f1ace4629a5",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "8c2bbdb2501e7dc0dcaccbf99d3800e0e01a5c6986063dac0b1aec97297a0866",
-        "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "b681bc6072243b3eac4cf24271e8cf0aa81c24c68283ef89eaac9198841e9f11",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "74b7b07dad5e8e7cfae7631328e60caa89ef7f01dc326fb29fa2fa96b6aded32",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "c709eac72b931fe72162c2a3c2bb7c1e9c347af055b6153e44d1dd673d057329",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "11588ee1bee96cf996873095eb4f764b62d90623ddcfa6eb17e98572a2f83dad",
+        "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "a719033e240e5671452c05f23a44ba4e2806b9e4f65c9a1c5ab027daeb14731b",
         "tests/e2e/accessory-permissions.spec.ts": "8e2ebbaf06b34827b8413f2f036e9ab6c7461597d9c3693d66fc69a465eef1dc",
         "tests/e2e/admin-foundation.spec.ts": "92c1d6fe48013d207a9006f66049f22b8164af4a0263f998f6d4742e8212dd8f",
@@ -213,14 +213,52 @@
         "tests/e2e/slab-price-editor.spec.ts": "2731aae413d8618179e5cf80ddfc86869873ded9fb9372faa2a35fb256892600",
         "tests/e2e/slab-publish-layout.spec.ts": "336b5cf9915015361f5597143c534fe6971a83434c99a3d5f06c6151d9b2f39e",
         "tests/e2e/store-product-menu.spec.ts": "c1e98722a53c712895b02a6c32bae07b9ad491deac1ff79d7253fa974a9532ae",
-        "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6"
+        "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
+        "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
+        "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156"
       },
       "testChanges": [
         {
           "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
           "before": "a6767264d21946b3e3c414bae9ae161f7e97ba3d39cb06c9957dfeaa6d60fa99",
-          "after": "e810ed52963267e15b2fcc972c6768a55732dd844a76b5fee1f8416fc46e06bd",
+          "after": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
           "reason": "收紧操作人 JSON null 断言，新增文本类型校验并保留原有时间、姓名和数据库一致性断言"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "e810ed52963267e15b2fcc972c6768a55732dd844a76b5fee1f8416fc46e06bd",
+          "after": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
+          "reason": "用户授权性能优化：仅替换独立测试数据库初始化入口，业务用例及断言逐字保持"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "d9daa109f6b13a61927f5ab32785ed895d1bde441c6aeda6088a05d0f44ae44c",
+          "after": "74b7b07dad5e8e7cfae7631328e60caa89ef7f01dc326fb29fa2fa96b6aded32",
+          "reason": "用户授权性能优化：仅替换独立测试数据库初始化入口，业务用例及断言逐字保持"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "855afd7e65ecc783b7547c962b90ac77640865d1bd7d1ec9fb614fa7205539f6",
+          "after": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
+          "reason": "用户授权性能优化：仅替换独立测试数据库初始化入口，业务用例及断言逐字保持"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "db301d9d8f7eea3913bf904d36fbcb197b5620365a97dff988609f1ace4629a5",
+          "after": "c709eac72b931fe72162c2a3c2bb7c1e9c347af055b6153e44d1dd673d057329",
+          "reason": "用户授权性能优化：仅替换独立测试数据库初始化入口，业务用例及断言逐字保持"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "8c2bbdb2501e7dc0dcaccbf99d3800e0e01a5c6986063dac0b1aec97297a0866",
+          "after": "11588ee1bee96cf996873095eb4f764b62d90623ddcfa6eb17e98572a2f83dad",
+          "reason": "用户授权性能优化：仅替换独立测试数据库初始化入口，业务用例及断言逐字保持"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java",
+          "before": "b681bc6072243b3eac4cf24271e8cf0aa81c24c68283ef89eaac9198841e9f11",
+          "after": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
+          "reason": "用户授权性能优化：仅替换独立测试数据库初始化入口，业务用例及断言逐字保持"
         }
       ],
       "routes": [
@@ -256,7 +294,11 @@
         "tests/e2e/store-finished-stock.spec.ts",
         "tests/e2e/store-product-menu.spec.ts"
       ],
-      "supportFiles": ["tests/e2e/admin-api-mocks.ts"]
+      "supportFiles": [
+        "tests/e2e/admin-api-mocks.ts",
+        "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java",
+        "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java"
+      ]
     }
   ]
 }

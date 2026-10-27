@@ -31,7 +31,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc(addFilters = false)
 @Testcontainers(disabledWithoutDocker = true)
 class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("store_finished_test").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   @Autowired private JdbcTemplate jdbc;
   @Autowired private StoreFinishedProductService products;

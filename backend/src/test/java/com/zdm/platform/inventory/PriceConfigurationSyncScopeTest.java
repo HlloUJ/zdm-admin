@@ -28,7 +28,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
 class PriceConfigurationSyncScopeTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("price_sync_scope").withUsername("test").withPassword("test");
   @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);

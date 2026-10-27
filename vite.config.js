@@ -86,6 +86,7 @@ export default defineConfig(({ mode }) => {
       },
     },
     server: {
+      watch: { ignored: ['**/backend/target/**', '**/.task-verification/**', '**/.task-runtime/**'] },
       host: taskPreview ? '127.0.0.1' : '0.0.0.0',
       port: frontendPort,
       strictPort: taskPreview,

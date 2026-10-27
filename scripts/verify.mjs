@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+import { performanceSummary, savePerformanceSummary, phaseEvidence } from './verification-performance.mjs';
 import {
   validateContracts,
   CONTRACT_FILE,
@@ -166,19 +168,51 @@ export async function executeVerification(
   { run = runVerificationTask, force = false, report = console.log, capture = captureSource } = {},
 ) {
   const started = performance.now();
+  const phases = [];
   const before = capture(plan.preflight.root);
+  const finish = (code) => {
+    if (!existsSync(plan.preflight.root)) return code;
+    try {
+      const file = savePerformanceSummary(
+        plan.preflight.root,
+        randomUUID(),
+        performanceSummary({
+          candidate: { head: before.head, digest: before.digest },
+          elapsedMs: performance.now() - started,
+          exitCode: code,
+          phases,
+        }),
+      );
+      report(`Performance report: ${file}`);
+    } catch (error) {
+      report(`Performance recording unavailable: ${error.message}`);
+    }
+    return code;
+  };
   if (
     plan.plannedCandidate &&
     ['digest', 'baseline', 'mergeBase', 'mutationStamp'].some((key) => plan.plannedCandidate[key] !== before[key])
   ) {
     report('Candidate changed after impact planning; regenerate the validation plan.');
-    return 1;
+    return finish(1);
   }
-  const execute = (task) => run(task, { force, report });
-  if ((await execute(plan.preflight)).exitCode !== 0) return 1;
-  if (plan.contractPreflight && (await execute(plan.contractPreflight)).exitCode !== 0) return 1;
+  const execute = async (task) => {
+    const phaseStart = performance.now();
+    const result = await run(task, { force, report });
+    phases.push({
+      name: task.name,
+      startMs: Math.round(phaseStart - started),
+      elapsedMs: performance.now() - phaseStart,
+      exitCode: result.exitCode,
+      reused: result.reused === true,
+      ...phaseEvidence(plan.preflight.root, result),
+    });
+    return result;
+  };
+  if ((await execute(plan.preflight)).exitCode !== 0) return finish(1);
+  if (plan.contractPreflight && (await execute(plan.contractPreflight)).exitCode !== 0) return finish(1);
   // Mock browser / isolated Testcontainers checks do not start or reconfigure the shared backend.
-  if (plan.runtime && (await execute(plan.runtime)).exitCode !== 0) return 1;
+  if (plan.runtime && (await execute(plan.runtime)).exitCode !== 0) return finish(1);
   const pipeline = async (tasks) => {
     for (const task of tasks) if ((await execute(task)).exitCode !== 0) return 1;
     return 0;
@@ -203,7 +237,7 @@ export async function executeVerification(
     report(
       'This is local evidence only. Required CI must pass on the final candidate before merge; CI unavailable requires the full local fallback.',
     );
-  return code;
+  return finish(code);
 }
 
 export async function main(args = process.argv.slice(2)) {

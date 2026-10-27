@@ -205,6 +205,7 @@ export async function runVerificationTask(task, options = {}) {
                 : 'inputs-changed'
         : 'first-attempt',
       name,
+      cacheMissReason: missReason,
       status: 'running',
       startedAt,
       completedAt: null,
