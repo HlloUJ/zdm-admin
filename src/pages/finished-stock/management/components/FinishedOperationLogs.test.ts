@@ -151,3 +151,36 @@ it('warns for legacy arrival logs and hides the warning for complete snapshots',
   await vm.showDetail(5);
   expect(vm.legacyArrivalPrices).toBe(false);
 });
+
+it('renders reentry as a complete snapshot while keeping the real trigger summary', async () => {
+  vi.mocked(getLoginUser).mockReturnValue({ clientCode: 'admin' } as ReturnType<typeof getLoginUser>);
+  const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';
+  vi.mocked(getFinishedOperationLog).mockResolvedValueOnce({
+    id: 8,
+    productId: 9,
+    productName: '重新入仓商品',
+    operationType: 'REENTRY',
+    operationSummary: reason,
+    operatorName: '真实触发人',
+    operationSource: 'MANUAL',
+    changeDetails: JSON.stringify({
+      商品ID: { after: 9 },
+      销售规格: { after: [] },
+      层级价格: { after: [], complete: true },
+    }),
+  } as any);
+  const wrapper = mount(FinishedOperationLogs, { props: { visible: false }, shallow: true });
+  const vm = wrapper.vm as unknown as {
+    showDetail: (id: number) => Promise<void>;
+    fullSnapshot: boolean;
+    legacyArrivalPrices: boolean;
+  };
+  await vm.showDetail(8);
+  expect(vm.fullSnapshot).toBe(true);
+  expect(vm.legacyArrivalPrices).toBe(false);
+  expect(wrapper.findComponent(ProductOperationLogTemplate).props('detail')).toMatchObject({
+    operationType: 'REENTRY',
+    operatorName: '真实触发人',
+    operationSummary: reason,
+  });
+});

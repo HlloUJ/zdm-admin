@@ -1,3 +1,6 @@
+import { ref } from 'vue';
+import { useSlabOperationLogPresentation } from './slabOperationLogPresentation';
+import type { SlabOperationLogRecord } from '@/services/slabs';
 import { describe, expect, it } from 'vitest';
 import { buildSlabPriceTierComparison, formatSlabPriceTierChanges } from './operationLogPriceTiers';
 
@@ -59,4 +62,27 @@ it('shows missing prices with the saved reason and name without adding current l
     afterPrice: '价格配置已停用，未生成价格',
     afterMissingReason: '价格配置已停用，未生成价格',
   });
+});
+
+it('keeps reentry on the full snapshot path with its recorded reason', () => {
+  const detail = ref({
+    operationType: 'REENTRY',
+    beforeStatus: null,
+    changeDetails: JSON.stringify({
+      价格层级: { after: [{ storeLevelId: 25, storeLevelName: '华东中心店', price: 20 }], complete: true },
+      重新入仓原因: { after: '运营删除失效记录后重新入仓' },
+    }),
+  } as unknown as SlabOperationLogRecord);
+  const view = useSlabOperationLogPresentation(
+    detail,
+    () => [],
+    () => ({}),
+  );
+  expect(view.operationLogIsCreate.value).toBe(true);
+  expect(view.operationLogChangeRows.value.find((row) => row.field === '重新入仓原因')?.after).toBe(
+    '运营删除失效记录后重新入仓',
+  );
+  expect(view.operationLogChangeRows.value.find((row) => row.field === '价格层级')?.priceTiers?.[0].afterPrice).toBe(
+    '20.00',
+  );
 });

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortByStateActivity, stateActivityColumns, stateSourceLabel } from './productStateActivity';
+import { sortByStateActivity, stateActivityColumns } from './productStateActivity';
 
 describe('product state activity', () => {
   it('puts recently transitioned old products ahead of newly created products without mutating input', () => {
@@ -29,11 +29,5 @@ describe('product state activity', () => {
     })) {
       expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);
     }
-  });
-  it('labels only cross-client triggers', () => {
-    expect(stateSourceLabel('supply-chain', 'admin')).toBe('供应链');
-    expect(stateSourceLabel('admin', 'store')).toBe('运营');
-    expect(stateSourceLabel('store', 'store')).toBe('');
-    expect(stateSourceLabel('system', 'store')).toBe('');
   });
 });

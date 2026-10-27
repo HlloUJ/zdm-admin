@@ -2572,6 +2572,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "  await vm.showDetail(5);\n  expect(vm.legacyArrivalPrices).toBe(false);\n});\n",
+          "after": "  await vm.showDetail(5);\n  expect(vm.legacyArrivalPrices).toBe(false);\n});\n\nit('renders reentry as a complete snapshot while keeping the real trigger summary', async () => {\n  vi.mocked(getLoginUser).mockReturnValue({ clientCode: 'admin' } as ReturnType<typeof getLoginUser>);\n  const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';\n  vi.mocked(getFinishedOperationLog).mockResolvedValueOnce({\n    id: 8,\n    productId: 9,\n    productName: '重新入仓商品',\n    operationType: 'REENTRY',\n    operationSummary: reason,\n    operatorName: '真实触发人',\n    operationSource: 'MANUAL',\n    changeDetails: JSON.stringify({\n      商品ID: { after: 9 },\n      销售规格: { after: [] },\n      层级价格: { after: [], complete: true },\n    }),\n  } as any);\n  const wrapper = mount(FinishedOperationLogs, { props: { visible: false }, shallow: true });\n  const vm = wrapper.vm as unknown as {\n    showDetail: (id: number) => Promise<void>;\n    fullSnapshot: boolean;\n    legacyArrivalPrices: boolean;\n  };\n  await vm.showDetail(8);\n  expect(vm.fullSnapshot).toBe(true);\n  expect(vm.legacyArrivalPrices).toBe(false);\n  expect(wrapper.findComponent(ProductOperationLogTemplate).props('detail')).toMatchObject({\n    operationType: 'REENTRY',\n    operatorName: '真实触发人',\n    operationSummary: reason,\n  });\n});\n"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
           "stage": "before-migrations",
           "before": "    expect(wrapper.text()).toContain('库存：0');\n  });\n});\n",
@@ -2584,6 +2590,12 @@
       "template": "0226fd57225b2078eec996ce39bc88ffb3d63a4d39fc6975499848203db19073",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "const fullSnapshot = computed(\n  () =>\n    detail.value?.operationType === 'CREATE' ||\n    (detail.value?.operationType === 'SOURCE_SHELF' && !!changes.value['商品ID'] && !!changes.value['销售规格']),\n);\nconst legacyArrivalPrices = computed(\n  () =>\n",
+          "after": "const fullSnapshot = computed(\n  () =>\n    detail.value?.operationType === 'CREATE' ||\n    (['SOURCE_SHELF', 'REENTRY'].includes(detail.value?.operationType || '') &&\n      !!changes.value['商品ID'] &&\n      !!changes.value['销售规格']),\n);\nconst legacyArrivalPrices = computed(\n  () =>\n"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块统一调整入仓日志：记录完整价格层级及缺价原因，历史日志仅提示，不改变计价、入仓和上架规则。",
           "stage": "before-migrations",
@@ -3284,6 +3296,24 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "                        </t-tooltip>\n                      </div>\n                    </template>\n                    <template #stateOperatorName=\"{ row }\">\n                      <t-space size=\"small\">\n                        <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>\n                        <t-tag\n                          v-if=\"stateSourceLabel(row.stateOperatorClientCode, 'admin')\"\n                          size=\"small\"\n                          variant=\"light\"\n                          >{{ stateSourceLabel(row.stateOperatorClientCode, 'admin') }}</t-tag\n                        >\n                      </t-space>\n                    </template>\n                    <template #stateOperatedAt=\"{ row }\">{{\n                      row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                    }}</template>\n",
+          "after": "                        </t-tooltip>\n                      </div>\n                    </template>\n                    <template #stateOperatorName=\"{ row }\"\n                      ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                    >\n                    <template #stateOperatedAt=\"{ row }\">{{\n                      row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                    }}</template>\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';\nimport { filterFinishedStockItems } from '../shared/finishedStockListFilter';\nimport { finishedStockFormIssues, isValidSpecQuantity } from '../shared/finishedStockFormValidation';\nimport { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';\n",
+          "after": "import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns } from '@/services/productStateActivity';\nimport { filterFinishedStockItems } from '../shared/finishedStockListFilter';\nimport { finishedStockFormIssues, isValidSpecQuantity } from '../shared/finishedStockFormValidation';\nimport { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "    code: record.sku ?? '',\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    stateOperatorClientCode: record.stateOperatorClientCode,\n    createdByName: record.createdByName?.trim() || '-',\n    offShelfByName: record.offShelfByName?.trim() || '未记录',\n    createdAt: record.createdAt,\n",
+          "after": "    code: record.sku ?? '',\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    createdByName: record.createdByName?.trim() || '-',\n    offShelfByName: record.offShelfByName?.trim() || '未记录',\n    createdAt: record.createdAt,\n"
+        },
+        {
           "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
           "stage": "before-migrations",
           "before": "<t-drawer\n      v-model:visible=\"priceDrawerVisible\"\n      header=\"批量填写\"\n      placement=\"right\"\n      size=\"min(1180px, 100vw)\"\n      lazy\n      destroy-on-close\n      @close=\"closePriceDrawer\"\n    >",
@@ -3937,6 +3967,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "export interface StockItem {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n  stateOperatorClientCode?: string;\n\n  sourceUnavailable?: boolean;\n  sourceStatus?: string;\n",
+          "after": "export interface StockItem {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceUnavailable?: boolean;\n  sourceStatus?: string;\n"
+        },
+        {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
           "before": "  label: string;\n  theme: 'primary' | 'default' | 'danger' | 'warning';\n  variant?: 'base' | 'outline' | 'text';\n",
@@ -4293,6 +4329,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "                    </button>\n                  </template>\n                  <template #totalStock=\"{ row }\">{{ row.totalStock ?? 0 }}</template>\n                  <template #stateOperatorName=\"{ row }\">\n                    <t-space size=\"small\">\n                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>\n                      <t-tag\n                        v-if=\"stateSourceLabel(row.stateOperatorClientCode, 'store')\"\n                        size=\"small\"\n                        variant=\"light\"\n                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'store') }}</t-tag\n                      >\n                    </t-space>\n                  </template>\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n",
+          "after": "                    </button>\n                  </template>\n                  <template #totalStock=\"{ row }\">{{ row.totalStock ?? 0 }}</template>\n                  <template #stateOperatorName=\"{ row }\"\n                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "import { useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { formatProductDateTime } from '@/utils/formatProductDateTime';\nimport { stateActivityColumns, stateSourceLabel, sortByStateActivity } from '@/services/productStateActivity';\nimport FinishedCreationSnapshot from '../management/components/FinishedCreationSnapshot.vue';\nimport FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';\nimport type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';\n",
+          "after": "import { useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { formatProductDateTime } from '@/utils/formatProductDateTime';\nimport { stateActivityColumns, sortByStateActivity } from '@/services/productStateActivity';\nimport FinishedCreationSnapshot from '../management/components/FinishedCreationSnapshot.vue';\nimport FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';\nimport type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';\n"
+        },
         {
           "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
           "stage": "before-migrations",
@@ -5443,6 +5491,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "                        </t-tooltip>\n                      </div>\n                    </template>\n                    <template #stateOperatorName=\"{ row }\">\n                      <t-space size=\"small\">\n                        <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>\n                        <t-tag\n                          v-if=\"stateSourceLabel(row.stateOperatorClientCode, 'supply-chain')\"\n                          size=\"small\"\n                          variant=\"light\"\n                          >{{ stateSourceLabel(row.stateOperatorClientCode, 'supply-chain') }}</t-tag\n                        >\n                      </t-space>\n                    </template>\n                    <template #stateOperatedAt=\"{ row }\">{{\n                      row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                    }}</template>\n",
+          "after": "                        </t-tooltip>\n                      </div>\n                    </template>\n                    <template #stateOperatorName=\"{ row }\"\n                      ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                    >\n                    <template #stateOperatedAt=\"{ row }\">{{\n                      row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                    }}</template>\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';\nimport { filterFinishedStockItems } from '../shared/finishedStockListFilter';\nimport { finishedStockFormIssues } from '../shared/finishedStockFormValidation';\nimport { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';\n",
+          "after": "import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns } from '@/services/productStateActivity';\nimport { filterFinishedStockItems } from '../shared/finishedStockListFilter';\nimport { finishedStockFormIssues } from '../shared/finishedStockFormValidation';\nimport { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "    code: record.sku ?? '',\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    stateOperatorClientCode: record.stateOperatorClientCode,\n    createdByName: record.createdByName?.trim() || '-',\n    offShelfByName: record.offShelfByName?.trim() || '未记录',\n    createdAt: record.createdAt,\n",
+          "after": "    code: record.sku ?? '',\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    createdByName: record.createdByName?.trim() || '-',\n    offShelfByName: record.offShelfByName?.trim() || '未记录',\n    createdAt: record.createdAt,\n"
+        },
         {
           "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
           "stage": "before-migrations",
@@ -7774,6 +7840,24 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "                  <template #offShelvedAt=\"{ row }\">\n                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}\n                  </template>\n                  <template #stateOperatorName=\"{ row }\">\n                    <t-space size=\"small\">\n                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>\n                      <t-tag\n                        v-if=\"stateSourceLabel(row.stateOperatorClientCode, 'admin')\"\n                        size=\"small\"\n                        variant=\"light\"\n                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'admin') }}</t-tag\n                      >\n                    </t-space>\n                  </template>\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n",
+          "after": "                  <template #offShelvedAt=\"{ row }\">\n                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}\n                  </template>\n                  <template #stateOperatorName=\"{ row }\"\n                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "import { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';\nimport { fillSlabProductForm, formatPrice, formatRatio, toNumber, toSlabPayload } from '../shared/slabPageMapping';\nimport { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';\nimport { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';\n",
+          "after": "import { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns } from '@/services/productStateActivity';\nimport { fillSlabProductForm, formatPrice, formatRatio, toNumber, toSlabPayload } from '../shared/slabPageMapping';\nimport { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';\nimport { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "    publisherType: normalizePublisherType(record.publisherType),\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    stateOperatorClientCode: record.stateOperatorClientCode,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt || '',\n    price: {\n",
+          "after": "    publisherType: normalizePublisherType(record.publisherType),\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt || '',\n    price: {\n"
+        },
+        {
           "reason": "2026-10-27 用户要求大板日志缺价行的价格系数未填写也使用官方错误色，其他字段保持原样。",
           "stage": "before-migrations",
           "before": "                  <template #price=\"{ row }\">\n",
@@ -8460,6 +8544,18 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "import { describe, expect, it } from 'vitest';\nimport { buildSlabPriceTierComparison, formatSlabPriceTierChanges } from './operationLogPriceTiers';\n\n",
+          "after": "import { ref } from 'vue';\nimport { useSlabOperationLogPresentation } from './slabOperationLogPresentation';\nimport type { SlabOperationLogRecord } from '@/services/slabs';\nimport { describe, expect, it } from 'vitest';\nimport { buildSlabPriceTierComparison, formatSlabPriceTierChanges } from './operationLogPriceTiers';\n\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "    afterMissingReason: '价格配置已停用，未生成价格',\n  });\n});\n",
+          "after": "    afterMissingReason: '价格配置已停用，未生成价格',\n  });\n});\n\nit('keeps reentry on the full snapshot path with its recorded reason', () => {\n  const detail = ref({\n    operationType: 'REENTRY',\n    beforeStatus: null,\n    changeDetails: JSON.stringify({\n      价格层级: { after: [{ storeLevelId: 25, storeLevelName: '华东中心店', price: 20 }], complete: true },\n      重新入仓原因: { after: '运营删除失效记录后重新入仓' },\n    }),\n  } as unknown as SlabOperationLogRecord);\n  const view = useSlabOperationLogPresentation(\n    detail,\n    () => [],\n    () => ({}),\n  );\n  expect(view.operationLogIsCreate.value).toBe(true);\n  expect(view.operationLogChangeRows.value.find((row) => row.field === '重新入仓原因')?.after).toBe(\n    '运营删除失效记录后重新入仓',\n  );\n  expect(view.operationLogChangeRows.value.find((row) => row.field === '价格层级')?.priceTiers?.[0].afterPrice).toBe(\n    '20.00',\n  );\n});\n"
+        },
+        {
           "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
           "stage": "before-migrations",
           "before": "    label: '华东中心店',\n    afterCoefficient: '未填写',\n    afterPrice: '价格配置已停用，未生成价格',\n  });\n});\n",
@@ -8531,7 +8627,15 @@
     },
     "src/pages/slab/shared/slabOperationLogPresentation.ts": {
       "content": "db1a8e2b42f0d19353e51a3012979f17ef640e1245223a2a145d84b953582ea3",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "    media?.message || (media ? '历史媒体已不可用' : '未填写');\n  const operationLogIsCreate = computed(() => {\n    const log = detail.value;\n    return log?.operationType === 'CREATE' || (log?.operationType === 'SOURCE_SHELF' && !log.beforeStatus);\n  });\n  const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {\n    const details = detail.value?.changeDetails;\n",
+          "after": "    media?.message || (media ? '历史媒体已不可用' : '未填写');\n  const operationLogIsCreate = computed(() => {\n    const log = detail.value;\n    return (\n      log?.operationType === 'CREATE' ||\n      (['SOURCE_SHELF', 'REENTRY'].includes(log?.operationType || '') && !log?.beforeStatus)\n    );\n  });\n  const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {\n    const details = detail.value?.changeDetails;\n"
+        }
+      ]
     },
     "src/pages/slab/shared/slabPageActions.ts": {
       "content": "9b94b48e9410881bdd1bfc20dfab93d75b22de3fc581a72f34f1eefea2579427",
@@ -8587,6 +8691,12 @@
       "content": "40b03fb3326340845096248764ed124c1fa4484c81cb75ae49eb1d156eff8d26",
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "export interface SlabItem {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n  stateOperatorClientCode?: string;\n\n  sourceUnavailable?: boolean;\n  sourceStatus?: string;\n",
+          "after": "export interface SlabItem {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceUnavailable?: boolean;\n  sourceStatus?: string;\n"
+        },
+        {
           "reason": "2026-10-15 user explicitly removed off-shelf date filtering, including UI, state and business predicate, from supply-chain and operations slab management; retain timestamps in table, logs, state sorting and other filters.",
           "before": "  offShelvedBy: string;\n  offShelfDateRange: string[];\n",
           "after": "  offShelvedBy: string;\n"
@@ -8628,6 +8738,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "                  <template #offShelvedAt=\"{ row }\">\n                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}\n                  </template>\n                  <template #stateOperatorName=\"{ row }\">\n                    <t-space size=\"small\">\n                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>\n                      <t-tag\n                        v-if=\"stateSourceLabel(row.stateOperatorClientCode, 'supply-chain')\"\n                        size=\"small\"\n                        variant=\"light\"\n                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'supply-chain') }}</t-tag\n                      >\n                    </t-space>\n                  </template>\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n",
+          "after": "                  <template #offShelvedAt=\"{ row }\">\n                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}\n                  </template>\n                  <template #stateOperatorName=\"{ row }\"\n                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "import { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';\nimport { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';\nimport { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';\nimport { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';\n",
+          "after": "import { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport { stateActivityColumns } from '@/services/productStateActivity';\nimport { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';\nimport { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';\nimport { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "    publisherType: normalizePublisherType(record.publisherType),\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    stateOperatorClientCode: record.stateOperatorClientCode,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt || '',\n    price: {\n",
+          "after": "    publisherType: normalizePublisherType(record.publisherType),\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt || '',\n    price: {\n"
+        },
         {
           "reason": "2026-10-23 current batch delivery fixes native Drawer width overflow with classic scrollbars; preserve approved maximum widths and every business binding.",
           "stage": "before-migrations",
@@ -10573,7 +10701,15 @@
     },
     "src/services/finishedProducts.ts": {
       "content": "26004aaf6c1165b901603b9580615be3795a895f0a75d0606378ae21dcb542df",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "export interface FinishedProductRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n  stateOperatorClientCode?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n",
+          "after": "export interface FinishedProductRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n"
+        }
+      ]
     },
     "src/services/functionAudience.ts": {
       "content": "72a32d99048b4e9a37151a2267c98a9803a164c9b11ec80e5df89b2497db3068",
@@ -10823,19 +10959,63 @@
     },
     "src/services/productOperationLog.test.ts": {
       "content": "b5fad8e0dc4058f72d2bb50bb86e285ca88339755e53175d0e6a93f3e0354692",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "  expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n  expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n});\n",
+          "after": "  expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n  expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n});\n\nit('offers reentry only in operations and keeps its real trigger summary', () => {\n  const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';\n  expect(productOperationTypeLabel('REENTRY')).toBe('重新入仓');\n  expect(productLogFilterOptions('admin')).toContainEqual({ value: 'REENTRY', label: '重新入仓' });\n  expect(productLogFilterOptions('supply-chain').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productLogFilterOptions('store').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(reason);\n});\n"
+        }
+      ]
     },
     "src/services/productOperationLog.ts": {
       "content": "f5a658e633d771320bfca7429be4eb47de8a58827bf89547a7c717dccec5e2ec",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "  PURGE: '彻底删除',\n  SOLD_OUT: '售完',\n  STATUS_UPDATE: '状态变更',\n  SOURCE_SHELF: '供应链上架',\n  SOURCE_OFF_SHELF: '供应链下架',\n  SOURCE_DELETE: '供应链彻底删除',\n",
+          "after": "  PURGE: '彻底删除',\n  SOLD_OUT: '售完',\n  STATUS_UPDATE: '状态变更',\n  REENTRY: '重新入仓',\n  SOURCE_SHELF: '供应链上架',\n  SOURCE_OFF_SHELF: '供应链下架',\n  SOURCE_DELETE: '供应链彻底删除',\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "    ...(client === 'supply-chain'\n      ? ['CREATE', 'UPDATE', ...commonActions]\n      : client === 'admin'\n        ? [...commonActions, ...upstreamActions]\n        : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),\n  ]);\n}\n",
+          "after": "    ...(client === 'supply-chain'\n      ? ['CREATE', 'UPDATE', ...commonActions]\n      : client === 'admin'\n        ? [...commonActions, 'REENTRY', ...upstreamActions]\n        : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),\n  ]);\n}\n"
+        }
+      ]
     },
     "src/services/productStateActivity.test.ts": {
       "content": "1458da4ec7682fdfb518f0536545017cefe3ae2719bece6998435e7f0fa83c7c",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "import { describe, expect, it } from 'vitest';\nimport { sortByStateActivity, stateActivityColumns, stateSourceLabel } from './productStateActivity';\n\ndescribe('product state activity', () => {\n  it('puts recently transitioned old products ahead of newly created products without mutating input', () => {\n",
+          "after": "import { describe, expect, it } from 'vitest';\nimport { sortByStateActivity, stateActivityColumns } from './productStateActivity';\n\ndescribe('product state activity', () => {\n  it('puts recently transitioned old products ahead of newly created products without mutating input', () => {\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "      expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);\n    }\n  });\n  it('labels only cross-client triggers', () => {\n    expect(stateSourceLabel('supply-chain', 'admin')).toBe('供应链');\n    expect(stateSourceLabel('admin', 'store')).toBe('运营');\n    expect(stateSourceLabel('store', 'store')).toBe('');\n    expect(stateSourceLabel('system', 'store')).toBe('');\n  });\n});\n",
+          "after": "      expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);\n    }\n  });\n});\n"
+        }
+      ]
     },
     "src/services/productStateActivity.ts": {
       "content": "7342589e51af41298d3f49d9895b2160e3ae2c77a62e9cde91dfaa86a75be53e",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "    { colKey: 'stateOperatedAt', title: time, width: 180, align: 'center' },\n  ];\n}\nexport function stateSourceLabel(source: string | undefined, business: string) {\n  if (!source || source === business || source === 'system') return '';\n  return (\n    ({ 'supply-chain': '供应链', admin: '运营', store: '门店', 'external-api': '外部系统' } as Record<string, string>)[\n      source\n    ] || ''\n  );\n}\ninterface ActivityRecord {\n  id: number;\n  stateOperatedAt?: string;\n",
+          "after": "    { colKey: 'stateOperatedAt', title: time, width: 180, align: 'center' },\n  ];\n}\ninterface ActivityRecord {\n  id: number;\n  stateOperatedAt?: string;\n"
+        }
+      ]
     },
     "src/services/recordSorting.test.ts": {
       "content": "97c940a5873be96b0a35fba2af8f85d67cf053fc0be455a55fe36886bce244fe",
@@ -10895,7 +11075,21 @@
     },
     "src/services/slabs.ts": {
       "content": "960012eecb4925652dee40c1c802efe7957160437910e2e5f10914109bc24c96",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "export interface SlabRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n  stateOperatorClientCode?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n",
+          "after": "export interface SlabRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n"
+        },
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "  | 'PHYSICAL_DELETE'\n  | 'PURGE'\n  | 'STATUS_UPDATE'\n  | 'SOURCE_SHELF'\n  | 'SOURCE_OFF_SHELF'\n  | 'SOURCE_DELETE'\n",
+          "after": "  | 'PHYSICAL_DELETE'\n  | 'PURGE'\n  | 'STATUS_UPDATE'\n  | 'REENTRY'\n  | 'SOURCE_SHELF'\n  | 'SOURCE_OFF_SHELF'\n  | 'SOURCE_DELETE'\n"
+        }
+      ]
     },
     "src/services/storeCategories.ts": {
       "content": "45c1f362e3652fe430d6fed421d7913a31fe69efae955170c4e4d717bbaa2a89",
@@ -10903,7 +11097,15 @@
     },
     "src/services/storeFinishedStock.ts": {
       "content": "65eac08f8d07f400e23212357ee2abf50d5d1e8a13787544e7c0568dc9b0f701",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
+          "stage": "before-migrations",
+          "before": "export interface StoreFinishedProduct {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n  stateOperatorClientCode?: string;\n\n  attributeNames?: Record<string, string>;\n  storeLevelName?: string | null;\n",
+          "after": "export interface StoreFinishedProduct {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  attributeNames?: Record<string, string>;\n  storeLevelName?: string | null;\n"
+        }
+      ]
     },
     "src/services/storeLevels.ts": {
       "content": "2998bb28b818a242040df7f906058c1c0b3d0f47dc88153c025c1dcc8c472657",

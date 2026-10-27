@@ -244,17 +244,9 @@
                   <template #offShelvedAt="{ row }">
                     {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
                   </template>
-                  <template #stateOperatorName="{ row }">
-                    <t-space size="small">
-                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>
-                      <t-tag
-                        v-if="stateSourceLabel(row.stateOperatorClientCode, 'admin')"
-                        size="small"
-                        variant="light"
-                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'admin') }}</t-tag
-                      >
-                    </t-space>
-                  </template>
+                  <template #stateOperatorName="{ row }"
+                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
+                  >
                   <template #stateOperatedAt="{ row }">{{
                     row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'
                   }}</template>
@@ -1180,7 +1172,7 @@ import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
-import { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';
+import { stateActivityColumns } from '@/services/productStateActivity';
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber, toSlabPayload } from '../shared/slabPageMapping';
 import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
@@ -1617,7 +1609,6 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     publisherType: normalizePublisherType(record.publisherType),
     stateOperatorName: record.stateOperatorName,
     stateOperatedAt: record.stateOperatedAt,
-    stateOperatorClientCode: record.stateOperatorClientCode,
     createdByName: record.createdByName?.trim() || '-',
     createdAt: record.createdAt || '',
     price: {

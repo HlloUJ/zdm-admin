@@ -158,17 +158,9 @@
                     </button>
                   </template>
                   <template #totalStock="{ row }">{{ row.totalStock ?? 0 }}</template>
-                  <template #stateOperatorName="{ row }">
-                    <t-space size="small">
-                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>
-                      <t-tag
-                        v-if="stateSourceLabel(row.stateOperatorClientCode, 'store')"
-                        size="small"
-                        variant="light"
-                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'store') }}</t-tag
-                      >
-                    </t-space>
-                  </template>
+                  <template #stateOperatorName="{ row }"
+                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
+                  >
                   <template #stateOperatedAt="{ row }">{{
                     row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'
                   }}</template>
@@ -495,7 +487,7 @@ import { rejectFormSubmission } from '@/utils/submitValidation';
 import { useFormFeedback } from '@/utils/formValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { formatProductDateTime } from '@/utils/formatProductDateTime';
-import { stateActivityColumns, stateSourceLabel, sortByStateActivity } from '@/services/productStateActivity';
+import { stateActivityColumns, sortByStateActivity } from '@/services/productStateActivity';
 import FinishedCreationSnapshot from '../management/components/FinishedCreationSnapshot.vue';
 import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';

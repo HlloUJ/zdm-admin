@@ -4,6 +4,9 @@ import { installAdminApiMocks } from './admin-api-mocks';
 const surfaces = [
   { path: '/finished-stock-management', client: 'admin', kind: 'finished' },
   { path: '/supply-chain/finished-stock-management', client: 'supply-chain', kind: 'finished' },
+  { path: '/accessory-management', client: 'admin', kind: 'accessory' },
+  { path: '/supply-chain/accessory-management', client: 'supply-chain', kind: 'accessory' },
+  { path: '/store/accessory-management', client: 'store', kind: 'store-accessory' },
   { path: '/slab-management', client: 'admin', kind: 'slab' },
   { path: '/supply-chain/slab-management', client: 'supply-chain', kind: 'slab' },
   { path: '/store/finished-stock-management', client: 'store', kind: 'store' },
@@ -14,7 +17,9 @@ const actorTitles = ['入库人', '上架人', '下架人', '', '移入人'];
 const timeTitles = ['入库时间', '上架时间', '下架时间', '售完时间', '移入时间'];
 
 for (const surface of surfaces) {
-  test(`${surface.path} shows state activity, cross-client source and complete-list ordering`, async ({ page }) => {
+  test(`${surface.path} shows state activity without source tags and keeps complete-list ordering`, async ({
+    page,
+  }) => {
     await installAdminApiMocks(page);
     await page.addInitScript((surface) => {
       localStorage.setItem('zdm-admin-token', 'dev-token');
@@ -48,7 +53,6 @@ for (const surface of surfaces) {
         createdAt: recent ? '2020-01-01T00:00:00' : '2026-10-01T00:00:00',
         stateOperatedAt: recent ? '2026-10-12T02:00:00.000000Z' : '2026-10-01T02:00:00.000000Z',
         stateOperatorName: '状态操作员',
-        stateOperatorClientCode: surface.client === 'store' ? 'admin' : 'supply-chain',
         variants: [],
         attributes: [],
         specDimensions: [],
@@ -63,14 +67,22 @@ for (const surface of surfaces) {
       })),
     );
     const endpoint =
-      surface.kind === 'slab' ? 'slabs' : surface.kind === 'store' ? 'store-finished-products' : 'finished-products';
+      surface.kind === 'slab'
+        ? 'slabs'
+        : surface.kind === 'accessory'
+          ? 'accessory-products'
+          : surface.kind === 'store-accessory'
+            ? 'store-accessory-products'
+            : surface.kind === 'store'
+              ? 'store-finished-products'
+              : 'finished-products';
     await page.route(`**/api/admin/${endpoint}`, (route) => route.fulfill({ json: { code: 0, data: records } }));
-    if (surface.kind === 'store') {
-      await page.route('**/api/admin/store-finished-products/categories', (route) =>
+    if (surface.client === 'store') {
+      await page.route(`**/api/admin/${endpoint}/categories`, (route) =>
         route.fulfill({ json: { code: 0, data: [] } }),
       );
     }
-    await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
+    await page.route(`**/api/admin/${endpoint}/attribute-template-options`, (route) =>
       route.fulfill({ json: { code: 0, data: [] } }),
     );
     await page.goto(surface.path);
@@ -86,9 +98,7 @@ for (const surface of surfaces) {
       if (actorTitles[index]) {
         await expect(main.getByRole('columnheader', { name: actorTitles[index], exact: true })).toBeVisible();
         await expect(rows.first()).toContainText('状态操作员');
-        const label = surface.client === 'store' ? '运营' : surface.client === 'admin' ? '供应链' : '';
-        if (label) await expect(rows.first().locator('.t-tag').getByText(label, { exact: true })).toBeVisible();
-        else await expect(rows.first().locator('.t-tag').getByText('供应链', { exact: true })).toHaveCount(0);
+        await expect(rows.first().locator('td').filter({ hasText: '状态操作员' }).locator('.t-tag')).toHaveCount(0);
       } else {
         await expect(rows.first()).not.toContainText('状态操作员');
       }

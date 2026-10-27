@@ -723,7 +723,6 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             status: slabStatus,
             stateOperatorName: offShelfRecords[0]!.offShelvedByName,
             stateOperatedAt: `${offShelfRecords[0]!.offShelvedAt}Z`,
-            stateOperatorClientCode: 'admin',
             offShelfRecords,
             createdAt: '2026-07-27T09:00:00',
           },
@@ -742,7 +741,6 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             status: 'offShelf',
             stateOperatorName: '王芳',
             stateOperatedAt: '2026-08-22T10:00:00Z',
-            stateOperatorClientCode: 'admin',
             offShelfRecords: [
               {
                 id: 3,

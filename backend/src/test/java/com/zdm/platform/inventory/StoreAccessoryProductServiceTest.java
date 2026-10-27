@@ -68,7 +68,6 @@ class StoreAccessoryProductServiceTest extends SpringContainerTestSupport {
     identity(99941L);
     var selected=products.select(List.of(99941L)).getFirst();
     assertThat(selected.stateOperatedAt()).isNotNull();
-    assertThat(selected.stateOperatorClientCode()).isEqualTo("store");
     var created=selected.createdAt();
     jdbc.update("UPDATE store_accessory_products SET status='selling' WHERE id=?",selected.id());
     stateActivities.record("store-accessory","store",selected.id(),"warehouse","selling",1L,"store");
@@ -79,7 +78,6 @@ class StoreAccessoryProductServiceTest extends SpringContainerTestSupport {
     assertThat(sold.stateOperatedAt()).isNotNull();
     assertThat(sold.stateOperatorName()).isEqualTo("系统");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_accessory_operation_logs WHERE listing_id=? AND operation_type='SOLD_OUT'",Long.class,selected.id())).isEqualTo(1L);
-    assertThat(sold.stateOperatorClientCode()).isEqualTo("system");
     assertThat(sold.createdAt()).isEqualTo(created);
     assertThat(products.list().getFirst().stateOperatedAt()).isEqualTo(sold.stateOperatedAt());
     stateActivities.storeStockChanged(99941L,0,0);

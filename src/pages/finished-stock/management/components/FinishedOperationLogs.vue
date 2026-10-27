@@ -201,7 +201,9 @@ const changes = computed<Record<string, { before: unknown; after: unknown; hint?
 const fullSnapshot = computed(
   () =>
     detail.value?.operationType === 'CREATE' ||
-    (detail.value?.operationType === 'SOURCE_SHELF' && !!changes.value['商品ID'] && !!changes.value['销售规格']),
+    (['SOURCE_SHELF', 'REENTRY'].includes(detail.value?.operationType || '') &&
+      !!changes.value['商品ID'] &&
+      !!changes.value['销售规格']),
 );
 const legacyArrivalPrices = computed(
   () =>

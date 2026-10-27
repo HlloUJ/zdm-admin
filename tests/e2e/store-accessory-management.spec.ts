@@ -64,7 +64,6 @@ function product(overrides: Record<string, unknown> = {}) {
     createdAt: '2026-10-08T12:34:56',
     stateOperatorName: '门店创建员工',
     stateOperatedAt: '2026-10-08T04:34:56Z',
-    stateOperatorClientCode: 'store',
     detail: '<p>门店商品详情</p>',
     categoryName: '平台分类',
     storeLevelName: '区域合作门店',

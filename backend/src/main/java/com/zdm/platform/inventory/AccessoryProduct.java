@@ -18,15 +18,10 @@ public class AccessoryProduct extends BaseEntity implements com.zdm.platform.sec
   @TableField(exist = false)
   @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
   private String stateOperatorName;
-  @TableField(exist = false)
-  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
-  private String stateOperatorClientCode;
   public java.time.LocalDateTime getStateOperatedAt() { return stateOperatedAt; }
   public void setStateOperatedAt(java.time.LocalDateTime value) { stateOperatedAt=value; }
   public String getStateOperatorName() { return stateOperatorName; }
   public void setStateOperatorName(String value) { stateOperatorName=value; }
-  public String getStateOperatorClientCode() { return stateOperatorClientCode; }
-  public void setStateOperatorClientCode(String value) { stateOperatorClientCode=value; }
   @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
   private List<AccessorySpecDimension> specDimensions;
 

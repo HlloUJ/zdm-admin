@@ -537,7 +537,9 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     assertThat(fresh.getName()).isEqualTo("新的来源名称");
     assertThat(fresh.getStatus()).isEqualTo("warehouse");
     assertThat(fresh.getMarkupPrices().stream().filter(price -> price.getStoreLevelId().equals(99609L)).findFirst().orElseThrow().getPrice()).isEqualByComparingTo(BigDecimal.valueOf(newCost).multiply(new BigDecimal("1.4")));
-    assertThat(logs.listPage("SLAB-COLLAB", "SOURCE_SHELF", null, null, null, 1, 10).total()).isEqualTo(1);
+    String arrivalType = purgeBeforeSourceRestore ? "SOURCE_SHELF" : "REENTRY";
+    assertThat(logs.listPage("SLAB-COLLAB", arrivalType, null, null, null, 1, 10).total()).isEqualTo(1);
+    assertThat(logs.listPage("SLAB-COLLAB", purgeBeforeSourceRestore ? "REENTRY" : "SOURCE_SHELF", null, null, null, 1, 10).total()).isZero();
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 20).records())
         .extracting(SlabOperationLog::getOperationType).contains("PURGE", "SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM media_references WHERE business_domain='SLAB_OPERATIONS_INVALIDATION' AND business_id=99601", Integer.class)).isZero();

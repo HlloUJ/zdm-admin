@@ -25,6 +25,14 @@ public class FinishedProductArrivalLogService {
   }
 
   public void record(Long id, String sourceStatus) {
+    record(id, sourceStatus, false);
+  }
+
+  public void recordReentry(Long id, String sourceStatus) {
+    record(id, sourceStatus, true);
+  }
+
+  private void record(Long id, String sourceStatus, boolean reentry) {
     FinishedProduct product = products.selectById(id);
     product.setVariants(variants.selectList(Wrappers.lambdaQuery(FinishedProductVariant.class)
         .eq(FinishedProductVariant::getFinishedProductId, id).orderByAsc(FinishedProductVariant::getId)));
@@ -32,6 +40,7 @@ public class FinishedProductArrivalLogService {
         .eq(FinishedProductAttributeEntry::getFinishedProductId, id).orderByAsc(FinishedProductAttributeEntry::getId)));
     product.setGuidePrices(guidePrices.listPrices(id));
     product.setMarkupPrices(prices.listPrices(id));
-    logs.recordArrival(product, sourceStatus);
+    if (reentry) { logs.recordReentry(product, sourceStatus); }
+    else { logs.recordArrival(product, sourceStatus); }
   }
 }
