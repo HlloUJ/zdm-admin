@@ -3296,6 +3296,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
+          "stage": "before-migrations",
+          "before": "      await Promise.all(recycleIds.map((id) => deleteFinishedProduct(id)));\n      dataItems.value = dataItems.value.filter((item) => item.status !== 'recycle');\n      selectedKeys.value = [];\n    }\n    closeConfirmDialog();\n    if ((type === 'delete' || type === 'purge') && product) {\n",
+          "after": "      await Promise.all(recycleIds.map((id) => deleteFinishedProduct(id)));\n      dataItems.value = dataItems.value.filter((item) => item.status !== 'recycle');\n      selectedKeys.value = [];\n      await loadInventoryData();\n    }\n    closeConfirmDialog();\n    if ((type === 'delete' || type === 'purge') && product) {\n"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
           "before": "                        </t-tooltip>\n                      </div>\n                    </template>\n                    <template #stateOperatorName=\"{ row }\">\n                      <t-space size=\"small\">\n                        <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>\n                        <t-tag\n                          v-if=\"stateSourceLabel(row.stateOperatorClientCode, 'admin')\"\n                          size=\"small\"\n                          variant=\"light\"\n                          >{{ stateSourceLabel(row.stateOperatorClientCode, 'admin') }}</t-tag\n                        >\n                      </t-space>\n                    </template>\n                    <template #stateOperatedAt=\"{ row }\">{{\n                      row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                    }}</template>\n",
@@ -7840,6 +7846,24 @@
       ],
       "approvedBusinessPatches": [
         {
+          "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
+          "stage": "before-migrations",
+          "before": "    uploadPreviewType.value = 'image';\n  }\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  item.status = status;\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  const selectedIdSet = new Set(selectedIds);\n  tableData.value.forEach((item) => {\n    if (!selectedIdSet.has(item.id)) return;\n    item.status = status;\n  });\n};\nconst shelfBlockingMessage = (row: SlabItem) => {\n  if (!row.mainImageMediaId || !row.scanImageMediaId || !row.designImageMediaId) {\n",
+          "after": "    uploadPreviewType.value = 'image';\n  }\n};\nconst refreshSlabItems = async (ids: number[]) => {\n  const selected = new Set(ids);\n  const records = await listSlabs();\n  records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  await refreshSlabItems([id]);\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  await refreshSlabItems(selectedIds);\n};\nconst shelfBlockingMessage = (row: SlabItem) => {\n  if (!row.mainImageMediaId || !row.scanImageMediaId || !row.designImageMediaId) {\n"
+        },
+        {
+          "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
+          "stage": "before-migrations",
+          "before": "    if (type === 'shelf' && row) await updateSlabStatus(row.id, 'selling');\n    if (type === 'delete' && row) {\n      await removeSlab(row.id);\n      row.status = 'recycle';\n    }\n    if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');\n    if (type === 'savePrice' && row) {\n",
+          "after": "    if (type === 'shelf' && row) await updateSlabStatus(row.id, 'selling');\n    if (type === 'delete' && row) {\n      await removeSlab(row.id);\n      await refreshSlabItems([row.id]);\n    }\n    if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');\n    if (type === 'savePrice' && row) {\n"
+        },
+        {
+          "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
+          "stage": "before-migrations",
+          "before": "    if (type === 'purge' && row) {\n      await deleteSlab(row.id);\n      tableData.value = tableData.value.filter((item) => item.id !== row.id);\n      if (sourceBlocked(row)) await loadSlabs();\n    }\n    if (type === 'batchPurge') {\n      const selectedIds = [...selectedKeys.value];\n      await deleteSlabs(selectedIds);\n      const deletedIds = new Set(selectedIds);\n      tableData.value = tableData.value.filter((item) => !deletedIds.has(item.id));\n    }\n    if (type === 'clearRecycle') {\n      await clearRecycleSlabs();\n      tableData.value = tableData.value.filter((item) => item.status !== 'recycle');\n    }\n    if (type !== 'savePrice') {\n      selectedKeys.value = [];\n",
+          "after": "    if (type === 'purge' && row) {\n      await deleteSlab(row.id);\n      tableData.value = tableData.value.filter((item) => item.id !== row.id);\n      await loadSlabs();\n    }\n    if (type === 'batchPurge') {\n      const selectedIds = [...selectedKeys.value];\n      await deleteSlabs(selectedIds);\n      const deletedIds = new Set(selectedIds);\n      tableData.value = tableData.value.filter((item) => !deletedIds.has(item.id));\n      await loadSlabs();\n    }\n    if (type === 'clearRecycle') {\n      await clearRecycleSlabs();\n      tableData.value = tableData.value.filter((item) => item.status !== 'recycle');\n      await loadSlabs();\n    }\n    if (type !== 'savePrice') {\n      selectedKeys.value = [];\n"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
           "before": "                  <template #offShelvedAt=\"{ row }\">\n                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}\n                  </template>\n                  <template #stateOperatorName=\"{ row }\">\n                    <t-space size=\"small\">\n                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>\n                      <t-tag\n                        v-if=\"stateSourceLabel(row.stateOperatorClientCode, 'admin')\"\n                        size=\"small\"\n                        variant=\"light\"\n                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'admin') }}</t-tag\n                      >\n                    </t-space>\n                  </template>\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n",
@@ -8738,6 +8762,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
+          "stage": "before-migrations",
+          "before": "    uploadPreviewType.value = 'image';\n  }\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  item.status = status;\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  const selectedIdSet = new Set(selectedIds);\n  tableData.value.forEach((item) => {\n    if (!selectedIdSet.has(item.id)) return;\n    item.status = status;\n  });\n};\nconst shelfBlockingMessage = (row: SlabItem) => {\n  if (!row.mainImageMediaId || !row.scanImageMediaId || !row.designImageMediaId) {\n",
+          "after": "    uploadPreviewType.value = 'image';\n  }\n};\nconst refreshSlabItems = async (ids: number[]) => {\n  const selected = new Set(ids);\n  const records = await listSlabs();\n  records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  await refreshSlabItems([id]);\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  await refreshSlabItems(selectedIds);\n};\nconst shelfBlockingMessage = (row: SlabItem) => {\n  if (!row.mainImageMediaId || !row.scanImageMediaId || !row.designImageMediaId) {\n"
+        },
+        {
+          "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
+          "stage": "before-migrations",
+          "before": "    if (type === 'shelf' && row) await updateSlabStatus(row.id, 'selling');\n    if (type === 'delete' && row) {\n      await removeSlab(row.id);\n      row.status = 'recycle';\n    }\n    if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');\n    if (type === 'savePrice' && row) {\n",
+          "after": "    if (type === 'shelf' && row) await updateSlabStatus(row.id, 'selling');\n    if (type === 'delete' && row) {\n      await removeSlab(row.id);\n      await refreshSlabItems([row.id]);\n    }\n    if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');\n    if (type === 'savePrice' && row) {\n"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",

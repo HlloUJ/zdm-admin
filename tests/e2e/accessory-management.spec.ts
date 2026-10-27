@@ -2217,6 +2217,8 @@ for (const failSecond of [false, true]) {
       name: `批量下架商品${id}`,
       status: 'selling',
       sourceStatus: 'selling',
+      stateOperatorName: '旧操作人',
+      stateOperatedAt: '2026-10-01T01:00:00.000000Z',
       categoryId: 5,
       supplierId: 2,
       totalStock: 1,
@@ -2247,6 +2249,8 @@ for (const failSecond of [false, true]) {
         return route.fulfill({ status: 400, json: { code: 400, message: '商品状态已变化', data: null } });
       product.status = 'offShelf';
       product.sourceStatus = 'offShelf';
+      product.stateOperatorName = `下架操作员${id}`;
+      product.stateOperatedAt = '2026-10-27T06:01:27.644508Z';
       return route.fulfill({ json: { code: 0, data: product } });
     });
     await page.goto('/supply-chain/accessory-management');
@@ -2273,6 +2277,14 @@ for (const failSecond of [false, true]) {
     } else {
       await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(0);
       await expect(main.getByText('批量下架商品73', { exact: true })).toHaveCount(0);
+    }
+    await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已下架' }).click();
+    for (const id of failSecond ? [73] : [73, 72, 71]) {
+      const row = main.locator('tbody tr').filter({ hasText: `批量下架商品${id}` });
+      await expect(row).toContainText(`下架操作员${id}`);
+      await expect(row).toContainText('2026/10/27 14:01');
+      await expect(row).not.toContainText('历史记录未记录');
+      await expect(row).not.toContainText('旧操作人');
     }
   });
 }

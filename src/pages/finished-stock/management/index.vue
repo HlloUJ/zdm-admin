@@ -2895,6 +2895,7 @@ const handleConfirm = async () => {
       await Promise.all(recycleIds.map((id) => deleteFinishedProduct(id)));
       dataItems.value = dataItems.value.filter((item) => item.status !== 'recycle');
       selectedKeys.value = [];
+      await loadInventoryData();
     }
     closeConfirmDialog();
     if ((type === 'delete' || type === 'purge') && product) {

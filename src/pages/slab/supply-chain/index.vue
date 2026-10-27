@@ -2055,20 +2055,21 @@ const releasePendingUpload = (removed: AdminMediaValue) => {
     uploadPreviewType.value = 'image';
   }
 };
+const refreshSlabItems = async (ids: number[]) => {
+  const selected = new Set(ids);
+  const records = await listSlabs();
+  records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);
+};
 const updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {
   const item = tableData.value.find((candidate) => candidate.id === id);
   if (!item) return;
   await updateSlabStatuses([id], status, reason, detail);
-  item.status = status;
+  await refreshSlabItems([id]);
 };
 const updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {
   const selectedIds = [...selectedKeys.value];
   await updateSlabStatuses(selectedIds, status, reason, detail);
-  const selectedIdSet = new Set(selectedIds);
-  tableData.value.forEach((item) => {
-    if (!selectedIdSet.has(item.id)) return;
-    item.status = status;
-  });
+  await refreshSlabItems(selectedIds);
 };
 const shelfBlockingMessage = (row: SlabItem) => {
   if (!row.mainImageMediaId || !row.scanImageMediaId || !row.designImageMediaId) {
@@ -2206,7 +2207,7 @@ const handleConfirmSubmit = async () => {
     if (type === 'shelf' && row) await updateSlabStatus(row.id, 'selling');
     if (type === 'delete' && row) {
       await removeSlab(row.id);
-      row.status = 'recycle';
+      await refreshSlabItems([row.id]);
     }
     if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');
     if (type === 'savePrice' && row) {

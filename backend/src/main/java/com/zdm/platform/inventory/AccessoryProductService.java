@@ -377,7 +377,7 @@ public class AccessoryProductService extends CreatorAwareService<AccessoryProduc
   @Transactional
   public AccessoryProduct sourceTransition(Long id, String target, String reason, String detail) {
     lifecycle.sourceTransition(AccessoryLifecycleService.Kind.ACCESSORY,id,target,reason,detail);
-    return attachDetails(getById(id));
+    return withDetails(getById(id));
   }
 
   public boolean cleanupTemporaryMedia(Long mediaId) {

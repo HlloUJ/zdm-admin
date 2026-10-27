@@ -105,3 +105,122 @@ for (const surface of surfaces) {
     }
   });
 }
+
+for (const surface of surfaces) {
+  for (const batch of [false, true]) {
+    test(`${surface.path} ${batch ? 'batch' : 'single'} restore immediately shows server actor and time`, async ({
+      page,
+    }) => {
+      await installAdminApiMocks(page);
+      await page.addInitScript((client) => {
+        localStorage.setItem('zdm-admin-token', 'dev-token');
+        localStorage.setItem(
+          'zdm-admin-user',
+          JSON.stringify({
+            id: 1,
+            name: '当前登录人',
+            clientCode: client === 'store' ? 'admin' : client,
+            roles: [client === 'store' ? 'STORE_ADMIN' : 'OPERATOR'],
+            permissions: ['all'],
+            dataPermission: 'all',
+            ...(client === 'store' ? { tenantId: 1, storeId: 2, storeType: 'cityPartner' } : {}),
+          }),
+        );
+      }, surface.client);
+      const records = [801, 802].map((id) => ({
+        id,
+        productId: id,
+        name: `状态同步${id}`,
+        sku: `SYNC-${id}`,
+        serialNo: `SYNC-${id}`,
+        status: 'offShelf',
+        effectiveStatus: 'offShelf',
+        sourceStatus: surface.client === 'supply-chain' ? 'offShelf' : 'selling',
+        sourceUnavailable: false,
+        stock: 2,
+        totalStock: 2,
+        stateOperatorName: '旧操作人',
+        stateOperatedAt: '2026-10-01T01:00:00.000000Z',
+        variants: [],
+        skus: [],
+        attributes: [],
+        specDimensions: [],
+        markupPrices: [],
+        guidePrices: [],
+        offShelfRecords: [],
+        imageUrls: [],
+        mainImageUrls: [],
+        attributeNames: {},
+      }));
+      const endpoint =
+        surface.kind === 'slab'
+          ? 'slabs'
+          : surface.kind === 'accessory'
+            ? 'accessory-products'
+            : surface.kind === 'store-accessory'
+              ? 'store-accessory-products'
+              : surface.kind === 'store'
+                ? 'store-finished-products'
+                : 'finished-products';
+      let mutations = 0;
+      await page.route(`**/api/admin/${endpoint}**`, async (route) => {
+        const request = route.request();
+        const path = new URL(request.url()).pathname;
+        if (path.endsWith('/action-check')) return route.fulfill({ json: { code: 0, data: true } });
+        if (request.method() !== 'GET') {
+          const payload = request.postDataJSON();
+          const ids: number[] = payload.ids ?? [Number(path.split('/').find((part) => /^80[12]$/.test(part)))];
+          const target = payload.target ?? payload.status;
+          expect(target).toBe('warehouse');
+          mutations++;
+          for (const record of records.filter((item) => ids.includes(item.id))) {
+            record.status = record.effectiveStatus = target;
+            if (surface.client === 'supply-chain') record.sourceStatus = target;
+            record.stateOperatorName = `真实入库人${record.id}`;
+            record.stateOperatedAt = '2026-10-27T06:01:27.644508Z';
+          }
+          return route.fulfill({
+            json: {
+              code: 0,
+              data:
+                surface.client === 'store'
+                  ? records.filter((item) => ids.includes(item.id))
+                  : surface.kind === 'slab'
+                    ? true
+                    : records.find((item) => ids.includes(item.id)),
+            },
+          });
+        }
+        if (path === `/api/admin/${endpoint}`) return route.fulfill({ json: { code: 0, data: records } });
+        if (/\/80[12]$/.test(path))
+          return route.fulfill({ json: { code: 0, data: records.find((item) => path.endsWith(`/${item.id}`)) } });
+        if (path.endsWith('/categories') || path.endsWith('/attribute-template-options'))
+          return route.fulfill({ json: { code: 0, data: [] } });
+        return route.fallback();
+      });
+      await page.goto(surface.path);
+      const main = page.getByRole('main');
+      await main.locator('.t-tabs__nav-item').filter({ hasText: '已下架' }).click();
+      if (batch) {
+        await main.locator('thead .t-checkbox').click();
+        await main.getByRole('button', { name: '批量放回到仓库', exact: true }).click();
+      } else {
+        await main
+          .locator('tbody tr')
+          .filter({ hasText: '状态同步801' })
+          .getByText('放回仓库', { exact: true })
+          .click();
+      }
+      await page.locator('.t-dialog:visible').getByRole('button', { name: /^确认/ }).click();
+      await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+      await main.locator('.t-tabs__nav-item').filter({ hasText: '仓库中' }).click();
+      for (const id of batch ? [801, 802] : [801]) {
+        const row = main.locator('tbody tr').filter({ hasText: `状态同步${id}` });
+        await expect(row).toContainText(`真实入库人${id}`);
+        await expect(row).toContainText('2026/10/27 14:01');
+        await expect(row).not.toContainText('旧操作人');
+      }
+      expect(mutations).toBeGreaterThan(0);
+    });
+  }
+}

@@ -2,6 +2,8 @@ package com.zdm.platform.inventory;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -82,6 +84,58 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
     assertThat(LocalDateTime.parse(record.path("stateOperatedAt").asText().replace("Z", ""))).isEqualTo(expected);
     assertThat(record.path("stateOperatorName").asText()).isNotBlank();
     assertThat(record.has("stateOperatorClientCode")).isFalse();
+  }
+  @ParameterizedTest @ValueSource(strings = {"finished", "accessory"})
+  void transitionResponseMatchesPersistedActivityBeforeAnyListRefresh(String kind) throws Exception {
+    identity("supply-chain"); product(kind, "selling");
+    for (String target : List.of("offShelf", "warehouse", "recycle", "warehouse")) {
+      String body = mvc.perform(put("/api/admin/" + endpoint(kind) + "/99880")
+          .contentType("application/json")
+          .content("{\"name\":\"状态时间商品\",\"status\":\"" + target + "\",\"offShelfReason\":\"价格调整\"}"))
+          .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
+      JsonNode response = json.readTree(body).path("data");
+      var activity = jdbc.queryForMap("SELECT occurred_at, operator_account_id FROM product_state_activity WHERE kind=? AND business_client_code='supply-chain' AND record_id=99880 AND state=?", kind, target);
+      assertThat(response.path("stateOperatorName").asText()).isNotBlank();
+      assertThat(response.path("stateOperatedAt").isTextual()).isTrue();
+      assertThat(LocalDateTime.parse(response.path("stateOperatedAt").asText().replace("Z", "")))
+          .isEqualTo(StateActivityTime.read(activity.get("occurred_at")));
+      assertThat(((Number) activity.get("operator_account_id")).longValue()).isEqualTo(1L);
+      JsonNode refreshed = null;
+      for (JsonNode row : json.readTree(mvc.perform(get("/api/admin/" + endpoint(kind)))
+          .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data")) {
+        if (row.path("id").asLong() == 99880L) { refreshed = row; break; }
+      }
+      assertThat(refreshed).isNotNull();
+      assertThat(response.path("stateOperatorName")).isEqualTo(refreshed.path("stateOperatorName"));
+      assertThat(response.path("stateOperatedAt")).isEqualTo(refreshed.path("stateOperatedAt"));
+      assertThat(response.path("sourceStatus").asText()).isEqualTo(target);
+    }
+  }
+  @ParameterizedTest @ValueSource(strings = {"admin", "supply-chain"})
+  void slabStatusMutationAndListReadSamePersistedActivity(String client) throws Exception {
+    identity(client); product("slab", "selling");
+    for (String target : List.of("offShelf", "warehouse", "recycle", "warehouse")) {
+      if ("recycle".equals(target)) {
+        mvc.perform(post("/api/admin/slabs/99880/delete").contentType("application/json").content("{}"))
+            .andExpect(status().isOk());
+      } else {
+        mvc.perform(put("/api/admin/slabs/batch-status").contentType("application/json")
+            .content("{\"ids\":[99880],\"status\":\"" + target + "\",\"reason\":\"价格调整\"}"))
+            .andExpect(status().isOk());
+      }
+      JsonNode actual = null;
+      for (JsonNode row : json.readTree(mvc.perform(get("/api/admin/slabs"))
+          .andExpect(status().isOk()).andReturn().getResponse().getContentAsString()).path("data")) {
+        if (row.path("id").asLong() == 99880L) { actual = row; break; }
+      }
+      assertThat(actual).isNotNull();
+      var activity = jdbc.queryForMap("SELECT state, occurred_at, operator_account_id FROM product_state_activity WHERE kind='slab' AND business_client_code=? AND record_id=99880", client);
+      assertThat(activity.get("state")).isEqualTo(target);
+      assertThat(actual.path("stateOperatorName").asText()).isNotBlank();
+      assertThat(LocalDateTime.parse(actual.path("stateOperatedAt").asText().replace("Z", "")))
+          .isEqualTo(StateActivityTime.read(activity.get("occurred_at")));
+      assertThat(((Number) activity.get("operator_account_id")).longValue()).isEqualTo(1L);
+    }
   }
   @ParameterizedTest @ValueSource(strings = {"finished", "accessory", "slab"})
   void reentryKeepsRealTriggerReasonAndHistoricalLogs(String kind) throws Exception {
