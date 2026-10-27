@@ -52,7 +52,7 @@
     "git:delivery-check": "node scripts/git-workflow-state.mjs --require-synced --require-integrated",
     "git:integration:sync": "node scripts/sync-integration.mjs",
     "quality": "npm run typecheck && npm run lint && npm run stylelint && npm run format:check && npm run test:unit && npm run test:scripts",
-    "quality:checks": "npm run quality:static && npm run test:unit && npm run test:source-guards",
+    "quality:checks": "npm run check:business-regressions && npm run quality:static && npm run test:unit && npm run test:source-guards",
     "quality:static": "npm run typecheck && npm run lint && npm run stylelint",
     "verify": "node scripts/verify.mjs",
     "verify:local": "node scripts/verify.mjs --browser chrome",
@@ -77,7 +77,8 @@
     "test:engineering": "node scripts/run-script-tests.mjs --engineering",
     "test:scripts:files": "node scripts/run-script-tests.mjs --files",
     "check:ui-templates": "node --test scripts/ui-template-policy.test.mjs",
-    "test:ci-reuse": "node scripts/run-ci-diagnostics.mjs"
+    "test:ci-reuse": "node scripts/run-ci-diagnostics.mjs",
+    "check:business-regressions": "node scripts/business-regression.mjs"
   },
   "lint-staged": {
     "*.{js,ts,vue}": [

@@ -846,6 +846,20 @@ async function mockCollection(page: Page, pattern: string, records: unknown[]) {
 
   await page.route(`${pattern}/**`, async (route) => {
     if (route.request().method() === 'DELETE') {
+      if (pattern === '**/api/admin/slabs') {
+        const action = new URL(route.request().url()).pathname.split('/').at(-1);
+        const ids = new Set<number>(
+          action === 'batch-purge' ? (route.request().postDataJSON() as number[]) : [Number(action)],
+        );
+        const remaining = collection.filter((record) => {
+          const slab = record as { id: number; status: string };
+          return action === 'clear-recycle' ? slab.status !== 'recycle' : !ids.has(slab.id);
+        });
+        const removed = collection.length - remaining.length;
+        collection.splice(0, collection.length, ...remaining);
+        await fulfillJson(route, action === 'clear-recycle' ? removed : true);
+        return;
+      }
       await fulfillJson(route, true);
       return;
     }

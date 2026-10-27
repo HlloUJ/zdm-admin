@@ -1,4 +1,10 @@
 import {
+  validateContracts,
+  CONTRACT_FILE,
+  validateChangedBusinessCoverage,
+  changedBusinessFiles,
+} from './business-regression.mjs';
+import {
   needsContractPreflight,
   deliveryCiCapability,
   localReadinessTasks,
@@ -215,6 +221,10 @@ export async function main(args = process.argv.slice(2)) {
       'Usage: node scripts/verify.mjs [--affected] [--runtime] [--browser chrome] [--list] [--force|--no-reuse]',
     );
     return 0;
+  }
+  if (existsSync(path.join(process.cwd(), CONTRACT_FILE))) {
+    validateContracts(process.cwd());
+    validateChangedBusinessCoverage(process.cwd(), changedBusinessFiles(process.cwd()));
   }
   const affected = args.includes('--affected');
   const plannedCandidate = args.includes('--list') ? null : captureSource(process.cwd());

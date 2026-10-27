@@ -1,3 +1,4 @@
+import { requireBackendBehaviors } from './business-regression.mjs';
 import { BACKEND_REPORTS } from './ci-report-contract.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -80,6 +81,7 @@ export function validateBackendReports(
       !/<(?:skipped|failure|error|flakyFailure|flakyError|rerunFailure|rerunError)\b/.test(xml),
       `Non-passing execution in ${entry.name}`,
     );
+    requireBackendBehaviors(entry.name, xml);
     total += count;
   }
   return { classes: classes.length, tests: total, failures: 0, errors: 0, skipped: 0 };

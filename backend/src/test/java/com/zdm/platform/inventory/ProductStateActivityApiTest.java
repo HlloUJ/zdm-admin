@@ -95,6 +95,7 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
           .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
       JsonNode response = json.readTree(body).path("data");
       var activity = jdbc.queryForMap("SELECT occurred_at, operator_account_id FROM product_state_activity WHERE kind=? AND business_client_code='supply-chain' AND record_id=99880 AND state=?", kind, target);
+      assertThat(response.path("stateOperatorName").isTextual()).isTrue();
       assertThat(response.path("stateOperatorName").asText()).isNotBlank();
       assertThat(response.path("stateOperatedAt").isTextual()).isTrue();
       assertThat(LocalDateTime.parse(response.path("stateOperatedAt").asText().replace("Z", "")))
@@ -131,6 +132,7 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
       assertThat(actual).isNotNull();
       var activity = jdbc.queryForMap("SELECT state, occurred_at, operator_account_id FROM product_state_activity WHERE kind='slab' AND business_client_code=? AND record_id=99880", client);
       assertThat(activity.get("state")).isEqualTo(target);
+      assertThat(actual.path("stateOperatorName").isTextual()).isTrue();
       assertThat(actual.path("stateOperatorName").asText()).isNotBlank();
       assertThat(LocalDateTime.parse(actual.path("stateOperatedAt").asText().replace("Z", "")))
           .isEqualTo(StateActivityTime.read(activity.get("occurred_at")));

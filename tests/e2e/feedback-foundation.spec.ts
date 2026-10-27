@@ -265,6 +265,8 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
     guidePrice: 9800,
     status: 'warehouse',
     sourceStatus: 'warehouse',
+    stateOperatorName: '外部系统',
+    stateOperatedAt: '2026-08-23T01:00:00.000000Z',
     createdByName: '外部系统',
     createdAt: '2026-08-23T09:00:00',
   };
@@ -278,6 +280,9 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   let deletionPayload: Record<string, unknown> | undefined;
   await page.route('**/api/admin/slabs/9/delete', async (route) => {
     deletionPayload = route.request().postDataJSON() as Record<string, unknown>;
+    interfaceSlab.status = interfaceSlab.sourceStatus = 'recycle';
+    interfaceSlab.stateOperatorName = '韩健';
+    interfaceSlab.stateOperatedAt = '2026-08-23T02:00:00.000000Z';
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -410,6 +415,8 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   await expect(row).toHaveCount(0);
   await page.getByText('回收站 1', { exact: true }).click();
   await expect(row).toBeVisible();
+  await expect(row).toContainText('韩健');
+  await expect(row).toContainText('2026/08/23 10:00');
   await page.getByRole('main').getByRole('button', { name: '操作日志', exact: true }).click();
   const logDrawer = page.locator('.t-drawer').filter({ hasText: '操作日志' });
   const operationLogRow = logDrawer.getByRole('row', { name: /外部系统大板 09/ });
@@ -507,8 +514,8 @@ test('permanently deletes one or multiple slabs from the recycle tab after confi
   );
   await page.getByRole('button', { name: '确认彻底删除', exact: true }).click();
   await singleDelete;
-  await expect(singleRow).toHaveCount(0);
   await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toBeHidden();
+  await expect(singleRow).toHaveCount(0);
 
   const batchRow = page.getByRole('row', { name: /回收站大板 08/ });
   await batchRow.locator('.t-checkbox').click();
@@ -523,6 +530,7 @@ test('permanently deletes one or multiple slabs from the recycle tab after confi
   );
   await page.getByRole('button', { name: '确认批量彻底删除', exact: true }).click();
   expect((await batchDelete).postDataJSON()).toEqual([8]);
+  await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toBeHidden();
   await expect(batchRow).toHaveCount(0);
 });
 
@@ -674,8 +682,8 @@ test('places clear recycle after batch purge and permanently deletes every recyc
   );
   await page.getByRole('button', { name: '确认清空回收站', exact: true }).click();
   expect((await clearRequest).postData()).toBeNull();
-  await expect(page.getByRole('row', { name: /回收站大板/ })).toHaveCount(0);
   await expect(page.getByText('已清空回收站“2 个大板”', { exact: true })).toBeVisible();
+  await expect(page.getByRole('row', { name: /回收站大板/ })).toHaveCount(0);
 });
 
 test('requires an off-shelf reason before batch off-shelving slabs', async ({ page }) => {

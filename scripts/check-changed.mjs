@@ -1,3 +1,4 @@
+import { validateChangedBusinessCoverage } from './business-regression.mjs';
 import { spawnSync } from 'node:child_process';
 import { existsSync, lstatSync } from 'node:fs';
 import path from 'node:path';
@@ -89,6 +90,7 @@ With file arguments, checks only files from the current task.
     report('No changed files require validation.');
     return 0;
   }
+  validateChangedBusinessCoverage(root, files);
   const plan = createValidationPlan(files, (file) => existsSync(path.resolve(root, file)), { root });
   report(`Changed files: ${files.length}`);
   for (const task of plan.tasks)

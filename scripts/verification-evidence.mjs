@@ -113,6 +113,8 @@ const BACKEND_ENTRIES = [
   'scripts/verification-evidence.mjs',
   'scripts/verification-runner.mjs',
   'scripts/backend-test-evidence.mjs',
+  'scripts/business-regression.mjs',
+  'scripts/business-regression-contracts.json',
 ];
 
 function backendInputScope(task) {
