@@ -36,6 +36,8 @@ export function openCompletion(directory, batch, { now = Date.now(), requestedAt
     clockSource: !formal ? 'not-started' : requestedAt ? 'request-timestamp' : 'first-completion-command',
     events: [],
     repairs: [],
+    pauses: [],
+    pauseTrackingSince: now,
   };
   saveCompletion(directory, state);
   Object.defineProperty(state, completionDirectory, { value: directory });
@@ -75,6 +77,8 @@ export function saveCompletion(directory, state) {
       };
       state.events = merge(disk.events, state.events, (e) => e.id ?? `${e.name}:${e.key}:${e.startedAt}`);
       state.repairs = merge(disk.repairs, state.repairs, (r) => r.id);
+      state.pauses = merge(disk.pauses ?? [], state.pauses ?? [], (p) => p.id);
+      state.pauseTrackingSince = disk.pauseTrackingSince ?? state.pauseTrackingSince;
       if (disk.startedAt !== null) {
         if (state.startedAt !== null) assert.equal(state.startedAt, disk.startedAt, 'Completion start cannot be reset');
         state.startedAt = disk.startedAt;
@@ -153,7 +157,7 @@ export async function completionStage(state, name, key, run, { now = Date.now, s
     save(state);
   }
 }
-export function recordRepair(state, { id, failureRun, evidence, category, now = Date.now() }) {
+export function recordRepair(state, { id, failureRun, evidence, category, kind = 'unclassified', now = Date.now() }) {
   assert.ok(state.startedAt !== null, 'Begin formal completion before recording repair');
   assert.match(id, /^[a-z0-9-]+$/);
   assert.ok(
@@ -170,6 +174,7 @@ export function recordRepair(state, { id, failureRun, evidence, category, now = 
     evidence && existsSync(evidence) && lstatSync(evidence).isFile() && !lstatSync(evidence).isSymbolicLink(),
     'Missing diagnostic evidence',
   );
+  assert.ok(['code', 'environment', 'transport', 'unclassified'].includes(kind), 'Unknown repair work kind');
   assert.ok(!state.repairs.some((r) => r.id === id), 'Repair already recorded');
   state.repairs.push({
     id,
@@ -180,6 +185,7 @@ export function recordRepair(state, { id, failureRun, evidence, category, now = 
     failureKey: failure.key,
     isCiFailure: Boolean(failure.failure?.ci),
     category,
+    kind,
     evidence,
     evidenceDigest: createHash('sha256').update(readFileSync(evidence)).digest('hex'),
     startedAt: now,
@@ -231,7 +237,15 @@ export function completionSummary(state, now = Date.now()) {
   assert.ok(wallMs >= 0);
   const measuredMs = union(clip(intervals)),
     ci = state.events.filter((e) => e.name === 'ci' && e.status === 'success').at(-1);
-  const repairMs = union(clip(state.repairs.map((r) => [r.startedAt, r.finishedAt ?? end])));
+  const windows = (records) => clip(records.map((r) => [r.startedAt, r.finishedAt ?? end]));
+  const ciWindows = windows(state.events.filter((e) => e.name === 'ci'));
+  const pauseWindows = windows(state.pauses ?? []);
+  const completePauseHistory = Number.isFinite(state.pauseTrackingSince) && state.pauseTrackingSince <= state.startedAt;
+  const restorations = state.repairs.filter((r) => r.category === 'stage-restoration');
+  const remediation = state.repairs.filter((r) => r.category !== 'stage-restoration');
+  const blocked = [...ciWindows, ...pauseWindows];
+  const active = (records) => intervalDifference(windows(records), blocked);
+  const repairMs = active(remediation);
   return {
     batch: state.batch,
     startedAt: new Date(state.startedAt).toISOString(),
@@ -266,7 +280,22 @@ export function completionSummary(state, now = Date.now()) {
           ),
       ),
     ),
+    timingVersion: 2,
     repairMs,
+    repairWindowMs: union(windows(remediation)),
+    codeRepairMs: active(remediation.filter((r) => r.kind === 'code')),
+    environmentRepairMs: active(remediation.filter((r) => ['environment', 'transport'].includes(r.kind))),
+    unclassifiedRepairMs: active(remediation.filter((r) => !r.kind || r.kind === 'unclassified')),
+    restorationWindowMs: union(windows(restorations)),
+    recoveryMs: active(restorations),
+    pauseMs: completePauseHistory ? union(pauseWindows) : null,
+    recordedPauseMs: union(pauseWindows),
+    pauseTiming: completePauseHistory ? 'recorded-request-resume' : 'incomplete-history-no-estimated-subtraction',
+    activeCiWaitMs: completePauseHistory ? intervalDifference(ciWindows, pauseWindows) : null,
+    waitTiming: state.events.some((e) => e.name === 'ci' && e.durationBasis?.includes('unknown'))
+      ? 'includes-unknown-interruption-upper-bound'
+      : 'observed-wait-windows',
+    pauses: (state.pauses ?? []).map((p) => ({ ...p, durationMs: (p.finishedAt ?? end) - p.startedAt })),
     unrecordedFailedRuns: state.events
       .filter((e) => e.failure?.ci && !state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)))
       .map((e) => e.failure.ci.runId),
@@ -278,10 +307,23 @@ export function completionSummary(state, now = Date.now()) {
       .filter((e) => e.status === 'failure' && !e.failure?.ci && !state.repairs.some((r) => r.failureEventId === e.id))
       .map((e) => ({ id: e.id, name: e.name, key: e.key })),
     repairs: state.repairs.map((r) => ({ ...r, durationMs: (r.finishedAt ?? end) - r.startedAt })),
+    repairCounts: {
+      code: remediation.filter((r) => r.kind === 'code').length,
+      unclassified: remediation.filter((r) => !r.kind || r.kind === 'unclassified').length,
+      restorations: restorations.length,
+    },
+    failureCounts: {
+      ci: state.events.filter((e) => e.failure?.ci).length,
+      interruptions: state.events.filter((e) => e.failure?.category === 'interrupted').length,
+      otherStages: state.events.filter(
+        (e) => e.status === 'failure' && !e.failure?.ci && e.failure?.category !== 'interrupted',
+      ).length,
+    },
     failedStages: state.events
       .filter((e) => e.status === 'failure')
       .map((e) => ({ name: e.name, key: e.key, failure: e.failure })),
-    overlapPolicy: 'Union intervals; repair is a subset, never add it to wall time',
+    overlapPolicy:
+      'Union intervals; pause/recovery/repair windows may overlap remote CI. Active repair and recovery exclude recorded CI wait and pause. Never add categories to wall time.',
     stages: state.events.map((e) => ({
       id: e.id,
       name: e.name,
@@ -322,4 +364,66 @@ export function completionGaps(state, end) {
   }
   if (cursor < end) gaps.push({ startedAt: cursor, finishedAt: end, durationMs: end - cursor, previous, next: null });
   return gaps;
+}
+
+export function intervalDifference(intervals, blocked) {
+  const ranges = [...new Set(intervals.flatMap(([a, b]) => [a, b]).concat(blocked.flatMap(([a, b]) => [a, b])))].sort(
+    (a, b) => a - b,
+  );
+  let total = 0;
+  for (let i = 1; i < ranges.length; i++) {
+    const a = ranges[i - 1],
+      b = ranges[i];
+    if (intervals.some(([x, y]) => x <= a && y >= b) && !blocked.some(([x, y]) => x <= a && y >= b)) total += b - a;
+  }
+  return total;
+}
+export function pauseCompletion(state, { now = Date.now() } = {}) {
+  assert.equal(state.closedAt, undefined, 'Closed delivery cannot be paused');
+  assert.ok(state.startedAt !== null && now >= state.startedAt, 'Formal delivery must be started');
+  const prior = (state.pauses ?? []).find((p) => p.finishedAt == null);
+  if (prior) return prior;
+  state.pauseTrackingSince ??= now;
+  const pause = {
+    id: randomUUID(),
+    startedAt: now,
+    status: 'paused',
+    reason: 'user-request',
+    stageIds: state.events.filter((e) => e.status === 'running').map((e) => e.id),
+  };
+  (state.pauses ??= []).push(pause);
+  return pause;
+}
+export function resumeCompletion(state, { now = Date.now() } = {}) {
+  const pause = (state.pauses ?? []).find((p) => p.finishedAt == null);
+  if (!pause) return null;
+  assert.equal(state.closedAt, undefined, 'Closed delivery cannot resume');
+  assert.ok(now >= pause.startedAt, 'Clock moved backwards');
+  pause.finishedAt = now;
+  pause.status = 'resumed';
+  return pause;
+}
+export function completionPhase(state) {
+  if (state.startedAt === null) return 'local-validation';
+  if ((state.pauses ?? []).some((p) => p.finishedAt == null)) return 'paused';
+  const main = [...state.events]
+    .reverse()
+    .find((e) => e.name === 'ci' && e.status === 'success' && e.result?.branch === 'main');
+  const key = main?.key;
+  const success = (name, k) => state.events.some((e) => e.name === name && e.key === k && e.status === 'success');
+  if (
+    state.closedAt &&
+    key &&
+    ['evidence', 'handoff', 'preserve', 'cleanup', 'close'].every((name) => success(name, key))
+  )
+    return 'delivered';
+  const latest = [...state.events].reverse().find((e) => e.name === 'ci');
+  if (latest?.status === 'failure' && latest.failure?.ci) return 'ci-failed';
+  if (main) {
+    if (success('handoff', key) || success('handoff', main.result.headSha + ':final'))
+      return 'handoff-verified-awaiting-settlement';
+    return 'main-verified-awaiting-handoff';
+  }
+  if (latest?.status === 'success') return 'pr-verified-awaiting-main';
+  return 'delivery-in-progress';
 }
