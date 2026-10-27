@@ -41,26 +41,28 @@ public class FinishedPriceConfigurationSyncService implements StoreLevelPriceSyn
     return count == null ? 0 : count;
   }
 
-  public int refreshAutoPrices(FinishedMarkupConfiguration configuration) {
+  public void refreshAutoPrices(FinishedMarkupConfiguration configuration) {
     if (!"enabled".equals(configuration.getStatus())) {
-      return 0;
+      return;
     }
-    return jdbc.update("""
+    jdbc.update("""
         UPDATE finished_product_prices price
+        INNER JOIN finished_products inventory ON inventory.id = price.finished_product_id
         INNER JOIN store_levels level ON level.id = price.store_level_id
         SET price.price_coefficient = ?, price.price = ROUND(price.cost_price * ?, 2)
         WHERE price.source_configuration_id = ? AND price.price_source = 'auto'
+          AND inventory.operations_deleted = FALSE
           AND (level.status = 'enabled'
             OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND price.cost_price >= 0
         """, configuration.getPriceCoefficient(), configuration.getPriceCoefficient(), configuration.getId());
   }
 
-  public int backfillMissingPrices(FinishedMarkupConfiguration configuration) {
+  public void backfillMissingPrices(FinishedMarkupConfiguration configuration) {
     if (!"enabled".equals(configuration.getStatus())) {
-      return 0;
+      return;
     }
-    return jdbc.update("""
+    jdbc.update("""
         INSERT INTO finished_product_prices
           (finished_product_id, sku_id, variant_label, store_level_id, store_level_name,
            price_coefficient, cost_price, price, price_source, source_configuration_id)
@@ -69,11 +71,13 @@ public class FinishedPriceConfigurationSyncService implements StoreLevelPriceSyn
                guide.cost_price, ROUND(guide.cost_price * configuration.price_coefficient, 2),
                'auto', configuration.id
         FROM finished_product_guide_prices guide
+        INNER JOIN finished_products inventory ON inventory.id = guide.finished_product_id
         INNER JOIN finished_markup_configurations configuration ON configuration.id = ?
         INNER JOIN store_levels level ON level.id = configuration.store_level_id
         LEFT JOIN finished_product_prices price ON price.finished_product_id = guide.finished_product_id
           AND price.sku_id = guide.sku_id AND price.store_level_id = configuration.store_level_id
         WHERE price.id IS NULL AND guide.cost_price >= 0
+          AND inventory.operations_deleted = FALSE
           AND (level.status = 'enabled'
             OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND configuration.status = 'enabled'

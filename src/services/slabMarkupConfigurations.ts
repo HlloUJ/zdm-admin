@@ -9,7 +9,6 @@ export interface SlabMarkupConfigurationRecord {
   status: 'enabled' | 'disabled';
   autoReferenceCount?: number;
   manualPriceCount?: number;
-  synchronizedPriceCount?: number;
   createdByName?: string;
   createdByAccountId?: number;
   createdAt?: string;

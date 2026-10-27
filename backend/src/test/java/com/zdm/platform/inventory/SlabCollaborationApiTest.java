@@ -567,8 +567,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     identity("admin", "all", "all");
     SlabMarkupConfiguration changed = new SlabMarkupConfiguration();
     changed.setPriceCoefficient(new BigDecimal("3"));
-    SlabMarkupConfiguration updated = priceConfigurations.updateConfiguration(99609L, changed);
-    assertThat(updated.getSynchronizedPriceCount()).isZero();
+    priceConfigurations.updateConfiguration(99609L, changed);
     assertThat(jdbc.queryForObject("SELECT price FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", BigDecimal.class)).isEqualByComparingTo("20");
     assertThat(slabs.visibleDetail(99601L).getCostPrice()).isEqualByComparingTo("10");
   }

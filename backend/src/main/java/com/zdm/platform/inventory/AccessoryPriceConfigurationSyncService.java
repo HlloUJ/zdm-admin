@@ -41,26 +41,28 @@ public class AccessoryPriceConfigurationSyncService implements StoreLevelPriceSy
     return count == null ? 0 : count;
   }
 
-  public int refreshAutoPrices(AccessoryMarkupConfiguration configuration) {
+  public void refreshAutoPrices(AccessoryMarkupConfiguration configuration) {
     if (!"enabled".equals(configuration.getStatus())) {
-      return 0;
+      return;
     }
-    return jdbc.update("""
+    jdbc.update("""
         UPDATE accessory_product_prices price
+        INNER JOIN accessory_products inventory ON inventory.id = price.accessory_product_id
         INNER JOIN store_levels level ON level.id = price.store_level_id
         SET price.price_coefficient = ?, price.price = ROUND(price.cost_price * ?, 2)
         WHERE price.source_configuration_id = ? AND price.price_source = 'auto'
+          AND inventory.operations_deleted = FALSE
           AND (level.status = 'enabled'
             OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND price.cost_price >= 0
         """, configuration.getPriceCoefficient(), configuration.getPriceCoefficient(), configuration.getId());
   }
 
-  public int backfillMissingPrices(AccessoryMarkupConfiguration configuration) {
+  public void backfillMissingPrices(AccessoryMarkupConfiguration configuration) {
     if (!"enabled".equals(configuration.getStatus())) {
-      return 0;
+      return;
     }
-    return jdbc.update("""
+    jdbc.update("""
         INSERT INTO accessory_product_prices
           (accessory_product_id, sku_id, variant_label, store_level_id, store_level_name,
            price_coefficient, cost_price, price, price_source, source_configuration_id)
@@ -69,11 +71,13 @@ public class AccessoryPriceConfigurationSyncService implements StoreLevelPriceSy
                guide.cost_price, ROUND(guide.cost_price * configuration.price_coefficient, 2),
                'auto', configuration.id
         FROM accessory_product_guide_prices guide
+        INNER JOIN accessory_products inventory ON inventory.id = guide.accessory_product_id
         INNER JOIN accessory_markup_configurations configuration ON configuration.id = ?
         INNER JOIN store_levels level ON level.id = configuration.store_level_id
         LEFT JOIN accessory_product_prices price ON price.accessory_product_id = guide.accessory_product_id
           AND price.sku_id = guide.sku_id AND price.store_level_id = configuration.store_level_id
         WHERE price.id IS NULL AND guide.cost_price >= 0
+          AND inventory.operations_deleted = FALSE
           AND (level.status = 'enabled'
             OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND configuration.status = 'enabled'

@@ -134,7 +134,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       row.status = route.request().postDataJSON().status;
       return route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, message: 'ok', data: { ...row, synchronizedPriceCount: 0 } }),
+        body: JSON.stringify({ code: 0, message: 'ok', data: row }),
       });
     }
     await route.fulfill({
@@ -474,3 +474,38 @@ test('大板缺少中间级别价格时仍按门店级别顺序展示', async ({
   await expect(rows.nth(3)).toContainText('2级');
   await expect(rows.nth(4)).toContainText('3级');
 });
+
+for (const scope of ['finished', 'accessory', 'slab'] as const) {
+  test(`${scope} 价格配置新增只显示标准成功提示`, async ({ page }) => {
+    await seedLogin(page, ['all'], ['SUPER_ADMIN']);
+    await mockMarkupConfigurations(page);
+    await page.route(new RegExp(`/api/admin/${scope}-markup-configurations(?:\\?.*)?$`), async (route) => {
+      const payload = route.request().method() === 'POST' ? route.request().postDataJSON() : null;
+      await route.fulfill({
+        json: {
+          code: 0,
+          data: payload
+            ? {
+                ...payload,
+                id: 99,
+                name: '社区门店',
+                status: 'enabled',
+                sortOrder: 1,
+              }
+            : [],
+        },
+      });
+    });
+    await page.goto('/markup-configuration');
+    if (scope !== 'finished')
+      await page.getByText(scope === 'slab' ? '大板价格配置' : '配件价格配置', { exact: true }).click();
+    await page.getByRole('button', { name: '新增', exact: true }).click();
+    const dialog = page.locator('.t-dialog:visible').filter({ has: page.getByText('新增', { exact: true }) });
+    await dialog.getByPlaceholder('请选择门店级别', { exact: true }).click();
+    await page.locator('.t-select__dropdown:visible').getByText('社区门店', { exact: true }).click();
+    await dialog.locator('.price-coefficient-input input').fill('1.50');
+    await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
+    await expect(page.locator('.zdm-admin-feedback')).toHaveText('已新增“社区门店”');
+    await expect(page.locator('.zdm-admin-feedback')).toHaveCount(1);
+  });
+}

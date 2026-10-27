@@ -33,8 +33,6 @@ public class SlabMarkupConfiguration extends BaseEntity implements com.zdm.platf
   @TableField(exist = false)
   private Long manualPriceCount;
 
-  @TableField(exist = false)
-  private Integer synchronizedPriceCount;
 
 
   public Long getStoreLevelId() {
@@ -108,13 +106,4 @@ public class SlabMarkupConfiguration extends BaseEntity implements com.zdm.platf
   public void setManualPriceCount(Long manualPriceCount) {
     this.manualPriceCount = manualPriceCount;
   }
-
-  public Integer getSynchronizedPriceCount() {
-    return synchronizedPriceCount;
-  }
-
-  public void setSynchronizedPriceCount(Integer synchronizedPriceCount) {
-    this.synchronizedPriceCount = synchronizedPriceCount;
-  }
-
 }

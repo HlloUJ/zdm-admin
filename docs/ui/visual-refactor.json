@@ -6959,6 +6959,12 @@
       "template": "5e3c0a78337d9dfc5455d79cd1734fbfacea060c58f3b27362c9647869b2bf52",
       "approvedBusinessPatches": [
         {
+          "reason": "2026-10-27 用户确认移除价格同步影响数量统计与额外提示，保留标准话术、实际价格同步及引用保护。",
+          "stage": "before-migrations",
+          "before": "      if (editingId.value) await commodityPricing.value.updateFinishedMarkupConfiguration(editingId.value, payload);\n      else await commodityPricing.value.createFinishedMarkupConfiguration(payload);\n    } else {\n      const result = editingId.value\n        ? await updateSlabMarkupConfiguration(editingId.value, payload)\n        : await createSlabMarkupConfiguration(payload);\n      if ((result.synchronizedPriceCount ?? 0) > 0) {\n        adminFeedback.success(`已同步更新${result.synchronizedPriceCount}条大板自动价格`);\n      }\n    }\n    const wasEditing = Boolean(editingId.value);\n    await loadData();\n",
+          "after": "      if (editingId.value) await commodityPricing.value.updateFinishedMarkupConfiguration(editingId.value, payload);\n      else await commodityPricing.value.createFinishedMarkupConfiguration(payload);\n    } else {\n      if (editingId.value) await updateSlabMarkupConfiguration(editingId.value, payload);\n      else await createSlabMarkupConfiguration(payload);\n    }\n    const wasEditing = Boolean(editingId.value);\n    await loadData();\n"
+        },
+        {
           "before": "      object-type=\"价格配置\"\n      :object-name=\"confirmRow?.name\"\n      @confirm=\"submitConfirm\"\n      @cancel=\"confirmVisible = false\"\n      @close=\"confirmVisible = false\"\n    />\n    <AdminConfirmDialog\n      v-model:visible=\"statusConfirmVisible\"\n      :function=\"statusConfirmRow?.status === 'enabled' ? 'disable' : 'enable'\"\n      :action=\"statusConfirmRow?.status === 'enabled' ? '停用' : '启用'\"\n      :object-type=\"`${activeType === 'finished' ? '成品' : '大板'}价格配置`\"\n      :object-name=\"statusConfirmRow?.name\"\n      @confirm=\"submitStatusConfirm\"\n      @cancel=\"statusConfirmVisible = false\"\n      @close=\"statusConfirmVisible = false\"\n    />\n  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\n",
           "after": "      object-type=\"价格配置\"\n      :object-name=\"confirmRow?.name\"\n      @confirm=\"submitConfirm\"\n      @cancel=\"confirmVisible = false\"\n      @close=\"confirmVisible = false\"\n    />\n    <AdminConfirmDialog\n      v-model:visible=\"statusConfirmVisible\"\n      :function=\"statusConfirmRow?.status === 'enabled' ? 'disable' : 'enable'\"\n      :action=\"statusConfirmRow?.status === 'enabled' ? '停用' : '启用'\"\n      :object-type=\"`${commodityLabel}价格配置`\"\n      :object-name=\"statusConfirmRow?.name\"\n      @confirm=\"submitStatusConfirm\"\n      @cancel=\"statusConfirmVisible = false\"\n      @close=\"statusConfirmVisible = false\"\n    />\n  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\n",
           "reason": "2026-10-22 用户确认三端配件管理和独立配件价格配置，复用成品现货对应界面与业务规则",
@@ -10861,7 +10867,15 @@
     },
     "src/services/slabMarkupConfigurations.ts": {
       "content": "8d7c5611bda0e98d062be8248afc773370864d08a95c10950bff9762657225b5",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "reason": "2026-10-27 用户确认移除价格同步影响数量统计与额外提示，保留标准话术、实际价格同步及引用保护。",
+          "stage": "before-migrations",
+          "before": "  status: 'enabled' | 'disabled';\n  autoReferenceCount?: number;\n  manualPriceCount?: number;\n  synchronizedPriceCount?: number;\n  createdByName?: string;\n  createdByAccountId?: number;\n  createdAt?: string;\n",
+          "after": "  status: 'enabled' | 'disabled';\n  autoReferenceCount?: number;\n  manualPriceCount?: number;\n  createdByName?: string;\n  createdByAccountId?: number;\n  createdAt?: string;\n"
+        }
+      ]
     },
     "src/services/slabOrigins.ts": {
       "content": "967d77162d56d8b25799d0a19e8a6c27c412e22020a081c075ae7f1aed67324a",
