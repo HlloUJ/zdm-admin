@@ -316,6 +316,25 @@ function main(args) {
     if (scope.problem) console.log(`Full fallback: ${scope.problem}`);
     return;
   }
+  if (mode === 'verify-engineering') {
+    // Current checkout/run identity is computed independently from the downloaded producer metadata.
+    const event = process.env.GITHUB_EVENT_PATH ? readJson(process.env.GITHUB_EVENT_PATH) : {};
+    const candidate = gitValue(['rev-parse', 'HEAD']);
+    if (process.env.GITHUB_SHA) assert.equal(candidate, process.env.GITHUB_SHA);
+    const current = revisionIdentity(event, candidate, gitValue(['rev-parse', 'HEAD^{tree}']));
+    const producer = readJson(path.join(directory, 'metadata.json'));
+    assert.equal(producer.job, 'scope', 'Engineering producer must be the same-run scope job');
+    assert.deepEqual(
+      producer.phases.map((phase) => phase.name),
+      ['npm-ci', 'engineering-tests'],
+    );
+    assert.deepEqual(producer.phases[0].command, ['npm', 'ci']);
+    verifyEngineeringEvidence(readJson(path.join(directory, 'scope.json')), producer, current);
+    console.log(
+      `Verified original scope-Runner engineering report: ${producer.engineeringResults.summary.tests} tests; diagnostics ${producer.engineeringResults.diagnosticReuse ? 'reused' : 'executed in full'}`,
+    );
+    return;
+  }
   if (mode === 'aggregate-frontend' || mode === 'aggregate-backend') {
     const domain = mode.slice('aggregate-'.length);
     const current = loadMetadata(directory);

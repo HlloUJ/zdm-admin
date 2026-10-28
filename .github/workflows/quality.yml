@@ -44,6 +44,17 @@ jobs:
         run: node scripts/ci-browser-image.mjs resolve
       - id: scope
         run: node scripts/ci-quality-evidence.mjs scope
+      # Keep the diagnostic producer and remaining engineering execution on this exact Runner.
+      - if: steps.scope.outputs.engineering == 'true'
+        run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - if: steps.scope.outputs.engineering == 'true'
+        run: node scripts/ci-quality-evidence.mjs run engineering-tests -- npm run test:engineering
+        env:
+          CI_DIAGNOSTIC_DIRECTORY: ${{ github.workspace }}/coverage/ci-evidence
+      - if: always()
+        run: node scripts/ci-quality-evidence.mjs finish
+        env:
+          JOB_STATUS: ${{ job.status }}
       - uses: actions/upload-artifact@v4
         with:
           name: ci-validation-scope
@@ -93,18 +104,12 @@ jobs:
         with:
           node-version: 22.23.4
           cache: npm
-      - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
       - uses: actions/download-artifact@v4
         with:
           name: ci-validation-scope
-          path: coverage/preflight-diagnostics
-      - run: node scripts/ci-quality-evidence.mjs run engineering-tests -- npm run test:engineering
-        env:
-          CI_DIAGNOSTIC_DIRECTORY: ${{ github.workspace }}/coverage/preflight-diagnostics
-      - if: always()
-        run: node scripts/ci-quality-evidence.mjs finish
-        env:
-          JOB_STATUS: ${{ job.status }}
+          path: coverage/ci-evidence
+      # Verify and forward the original scope-Runner report; do not impersonate its execution.
+      - run: node scripts/ci-quality-evidence.mjs verify-engineering
       - uses: actions/upload-artifact@v4
         if: always()
         with:
