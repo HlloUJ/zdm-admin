@@ -30,7 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc
 @Testcontainers(disabledWithoutDocker = true)
 class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("accessory_price_source").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   @Autowired private JdbcTemplate jdbc;
   @Autowired private com.fasterxml.jackson.databind.ObjectMapper json;
@@ -122,7 +122,7 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT status FROM accessory_products WHERE id=99408", String.class)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT operations_invalidated_reason FROM accessory_products WHERE id=99408", String.class)).isNull();
     assertThat(jdbc.queryForObject("SELECT price FROM accessory_product_guide_prices WHERE accessory_product_id=99408", BigDecimal.class)).isEqualByComparingTo("60");
-    assertThat(jdbc.queryForList("SELECT operation_type FROM accessory_operation_logs WHERE product_id=99408 AND business_client_code='admin' ORDER BY id", String.class)).containsExactly("PURGE", "SOURCE_SHELF");
+    assertThat(jdbc.queryForList("SELECT operation_type FROM accessory_operation_logs WHERE product_id=99408 AND business_client_code='admin' ORDER BY id", String.class)).containsExactly("PURGE", "REENTRY");
   }
 
   @Test
@@ -178,7 +178,8 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
           """, skuId, key);
     }
     authenticateDirectService();
-    assertThat(sync.backfillMissingPrices(configurations.selectById(99101L))).isEqualTo(2);
+    sync.backfillMissingPrices(configurations.selectById(99101L));
+    assertThat(prices.listPrices(99101L)).hasSize(2);
     List<AccessoryProductPrice> existing = prices.listPrices(99101L);
     existing.get(1).setPriceSource("manual");
     authenticateDirectService();
@@ -485,10 +486,12 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
         .isEqualByComparingTo("12");
 
     jdbc.update("UPDATE accessory_markup_configurations SET price_coefficient=1.8 WHERE id=99405");
-    assertThat(sync.refreshAutoPrices(configurations.selectById(99405L))).isZero();
+    var frozenPrices = jdbc.queryForList("SELECT * FROM accessory_product_prices WHERE accessory_product_id=99405 ORDER BY id");
+    sync.refreshAutoPrices(configurations.selectById(99405L));
+    assertThat(jdbc.queryForList("SELECT * FROM accessory_product_prices WHERE accessory_product_id=99405 ORDER BY id")).isEqualTo(frozenPrices);
     jdbc.update("INSERT INTO accessory_product_variants (id,accessory_product_id,variant_label,stock,cost_price) VALUES (99452,99405,'规格B',1,30)");
     jdbc.update("INSERT INTO accessory_product_guide_prices (accessory_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES (99405,99452,'规格B',3,30,90)");
-    assertThat(sync.backfillMissingPrices(configurations.selectById(99405L))).isZero();
+    sync.backfillMissingPrices(configurations.selectById(99405L));
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM accessory_product_prices WHERE accessory_product_id=99405 AND store_level_id=99405",Long.class))
         .isEqualTo(1L);
   }

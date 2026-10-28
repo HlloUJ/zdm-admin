@@ -35,7 +35,7 @@ public class StoreAccessoryProductService {
       List<AccessoryProductAttributeEntry> attributes, List<AccessorySpecDimension> specDimensions,
       List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, String offShelfReason,
       String offShelfDetail, LocalDateTime offShelfAt, Map<String, String> attributeNames,
-      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt, String stateOperatorClientCode) {
+      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt) {
     public ProductView {
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
@@ -275,7 +275,7 @@ public class StoreAccessoryProductService {
   public List<ProductView> list() {
     var store = scopes.require();
     List<Map<String, Object>> listings = jdbc.queryForList("""
-        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, activity.operator_client_code AS state_operator_client_code, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
+        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
         FROM store_accessory_products listing
         LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
         LEFT JOIN product_state_activity activity ON activity.kind='store-accessory' AND activity.business_client_code='store' AND activity.record_id=listing.id
@@ -676,8 +676,7 @@ public class StoreAccessoryProductService {
             .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName, number(listing.get("store_category_id")),
         pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))), flag(listing.get("sale_price_attention")),
         effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_name") : null,
-        effective.equals(listing.get("activity_state")) ? timestamp(listing.get("state_operated_at")) : null,
-        effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_client_code") : null);
+        effective.equals(listing.get("activity_state")) ? timestamp(listing.get("state_operated_at")) : null);
     return legacyHistoricalView(listing, rendered);
   }
 
@@ -820,7 +819,7 @@ public class StoreAccessoryProductService {
 
   private Map<String, Object> listing(CityPartnerStoreScope.Store store, Long id, boolean lock) {
     List<Map<String, Object>> rows = jdbc.queryForList("""
-        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, activity.operator_client_code AS state_operator_client_code, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
+        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
         FROM store_accessory_products listing
         LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
         LEFT JOIN product_state_activity activity ON activity.kind='store-accessory' AND activity.business_client_code='store' AND activity.record_id=listing.id

@@ -5,7 +5,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync, realpat
 import os from 'node:os';
 import path from 'node:path';
 
-export const EVIDENCE_VERSION = 3;
+export const EVIDENCE_VERSION = 4;
 const contentCache = new Map();
 export const digest = (value) => createHash('sha256').update(value).digest('hex');
 const jsonDigest = (value) => digest(JSON.stringify(value));
@@ -113,6 +113,8 @@ const BACKEND_ENTRIES = [
   'scripts/verification-evidence.mjs',
   'scripts/verification-runner.mjs',
   'scripts/backend-test-evidence.mjs',
+  'scripts/business-regression.mjs',
+  'scripts/business-regression-contracts.json',
 ];
 
 function backendInputScope(task) {
@@ -182,12 +184,16 @@ export function backendContainerImages(root, files) {
     );
     if (/\.withImagePullPolicy\s*\(/.test(source))
       throw new Error('Custom container image pull policy requires fresh execution');
-    for (const match of source.matchAll(/new\s+[\w.]*Container(?:\s*<[^<>]*>)?\s*\(\s*([^\n;]+)/g)) {
-      const argument = match[1];
+    for (const match of source.matchAll(/new\s+([\w.]*Container)(?:\s*<[^<>]*>)?\s*\(\s*([^\n;]+)/g)) {
+      const argument = match[2];
       const literal = argument.match(/^"([^"\n]+)"\s*[,)]/)?.[1];
       const parsed = argument.match(/^(?:DockerImageName\.)?parse\(\s*"([^"\n]+)"\s*\)/)?.[1];
       const variable = argument.match(/^(\w+)\s*[,)]/)?.[1];
-      const image = literal ?? parsed ?? constants.get(variable);
+      const type = match[1].split('.').at(-1);
+      const fixedSuper = argument.startsWith(')')
+        ? source.match(new RegExp(`\\b${type}\\s*\\(\\s*\\)\\s*\\{\\s*super\\(\\s*"([^"\\n]+)"\\s*\\)`))?.[1]
+        : null;
+      const image = literal ?? parsed ?? constants.get(variable) ?? fixedSuper;
       if (!image || !/^[\w][\w./:@-]+$/.test(image))
         throw new Error(`Dynamic container image cannot be proven: ${file}`);
       images.add(image);
@@ -334,17 +340,25 @@ export function captureIdentity(task, { captureCommand = capture } = {}) {
     platform: process.platform,
     arch: process.arch,
     release: os.release(),
-    env: jsonDigest(
-      Object.fromEntries(
-        Object.entries(env)
-          // Shell depth / last executable describe the caller, not these project checks.
-          .filter(
-            ([name]) => !['SHLVL', '_', 'npm_lifecycle_event', 'npm_lifecycle_script', 'npm_command'].includes(name),
-          )
-          .sort(),
-      ),
+    // Invocation tracing is not consumed by project checks. Unknown and sandbox variables remain inputs.
+    variables: Object.fromEntries(
+      Object.entries(env)
+        .filter(
+          ([name]) =>
+            ![
+              'SHLVL',
+              '_',
+              'npm_lifecycle_event',
+              'npm_lifecycle_script',
+              'npm_command',
+              'CODEX_TOOL_CALL_ID',
+            ].includes(name),
+        )
+        .sort()
+        .map(([name, value]) => [name, digest(String(value))]),
     ),
   };
+  environment.env = jsonDigest(environment.variables);
   let reusable = eligible;
   let inputProofComplete = proveInputs;
   let reason = eligible
@@ -502,8 +516,18 @@ export function evidenceMissReason(record, snapshot, artifacts) {
     return 'Maven dependency files changed (conservative shared-cache proof)';
   if (jsonDigest(old?.environment?.docker ?? null) !== jsonDigest(next.environment?.docker ?? null))
     return 'Backend compose configuration, relevant image or Docker toolchain changed';
-  if (jsonDigest(old?.environment ?? null) !== jsonDigest(next.environment))
-    return 'Command, dependency or execution environment changed';
+  if (old?.environment?.variables && next.environment.variables) {
+    const keys = [...new Set([...Object.keys(old.environment.variables), ...Object.keys(next.environment.variables)])]
+      .filter((name) => old.environment.variables[name] !== next.environment.variables[name])
+      .sort();
+    if (keys.length) return `Execution environment variables changed: ${keys.join(', ')}`;
+  }
+  if (jsonDigest(old?.environment ?? null) !== jsonDigest(next.environment)) {
+    const keys = [...new Set([...Object.keys(old?.environment ?? {}), ...Object.keys(next.environment)])].filter(
+      (name) => jsonDigest(old?.environment?.[name] ?? null) !== jsonDigest(next.environment[name] ?? null),
+    );
+    return `Command, dependency or execution environment changed: ${keys.join(', ')}`;
+  }
   if (record.artifacts !== artifacts) return 'Required output artifacts changed or are missing';
   if (record.fingerprint !== snapshot.fingerprint) return 'Command, coverage or input scope changed';
   return 'Evidence or its complete log is missing, damaged or incomplete';

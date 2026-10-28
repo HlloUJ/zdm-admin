@@ -70,7 +70,7 @@ public class SlabMarkupConfigurationService {
       throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
     SlabMarkupConfiguration created = requireConfiguration(payload.getId());
-    created.setSynchronizedPriceCount(priceSyncService.backfillMissingPrices(created));
+    priceSyncService.backfillMissingPrices(created);
     enrichUsage(created);
     return created;
   }
@@ -94,7 +94,7 @@ public class SlabMarkupConfigurationService {
       throw new IllegalArgumentException(DUPLICATE_LEVEL_MESSAGE, exception);
     }
     SlabMarkupConfiguration updated = requireConfiguration(id);
-    updated.setSynchronizedPriceCount(priceSyncService.refreshAutoPrices(updated));
+    priceSyncService.refreshAutoPrices(updated);
     enrichUsage(updated);
     return updated;
   }
@@ -109,12 +109,10 @@ public class SlabMarkupConfigurationService {
     existing.setStatus(status);
     mapper.updateById(existing);
     SlabMarkupConfiguration updated = requireConfiguration(id);
-    int synchronizedCount = 0;
     if ("enabled".equals(status)) {
-      synchronizedCount += priceSyncService.refreshAutoPrices(updated);
-      synchronizedCount += priceSyncService.backfillMissingPrices(updated);
+      priceSyncService.refreshAutoPrices(updated);
+      priceSyncService.backfillMissingPrices(updated);
     }
-    updated.setSynchronizedPriceCount(synchronizedCount);
     enrichUsage(updated);
     return updated;
   }

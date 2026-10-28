@@ -1,3 +1,4 @@
+import { requireBrowserBehaviors, browserBehaviorTitles, ciBrowserBehaviorNames } from './business-regression.mjs';
 import { validateDiagnosticComposition } from './ci-diagnostic-evidence.mjs';
 import {
   collectBackendEvidence,
@@ -96,7 +97,7 @@ export function testIdentities(report, executed = false) {
   return ids.sort();
 }
 
-export function verifyFrontendEvidence(needs, groups) {
+export function verifyFrontendEvidence(needs, groups, { requiredBehaviors = [] } = {}) {
   const expectedJobs = ['frontend_static', 'frontend_e2e_1', 'frontend_e2e_2'];
   for (const job of expectedJobs) assert.equal(needs[job]?.result, 'success', `${job} did not succeed`);
   assert.equal(groups.length, 3, 'All three frontend evidence artifacts are required');
@@ -129,6 +130,8 @@ export function verifyFrontendEvidence(needs, groups) {
     .sort();
   assert.equal(new Set(actual).size, actual.length, 'A test ran in more than one shard');
   assert.deepEqual(actual, expected, 'Shard union differs from the complete test list');
+  if (requiredBehaviors.length)
+    requireBrowserBehaviors(ciBrowserBehaviorNames(groups.slice(1).map((group) => group.report)), requiredBehaviors);
   return { status: 'success', identity: first, testCount: actual.length, shardCount: 2 };
 }
 
@@ -329,7 +332,7 @@ function main(args) {
         report: readJson(path.join(name, artifact, index === 0 ? 'all-tests.json' : 'report.json')),
       }));
       groups.forEach((group) => verifyScope(scope, group.metadata));
-      result = verifyFrontendEvidence(needs, groups);
+      result = verifyFrontendEvidence(needs, groups, { requiredBehaviors: browserBehaviorTitles() });
     } else if (applicable) {
       const metadata = readJson(path.join(name, 'ci-backend-full', 'metadata.json'));
       const reports = readJson(path.join(name, 'ci-backend-full', 'backend-tests.json'));

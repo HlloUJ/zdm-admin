@@ -23,6 +23,7 @@
     @open-detail="showDetail"
   >
     <template #detail>
+      <t-alert v-if="legacyArrivalPrices" theme="info" message="历史日志仅记录已生成的价格，未记录完整价格层级" />
       <SalesLogFullscreen v-if="initialWarehousePrice" title="入仓价格">
         <FinishedSalesLogTable :snapshot="priceLogSnapshot(changes['入仓价格'].after)" :other="{}" price-only />
       </SalesLogFullscreen>
@@ -190,7 +191,7 @@ watch(
     if (visible) void load();
   },
 );
-const changes = computed<Record<string, { before: unknown; after: unknown; hint?: string }>>(() => {
+const changes = computed<Record<string, { before: unknown; after: unknown; hint?: string; complete?: boolean }>>(() => {
   try {
     return JSON.parse(detail.value?.changeDetails || '{}');
   } catch {
@@ -200,7 +201,16 @@ const changes = computed<Record<string, { before: unknown; after: unknown; hint?
 const fullSnapshot = computed(
   () =>
     detail.value?.operationType === 'CREATE' ||
-    (detail.value?.operationType === 'SOURCE_SHELF' && !!changes.value['商品ID'] && !!changes.value['销售规格']),
+    (['SOURCE_SHELF', 'REENTRY'].includes(detail.value?.operationType || '') &&
+      !!changes.value['商品ID'] &&
+      !!changes.value['销售规格']),
+);
+const legacyArrivalPrices = computed(
+  () =>
+    getLoginUser().clientCode === 'admin' &&
+    detail.value?.operationType === 'SOURCE_SHELF' &&
+    !detail.value.beforeStatus &&
+    !changes.value['层级价格']?.complete,
 );
 const initialWarehousePrice = computed(
   () =>

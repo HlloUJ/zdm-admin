@@ -139,7 +139,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
       row.status = route.request().postDataJSON().status;
       return route.fulfill({
         contentType: 'application/json',
-        body: JSON.stringify({ code: 0, message: 'ok', data: { ...row, synchronizedPriceCount: 0 } }),
+        body: JSON.stringify({ code: 0, message: 'ok', data: row }),
       });
     }
     await route.fulfill({

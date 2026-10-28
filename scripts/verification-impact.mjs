@@ -1,8 +1,12 @@
+import { businessImpact } from './business-regression.mjs';
 // Fail closed: this only omits a domain after every changed path has a known scope.
 const DOC = /(?:\.md$|^docs\/.*\.(?:png|jpe?g|gif|webp|svg|pdf)$)/i;
 const FRONTEND = /^(?:src\/|tests\/e2e\/|public\/)/;
 const FRONTEND_CONFIG =
   /^(?:vite|vitest|playwright|eslint|tsconfig|stylelint|prettier)(?:[./-]|$)|^\.(?:prettier|stylelint|eslint)/;
+// Product state / lifecycle contracts span API, shared adapters and three terminals.
+const PRODUCT =
+  /^(?:backend\/src\/main\/java\/com\/zdm\/platform\/inventory\/|src\/(?:pages\/(?:finished-stock\/|slab\/(?:management|supply-chain|shared)\/)|modules\/accessory\/|composables\/useCommodityModule|services\/(?:finishedProducts|accessoryProducts|slabs|storeFinishedStock|storeAccessoryStock|productStateActivity)))/;
 const SENSITIVE = /(?:auth|security|permission|functionCatalog|adminPermissions|contract|(?:^|\/)shared(?:\/|$))/i;
 const BACKEND_SHARED = /\/(?:config|dto|api|contract|web|exception)\/|Application\.java$/;
 const BACKEND_CONTRACT = /(?:Controller|Request|Response|Dto|DTO)\.java$|^backend\/src\/main\/resources\//;
@@ -25,7 +29,7 @@ const RUNTIME_FILES = new Set([
 ]);
 const RUNTIME = /^(?:backend\/|docker(?:[./-]|$)|Dockerfile|compose[.-]|pom\.xml$|\.env(?:\.|$)|\.mvn\/)/;
 
-export function classifyChangedFiles(files, { engineeringProof = { proven: false } } = {}) {
+export function classifyChangedFiles(files, { engineeringProof = { proven: false }, root = process.cwd() } = {}) {
   const result = {
     frontend: false,
     backend: false,
@@ -45,6 +49,7 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
     full('无法证明有效变更范围，执行前后端完整门禁。', false);
     return result;
   }
+  if (businessImpact(root, files).length) full('实际反向调用链关联商品跨端业务契约。', false);
   for (const original of [...new Set(files)]) {
     if (typeof original !== 'string' || !original || /^(?:\/|[A-Za-z]:)|(?:^|[/\\])\.\.(?:[/\\]|$)/.test(original)) {
       full('路径不明确，执行前后端完整门禁。', false);
@@ -56,7 +61,9 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
       continue;
     }
     const runtime = !file.startsWith('backend/src/test/') && (RUNTIME.test(file) || RUNTIME_FILES.has(file));
-    if (FRONTEND.test(file)) {
+    if (PRODUCT.test(file)) {
+      full(`商品状态与生命周期跨端契约：${file}`, runtime);
+    } else if (FRONTEND.test(file)) {
       if (SENSITIVE.test(file) || /^src\/services\//.test(file) || file === 'tests/e2e/admin-api-mocks.ts') {
         full(`共享契约、认证或权限：${file}`, false);
       } else {

@@ -1,3 +1,12 @@
+import { observeTaskTiming } from './task-timing.mjs';
+import { randomUUID } from 'node:crypto';
+import { performanceSummary, savePerformanceSummary, phaseEvidence } from './verification-performance.mjs';
+import {
+  validateContracts,
+  CONTRACT_FILE,
+  validateChangedBusinessCoverage,
+  changedBusinessFiles,
+} from './business-regression.mjs';
 import {
   needsContractPreflight,
   deliveryCiCapability,
@@ -7,7 +16,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync } from 'node:fs';
 import { runVerificationTask } from './verification-runner.mjs';
 import { captureSource } from './verification-evidence.mjs';
 import { createValidationPlan } from './check-changed-plan.mjs';
@@ -160,19 +169,86 @@ export async function executeVerification(
   { run = runVerificationTask, force = false, report = console.log, capture = captureSource } = {},
 ) {
   const started = performance.now();
+  const phases = [];
   const before = capture(plan.preflight.root);
+  // One UUID per executor, never inherited from a previous run or sent to CI.
+  const localDiagnostics =
+    plan.contractPreflight &&
+    plan.engineering?.some((task) => task.args.includes('test:engineering')) &&
+    !(plan.preflight.env?.CI || plan.preflight.env?.GITHUB_ACTIONS === 'true') &&
+    existsSync(plan.preflight.root)
+      ? { run: randomUUID() }
+      : null;
+  if (localDiagnostics) {
+    localDiagnostics.directory = path.join(
+      plan.preflight.root,
+      '.task-verification/local-diagnostics',
+      localDiagnostics.run,
+    );
+    mkdirSync(localDiagnostics.directory, { recursive: true });
+  }
+  const finish = async (code) => {
+    if (!existsSync(plan.preflight.root)) return code;
+    try {
+      const file = savePerformanceSummary(
+        plan.preflight.root,
+        randomUUID(),
+        performanceSummary({
+          candidate: { head: before.head, digest: before.digest },
+          elapsedMs: performance.now() - started,
+          exitCode: code,
+          phases,
+        }),
+      );
+      report(`Performance report: ${file}`);
+    } catch (error) {
+      report(`Performance recording unavailable: ${error.message}`);
+    }
+    if (run === runVerificationTask) await observeTaskTiming(plan.preflight.root, report);
+    return code;
+  };
   if (
     plan.plannedCandidate &&
     ['digest', 'baseline', 'mergeBase', 'mutationStamp'].some((key) => plan.plannedCandidate[key] !== before[key])
   ) {
     report('Candidate changed after impact planning; regenerate the validation plan.');
-    return 1;
+    return finish(1);
   }
-  const execute = (task) => run(task, { force, report });
-  if ((await execute(plan.preflight)).exitCode !== 0) return 1;
-  if (plan.contractPreflight && (await execute(plan.contractPreflight)).exitCode !== 0) return 1;
-  // Mock browser / isolated Testcontainers checks do not start or reconfigure the shared backend.
-  if (plan.runtime && (await execute(plan.runtime)).exitCode !== 0) return 1;
+  const execute = async (task) => {
+    const phaseStart = performance.now();
+    const diagnosticTask =
+      localDiagnostics && (task === plan.contractPreflight || task.args.includes('test:engineering'))
+        ? { ...task, localDiagnostics: localDiagnostics }
+        : task;
+    const result = await run(diagnosticTask, { force, report });
+    phases.push({
+      name: task.name,
+      startMs: Math.round(phaseStart - started),
+      elapsedMs: performance.now() - phaseStart,
+      exitCode: result.exitCode,
+      reused: result.reused === true,
+      ...phaseEvidence(plan.preflight.root, result),
+    });
+    return result;
+  };
+  if ((await execute(plan.preflight)).exitCode !== 0) return finish(1);
+  if (
+    plan.backend.some((task) => task.args.includes('backend:test')) &&
+    (
+      await execute({
+        root: plan.preflight.root,
+        name: 'backend test discovery',
+        command: process.execPath,
+        args: ['scripts/backend-test-evidence.mjs', '--inventory'],
+        env: plan.preflight.env,
+        reuse: false,
+      })
+    ).exitCode !== 0
+  )
+    return finish(1);
+  if (plan.contractPreflight && (await execute(plan.contractPreflight)).exitCode !== 0) return finish(1);
+  // Only explicitly required runtime checks run; isolated tests never start a shared backend.
+  if (plan.runtime && (await execute(plan.runtime)).exitCode !== 0) return finish(1);
   const pipeline = async (tasks) => {
     for (const task of tasks) if ((await execute(task)).exitCode !== 0) return 1;
     return 0;
@@ -197,7 +273,7 @@ export async function executeVerification(
     report(
       'This is local evidence only. Required CI must pass on the final candidate before merge; CI unavailable requires the full local fallback.',
     );
-  return code;
+  return finish(code);
 }
 
 export async function main(args = process.argv.slice(2)) {
@@ -215,6 +291,10 @@ export async function main(args = process.argv.slice(2)) {
       'Usage: node scripts/verify.mjs [--affected] [--runtime] [--browser chrome] [--list] [--force|--no-reuse]',
     );
     return 0;
+  }
+  if (existsSync(path.join(process.cwd(), CONTRACT_FILE))) {
+    validateContracts(process.cwd());
+    validateChangedBusinessCoverage(process.cwd(), changedBusinessFiles(process.cwd()));
   }
   const affected = args.includes('--affected');
   const plannedCandidate = args.includes('--list') ? null : captureSource(process.cwd());
@@ -240,6 +320,8 @@ export async function main(args = process.argv.slice(2)) {
         'Read-only plan: live CI capability is not queried; this shows the conservative full fallback. Execution probes required protection before choosing local readiness.',
       );
     }
+    if (plan.backend.some((task) => task.args.includes('backend:test')))
+      console.log('Early static check: backend test discovery (before contract/runtime pipelines)');
     console.log(`Preflight: ${plan.preflight.command} ${plan.preflight.args.join(' ')}`);
     if (plan.contractPreflight)
       console.log(`Contract preflight: ${plan.contractPreflight.command} ${plan.contractPreflight.args.join(' ')}`);

@@ -243,3 +243,20 @@ test('scope changes record actionable miss reasons', (t) => {
     /backend-maven inputs/,
   );
 });
+
+test('zero-argument database wrappers require a provable literal super image', (t) => {
+  const f = fixture(t);
+  f.write(
+    'backend/src/test/java/example/OneTest.java',
+    'class IsolatedContainer extends MySQLContainer<IsolatedContainer> { IsolatedContainer() { super("mysql:8.0"); } } class OneTest { Object db = new IsolatedContainer(); }',
+  );
+  assert.deepEqual(backendContainerImages(f.root, ['backend/src/test/java/example/OneTest.java']), ['mysql:8.0']);
+  f.write(
+    'backend/src/test/java/example/OneTest.java',
+    'class IsolatedContainer extends MySQLContainer<IsolatedContainer> { IsolatedContainer() { super(System.getenv("IMAGE")); } } class OneTest { Object db = new IsolatedContainer(); }',
+  );
+  assert.throws(
+    () => backendContainerImages(f.root, ['backend/src/test/java/example/OneTest.java']),
+    /Dynamic container image/,
+  );
+});

@@ -58,7 +58,6 @@ export interface PaginationState {
 export interface StockItem {
   stateOperatorName?: string;
   stateOperatedAt?: string;
-  stateOperatorClientCode?: string;
 
   sourceUnavailable?: boolean;
   sourceStatus?: string;

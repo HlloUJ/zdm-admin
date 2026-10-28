@@ -37,7 +37,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Transactional
 class DataScopeApiTest extends SpringContainerTestSupport {
   @Container
-  private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("zdm_scope_test").withUsername("test").withPassword("test");
   @DynamicPropertySource
   static void database(DynamicPropertyRegistry registry) {

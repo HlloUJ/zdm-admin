@@ -32,9 +32,8 @@ public class AccessoryStateActivityService {
    var row=activity.get(item.getId());
    String state="supply-chain".equals(business)?item.getSourceStatus():item.getStatus();
    if(row==null || !java.util.Objects.equals(state,row.get("state"))) { return; }
-   item.setStateOperatedAt(row.get("occurred_at") instanceof java.sql.Timestamp time?time.toLocalDateTime():null);
+   item.setStateOperatedAt(StateActivityTime.read(row.get("occurred_at")));
    item.setStateOperatorName((String)row.get("operator_name"));
-   item.setStateOperatorClientCode((String)row.get("operator_client_code"));
   });
   return records;
  }

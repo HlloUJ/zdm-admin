@@ -31,7 +31,7 @@ import com.zdm.platform.security.CurrentIdentity;
 @Testcontainers(disabledWithoutDocker = true)
 class MediaRetentionApiTest extends SpringContainerTestSupport {
   @Container
-  static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("media_retention_test").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   static final Path ROOT = Path.of(System.getProperty("java.io.tmpdir"), "media-retention-" + UUID.randomUUID());
   @DynamicPropertySource

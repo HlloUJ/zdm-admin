@@ -25,6 +25,14 @@ public class AccessoryProductArrivalLogService {
   }
 
   public void record(Long id, String sourceStatus) {
+    record(id, sourceStatus, false);
+  }
+
+  public void recordReentry(Long id, String sourceStatus) {
+    record(id, sourceStatus, true);
+  }
+
+  private void record(Long id, String sourceStatus, boolean reentry) {
     AccessoryProduct product = products.selectById(id);
     product.setVariants(variants.selectList(Wrappers.lambdaQuery(AccessoryProductVariant.class)
         .eq(AccessoryProductVariant::getAccessoryProductId, id).orderByAsc(AccessoryProductVariant::getId)));
@@ -32,6 +40,7 @@ public class AccessoryProductArrivalLogService {
         .eq(AccessoryProductAttributeEntry::getAccessoryProductId, id).orderByAsc(AccessoryProductAttributeEntry::getId)));
     product.setGuidePrices(guidePrices.listPrices(id));
     product.setMarkupPrices(prices.listPrices(id));
-    logs.recordArrival(product, sourceStatus);
+    if (reentry) { logs.recordReentry(product, sourceStatus); }
+    else { logs.recordArrival(product, sourceStatus); }
   }
 }

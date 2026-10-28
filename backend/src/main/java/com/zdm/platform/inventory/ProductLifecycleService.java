@@ -289,8 +289,12 @@ public class ProductLifecycleService {
       }
       reprice(kind, id, false);
       sqlSession.clearCache();
-      if (kind == Kind.FINISHED) { arrivalLogs.record(id, (String) row.get("source_status")); }
-      else { record(kind, row, "admin", "SOURCE_SHELF", null, null, "warehouse", slabLogs.arrivalSnapshot(id)); }
+      if (kind == Kind.FINISHED) { arrivalLogs.recordReentry(id, (String) row.get("source_status")); }
+      else {
+        var reentry = new LinkedHashMap<String, Object>(slabLogs.arrivalSnapshot(id));
+        reentry.put("重新入仓原因", Map.of("before", "", "after", FinishedOperationLogService.REENTRY_SUMMARY));
+        record(kind, row, "admin", "REENTRY", null, null, "warehouse", reentry);
+      }
     }
     sqlSession.clearCache();
     return "purged".equals(row.get("source_status"));

@@ -483,3 +483,26 @@ test('engineering cannot be falsely skipped or substituted by a different scope 
     /Missing engineering/,
   );
 });
+
+test('actual frontend aggregate rejects a business omission even when list and both shards agree', () => {
+  const state = fixture();
+  state.groups[0].report = report(['a', 'b', 'c']);
+  state.groups[1].report = report(['a'], true);
+  state.groups[2].report = report(['b', 'c'], true);
+  const required = [
+    '/slab-management single restore immediately shows server actor and time',
+    '/store/accessory-management batch restore immediately shows server actor and time',
+  ];
+  for (const group of state.groups)
+    for (const suite of group.report.suites)
+      for (const spec of suite.specs)
+        spec.title = spec.id === 'c' ? 'unrelated control case' : required[spec.id === 'a' ? 0 : 1];
+  verifyFrontendEvidence(state.needs, state.groups, { requiredBehaviors: required });
+  for (const group of state.groups)
+    for (const suite of group.report.suites) suite.specs = suite.specs.filter((spec) => spec.id !== 'b');
+  verifyFrontendEvidence(state.needs, state.groups);
+  assert.throws(
+    () => verifyFrontendEvidence(state.needs, state.groups, { requiredBehaviors: required }),
+    /Missing or duplicate executed business behavior/,
+  );
+});

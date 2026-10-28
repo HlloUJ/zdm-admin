@@ -21,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperationLogMapper, AccessoryOperationLog> {
   static final String SOURCE_SHELF_SUMMARY = "供应链已上架，商品进入运营管理平台仓库";
+  static final String REENTRY_SUMMARY = "运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓";
   @org.springframework.beans.factory.annotation.Autowired
   private AccessoryStateActivityService stateActivities;
   private final JdbcTemplate jdbc;
@@ -238,7 +239,20 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
 
   @Transactional
   public void recordArrival(AccessoryProduct product, String sourceStatus) {
+    recordArrival(product, sourceStatus, false);
+  }
+
+  @Transactional
+  public void recordReentry(AccessoryProduct product, String sourceStatus) {
+    recordArrival(product, sourceStatus, true);
+  }
+
+  private void recordArrival(AccessoryProduct product, String sourceStatus, boolean reentry) {
     Map<String, Object> snapshot = snapshot(product, false);
+    List<Map<String, Object>> prices = json.convertValue(snapshot.get("层级价格"),
+        new com.fasterxml.jackson.core.type.TypeReference<List<Map<String, Object>>>() {});
+    snapshot.put("层级价格", ArrivalLogPriceTiers.complete(jdbc, "accessory", prices,
+        product.getVariants().stream().map(AccessoryProductVariant::getId).toList()));
     Map<String, Object> changes = new LinkedHashMap<>();
     snapshot.forEach((key, value) -> {
       Map<String, Object> change = new LinkedHashMap<>();
@@ -247,7 +261,11 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
       if ("商品分类".equals(key)) { change.put("pathRecorded", true); }
       changes.put(key, change);
     });
+    @SuppressWarnings("unchecked")
+    Map<String, Object> tierChange = (Map<String, Object>) changes.get("层级价格");
+    tierChange.put("complete", true);
     changes.put("来源状态", Map.of("before", sourceStatus, "after", product.getSourceStatus()));
+    if (reentry) { changes.put("重新入仓原因", Map.of("before", "", "after", REENTRY_SUMMARY)); }
     var identity = identities.require();
     AccessoryOperationLog log = new AccessoryOperationLog();
     log.setProductCreatedByAccountId(product.getCreatedByAccountId());
@@ -258,10 +276,10 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     log.setProductName(product.getName());
     log.setMerchantCode(product.getSku());
     log.setPublisherType(product.getPublisherType());
-    log.setOperationType("SOURCE_SHELF");
-    log.setOperationSummary(SOURCE_SHELF_SUMMARY);
+    log.setOperationType(reentry ? "REENTRY" : "SOURCE_SHELF");
+    log.setOperationSummary(reentry ? REENTRY_SUMMARY : SOURCE_SHELF_SUMMARY);
     log.setAfterStatus(product.getStatus());
-    log.setOperationSource("SUPPLY_CHAIN");
+    log.setOperationSource(reentry ? "MANUAL" : "SUPPLY_CHAIN");
     log.setOperatorName(identity.displayName());
     log.setOperatorAccountId(identity.accountId());
     log.setOperatedAt(LocalDateTime.now());

@@ -1,3 +1,4 @@
+import { requireBackendBehaviors } from './business-regression.mjs';
 import { BACKEND_REPORTS } from './ci-report-contract.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
@@ -26,20 +27,8 @@ export function backendReportState(
   );
 }
 
-export function validateBackendReports(
-  root,
-  {
-    startedAt,
-    selector,
-    previousReports = {},
-    reportsDirectory = path.join(root, 'backend/target', BACKEND_REPORTS.surefire),
-  } = {},
-) {
+export function backendTestInventory(root) {
   const sourceRoot = path.join(root, 'backend/src/test/java');
-  const patterns = selector?.split(',').map((value) => {
-    assert.match(value, /^[\w.*]+$/, 'Unsupported backend test selector');
-    return new RegExp(`^${value.replaceAll('.', '\\.').replaceAll('*', '.*')}$`);
-  });
   const classes = filesBelow(sourceRoot)
     .filter((file) => /(?:^|\/)(?:Test[^/]*|[^/]*Test|[^/]*Tests|[^/]*TestCase)\.java$/.test(file))
     .map((file) => ({
@@ -50,11 +39,33 @@ export function validateBackendReports(
       minimum: (
         readFileSync(file, 'utf8').match(/@(?:Test|ParameterizedTest|RepeatedTest|TestFactory|TestTemplate)\b/g) ?? []
       ).length,
-    }))
-    .filter(
-      (entry) =>
-        !patterns || patterns.some((pattern) => pattern.test(entry.name) || pattern.test(entry.name.split('.').at(-1))),
+    }));
+  assert.ok(classes.length, 'No expected backend test classes found');
+  for (const entry of classes)
+    assert.ok(
+      entry.minimum > 0,
+      `Test-discovery name has no test methods: ${entry.name}; name infrastructure helpers outside Surefire test patterns`,
     );
+  return classes;
+}
+
+export function validateBackendReports(
+  root,
+  {
+    startedAt,
+    selector,
+    previousReports = {},
+    reportsDirectory = path.join(root, 'backend/target', BACKEND_REPORTS.surefire),
+  } = {},
+) {
+  const patterns = selector?.split(',').map((value) => {
+    assert.match(value, /^[\w.*]+$/, 'Unsupported backend test selector');
+    return new RegExp(`^${value.replaceAll('.', '\\.').replaceAll('*', '.*')}$`);
+  });
+  const classes = backendTestInventory(root).filter(
+    (entry) =>
+      !patterns || patterns.some((pattern) => pattern.test(entry.name) || pattern.test(entry.name.split('.').at(-1))),
+  );
   assert.ok(classes.length, 'No expected backend test classes found');
   const current = backendReportState(root, reportsDirectory);
   let total = 0;
@@ -80,6 +91,7 @@ export function validateBackendReports(
       !/<(?:skipped|failure|error|flakyFailure|flakyError|rerunFailure|rerunError)\b/.test(xml),
       `Non-passing execution in ${entry.name}`,
     );
+    requireBackendBehaviors(entry.name, xml);
     total += count;
   }
   return { classes: classes.length, tests: total, failures: 0, errors: 0, skipped: 0 };
@@ -87,7 +99,13 @@ export function validateBackendReports(
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    console.log(JSON.stringify(validateBackendReports(process.cwd())));
+    console.log(
+      JSON.stringify(
+        process.argv.includes('--inventory')
+          ? backendTestInventory(process.cwd())
+          : validateBackendReports(process.cwd()),
+      ),
+    );
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

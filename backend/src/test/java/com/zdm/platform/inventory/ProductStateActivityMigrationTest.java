@@ -10,7 +10,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 
 @Testcontainers(disabledWithoutDocker = true)
 class ProductStateActivityMigrationTest {
- @Container static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+ @Container static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
   .withDatabaseName("state_activity").withUsername("test").withPassword("test");
  @Test void preservesHistoryAndTracksOnlyRealTransitionsAcrossClients() throws Exception {
   var configuration=Flyway.configure().dataSource(MYSQL.getJdbcUrl(),MYSQL.getUsername(),MYSQL.getPassword());

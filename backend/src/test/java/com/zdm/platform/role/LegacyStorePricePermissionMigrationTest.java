@@ -12,7 +12,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class LegacyStorePricePermissionMigrationTest {
   @Container
-  private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("legacy_price_retirement_test");
 
   @Test

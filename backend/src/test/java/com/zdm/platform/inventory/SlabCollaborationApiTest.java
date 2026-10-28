@@ -36,7 +36,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 @Transactional
 class SlabCollaborationApiTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("slab_collaboration").withUsername("test").withPassword("test");
   @DynamicPropertySource static void database(DynamicPropertyRegistry registry) {
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
@@ -368,7 +368,13 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     fixture("warehouse", "selling", false, 1L);
     identity("supply-chain", "all", "all");
     jdbc.update("UPDATE slab_inventory SET length_mm=2000,width_mm=1800,thickness_mm=20,area_square_meter=3.6 WHERE id=99601");
+    jdbc.update("INSERT INTO store_levels (id,name,sort_order) VALUES (99552,'日志缺价级别',1)");
     var snapshot = logs.arrivalSnapshot(99601L);
+    var captured = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules().valueToTree(snapshot);
+    assertThat(captured.path("价格层级").path("complete").asBoolean()).isTrue();
+    assertThat(captured.path("价格层级").path("after").findValuesAsText("missingReason"))
+        .contains("未配置价格系数，未生成价格");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_prices WHERE slab_id=99601 AND store_level_id=99552", Long.class)).isZero();
     logs.record(slabs.getById(99601L), "CREATE", null, "warehouse", null, null, "MANUAL", snapshot);
     assertThat(jdbc.queryForObject("SELECT operation_summary FROM slab_operation_logs WHERE slab_id=99601 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("发布商品");
     identity("admin", "all", "all");
@@ -531,7 +537,9 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     assertThat(fresh.getName()).isEqualTo("新的来源名称");
     assertThat(fresh.getStatus()).isEqualTo("warehouse");
     assertThat(fresh.getMarkupPrices().stream().filter(price -> price.getStoreLevelId().equals(99609L)).findFirst().orElseThrow().getPrice()).isEqualByComparingTo(BigDecimal.valueOf(newCost).multiply(new BigDecimal("1.4")));
-    assertThat(logs.listPage("SLAB-COLLAB", "SOURCE_SHELF", null, null, null, 1, 10).total()).isEqualTo(1);
+    String arrivalType = purgeBeforeSourceRestore ? "SOURCE_SHELF" : "REENTRY";
+    assertThat(logs.listPage("SLAB-COLLAB", arrivalType, null, null, null, 1, 10).total()).isEqualTo(1);
+    assertThat(logs.listPage("SLAB-COLLAB", purgeBeforeSourceRestore ? "REENTRY" : "SOURCE_SHELF", null, null, null, 1, 10).total()).isZero();
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 20).records())
         .extracting(SlabOperationLog::getOperationType).contains("PURGE", "SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM media_references WHERE business_domain='SLAB_OPERATIONS_INVALIDATION' AND business_id=99601", Integer.class)).isZero();
@@ -561,8 +569,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     identity("admin", "all", "all");
     SlabMarkupConfiguration changed = new SlabMarkupConfiguration();
     changed.setPriceCoefficient(new BigDecimal("3"));
-    SlabMarkupConfiguration updated = priceConfigurations.updateConfiguration(99609L, changed);
-    assertThat(updated.getSynchronizedPriceCount()).isZero();
+    priceConfigurations.updateConfiguration(99609L, changed);
     assertThat(jdbc.queryForObject("SELECT price FROM slab_prices WHERE slab_id=99601 AND store_level_id=99609", BigDecimal.class)).isEqualByComparingTo("20");
     assertThat(slabs.visibleDetail(99601L).getCostPrice()).isEqualByComparingTo("10");
   }
