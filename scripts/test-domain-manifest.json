@@ -249,9 +249,10 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.mjs": {
-      "digest": "d73d91922c7fe61d4ee60803b8ee94067ae28c4ef612987e71cbbcb42e4f6c42",
+      "digest": "da51a51841e27ca45bb1eeed9e04e1a1560622a440d7f47a848d78afaec0bd51",
       "imports": [
         "scripts/ci-backend-equivalence.mjs",
+        "scripts/ci-browser-image.mjs",
         "scripts/ci-equivalence-environment.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/script-test-plan.mjs"
@@ -259,7 +260,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.test.mjs": {
-      "digest": "8ce9b78814bfd8248f0fa704b2a9604396268c78c0b1419ac218aa64a1ad94d8",
+      "digest": "0f1f2b5eeadcfd57154fa436a6a2ceb9e824dc9dbb43eded7c71c514293b2880",
       "imports": [
         "scripts/ci-equivalence-environment.mjs",
         "scripts/ci-equivalence.mjs",
