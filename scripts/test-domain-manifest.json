@@ -656,9 +656,9 @@
       "dynamicImports": 0
     },
     "scripts/preview-probe.test.mjs": {
-      "digest": "9879e75cbf5a8cc48032a9005b1e71aac7d6225be2eeba8165b76643918847a3",
+      "digest": "d2865fe2b5cb9636f7cd355175031efef8a0469194b679f5fdb2f66293260efe",
       "imports": ["scripts/dev-task.mjs"],
-      "dynamicImports": 0
+      "dynamicImports": 2
     },
     "scripts/restore-db.sh": {
       "digest": "26b769fb9d6a38022aa9aae951d00fd9d823beb4bfe93d345d76cd15a8a85db2",
@@ -836,7 +836,7 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.test.mjs": {
-      "digest": "4a43fd0fb3b292f6f68eb791110b5a89a3ac3ee246d19ec0bc9bc816c553f180",
+      "digest": "379d872343453945443e13819543b3dfd83e92a82b45264a00b500e0f26eb06f",
       "imports": ["scripts/task-preview-service.mjs"],
       "dynamicImports": 2
     },
