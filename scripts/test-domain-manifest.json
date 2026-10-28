@@ -13,7 +13,7 @@
       "dynamicImports": 1
     },
     ".github/workflows/quality.yml": {
-      "digest": "21ccd51b35864a08b5f01205179d0740e24acd97d3cc05b4681d02fa310c386d",
+      "digest": "744fecb594f4d1e5f4e8fc8772739689b1b408d77dbdfd28d27184dffa9ca136",
       "imports": [],
       "dynamicImports": 0
     },
@@ -272,14 +272,20 @@
       ],
       "dynamicImports": 1
     },
+    "scripts/ci-light-checks.mjs": {
+      "digest": "ac1843722e30995eb764615bb37329b663b4941e40eeb9ea184c4b6f1f68f4ec",
+      "imports": ["scripts/ci-quality-evidence.mjs", "scripts/verification-policy.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/ci-quality-evidence.mjs": {
-      "digest": "7e620b072e3ebadcd37fcdc9ae607083ff658e08d4bca1557ae0667b9566fb21",
+      "digest": "acca1d362fcf1782cb3717da1aca66444474c627d7c52ce5e016cb0faa1ae7bd",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/business-regression.mjs",
         "scripts/ci-backend-equivalence.mjs",
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/ci-equivalence.mjs",
+        "scripts/ci-light-checks.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/run-script-tests.mjs",
         "scripts/script-test-plan.mjs",
@@ -288,8 +294,9 @@
       "dynamicImports": 0
     },
     "scripts/ci-quality-evidence.test.mjs": {
-      "digest": "5c53825e244f70d9b75078dea9f065c20e8586cff1a82f800565454eae2bc9f2",
+      "digest": "52cb2f6ccbfb19716464586a95d36f679c1068d50cfe960b6edca4a3e83e147c",
       "imports": [
+        "scripts/ci-light-checks.mjs",
         "scripts/ci-quality-evidence.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/task-batch.mjs",
@@ -526,7 +533,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "d0bad0e8a3dca980d244480c30a9e0f8be7a01d1d5dbfefb22c4172e7df08e50",
+      "digest": "7fa8fe7529f6cc4a254cb31a34b9c45be3a529c4d2fcb863a1c806e29c784a89",
       "imports": [
         "scripts/absent.mjs",
         "scripts/affected-test-inputs.mjs",
@@ -556,6 +563,7 @@
         "scripts/ci-equivalence-environment.mjs",
         "scripts/ci-equivalence.mjs",
         "scripts/ci-equivalence.test.mjs",
+        "scripts/ci-light-checks.mjs",
         "scripts/ci-quality-evidence.mjs",
         "scripts/ci-quality-evidence.test.mjs",
         "scripts/ci-report-contract.mjs",
@@ -594,6 +602,7 @@
         "scripts/engineering-impact.test.mjs",
         "scripts/ensure-backend.mjs",
         "scripts/feedback-foundation.test.mjs",
+        "scripts/format.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/frontend-test-evidence.test.mjs",
         "scripts/git-workflow-core.mjs",
@@ -602,6 +611,7 @@
         "scripts/helper.mjs",
         "scripts/helper.test.mjs",
         "scripts/integration-handoff-state.mjs",
+        "scripts/light.mjs",
         "scripts/lint-policy.test.mjs",
         "scripts/local-diagnostic-evidence.mjs",
         "scripts/local-diagnostic-evidence.test.mjs",
@@ -613,6 +623,7 @@
         "scripts/node-source-evidence-reporter.mjs",
         "scripts/playwright-evidence-reporter.mjs",
         "scripts/preview-probe.test.mjs",
+        "scripts/remaining.test.mjs",
         "scripts/run-ci-diagnostics.mjs",
         "scripts/run-frontend-tests.mjs",
         "scripts/run-integration.mjs",
@@ -895,7 +906,7 @@
       "dynamicImports": 0
     },
     "scripts/run-targeted-script-tests.mjs": {
-      "digest": "51598df15e1cdfb1e9cf938d0cbe8fac27a4d2ccea7815c6659a88602efe9874",
+      "digest": "350c2a591ea8f428004f1e53d92627065e63b616701558bbaabd51d737a6dfae",
       "imports": [
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -1162,17 +1173,25 @@
       "dynamicImports": 0
     },
     "scripts/verification-policy.mjs": {
-      "digest": "054f4060c3079464306dff2a34b48dc44301438e01f03c2beb59db97b774ba77",
+      "digest": "ecb9f801edead107adb315dbb9306fed827352043325cea489d35b4ff96fc44f",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/verification-policy.test.mjs": {
-      "digest": "6f4884e43464c5be0b9fc781dba2b217d5f764f283faf14cace924a6ae66ef58",
+      "digest": "e25a222c62dac6a0864e90885628e8fd07b408b221aa12d7cf765ab09e21bfbd",
       "imports": [
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/ci-light-checks.mjs",
+        "scripts/ci-quality-evidence.mjs",
         "scripts/completion-process.mjs",
         "scripts/dev-task.mjs",
         "scripts/e2e-shards.mjs",
+        "scripts/format.mjs",
+        "scripts/light.mjs",
         "scripts/playwright-evidence-reporter.mjs",
+        "scripts/remaining.test.mjs",
+        "scripts/run-script-tests.mjs",
+        "scripts/run-targeted-script-tests.mjs",
         "scripts/verification-policy.mjs",
         "scripts/verify.mjs"
       ],
@@ -1197,7 +1216,7 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "bfc351a9e66694e6820f9f004018894d054e64fe777fd197cac4ffdd15ba57c7",
+      "digest": "dab5854a356c90949031f0afdb16a4b8411e669471e734be39a1c66ecc8e6ddd",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/business-regression.mjs",

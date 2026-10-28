@@ -326,9 +326,10 @@ function main(args) {
     assert.equal(producer.job, 'scope', 'Engineering producer must be the same-run scope job');
     assert.deepEqual(
       producer.phases.map((phase) => phase.name),
-      ['npm-ci', 'engineering-tests'],
+      ['npm-ci', 'light-checks', 'engineering-tests'],
     );
     assert.deepEqual(producer.phases[0].command, ['npm', 'ci']);
+    assert.deepEqual(producer.phases[1].command, ['node', 'scripts/ci-light-checks.mjs']);
     verifyEngineeringEvidence(readJson(path.join(directory, 'scope.json')), producer, current);
     console.log(
       `Verified original scope-Runner engineering report: ${producer.engineeringResults.summary.tests} tests; diagnostics ${producer.engineeringResults.diagnosticReuse ? 'reused' : 'executed in full'}`,

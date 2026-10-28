@@ -11,6 +11,7 @@ import {
   needsContractPreflight,
   deliveryCiCapability,
   localReadinessTasks,
+  earlyReadinessTasks,
   requiresLocalRiskGate,
 } from './verification-policy.mjs';
 import { fileURLToPath } from 'node:url';
@@ -61,6 +62,7 @@ export function createVerificationPlan({
   const task = (name, script, extra = {}) => ({ root, name, command, args: ['run', script], env, ...extra });
   const browserEnv = browser ? { ...env, PLAYWRIGHT_CHANNEL: browser } : env;
   const plan = {
+    earlyChecks: earlyReadinessTasks(root, files, env),
     preflight: task('format check', 'format:check', { reuse: false }),
     contractPreflight:
       !affected || needsContractPreflight(files)
@@ -90,11 +92,17 @@ export function createVerificationPlan({
     impact,
     plannedCandidate,
   };
+  const complete = () => {
+    // A light check moved to the front must not execute again in readiness.
+    const signatures = new Set(plan.earlyChecks.map((entry) => JSON.stringify([entry.command, entry.args])));
+    plan.frontend = plan.frontend.filter((entry) => !signatures.has(JSON.stringify([entry.command, entry.args])));
+    return plan;
+  };
   if (affected && ciCapability?.verified === false) {
     plan.affected = false;
     plan.ciFallback = true;
     plan.contractPreflight = task('CI reuse contract preflight', 'test:ci-reuse', { reuse: false });
-    return plan;
+    return complete();
   }
   if (affected && ciCapability?.verified && !requiresLocalRiskGate(files)) {
     const existing = files.filter((file) => existsSync(path.resolve(root, file)));
@@ -114,7 +122,7 @@ export function createVerificationPlan({
       engineering: impact.engineering,
       full: impact.full,
     };
-    return plan;
+    return complete();
   }
   if (affected && !impact.full) {
     const selected = createValidationPlan(files, (file) => existsSync(path.resolve(root, file)), { root });
@@ -161,7 +169,7 @@ export function createVerificationPlan({
     if (impact.backend)
       plan.backend.push(task('backend static quality', 'backend:quality:static', { kind: 'backend' }));
   }
-  return plan;
+  return complete();
 }
 
 export async function executeVerification(
@@ -237,6 +245,7 @@ export async function executeVerification(
     return result;
   };
   if ((await execute(plan.preflight)).exitCode !== 0) return finish(1);
+  for (const task of plan.earlyChecks ?? []) if ((await execute(task)).exitCode !== 0) return finish(1);
   if (
     plan.backend.some((task) => task.args.includes('backend:test')) &&
     (
@@ -303,7 +312,7 @@ export async function main(args = process.argv.slice(2)) {
   }
   const affected = args.includes('--affected');
   const plannedCandidate = args.includes('--list') ? null : captureSource(process.cwd());
-  const changes = affected ? collectDeliveryChanges(process.cwd()) : {};
+  const changes = collectDeliveryChanges(process.cwd());
   const plan = createVerificationPlan({
     root: process.cwd(),
     browser,
@@ -328,6 +337,7 @@ export async function main(args = process.argv.slice(2)) {
     if (plan.backend.some((task) => task.args.includes('backend:test')))
       console.log('Early static check: backend test discovery (before contract/runtime pipelines)');
     console.log(`Preflight: ${plan.preflight.command} ${plan.preflight.args.join(' ')}`);
+    for (const task of plan.earlyChecks) console.log(`Early check: ${task.command} ${task.args.join(' ')}`);
     if (plan.contractPreflight)
       console.log(`Contract preflight: ${plan.contractPreflight.command} ${plan.contractPreflight.args.join(' ')}`);
     console.log(

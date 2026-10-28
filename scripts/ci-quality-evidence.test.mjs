@@ -530,6 +530,7 @@ test('engineering forwarding CLI checks actual checkout, run, producer and repor
     },
     phases: [
       { name: 'npm-ci', command: ['npm', 'ci'], exitCode: 0 },
+      { name: 'light-checks', command: ['node', 'scripts/ci-light-checks.mjs'], exitCode: 0 },
       { name: 'engineering-tests', runId: 'run', command: ['npm', 'run', 'test:engineering'], exitCode: 0 },
     ],
   };
@@ -550,7 +551,7 @@ test('engineering forwarding CLI checks actual checkout, run, producer and repor
     (x) => (x.workflowRunId = 'different'),
     (x) => (x.engineeringResults.summary.skipped = 1),
     (x) => (x.engineeringTests = []),
-    (x) => x.phases[1].command.push('--skip'),
+    (x) => x.phases[2].command.push('--skip'),
   ]) {
     const value = structuredClone(metadata);
     if (mutation) mutation(value);
@@ -573,6 +574,9 @@ test('workflow executes diagnostics and remaining engineering on one Runner and 
     scope.indexOf('npm run test:ci-reuse') < scope.indexOf('run engineering-tests -- npm run test:engineering'),
   );
   assert.match(scope, /CI_DIAGNOSTIC_DIRECTORY: \$\{\{ github.workspace \}\}\/coverage\/ci-evidence/);
+  assert.ok(
+    scope.indexOf('run light-checks -- node scripts/ci-light-checks.mjs') < scope.indexOf('npm run test:ci-reuse'),
+  );
   assert.equal((text.match(/run engineering-tests -- npm run test:engineering/g) ?? []).length, 1);
   assert.doesNotMatch(engineering, /npm ci|test:engineering|CI_EVIDENCE_JOB/);
   assert.match(engineering, /scripts\/ci-quality-evidence\.mjs verify-engineering/);

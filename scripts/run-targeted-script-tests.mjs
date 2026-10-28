@@ -76,6 +76,7 @@ export function runTargetedScriptTests(
   const executed = reports.flatMap((report) => report.files);
   assert.equal(new Set(executed).size, executed.length, 'Overlapping test executions');
   assert.deepEqual(executed.sort(), plan.inventory, 'Missing associated test inventory');
+  mkdirSync(directory, { recursive: true });
   writeFileSync(
     path.join(directory, 'execution-plan.json'),
     JSON.stringify({ plan, identity, reports }, null, 2) + '\n',

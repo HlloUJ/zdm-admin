@@ -73,3 +73,9 @@ export function requiresLocalRiskGate(files) {
       (/^src\//.test(file) && /(?:auth|security|permission|functionCatalog|adminPermissions)/i.test(file)),
   );
 }
+
+export function earlyReadinessTasks(root, files, env) {
+  return localReadinessTasks(root, files, env).filter((entry) =>
+    ['lint:changed', 'typecheck:cached', 'stylelint:changed'].includes(entry.args[1]),
+  );
+}
