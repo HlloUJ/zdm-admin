@@ -30,6 +30,7 @@ import {
 import { inventoryAssets } from './task-completion.mjs';
 import { runCompletionFlow } from './completion-flow.mjs';
 import { finalHandoffPlan, finalHandoff } from './completion-handoff.mjs';
+import { createCompletionPreviewControl } from './completion-preview.mjs';
 import { parseWorktreePorcelain } from './git-workflow-core.mjs';
 import {
   integrationBackendSnapshot,
@@ -58,6 +59,7 @@ export async function completionCommand(
     runtimeProof = readIntegrationProof,
     waitQuality = waitRemoteQuality,
     verifyEvidence = verifyCompletionEvidence,
+    previewControl = createCompletionPreviewControl({ execute }),
   },
 ) {
   const limits = {
@@ -200,6 +202,7 @@ export async function completionCommand(
       checkRuntime,
       common,
       inventoryAssets,
+      previewControl,
       dispatch: (cwd, args) =>
         completionCommand(cwd, args, {
           preserveAssets,
@@ -209,6 +212,7 @@ export async function completionCommand(
           runtimeProof,
           waitQuality,
           verifyEvidence,
+          previewControl,
         }),
     });
   }
@@ -222,7 +226,7 @@ export async function completionCommand(
     return { batch: batch.id, startedAt: new Date(state.startedAt).toISOString(), clockSource: state.clockSource };
   }
   if (mode === 'final-handoff') {
-    const options = { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common };
+    const options = { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common, previewControl };
     return finalHandoff(root, batch, rest[0], options);
   }
   if (mode === 'measure') {
@@ -420,6 +424,7 @@ export async function completionCommand(
             false,
             'Database task lock remains',
           );
+          await previewControl.check({ anchor, task: batch.worktree, preview, main: expectedMain, common });
           const runtime = await checkRuntime(root, common);
           assert.equal(runtime.runtimeHealthy, true);
           assert.equal(runtime.backupRetained, true);

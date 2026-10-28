@@ -81,7 +81,7 @@ export function finalHandoffPlan(root, batch, main, { execute, state }) {
 }
 
 export async function finalHandoff(root, batch, main, options) {
-  const { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common } = options;
+  const { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common, previewControl } = options;
   assert.ok(state.startedAt !== null, 'Begin formal completion before final handoff');
   // Use only the published entry, never execute a task candidate before its main CI succeeds.
   const ci = [...state.events]
@@ -102,8 +102,12 @@ export async function finalHandoff(root, batch, main, options) {
       async () => {
         execute(root, 'git', ['fetch', 'origin']);
         const plan = finalHandoffPlan(root, batch, main, options);
-        const before = await checkRuntime(root, common);
-        assert.ok(before.runtimeHealthy && before.backupRetained, 'Persistent runtime or backup unavailable');
+        const owner = await previewControl.assertOwner({ ...plan, common });
+        const before = await checkRuntime(root, common, { allowPreviewUnavailable: true });
+        assert.ok(
+          (before.integrationHealthy ?? before.runtimeHealthy) && before.backupRetained,
+          'Persistent runtime or backup unavailable',
+        );
         if (state.previewFingerprint)
           assert.equal(before.profileFingerprint, state.previewFingerprint, 'Persistent data profile changed');
         if (plan.integrationNeedsMerge || plan.integrationNeedsPush) {
@@ -165,7 +169,8 @@ export async function finalHandoff(root, batch, main, options) {
           );
         };
         const beforeSnapshot = runtimeSnapshot(plan.integration);
-        const reused = snapshotReady(beforeSnapshot);
+        const taskSelected = owner.worktree && path.resolve(owner.worktree) === path.resolve(plan.task);
+        const reused = snapshotReady(beforeSnapshot) && !taskSelected;
         if (!reused)
           execute(plan.anchor, process.execPath, [
             path.join(plan.anchor, 'scripts/delivery-launcher.mjs'),
@@ -178,12 +183,15 @@ export async function finalHandoff(root, batch, main, options) {
         assert.ok(snapshotReady(afterSnapshot), 'Published runtime handoff proof missing');
         execute(root, 'git', ['merge-base', '--is-ancestor', main, afterSnapshot.integrationHead]);
         assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview differs from published main');
+        const preview = await previewControl.ensure({ ...plan, common });
+        assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview changed during startup');
         const after = await checkRuntime(root, common);
         assert.ok(after.runtimeHealthy && after.backupRetained, 'Runtime health or backup changed');
         assert.equal(after.profileFingerprint, before.profileFingerprint, 'Persistent data profile changed');
         return {
           main,
           launcherReused: reused,
+          previewReused: preview.reused,
           integrationUpdated: plan.integrationNeedsMerge,
           previewUpdated: plan.previewNeedsAdvance,
         };
