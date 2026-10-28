@@ -28,7 +28,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
   private static final String PLATFORM_PUBLISHER = "平台发布";
   private static final String API_PUBLISHER = "接口获取";
   private static final Set<String> ALLOWED_STATUSES = Set.of(
-      "warehouse", "selling", "offShelf", "soldOut", "recycle");
+      "warehouse", "selling", "soldOut", "recycle");
 
   private final ProductLifecycleService lifecycle;
   private final SlabInvalidationSnapshotService invalidationSnapshots;
@@ -101,6 +101,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
   @Transactional
   public SlabInventory createWithPrices(SlabInventory inventory) {
     lifecycle.requireSupplyChain();
+    if ("offShelf".equals(inventory.getStatus())) { throw new IllegalArgumentException("已下架状态已取消"); }
     boolean publishNow="selling".equals(inventory.getStatus()) && !API_PUBLISHER.equals(inventory.getPublisherType());
     inventory.setStatus("warehouse");
     inventory.setSourceStatus("warehouse");
@@ -335,8 +336,8 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
     if (inventory == null) {
       throw new IllegalArgumentException("大板不存在或已被删除");
     }
-    if (!Set.of("warehouse", "offShelf").contains(inventory.getStatus())) {
-      throw new IllegalArgumentException("只有仓库中或已下架的大板可以删除");
+    if (!Set.of("warehouse", "selling").contains(inventory.getStatus())) {
+      throw new IllegalArgumentException("只有仓库中或已上架的大板可以删除");
     }
     return inventory;
   }
@@ -393,7 +394,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
       return;
     }
     ids.stream().distinct().sorted().forEach(id -> lifecycle.lock(ProductLifecycleService.Kind.SLAB,id));
-    if (!ALLOWED_STATUSES.contains(status)) {
+    if (!ALLOWED_STATUSES.contains(status) && !"offShelf".equals(status)) {
       throw new IllegalArgumentException("大板状态不正确");
     }
     String normalizedReason = normalizeOptionalText(reason);
@@ -420,15 +421,16 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
       lifecycle.requireSlabOperational(item);
       validateStatusTransition(item, status);
     });
+    String nextState = "offShelf".equals(status) ? "warehouse" : status;
     lambdaUpdate()
         .in(SlabInventory::getId, normalizedIds)
-        .set(SlabInventory::getStatus, status)
+        .set(SlabInventory::getStatus, nextState)
         .update();
     inventory.forEach(item -> operationLogService.record(
         item,
         statusOperationType(item.getStatus(), status),
         item.getStatus(),
-        status,
+        nextState,
         normalizedReason,
         normalizedDetail,
         "MANUAL",
@@ -463,9 +465,6 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
     }
     if ("selling".equals(beforeStatus) && "offShelf".equals(afterStatus)) {
       return "OFF_SHELF";
-    }
-    if ("offShelf".equals(beforeStatus) && "warehouse".equals(afterStatus)) {
-      return "RESTORE_WAREHOUSE";
     }
     if ("recycle".equals(beforeStatus) && "warehouse".equals(afterStatus)) {
       return "RESTORE_RECYCLE";
@@ -519,7 +518,7 @@ public class SlabInventoryService extends CreatorAwareService<SlabInventoryMappe
     boolean allowed = switch (currentStatus) {
       case "warehouse" -> "selling".equals(targetStatus);
       case "selling" -> "offShelf".equals(targetStatus);
-      case "offShelf", "recycle" -> "warehouse".equals(targetStatus);
+      case "recycle" -> "warehouse".equals(targetStatus);
       default -> false;
     };
     if (!allowed) {

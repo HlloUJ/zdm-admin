@@ -3,7 +3,6 @@ import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 const labels: Record<string, [string, string]> = {
   warehouse: ['入库人', '入库时间'],
   selling: ['上架人', '上架时间'],
-  offShelf: ['下架人', '下架时间'],
   soldOut: ['', '售完时间'],
   recycle: ['移入人', '移入时间'],
 };

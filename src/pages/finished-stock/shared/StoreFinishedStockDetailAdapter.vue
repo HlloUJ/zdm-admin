@@ -64,6 +64,7 @@ const detail = computed(() => ({
   stock: props.product.totalStock,
   publisherType: '',
   status: props.product.effectiveStatus,
+  offShelfByName: props.product.offShelfByName,
   offShelfReason: props.product.offShelfReason,
   offShelfAt: props.product.offShelfAt,
   offShelfDetail: props.product.offShelfDetail,

@@ -2545,7 +2545,15 @@
     },
     "src/pages/finished-stock/management/components/FinishedEditChanges.test.ts": {
       "content": "66c6fcf1cfb8d2257a1d0545e91657ba70d1600b09e5e56039f220bc9219494e",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "\ndescribe('edit log layout', () => {\n  it.each([\n    ['warehouse', 'selling', '仓库中', '已上架'],\n    ['selling', 'offShelf', '已上架', '已下架'],\n  ])(\n    'renders source status %s → %s with consistent source and operations labels',\n    (before, after, beforeLabel, afterLabel) => {\n      const wrapper = mount(FinishedEditChanges, {\n",
+          "after": "\ndescribe('edit log layout', () => {\n  it.each([\n    ['warehouse', 'selling', '仓库中', '已上架'],\n    ['selling', 'warehouse', '已上架', '仓库中'],\n  ])(\n    'renders source status %s → %s with consistent source and operations labels',\n    (before, after, beforeLabel, afterLabel) => {\n      const wrapper = mount(FinishedEditChanges, {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        }
+      ]
     },
     "src/pages/finished-stock/management/components/FinishedEditChanges.vue": {
       "script": "180832978022c035424aa717abe35ca13c47f641b852ed9cd905cbccf599106c",
@@ -2795,6 +2803,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n",
+          "after": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <t-alert v-if=\"product.status === 'warehouse' && product.offShelfReason\" theme=\"warning\" title=\"最近下架信息\">\n      {{ product.offShelfReason }} · {{ product.offShelfDetail || '—' }} {{ product.offShelfByName || '未记录' }} ·\n      {{ product.offShelfAt || '未记录' }}\n    </t-alert>\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  createdByName: string;\n  createdAt?: string;\n  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  image: string;\n",
+          "after": "  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  createdByName: string;\n  createdAt?: string;\n  offShelfByName?: string;\n  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  image: string;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-23 用户确认按补充规范调整全业务端抽屉：宽度封顶、普通字段填满、日志显式搜索范围及原生详情分区；保留业务逻辑、权限、交互和非抽屉编辑表单",
           "stage": "before-migrations",
@@ -3295,6 +3315,60 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "import { useRoute, useRouter } from 'vue-router';\nconst tabs: TabConfig[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'offShelf', label: '已下架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nconst pageSizeOptions = [10, 20, 50];\n",
+          "after": "import { useRoute, useRouter } from 'vue-router';\nconst tabs: TabConfig[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nconst pageSizeOptions = [10, 20, 50];\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "const activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  offShelf: 'off-shelf',\n  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst hasFinishedAction = (action: string, status = activeTab.value) =>\n",
+          "after": "const activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst hasFinishedAction = (action: string, status = activeTab.value) =>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "});\nconst filters = reactive<Record<StockStatus, FilterState>>({\n  warehouse: defaultFilter(),\n  selling: defaultFilter(),\n  offShelf: defaultFilter(),\n  soldOut: defaultFilter(),\n  recycle: defaultFilter(),\n});\nconst appliedFilters = reactive<Record<StockStatus, FilterState>>({\n  warehouse: defaultFilter(),\n  selling: defaultFilter(),\n  offShelf: defaultFilter(),\n  soldOut: defaultFilter(),\n  recycle: defaultFilter(),\n});\nconst paginations = reactive<Record<StockStatus, PaginationState>>({\n  warehouse: { current: 1, pageSize: 10 },\n  selling: { current: 1, pageSize: 10 },\n  offShelf: { current: 1, pageSize: 10 },\n  soldOut: { current: 1, pageSize: 10 },\n  recycle: { current: 1, pageSize: 10 },\n});\nconst createEmptyProductForm = (): ProductForm => ({\n",
+          "after": "});\nconst filters = reactive<Record<StockStatus, FilterState>>({\n  warehouse: defaultFilter(),\n  selling: defaultFilter(),\n  soldOut: defaultFilter(),\n  recycle: defaultFilter(),\n});\nconst appliedFilters = reactive<Record<StockStatus, FilterState>>({\n  warehouse: defaultFilter(),\n  selling: defaultFilter(),\n  soldOut: defaultFilter(),\n  recycle: defaultFilter(),\n});\nconst paginations = reactive<Record<StockStatus, PaginationState>>({\n  warehouse: { current: 1, pageSize: 10 },\n  selling: { current: 1, pageSize: 10 },\n  soldOut: { current: 1, pageSize: 10 },\n  recycle: { current: 1, pageSize: 10 },\n});\nconst createEmptyProductForm = (): ProductForm => ({\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "});\nconst countByStatus = computed<Record<StockStatus, number>>(() => ({\n  warehouse: dataItems.value.filter((item) => item.status === 'warehouse').length,\n  selling: dataItems.value.filter((item) => item.status === 'selling').length,\n  offShelf: dataItems.value.filter((item) => item.status === 'offShelf').length,\n  soldOut: dataItems.value.filter((item) => item.status === 'soldOut').length,\n  recycle: dataItems.value.filter((item) => item.status === 'recycle').length,\n}));\nconst normalizeStatus = (status?: string): StockStatus =>\n  status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';\nconst normalizePublisherType = (value?: string): PublisherType => (value === '接口获取' ? '接口获取' : '平台发布');\nconst categoryPathById = (categoryId?: number) => {\n  if (!categoryId) return '未分类';\n  const categoryMap = new Map(productCategories.value.map((category) => [category.id, category]));\n",
+          "after": "});\nconst countByStatus = computed<Record<StockStatus, number>>(() => ({\n  warehouse: dataItems.value.filter((item) => item.status === 'warehouse').length,\n  selling: dataItems.value.filter((item) => item.status === 'selling').length,\n  soldOut: dataItems.value.filter((item) => item.status === 'soldOut').length,\n  recycle: dataItems.value.filter((item) => item.status === 'recycle').length,\n}));\nconst normalizeStatus = (status?: string): StockStatus =>\n  status === 'selling' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';\nconst normalizePublisherType = (value?: string): PublisherType => (value === '接口获取' ? '接口获取' : '平台发布');\nconst categoryPathById = (categoryId?: number) => {\n  if (!categoryId) return '未分类';\n  const categoryMap = new Map(productCategories.value.map((category) => [category.id, category]));\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    markupPrices: nextItem.markupPrices,\n    attributes: nextItem.attributes,\n    variants: nextItem.variants,\n    specDimensions: nextItem.specDimensions,\n    offShelfReason: nextItem.offShelfReason,\n    offShelfDetail: nextItem.offShelfDetail,\n    status: nextItem.status,\n  };\n",
+          "after": "    markupPrices: nextItem.markupPrices,\n    attributes: nextItem.attributes,\n    variants: nextItem.variants,\n    specDimensions: nextItem.specDimensions,\n    operation: nextItem.operation,\n    offShelfReason: nextItem.offShelfReason,\n    offShelfDetail: nextItem.offShelfDetail,\n    status: nextItem.status,\n  };\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    selling: [\n      { action: 'publish', label: '发布商品', icon: 'add' },\n      { action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' },\n    ],\n    offShelf: [{ action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' }],\n    soldOut: [],\n    recycle: [\n      { action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' },\n      { action: 'batchPurge', label: '批量彻底删除', icon: 'delete', className: 'deep-danger-button' },\n",
+          "after": "    selling: [\n      { action: 'publish', label: '发布商品', icon: 'add' },\n      { action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' },\n    ],\n    soldOut: [],\n    recycle: [\n      { action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' },\n      { action: 'batchPurge', label: '批量彻底删除', icon: 'delete', className: 'deep-danger-button' },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": ");\n// Fixed pixel widths; update only when the tab action buttons change.\nconst operationWidths = {\n  warehouse: 190,\n  selling: 152,\n  offShelf: 180,\n  soldOut: 104,\n  recycle: 208,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n",
+          "after": ");\n// Fixed pixel widths; update only when the tab action buttons change.\nconst operationWidths = {\n  warehouse: 190,\n  selling: 208,\n  soldOut: 104,\n  recycle: 208,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  ];\n  if (activeTab.value !== 'soldOut') {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n  if (activeTab.value === 'offShelf') {\n    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  }\n  base.push({\n    colKey: 'operation',\n",
+          "after": "  ];\n  if (activeTab.value !== 'soldOut') {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n  if (activeTab.value === 'warehouse') {\n    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  }\n  base.push({\n    colKey: 'operation',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "const closeImagePreview = () => {\n  imagePreviewVisible.value = false;\n  imagePreviewSrc.value = '';\n};\nconst updateProductStatus = async (id: number, status: StockStatus, reason?: string, detail?: string) => {\n  const item = dataItems.value.find((product) => product.id === id);\n  if (!item) return;\n  const afterStock = status === 'soldOut' ? 0 : item.stock;\n  const updated = await updateFinishedProduct(\n    id,\n    toProductPayload(item, {\n      status,\n      stock: afterStock,\n      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,\n      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,\n    }),\n",
+          "after": "const closeImagePreview = () => {\n  imagePreviewVisible.value = false;\n  imagePreviewSrc.value = '';\n};\nconst updateProductStatus = async (id: number, status: StockStatus | 'offShelf', reason?: string, detail?: string) => {\n  const item = dataItems.value.find((product) => product.id === id);\n  if (!item) return;\n  const afterStock = status === 'soldOut' ? 0 : item.stock;\n  const updated = await updateFinishedProduct(\n    id,\n    toProductPayload(item, {\n      status: status === 'offShelf' ? 'warehouse' : status,\n      operation: status === 'offShelf' ? 'offShelf' : undefined,\n      stock: afterStock,\n      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,\n      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,\n    }),\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
           "stage": "before-migrations",
@@ -3811,6 +3885,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  offShelfReason: props.product.offShelfReason,\n  offShelfAt: props.product.offShelfAt,\n  offShelfDetail: props.product.offShelfDetail,\n  sourceUnavailable: props.product.sourceUnavailable,\n",
+          "after": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  offShelfByName: props.product.offShelfByName,\n  offShelfReason: props.product.offShelfReason,\n  offShelfAt: props.product.offShelfAt,\n  offShelfDetail: props.product.offShelfDetail,\n  sourceUnavailable: props.product.sourceUnavailable,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
           "reason": "2026-10-23 用户确认按补充规范调整全业务端抽屉：宽度封顶、普通字段填满、日志显式搜索范围及原生详情分区；保留业务逻辑、权限、交互和非抽屉编辑表单",
           "stage": "before-migrations",
           "before": "    :store-level-name=\"product.storeLevelName || undefined\"",
@@ -3871,6 +3951,18 @@
       "content": "d4ba84aac2dc6dad94c7f130b3bad4a21824749f6ee5ceb67eaf1c42c60ffa05",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "export type FinishedStockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\nexport type FinishedStockAction = 'edit' | 'detail' | 'shelf' | 'offShelf' | 'restore' | 'delete' | 'purge';\n\nexport interface FinishedStockActionDefinition {\n  id: FinishedStockAction;\n",
+          "after": "export type FinishedStockStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\nexport type FinishedStockAction = 'edit' | 'detail' | 'shelf' | 'offShelf' | 'restore' | 'delete' | 'purge';\n\nexport interface FinishedStockActionDefinition {\n  id: FinishedStockAction;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  ],\n  selling: [\n    { id: 'offShelf', label: '下架', permission: 'off-shelf' },\n    { id: 'edit', label: '编辑', permission: 'edit' },\n  ],\n  offShelf: [\n    { id: 'detail', label: '详情', permission: 'detail' },\n    { id: 'restore', label: '放回仓库', permission: 'restore' },\n    { id: 'delete', label: '删除', permission: 'delete' },\n  ],\n  soldOut: [{ id: 'detail', label: '详情', permission: 'detail' }],\n  recycle: [\n",
+          "after": "  ],\n  selling: [\n    { id: 'offShelf', label: '下架', permission: 'off-shelf' },\n    { id: 'edit', label: '编辑', permission: 'edit' },\n    { id: 'delete', label: '删除', permission: 'delete' },\n  ],\n  soldOut: [{ id: 'detail', label: '详情', permission: 'detail' }],\n  recycle: [\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -3972,6 +4064,18 @@
       "content": "e2d9082c5cd7a900a4334e332a69b73c7bace01b2fde276467dd8717a577b1c3",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "export interface FinishedStockRowAction {\n  id: string;\n  label: string;\n}\nexport type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\nexport type PublisherType = '平台发布' | '接口获取';\nexport type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';\nexport type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';\nexport type FormSectionKey = 'description' | 'base' | 'sales';\n",
+          "after": "export interface FinishedStockRowAction {\n  id: string;\n  label: string;\n}\nexport type StockStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\nexport type PublisherType = '平台发布' | '接口获取';\nexport type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';\nexport type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';\nexport type FormSectionKey = 'description' | 'base' | 'sales';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  isExternalSupplier: boolean;\n  guidePrice?: number;\n  priceRange: string;\n  status: StockStatus;\n  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  markupPrices?: FinishedProductPrice[];\n",
+          "after": "  isExternalSupplier: boolean;\n  guidePrice?: number;\n  priceRange: string;\n  status: StockStatus;\n  operation?: 'offShelf';\n  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  markupPrices?: FinishedProductPrice[];\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
@@ -4335,6 +4439,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`);\nconst statusLabels: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  offShelf: '已下架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\nconst tabOrder: StoreFinishedStatus[] = ['warehouse', 'selling', 'offShelf', 'soldOut', 'recycle'];\nconst tabs = computed(() =>\n  tabOrder\n    .filter((tab) => can(tab === 'offShelf' ? 'off-shelf' : tab === 'soldOut' ? 'sold-out' : tab, 'view'))\n    .map((value) => ({\n      value,\n      label: `${statusLabels[value]}（${rows.value.filter((item) => item.effectiveStatus === value).length}）`,\n    })),\n);\nconst activeTab = ref<StoreFinishedStatus>('warehouse');\nconst activeScope = computed(() =>\n  activeTab.value === 'offShelf' ? 'off-shelf' : activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value,\n);\nconst rows = ref<StoreFinishedProduct[]>([]);\nconst loading = ref(false);\nconst page = ref(1);\nconst pageSize = ref(10);\n",
+          "after": "const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`);\nconst statusLabels: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\nconst tabOrder: StoreFinishedStatus[] = ['warehouse', 'selling', 'soldOut', 'recycle'];\nconst tabs = computed(() =>\n  tabOrder\n    .filter((tab) => can(tab === 'soldOut' ? 'sold-out' : tab, 'view'))\n    .map((value) => ({\n      value,\n      label: `${statusLabels[value]}（${rows.value.filter((item) => item.effectiveStatus === value).length}）`,\n    })),\n);\nconst activeTab = ref<StoreFinishedStatus>('warehouse');\nconst activeScope = computed(() => (activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value));\nconst rows = ref<StoreFinishedProduct[]>([]);\nconst loading = ref(false);\nconst page = ref(1);\nconst pageSize = ref(10);\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "} = useStoreFinishedLogs(stateLabel);\nconst batchActions: Record<string, { kind: ActionKind | 'off-shelf'; label: string; permission: string }> = {\n  warehouse: { kind: 'batch-shelf', label: '批量上架', permission: 'batch-shelf' },\n  selling: { kind: 'off-shelf', label: '批量下架', permission: 'batch-off-shelf' },\n  offShelf: { kind: 'batch-restore', label: '批量放回到仓库', permission: 'batch-restore' },\n  recycle: { kind: 'batch-restore', label: '批量放回到仓库', permission: 'batch-restore' },\n};\nconst batchAction = computed(() => {\n  const action = batchActions[activeTab.value];\n",
+          "after": "} = useStoreFinishedLogs(stateLabel);\nconst batchActions: Record<string, { kind: ActionKind | 'off-shelf'; label: string; permission: string }> = {\n  warehouse: { kind: 'batch-shelf', label: '批量上架', permission: 'batch-shelf' },\n  selling: { kind: 'off-shelf', label: '批量下架', permission: 'batch-off-shelf' },\n  recycle: { kind: 'batch-restore', label: '批量放回到仓库', permission: 'batch-restore' },\n};\nconst batchAction = computed(() => {\n  const action = batchActions[activeTab.value];\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n];\nconst operationWidths: Record<StoreFinishedStatus, number> = {\n  warehouse: 190,\n  selling: 152,\n  offShelf: 180,\n  soldOut: 104,\n  recycle: 208,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...baseColumns,\n  ...stateActivityColumns(activeTab.value),\n  ...(activeTab.value === 'offShelf' ? [{ colKey: 'offShelfReason', title: '下架原因', minWidth: 140 }] : []),\n  { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },\n]);\nconst poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'select', title: 'poolSelectTitle', width: 48 },\n",
+          "after": "  { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n];\nconst operationWidths: Record<StoreFinishedStatus, number> = {\n  warehouse: 190,\n  selling: 208,\n  soldOut: 104,\n  recycle: 208,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...baseColumns,\n  ...stateActivityColumns(activeTab.value),\n  ...(activeTab.value === 'warehouse' ? [{ colKey: 'offShelfReason', title: '下架原因', minWidth: 140 }] : []),\n  { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },\n]);\nconst poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'select', title: 'poolSelectTitle', width: 48 },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
@@ -5497,6 +5619,66 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "            </template>\n          </AdminListLayout> </template\n        ><template v-else-if=\"formPageVisible\">\n          <section ref=\"productFormRoot\" class=\"form-shell\">\n            <AdminSectionCard class=\"form-heading-card\" aria-label=\"发布商品信息\">\n              <div class=\"form-title-row\">\n                <div>\n                  <h1>{{ formPageTitle }}</h1>\n",
+          "after": "            </template>\n          </AdminListLayout> </template\n        ><template v-else-if=\"formPageVisible\">\n          <section ref=\"productFormRoot\" class=\"form-shell\">\n            <t-alert\n              v-if=\"editingProduct?.status === 'warehouse' && editingProduct.offShelfReason\"\n              theme=\"warning\"\n              title=\"最近下架信息\"\n            >\n              {{ editingProduct.offShelfReason }} · {{ editingProduct.offShelfDetail || '—' }}\n              {{ editingProduct.offShelfByName || '未记录' }} · {{ editingProduct.offShelfAt || '未记录' }}\n            </t-alert>\n            <AdminSectionCard class=\"form-heading-card\" aria-label=\"发布商品信息\">\n              <div class=\"form-title-row\">\n                <div>\n                  <h1>{{ formPageTitle }}</h1>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "import { useRoute, useRouter } from 'vue-router';\nconst tabs: TabConfig[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'offShelf', label: '已下架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nconst pageSizeOptions = [10, 20, 50];\n",
+          "after": "import { useRoute, useRouter } from 'vue-router';\nconst tabs: TabConfig[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nconst pageSizeOptions = [10, 20, 50];\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "const activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  offShelf: 'off-shelf',\n  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst hasFinishedAction = (action: string, status = activeTab.value) =>\n",
+          "after": "const activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst hasFinishedAction = (action: string, status = activeTab.value) =>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "});\nconst filters = reactive<Record<StockStatus, FilterState>>({\n  warehouse: defaultFilter(),\n  selling: defaultFilter(),\n  offShelf: defaultFilter(),\n  soldOut: defaultFilter(),\n  recycle: defaultFilter(),\n});\nconst appliedFilters = reactive<Record<StockStatus, FilterState>>({\n  warehouse: defaultFilter(),\n  selling: defaultFilter(),\n  offShelf: defaultFilter(),\n  soldOut: defaultFilter(),\n  recycle: defaultFilter(),\n});\nconst paginations = reactive<Record<StockStatus, PaginationState>>({\n  warehouse: { current: 1, pageSize: 10 },\n  selling: { current: 1, pageSize: 10 },\n  offShelf: { current: 1, pageSize: 10 },\n  soldOut: { current: 1, pageSize: 10 },\n  recycle: { current: 1, pageSize: 10 },\n});\nconst createEmptyProductForm = (): ProductForm => ({\n",
+          "after": "});\nconst filters = reactive<Record<StockStatus, FilterState>>({\n  warehouse: defaultFilter(),\n  selling: defaultFilter(),\n  soldOut: defaultFilter(),\n  recycle: defaultFilter(),\n});\nconst appliedFilters = reactive<Record<StockStatus, FilterState>>({\n  warehouse: defaultFilter(),\n  selling: defaultFilter(),\n  soldOut: defaultFilter(),\n  recycle: defaultFilter(),\n});\nconst paginations = reactive<Record<StockStatus, PaginationState>>({\n  warehouse: { current: 1, pageSize: 10 },\n  selling: { current: 1, pageSize: 10 },\n  soldOut: { current: 1, pageSize: 10 },\n  recycle: { current: 1, pageSize: 10 },\n});\nconst createEmptyProductForm = (): ProductForm => ({\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "});\nconst countByStatus = computed<Record<StockStatus, number>>(() => ({\n  warehouse: dataItems.value.filter((item) => item.status === 'warehouse').length,\n  selling: dataItems.value.filter((item) => item.status === 'selling').length,\n  offShelf: dataItems.value.filter((item) => item.status === 'offShelf').length,\n  soldOut: dataItems.value.filter((item) => item.status === 'soldOut').length,\n  recycle: dataItems.value.filter((item) => item.status === 'recycle').length,\n}));\nconst normalizeStatus = (status?: string): StockStatus =>\n  status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';\nconst normalizePublisherType = (value?: string): PublisherType => (value === '接口获取' ? '接口获取' : '平台发布');\nconst categoryPathById = (categoryId?: number) => {\n  if (!categoryId) return '未分类';\n  const categoryMap = new Map(productCategories.value.map((category) => [category.id, category]));\n",
+          "after": "});\nconst countByStatus = computed<Record<StockStatus, number>>(() => ({\n  warehouse: dataItems.value.filter((item) => item.status === 'warehouse').length,\n  selling: dataItems.value.filter((item) => item.status === 'selling').length,\n  soldOut: dataItems.value.filter((item) => item.status === 'soldOut').length,\n  recycle: dataItems.value.filter((item) => item.status === 'recycle').length,\n}));\nconst normalizeStatus = (status?: string): StockStatus =>\n  status === 'selling' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';\nconst normalizePublisherType = (value?: string): PublisherType => (value === '接口获取' ? '接口获取' : '平台发布');\nconst categoryPathById = (categoryId?: number) => {\n  if (!categoryId) return '未分类';\n  const categoryMap = new Map(productCategories.value.map((category) => [category.id, category]));\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    markupPrices: nextItem.markupPrices,\n    attributes: nextItem.attributes,\n    variants: nextItem.variants,\n    specDimensions: nextItem.specDimensions,\n    offShelfReason: nextItem.offShelfReason,\n    offShelfDetail: nextItem.offShelfDetail,\n    status: nextItem.status,\n  };\n",
+          "after": "    markupPrices: nextItem.markupPrices,\n    attributes: nextItem.attributes,\n    variants: nextItem.variants,\n    specDimensions: nextItem.specDimensions,\n    operation: nextItem.operation,\n    offShelfReason: nextItem.offShelfReason,\n    offShelfDetail: nextItem.offShelfDetail,\n    status: nextItem.status,\n  };\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    selling: [\n      { action: 'publish', label: '发布商品', icon: 'add' },\n      { action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' },\n    ],\n    offShelf: [{ action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' }],\n    soldOut: [],\n    recycle: [\n      { action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' },\n      { action: 'batchPurge', label: '批量彻底删除', icon: 'delete', className: 'deep-danger-button' },\n",
+          "after": "    selling: [\n      { action: 'publish', label: '发布商品', icon: 'add' },\n      { action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' },\n    ],\n    soldOut: [],\n    recycle: [\n      { action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' },\n      { action: 'batchPurge', label: '批量彻底删除', icon: 'delete', className: 'deep-danger-button' },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": ");\n// Fixed pixel widths; update only when the tab action buttons change.\nconst operationWidths = {\n  warehouse: 190,\n  selling: 152,\n  offShelf: 180,\n  soldOut: 104,\n  recycle: 208,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n",
+          "after": ");\n// Fixed pixel widths; update only when the tab action buttons change.\nconst operationWidths = {\n  warehouse: 190,\n  selling: 208,\n  soldOut: 104,\n  recycle: 208,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  ];\n  if (activeTab.value !== 'soldOut') {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n  if (activeTab.value === 'offShelf') {\n    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  }\n  base.push({\n    colKey: 'operation',\n",
+          "after": "  ];\n  if (activeTab.value !== 'soldOut') {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n  if (activeTab.value === 'warehouse') {\n    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  }\n  base.push({\n    colKey: 'operation',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "const closeImagePreview = () => {\n  imagePreviewVisible.value = false;\n  imagePreviewSrc.value = '';\n};\nconst updateProductStatus = async (id: number, status: StockStatus, reason?: string, detail?: string) => {\n  const item = dataItems.value.find((product) => product.id === id);\n  if (!item) return;\n  const afterStock = status === 'soldOut' ? 0 : item.stock;\n  const updated = await updateFinishedProduct(\n    id,\n    toProductPayload(item, {\n      status,\n      stock: afterStock,\n      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,\n      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,\n    }),\n",
+          "after": "const closeImagePreview = () => {\n  imagePreviewVisible.value = false;\n  imagePreviewSrc.value = '';\n};\nconst updateProductStatus = async (id: number, status: StockStatus | 'offShelf', reason?: string, detail?: string) => {\n  const item = dataItems.value.find((product) => product.id === id);\n  if (!item) return;\n  const afterStock = status === 'soldOut' ? 0 : item.stock;\n  const updated = await updateFinishedProduct(\n    id,\n    toProductPayload(item, {\n      status: status === 'offShelf' ? 'warehouse' : status,\n      operation: status === 'offShelf' ? 'offShelf' : undefined,\n      stock: afterStock,\n      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,\n      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,\n    }),\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
@@ -7846,6 +8028,72 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "                      <t-select v-model=\"currentFilter.variety\" clearable filterable placeholder=\"请选择品种\">\n                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'offShelf'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n",
+          "after": "                      <t-select v-model=\"currentFilter.variety\" clearable filterable placeholder=\"请选择品种\">\n                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'warehouse'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "                      <t-form-item label=\"下架人\">\n                        <t-input v-model=\"currentFilter.offShelvedBy\" clearable placeholder=\"请输入下架人\" />\n                      </t-form-item>\n                    </template>\n                    <template v-else>\n                      <t-form-item label=\"产地\">\n                        <t-select v-model=\"currentFilter.origin\" clearable filterable placeholder=\"请选择产地\">\n                          <t-option v-for=\"item in originOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                        </t-select>\n                      </t-form-item>\n                      <t-form-item label=\"纹理\">\n                        <t-select v-model=\"currentFilter.texture\" clearable filterable placeholder=\"请选择纹理\">\n                          <t-option v-for=\"item in textureFilterOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                        </t-select>\n                      </t-form-item>\n                      <t-form-item label=\"色系\">\n                        <t-cascader\n                          v-model=\"currentFilter.color\"\n                          :options=\"colorFilterCascaderOptions\"\n                          :show-all-levels=\"false\"\n                          :check-strictly=\"false\"\n                          clearable\n                          filterable\n                          placeholder=\"请选择色系\"\n                          trigger=\"hover\"\n                          value-mode=\"onlyLeaf\"\n                          value-type=\"single\"\n                        />\n                      </t-form-item>\n                    </template>\n                    <t-form-item v-if=\"activeTab !== 'offShelf'\" label=\"等级\" class=\"grade-filter\">\n                      <t-select v-model=\"currentFilter.grade\" clearable filterable placeholder=\"请选择等级\">\n                        <t-option\n                          v-for=\"item in gradeFilterOptions\"\n                          :key=\"item.value\"\n",
+          "after": "                      <t-form-item label=\"下架人\">\n                        <t-input v-model=\"currentFilter.offShelvedBy\" clearable placeholder=\"请输入下架人\" />\n                      </t-form-item>\n                    </template>\n                    <t-form-item label=\"产地\">\n                      <t-select v-model=\"currentFilter.origin\" clearable filterable placeholder=\"请选择产地\">\n                        <t-option v-for=\"item in originOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <t-form-item label=\"纹理\">\n                      <t-select v-model=\"currentFilter.texture\" clearable filterable placeholder=\"请选择纹理\">\n                        <t-option v-for=\"item in textureFilterOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <t-form-item label=\"色系\">\n                      <t-cascader\n                        v-model=\"currentFilter.color\"\n                        :options=\"colorFilterCascaderOptions\"\n                        :show-all-levels=\"false\"\n                        :check-strictly=\"false\"\n                        clearable\n                        filterable\n                        placeholder=\"请选择色系\"\n                        trigger=\"hover\"\n                        value-mode=\"onlyLeaf\"\n                        value-type=\"single\"\n                      />\n                    </t-form-item>\n                    <t-form-item label=\"等级\" class=\"grade-filter\">\n                      <t-select v-model=\"currentFilter.grade\" clearable filterable placeholder=\"请选择等级\">\n                        <t-option\n                          v-for=\"item in gradeFilterOptions\"\n                          :key=\"item.value\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "                          :value=\"item.value\"\n                        />\n                      </t-select>\n                    </t-form-item>\n                    <t-form-item\n                      v-if=\"activeTab !== 'offShelf'\"\n                      label=\"供应商\"\n                      class=\"supplier-filter supplier-filter--aligned\"\n                    >\n                      <t-select v-model=\"currentFilter.supplier\" clearable filterable placeholder=\"请选择供应商\">\n                        <t-option\n                          v-for=\"item in supplierFilterOptions\"\n                          :key=\"item.id\"\n",
+          "after": "                          :value=\"item.value\"\n                        />\n                      </t-select>\n                    </t-form-item>\n                    <t-form-item label=\"供应商\" class=\"supplier-filter supplier-filter--aligned\">\n                      <t-select v-model=\"currentFilter.supplier\" clearable filterable placeholder=\"请选择供应商\">\n                        <t-option\n                          v-for=\"item in supplierFilterOptions\"\n                          :key=\"item.id\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "              :page-size-options=\"pageSizeOptions\"\n            />\n          </template>\n        </AdminListLayout>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n          v-model:active-section=\"productTab\"\n",
+          "after": "              :page-size-options=\"pageSizeOptions\"\n            />\n          </template>\n        </AdminListLayout>\n        <t-alert\n          v-if=\"\n            editingRowId &&\n            tableData.find((item) => item.id === editingRowId)?.status === 'warehouse' &&\n            latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)\n          \"\n          theme=\"warning\"\n          title=\"最近下架信息\"\n        >\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.standardReason }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.detailReason || '—' }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedByName || '未记录' }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedAt || '未记录' }}\n        </t-alert>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n          v-model:active-section=\"productTab\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "const sourceBlocked = (row: SlabItem) => Boolean(row.sourceUnavailable);\nconst slabPermissionScope: Record<SlabTab, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  offShelf: 'off-shelf',\n  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst slabPermission = (status: SlabTab, action: string) =>\n",
+          "after": "const sourceBlocked = (row: SlabItem) => Boolean(row.sourceUnavailable);\nconst slabPermissionScope: Record<SlabTab, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst slabPermission = (status: SlabTab, action: string) =>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  })[source] || source;\nconst operationStatusLabels: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  offShelf: '已下架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\n",
+          "after": "  })[source] || source;\nconst operationStatusLabels: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": ");\nconst filters = reactive<Record<SlabTab, FilterState>>({\n  warehouse: makeFilterState(),\n  selling: makeFilterState(),\n  offShelf: makeFilterState(),\n  soldOut: makeFilterState(),\n  recycle: makeFilterState(),\n});\nconst appliedFilters = reactive<Record<SlabTab, FilterState>>({\n  warehouse: makeFilterState(),\n  selling: makeFilterState(),\n  offShelf: makeFilterState(),\n  soldOut: makeFilterState(),\n  recycle: makeFilterState(),\n});\nconst paginations = reactive<\n",
+          "after": ");\nconst filters = reactive<Record<SlabTab, FilterState>>({\n  warehouse: makeFilterState(),\n  selling: makeFilterState(),\n  soldOut: makeFilterState(),\n  recycle: makeFilterState(),\n});\nconst appliedFilters = reactive<Record<SlabTab, FilterState>>({\n  warehouse: makeFilterState(),\n  selling: makeFilterState(),\n  soldOut: makeFilterState(),\n  recycle: makeFilterState(),\n});\nconst paginations = reactive<\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  >\n>({\n  warehouse: { current: 1, pageSize: 10 },\n  selling: { current: 1, pageSize: 10 },\n  offShelf: { current: 1, pageSize: 10 },\n  soldOut: { current: 1, pageSize: 10 },\n  recycle: { current: 1, pageSize: 10 },\n});\nconst tableData = ref<SlabItem[]>([]);\nconst normalizeStatus = (status?: string): SlabStatus => {\n  if (status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle') return status;\n  return 'warehouse';\n};\nconst normalizePublisherType = (publisherType?: string): PublisherType =>\n  publisherType === '接口获取' ? '接口获取' : '平台发布';\n",
+          "after": "  >\n>({\n  warehouse: { current: 1, pageSize: 10 },\n  selling: { current: 1, pageSize: 10 },\n  soldOut: { current: 1, pageSize: 10 },\n  recycle: { current: 1, pageSize: 10 },\n});\nconst tableData = ref<SlabItem[]>([]);\nconst normalizeStatus = (status?: string): SlabStatus => {\n  if (status === 'selling' || status === 'soldOut' || status === 'recycle') return status;\n  return 'warehouse';\n};\nconst normalizePublisherType = (publisherType?: string): PublisherType =>\n  publisherType === '接口获取' ? '接口获取' : '平台发布';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": ");\n// Fixed pixel widths; update only when the tab action buttons change.\nconst operationWidths = {\n  warehouse: 184,\n  selling: 148,\n  offShelf: 176,\n  soldOut: 104,\n  recycle: 204,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  if (activeTab.value === 'offShelf') {\n    return [\n      { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n      { colKey: 'image', title: '商品主图', width: 96, align: 'center' },\n      { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n      { colKey: 'variety', title: '品种', width: 140 },\n      { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },\n      ...stateActivityColumns(activeTab.value),\n      {\n        colKey: 'operation',\n        title: '操作',\n        width: operationWidths[activeTab.value],\n        align: 'left',\n        fixed: 'right',\n      },\n    ];\n  }\n  const baseColumns: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n    { colKey: 'image', title: '商品主图', width: 96, align: 'center' },\n    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n",
+          "after": ");\n// Fixed pixel widths; update only when the tab action buttons change.\nconst operationWidths = {\n  warehouse: 184,\n  selling: 208,\n  soldOut: 104,\n  recycle: 204,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const baseColumns: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n    { colKey: 'image', title: '商品主图', width: 96, align: 'center' },\n    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value),\n  ];\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n    width: operationWidths[activeTab.value],\n",
+          "after": "    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value),\n  ];\n  if (activeTab.value === 'warehouse')\n    baseColumns.push({ colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n    width: operationWidths[activeTab.value],\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  const selected = new Set(ids);\n  const records = await listSlabs();\n  records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  await refreshSlabItems([id]);\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  await refreshSlabItems(selectedIds);\n};\n",
+          "after": "  const selected = new Set(ids);\n  const records = await listSlabs();\n  records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus | 'offShelf', reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  await refreshSlabItems([id]);\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus | 'offShelf', reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  await refreshSlabItems(selectedIds);\n};\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
           "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
           "stage": "before-migrations",
           "before": "    uploadPreviewType.value = 'image';\n  }\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  item.status = status;\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  const selectedIdSet = new Set(selectedIds);\n  tableData.value.forEach((item) => {\n    if (!selectedIdSet.has(item.id)) return;\n    item.status = status;\n  });\n};\nconst shelfBlockingMessage = (row: SlabItem) => {\n  if (!row.mainImageMediaId || !row.scanImageMediaId || !row.designImageMediaId) {\n",
@@ -8637,6 +8885,12 @@
       "content": "0dd9d8474550747540a59b8d6ca025fb1df41d55c45cf4de371330fe65141330",
       "approvedBusinessPatches": [
         {
+          "before": "    const supplierKeyword = filter.supplier.trim().toLowerCase();\n    const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);\n    const latestRecord = latestOffShelfRecord(item);\n    const offShelfReasonMatched =\n      activeTab !== 'offShelf' || !filter.offShelfReason || latestRecord?.standardReason === filter.offShelfReason;\n    const offShelvedByKeyword = filter.offShelvedBy.trim().toLowerCase();\n    const offShelvedByMatched =\n      activeTab !== 'offShelf' ||\n      !offShelvedByKeyword ||\n      latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);\n    return (\n      statusMatched &&\n",
+          "after": "    const supplierKeyword = filter.supplier.trim().toLowerCase();\n    const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);\n    const latestRecord = latestOffShelfRecord(item);\n    const offShelfReasonMatched =\n      activeTab !== 'warehouse' || !filter.offShelfReason || latestRecord?.standardReason === filter.offShelfReason;\n    const offShelvedByKeyword = filter.offShelvedBy.trim().toLowerCase();\n    const offShelvedByMatched =\n      activeTab !== 'warehouse' ||\n      !offShelvedByKeyword ||\n      latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);\n    return (\n      statusMatched &&\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
           "reason": "2026-10-15 user explicitly removed off-shelf date filtering, including UI, state and business predicate, from supply-chain and operations slab management; retain timestamps in table, logs, state sorting and other filters.",
           "before": "    const [offShelfStartDate, offShelfEndDate] = filter.offShelfDateRange;\n    const offShelfTime = offShelfTimestamp(latestRecord);\n    const offShelfDateMatched =\n      activeTab !== 'offShelf' ||\n      ((!offShelfStartDate || offShelfTime >= new Date(`${offShelfStartDate}T00:00:00`).getTime()) &&\n        (!offShelfEndDate || offShelfTime <= new Date(`${offShelfEndDate}T23:59:59.999`).getTime()));\n    return (\n",
           "after": "    return (\n"
@@ -8665,6 +8919,18 @@
       "content": "9b94b48e9410881bdd1bfc20dfab93d75b22de3fc581a72f34f1eefea2579427",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "    selling: [\n      { label: '发布商品', action: 'publish', icon: 'add' },\n      { label: '批量下架', action: 'batchOffShelf', icon: 'download', className: 'brown-button' },\n    ],\n    offShelf: [{ label: '批量放回到仓库', action: 'batchRestore', icon: 'rollback' }],\n    soldOut: [],\n    recycle: [\n      { label: '批量放回到仓库', action: 'batchRestore', icon: 'rollback' },\n      { label: '批量彻底删除', action: 'batchPurge', icon: 'delete', className: 'dark-red-button' },\n",
+          "after": "    selling: [\n      { label: '发布商品', action: 'publish', icon: 'add' },\n      { label: '批量下架', action: 'batchOffShelf', icon: 'download', className: 'brown-button' },\n    ],\n    soldOut: [],\n    recycle: [\n      { label: '批量放回到仓库', action: 'batchRestore', icon: 'rollback' },\n      { label: '批量彻底删除', action: 'batchPurge', icon: 'delete', className: 'dark-red-button' },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  if (status === 'selling') {\n    return filterActions([\n      { label: '下架', action: 'offShelf' },\n      { label: '编辑', action: 'edit' },\n    ]);\n  }\n  if (status === 'offShelf') {\n    return filterActions([\n      { label: '详情', action: 'detail' },\n      { label: '放回仓库', action: 'restore' },\n      { label: '删除', action: 'delete' },\n    ]);\n  }\n  if (status === 'soldOut') return filterActions([{ label: '详情', action: 'detail' }]);\n",
+          "after": "  if (status === 'selling') {\n    return filterActions([\n      { label: '下架', action: 'offShelf' },\n      { label: '编辑', action: 'edit' },\n      { label: '删除', action: 'delete' },\n    ]);\n  }\n  if (status === 'soldOut') return filterActions([{ label: '详情', action: 'detail' }]);\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-16 用户确认全局53类功能配色、确认同色与取消中性色及字段错误反馈；仅登记本轮准确接入差异，保留业务行为",
           "stage": "before-migrations",
@@ -8715,6 +8981,12 @@
       "content": "40b03fb3326340845096248764ed124c1fa4484c81cb75ae49eb1d156eff8d26",
       "approvedBusinessPatches": [
         {
+          "before": "  label: string;\n}[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'offShelf', label: '已下架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nexport const pageSizeOptions = [10, 20, 50];\n",
+          "after": "  label: string;\n}[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nexport const pageSizeOptions = [10, 20, 50];\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
           "before": "export interface SlabItem {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n  stateOperatorClientCode?: string;\n\n  sourceUnavailable?: boolean;\n  sourceStatus?: string;\n",
@@ -8762,6 +9034,78 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                      <t-select v-model=\"currentFilter.variety\" clearable filterable placeholder=\"请选择品种\">\n                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'offShelf'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n",
+          "after": "                      <t-select v-model=\"currentFilter.variety\" clearable filterable placeholder=\"请选择品种\">\n                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'warehouse'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "                      <t-form-item label=\"下架人\">\n                        <t-input v-model=\"currentFilter.offShelvedBy\" clearable placeholder=\"请输入下架人\" />\n                      </t-form-item>\n                    </template>\n                    <template v-else>\n                      <t-form-item label=\"产地\">\n                        <t-select v-model=\"currentFilter.origin\" clearable filterable placeholder=\"请选择产地\">\n                          <t-option v-for=\"item in originOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                        </t-select>\n                      </t-form-item>\n                      <t-form-item label=\"纹理\">\n                        <t-select v-model=\"currentFilter.texture\" clearable filterable placeholder=\"请选择纹理\">\n                          <t-option v-for=\"item in textureFilterOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                        </t-select>\n                      </t-form-item>\n                      <t-form-item label=\"色系\">\n                        <t-cascader\n                          v-model=\"currentFilter.color\"\n                          :options=\"colorFilterCascaderOptions\"\n                          :show-all-levels=\"false\"\n                          :check-strictly=\"false\"\n                          clearable\n                          filterable\n                          placeholder=\"请选择色系\"\n                          trigger=\"hover\"\n                          value-mode=\"onlyLeaf\"\n                          value-type=\"single\"\n                        />\n                      </t-form-item>\n                    </template>\n                    <t-form-item v-if=\"activeTab !== 'offShelf'\" label=\"等级\" class=\"grade-filter\">\n                      <t-select v-model=\"currentFilter.grade\" clearable filterable placeholder=\"请选择等级\">\n                        <t-option\n                          v-for=\"item in gradeFilterOptions\"\n                          :key=\"item.value\"\n",
+          "after": "                      <t-form-item label=\"下架人\">\n                        <t-input v-model=\"currentFilter.offShelvedBy\" clearable placeholder=\"请输入下架人\" />\n                      </t-form-item>\n                    </template>\n                    <t-form-item label=\"产地\">\n                      <t-select v-model=\"currentFilter.origin\" clearable filterable placeholder=\"请选择产地\">\n                        <t-option v-for=\"item in originOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <t-form-item label=\"纹理\">\n                      <t-select v-model=\"currentFilter.texture\" clearable filterable placeholder=\"请选择纹理\">\n                        <t-option v-for=\"item in textureFilterOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <t-form-item label=\"色系\">\n                      <t-cascader\n                        v-model=\"currentFilter.color\"\n                        :options=\"colorFilterCascaderOptions\"\n                        :show-all-levels=\"false\"\n                        :check-strictly=\"false\"\n                        clearable\n                        filterable\n                        placeholder=\"请选择色系\"\n                        trigger=\"hover\"\n                        value-mode=\"onlyLeaf\"\n                        value-type=\"single\"\n                      />\n                    </t-form-item>\n                    <t-form-item label=\"等级\" class=\"grade-filter\">\n                      <t-select v-model=\"currentFilter.grade\" clearable filterable placeholder=\"请选择等级\">\n                        <t-option\n                          v-for=\"item in gradeFilterOptions\"\n                          :key=\"item.value\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "                          :value=\"item.value\"\n                        />\n                      </t-select>\n                    </t-form-item>\n                    <t-form-item v-if=\"activeTab !== 'offShelf'\" label=\"供应商\" class=\"supplier-filter\">\n                      <t-select v-model=\"currentFilter.supplier\" clearable filterable placeholder=\"请选择供应商\">\n                        <t-option\n                          v-for=\"item in supplierFilterOptions\"\n                          :key=\"item.id\"\n",
+          "after": "                          :value=\"item.value\"\n                        />\n                      </t-select>\n                    </t-form-item>\n                    <t-form-item label=\"供应商\" class=\"supplier-filter\">\n                      <t-select v-model=\"currentFilter.supplier\" clearable filterable placeholder=\"请选择供应商\">\n                        <t-option\n                          v-for=\"item in supplierFilterOptions\"\n                          :key=\"item.id\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "              :page-size-options=\"pageSizeOptions\"\n            />\n          </template>\n        </AdminListLayout>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n          v-model:active-section=\"productTab\"\n",
+          "after": "              :page-size-options=\"pageSizeOptions\"\n            />\n          </template>\n        </AdminListLayout>\n        <t-alert\n          v-if=\"\n            editingRowId &&\n            tableData.find((item) => item.id === editingRowId)?.status === 'warehouse' &&\n            latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)\n          \"\n          theme=\"warning\"\n          title=\"最近下架信息\"\n        >\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.standardReason }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.detailReason || '—' }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedByName || '未记录' }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedAt || '未记录' }}\n        </t-alert>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n          v-model:active-section=\"productTab\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "const sourceBlocked: (row: SlabItem) => boolean = () => false;\nconst slabPermissionScope: Record<SlabTab, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  offShelf: 'off-shelf',\n  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst slabPermission = (status: SlabTab, action: string) =>\n",
+          "after": "const sourceBlocked: (row: SlabItem) => boolean = () => false;\nconst slabPermissionScope: Record<SlabTab, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst slabPermission = (status: SlabTab, action: string) =>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  })[source] || source;\nconst operationStatusLabels: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  offShelf: '已下架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\n",
+          "after": "  })[source] || source;\nconst operationStatusLabels: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": ");\nconst filters = reactive<Record<SlabTab, FilterState>>({\n  warehouse: makeFilterState(),\n  selling: makeFilterState(),\n  offShelf: makeFilterState(),\n  soldOut: makeFilterState(),\n  recycle: makeFilterState(),\n});\nconst appliedFilters = reactive<Record<SlabTab, FilterState>>({\n  warehouse: makeFilterState(),\n  selling: makeFilterState(),\n  offShelf: makeFilterState(),\n  soldOut: makeFilterState(),\n  recycle: makeFilterState(),\n});\nconst paginations = reactive<\n",
+          "after": ");\nconst filters = reactive<Record<SlabTab, FilterState>>({\n  warehouse: makeFilterState(),\n  selling: makeFilterState(),\n  soldOut: makeFilterState(),\n  recycle: makeFilterState(),\n});\nconst appliedFilters = reactive<Record<SlabTab, FilterState>>({\n  warehouse: makeFilterState(),\n  selling: makeFilterState(),\n  soldOut: makeFilterState(),\n  recycle: makeFilterState(),\n});\nconst paginations = reactive<\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  >\n>({\n  warehouse: { current: 1, pageSize: 10 },\n  selling: { current: 1, pageSize: 10 },\n  offShelf: { current: 1, pageSize: 10 },\n  soldOut: { current: 1, pageSize: 10 },\n  recycle: { current: 1, pageSize: 10 },\n});\nconst tableData = ref<SlabItem[]>([]);\nconst normalizeStatus = (status?: string): SlabStatus => {\n  if (status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle') return status;\n  return 'warehouse';\n};\nconst normalizePublisherType = (publisherType?: string): PublisherType =>\n  publisherType === '接口获取' ? '接口获取' : '平台发布';\n",
+          "after": "  >\n>({\n  warehouse: { current: 1, pageSize: 10 },\n  selling: { current: 1, pageSize: 10 },\n  soldOut: { current: 1, pageSize: 10 },\n  recycle: { current: 1, pageSize: 10 },\n});\nconst tableData = ref<SlabItem[]>([]);\nconst normalizeStatus = (status?: string): SlabStatus => {\n  if (status === 'selling' || status === 'soldOut' || status === 'recycle') return status;\n  return 'warehouse';\n};\nconst normalizePublisherType = (publisherType?: string): PublisherType =>\n  publisherType === '接口获取' ? '接口获取' : '平台发布';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": ");\n// Fixed pixel widths; update only when the tab action buttons change.\nconst operationWidths = {\n  warehouse: 184,\n  selling: 148,\n  offShelf: 176,\n  soldOut: 104,\n  recycle: 204,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  if (activeTab.value === 'offShelf') {\n    return [\n      { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n      { colKey: 'image', title: '商品主图', width: 96, align: 'center' },\n      { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n      { colKey: 'variety', title: '品种', width: 140 },\n      { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },\n      ...stateActivityColumns(activeTab.value),\n      {\n        colKey: 'operation',\n        title: '操作',\n        width: operationWidths[activeTab.value],\n        align: 'left',\n        fixed: 'right',\n      },\n    ];\n  }\n  const baseColumns: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n    { colKey: 'image', title: '商品主图', width: 96, align: 'center' },\n    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n",
+          "after": ");\n// Fixed pixel widths; update only when the tab action buttons change.\nconst operationWidths = {\n  warehouse: 184,\n  selling: 208,\n  soldOut: 104,\n  recycle: 204,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const baseColumns: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n    { colKey: 'image', title: '商品主图', width: 96, align: 'center' },\n    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value),\n  ];\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n    width: operationWidths[activeTab.value],\n",
+          "after": "    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value),\n  ];\n  if (activeTab.value === 'warehouse')\n    baseColumns.push({ colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n    width: operationWidths[activeTab.value],\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "const pagePartiallySelected = computed(\n  () => currentPageIds.value.some((id) => selectedKeySet.value.has(id)) && !pageAllSelected.value,\n);\nconst priceDrawerReadonly = computed(\n  () => activeTab.value === 'soldOut' || activeTab.value === 'recycle' || activeTab.value === 'offShelf',\n);\nconst productDialogTitle = computed(() => {\n  if (productMode.value === 'create') return '发布商品';\n  if (productMode.value === 'edit') return '编辑商品';\n",
+          "after": "const pagePartiallySelected = computed(\n  () => currentPageIds.value.some((id) => selectedKeySet.value.has(id)) && !pageAllSelected.value,\n);\nconst priceDrawerReadonly = computed(\n  () => activeTab.value === 'soldOut' || activeTab.value === 'recycle' || activeTab.value === 'warehouse',\n);\nconst productDialogTitle = computed(() => {\n  if (productMode.value === 'create') return '发布商品';\n  if (productMode.value === 'edit') return '编辑商品';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  const selected = new Set(ids);\n  const records = await listSlabs();\n  records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  await refreshSlabItems([id]);\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  await refreshSlabItems(selectedIds);\n};\n",
+          "after": "  const selected = new Set(ids);\n  const records = await listSlabs();\n  records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);\n};\nconst updateSlabStatus = async (id: number, status: SlabStatus | 'offShelf', reason?: string, detail?: string) => {\n  const item = tableData.value.find((candidate) => candidate.id === id);\n  if (!item) return;\n  await updateSlabStatuses([id], status, reason, detail);\n  await refreshSlabItems([id]);\n};\nconst updateSelectedSlabStatuses = async (status: SlabStatus | 'offShelf', reason?: string, detail?: string) => {\n  const selectedIds = [...selectedKeys.value];\n  await updateSlabStatuses(selectedIds, status, reason, detail);\n  await refreshSlabItems(selectedIds);\n};\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "用户确认：修复商品状态操作后即时同步操作人、时间与自动重新入仓结果，保留既有业务规则",
           "stage": "before-migrations",
@@ -10733,12 +11077,38 @@
     },
     "src/services/finishedOperationLogs.ts": {
       "content": "b0c40e934d0d909989db72ff9111004201bce8bf076e897a12c36263fe5f1db4",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "  request<FinishedOperationLog>(`/admin/finished-products/operation-logs/${id}`);\nexport const finishedLogStates: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  offShelf: '已下架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\n",
+          "after": "  request<FinishedOperationLog>(`/admin/finished-products/operation-logs/${id}`);\nexport const finishedLogStates: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        }
+      ]
     },
     "src/services/finishedProducts.ts": {
       "content": "26004aaf6c1165b901603b9580615be3795a895f0a75d0606378ae21dcb542df",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "}\n\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\n\nexport interface FinishedProductPrice {\n  priceSource?: 'auto' | 'manual';\n  sourceConfigurationId?: number;\n",
+          "after": "}\n\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type FinishedProductStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\n\nexport interface FinishedProductPrice {\n  priceSource?: 'auto' | 'manual';\n  sourceConfigurationId?: number;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "export interface FinishedProductRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  sourceOffShelfReason?: string;\n  sourceOffShelfDetail?: string;\n",
+          "after": "export interface FinishedProductRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  sourceOffShelfReason?: string;\n  sourceOffShelfDetail?: string;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  status: FinishedProductStatus;\n}\n\nexport function listFinishedProducts() {\n  return request<FinishedProductRecord[]>('/admin/finished-products');\n",
+          "after": "  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  status: FinishedProductStatus;\n  operation?: 'offShelf';\n}\n\nexport function listFinishedProducts() {\n  return request<FinishedProductRecord[]>('/admin/finished-products');\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
@@ -10763,6 +11133,48 @@
       "content": "74ccb48297c3d1c6b680750b1e260a63db93b4fe16c97d1d9001ae759868ac67",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "      const sourcePage = terminalFunctionTrees['supply-chain']\n        .flatMap((m) => m.menus)\n        .flatMap((m) => m.pages)\n        .find((p) => p.value === `supply-chain.${module}`)!;\n      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已下架', '已售完', '回收站']);\n      expect(sourcePage.tabs.map((tab) => tab.actions.map((action) => action.label))).toEqual([\n        ['查看', '发布商品', '批量上架', '上架', '编辑', '删除'],\n        ['查看', '发布商品', '批量下架', '下架', '编辑'],\n        ['查看', '批量放回到仓库', '详情', '放回仓库', '删除'],\n        ['查看', '详情'],\n        ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],\n      ]);\n      expect(source).toContain(`supply-chain.${module}.warehouse.publish`);\n      expect(source).toContain(`supply-chain.${module}.warehouse.shelf`);\n      expect(source).toContain(`supply-chain.${module}.selling.off-shelf`);\n      expect(source).toContain(`supply-chain.${module}.off-shelf.restore`);\n      expect(source).not.toContain(`supply-chain.${module}.sold-out.edit`);\n      expect(source).not.toContain(`supply-chain.${module}.sold-out.delete`);\n      for (const scope of ['warehouse', 'selling']) {\n        expect(source).toContain(`supply-chain.${module}.${scope}.edit`);\n        expect(operations).toContain(`admin.${module}.${scope}.edit`);\n      }\n      for (const scope of ['off-shelf', 'sold-out', 'recycle']) {\n        expect(source).toContain(`supply-chain.${module}.${scope}.detail`);\n        expect(operations).toContain(`admin.${module}.${scope}.detail`);\n      }\n      expect(source.some((value) => value.startsWith(`supply-chain.${module}.`) && value.endsWith('.price'))).toBe(\n",
+          "after": "      const sourcePage = terminalFunctionTrees['supply-chain']\n        .flatMap((m) => m.menus)\n        .flatMap((m) => m.pages)\n        .find((p) => p.value === `supply-chain.${module}`)!;\n      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已售完', '回收站']);\n      expect(sourcePage.tabs.map((tab) => tab.actions.map((action) => action.label))).toEqual([\n        ['查看', '发布商品', '批量上架', '上架', '编辑', '删除'],\n        ['查看', '发布商品', '批量下架', '下架', '编辑', '删除'],\n        ['查看', '详情'],\n        ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],\n      ]);\n      expect(source).toContain(`supply-chain.${module}.warehouse.publish`);\n      expect(source).toContain(`supply-chain.${module}.warehouse.shelf`);\n      expect(source).toContain(`supply-chain.${module}.selling.off-shelf`);\n      expect(source).not.toContain(`supply-chain.${module}.off-shelf.restore`);\n      expect(source).toContain(`supply-chain.${module}.selling.delete`);\n      expect(source).not.toContain(`supply-chain.${module}.sold-out.edit`);\n      expect(source).not.toContain(`supply-chain.${module}.sold-out.delete`);\n      for (const scope of ['warehouse', 'selling']) {\n        expect(source).toContain(`supply-chain.${module}.${scope}.edit`);\n        expect(operations).toContain(`admin.${module}.${scope}.edit`);\n      }\n      for (const scope of ['sold-out', 'recycle']) {\n        expect(source).toContain(`supply-chain.${module}.${scope}.detail`);\n        expect(operations).toContain(`admin.${module}.${scope}.detail`);\n      }\n      expect(source.some((value) => value.startsWith(`supply-chain.${module}.`) && value.endsWith('.price'))).toBe(\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    expect(grants.every((value) => /^store\\.(finished-stock-management|accessory-management)\\./.test(value))).toBe(\n      true,\n    );\n    expect(collectFunctionCatalogRows(products).map((row) => row.menuLabel)).toEqual([\n      ...Array(6).fill('成品现货管理'),\n      ...Array(6).fill('配件管理'),\n    ]);\n    for (const scope of ['finished-stock-management', 'accessory-management']) {\n      const assigned = [`store.${scope}.warehouse.view`, `store.${scope}.warehouse.edit`];\n      expect(normalizeTerminalPermissions('store', assigned)).toEqual(assigned);\n",
+          "after": "    expect(grants.every((value) => /^store\\.(finished-stock-management|accessory-management)\\./.test(value))).toBe(\n      true,\n    );\n    expect(collectFunctionCatalogRows(products).map((row) => row.menuLabel)).toEqual([\n      ...Array(5).fill('成品现货管理'),\n      ...Array(5).fill('配件管理'),\n    ]);\n    for (const scope of ['finished-stock-management', 'accessory-management']) {\n      const assigned = [`store.${scope}.warehouse.view`, `store.${scope}.warehouse.edit`];\n      expect(normalizeTerminalPermissions('store', assigned)).toEqual(assigned);\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    }\n    expect(filterFunctionCatalogByPermissions([products], [])).toEqual([]);\n  });\n\n  it('assigns store products as secondary menus with five tabs and separate role pricing', () => {\n    const stock = terminalFunctionTrees.store.find((module) => module.value === 'store.products')!;\n    expect(stock.label).toBe('商品管理');\n    expect(stock.menus.map((menu) => [menu.label, menu.value, menu.direct])).toEqual([\n      ['成品现货管理', 'store.finished-stock-management.menu', false],\n      ['配件管理', 'store.accessory-management.menu', false],\n    ]);\n    expect(stock.menus[0].direct).toBe(false);\n    expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual([\n      '仓库中',\n      '已上架',\n      '已下架',\n      '已售完',\n      '回收站',\n    ]);\n    const storeValues = getFunctionCatalogPermissionValues(terminalFunctionTrees.store);\n    expect(storeValues).toContain('store.finished-stock-management.warehouse.select');\n    expect(stock.menus[0].pages[0].tabs.slice(0, 2).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n      ['查看', '商品中心', '批量上架', '上架', '编辑', '删除'],\n      ['查看', '批量下架', '下架', '编辑'],\n    ]);\n    expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');\n    expect(storeValues).not.toContain('store.finished-stock-management.selling.delete');\n    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['操作日志']);\n    expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');\n    const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;\n    expect(pricing.menus[0].direct).toBe(true);\n",
+          "after": "    }\n    expect(filterFunctionCatalogByPermissions([products], [])).toEqual([]);\n  });\n\n  it('assigns store products as secondary menus with four tabs and separate role pricing', () => {\n    const stock = terminalFunctionTrees.store.find((module) => module.value === 'store.products')!;\n    expect(stock.label).toBe('商品管理');\n    expect(stock.menus.map((menu) => [menu.label, menu.value, menu.direct])).toEqual([\n      ['成品现货管理', 'store.finished-stock-management.menu', false],\n      ['配件管理', 'store.accessory-management.menu', false],\n    ]);\n    expect(stock.menus[0].direct).toBe(false);\n    expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已售完', '回收站']);\n    const storeValues = getFunctionCatalogPermissionValues(terminalFunctionTrees.store);\n    expect(storeValues).toContain('store.finished-stock-management.warehouse.select');\n    expect(stock.menus[0].pages[0].tabs.slice(0, 2).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n      ['查看', '商品中心', '批量上架', '上架', '编辑', '删除'],\n      ['查看', '批量下架', '下架', '编辑', '删除'],\n    ]);\n    expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');\n    expect(storeValues).toContain('store.finished-stock-management.selling.delete');\n    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['操作日志']);\n    expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');\n    const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;\n    expect(pricing.menus[0].direct).toBe(true);\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "\n  it('keeps production audience filters available and limits store roles to terminal grants', () => {\n    const operationValues = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));\n    expect(operationValues).toContain('admin.slab-management.warehouse.view');\n    expect(operationValues).toContain('admin.slab-management.off-shelf.detail');\n    expect(operationValues).toContain('admin.slab-management.recycle.detail');\n    expect(operationValues).toContain('admin.tenant.tenant-management.unarchived.view');\n    expect(operationValues).toContain('admin.tenant.store-level-management.view');\n    expect(operationValues).toContain('admin.product-data-center.markup-configuration.finished.view');\n",
+          "after": "\n  it('keeps production audience filters available and limits store roles to terminal grants', () => {\n    const operationValues = getFunctionCatalogPermissionValues(filterFunctionCatalogByAudience('admin'));\n    expect(operationValues).toContain('admin.slab-management.warehouse.view');\n    expect(operationValues).not.toContain('admin.slab-management.off-shelf.detail');\n    expect(operationValues).toContain('admin.slab-management.recycle.detail');\n    expect(operationValues).toContain('admin.tenant.tenant-management.unarchived.view');\n    expect(operationValues).toContain('admin.tenant.store-level-management.view');\n    expect(operationValues).toContain('admin.product-data-center.markup-configuration.finished.view');\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "          ['查看', 'admin.finished-stock-management.selling.view'],\n          ['批量下架', 'admin.finished-stock-management.selling.batch-off-shelf'],\n          ['下架', 'admin.finished-stock-management.selling.off-shelf'],\n          ['编辑', 'admin.finished-stock-management.selling.edit'],\n        ],\n      ],\n      [\n        '已下架',\n        'admin.finished-stock-management.off-shelf',\n        [\n          ['查看', 'admin.finished-stock-management.off-shelf.view'],\n          ['批量放回到仓库', 'admin.finished-stock-management.off-shelf.batch-restore'],\n          ['详情', 'admin.finished-stock-management.off-shelf.detail'],\n          ['放回仓库', 'admin.finished-stock-management.off-shelf.restore'],\n          ['删除', 'admin.finished-stock-management.off-shelf.delete'],\n        ],\n      ],\n      [\n        '已售完',\n",
+          "after": "          ['查看', 'admin.finished-stock-management.selling.view'],\n          ['批量下架', 'admin.finished-stock-management.selling.batch-off-shelf'],\n          ['下架', 'admin.finished-stock-management.selling.off-shelf'],\n          ['编辑', 'admin.finished-stock-management.selling.edit'],\n          ['删除', 'admin.finished-stock-management.selling.delete'],\n        ],\n      ],\n      [\n        '已售完',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "          ['彻底删除', 'admin.finished-stock-management.recycle.purge'],\n        ],\n      ],\n    ]);\n    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(23);\n    expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);\n    const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>\n      value.startsWith('admin.finished-stock-management.'),\n    );\n    expect(values).toHaveLength(24);\n    expect(new Set(values).size).toBe(24);\n    expect(page.tabs.flatMap((tab) => tab.actions).some((action) => ['查询', '重置'].includes(action.label))).toBe(\n      false,\n    );\n    expect(\n",
+          "after": "          ['彻底删除', 'admin.finished-stock-management.recycle.purge'],\n        ],\n      ],\n    ]);\n    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(19);\n    expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);\n    const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>\n      value.startsWith('admin.finished-stock-management.'),\n    );\n    expect(values).toHaveLength(20);\n    expect(new Set(values).size).toBe(20);\n    expect(page.tabs.flatMap((tab) => tab.actions).some((action) => ['查询', '重置'].includes(action.label))).toBe(\n      false,\n    );\n    expect(\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    const page = fullFunctionCatalog\n      .flatMap((module) => module.menus)\n      .flatMap((menu) => menu.pages)\n      .find((item) => item.value === 'admin.slab-management')!;\n    expect(page.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已下架', '已售完', '回收站']);\n    expect(page.tabs.slice(0, 2).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n      ['查看', '批量上架', '上架', '编辑', '删除'],\n      ['查看', '批量下架', '下架', '编辑'],\n    ]);\n    for (const tab of page.tabs) {\n      const active = tab.value.endsWith('.warehouse') || tab.value.endsWith('.selling');\n      expect(tab.actions.filter((action) => action.value.endsWith(active ? '.edit' : '.detail'))).toEqual([\n",
+          "after": "    const page = fullFunctionCatalog\n      .flatMap((module) => module.menus)\n      .flatMap((menu) => menu.pages)\n      .find((item) => item.value === 'admin.slab-management')!;\n    expect(page.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已售完', '回收站']);\n    expect(page.tabs.slice(0, 2).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n      ['查看', '批量上架', '上架', '编辑', '删除'],\n      ['查看', '批量下架', '下架', '编辑', '删除'],\n    ]);\n    for (const tab of page.tabs) {\n      const active = tab.value.endsWith('.warehouse') || tab.value.endsWith('.selling');\n      expect(tab.actions.filter((action) => action.value.endsWith(active ? '.edit' : '.detail'))).toEqual([\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "before": "  it('keeps platform, supplier and store capabilities in their respective audiences', () => {\n    expect(fullFunctionCatalog.map((module) => module.value)).toEqual([\n      'admin.tenant',\n      'store.finished-stock-management',\n      'store.customer-management',\n      'store.accessory-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n",
           "after": "  it('keeps platform, supplier and store capabilities in their respective audiences', () => {\n    expect(fullFunctionCatalog.map((module) => module.value)).toEqual([\n      'admin.tenant',\n      'store.products',\n      'store.customer-management',\n      'store.order-management',\n      'store.price-configuration',\n      'admin.product-data-center',\n",
@@ -10817,6 +11229,18 @@
       "content": "1209bc105a9465acd24974c6fd642993f1463bc39659f30d418a2eae55f6f190",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "                    { label: '查看', value: 'admin.finished-stock-management.selling.view' },\n                    { label: '批量下架', value: 'admin.finished-stock-management.selling.batch-off-shelf' },\n                    { label: '下架', value: 'admin.finished-stock-management.selling.off-shelf' },\n                    { label: '编辑', value: 'admin.finished-stock-management.selling.edit' },\n                  ],\n                },\n                {\n                  label: '已下架',\n                  value: 'admin.finished-stock-management.off-shelf',\n                  actions: [\n                    { label: '查看', value: 'admin.finished-stock-management.off-shelf.view' },\n                    { label: '批量放回到仓库', value: 'admin.finished-stock-management.off-shelf.batch-restore' },\n                    { label: '详情', value: 'admin.finished-stock-management.off-shelf.detail' },\n                    { label: '放回仓库', value: 'admin.finished-stock-management.off-shelf.restore' },\n                    { label: '删除', value: 'admin.finished-stock-management.off-shelf.delete' },\n                  ],\n                },\n                {\n                  label: '已售完',\n",
+          "after": "                    { label: '查看', value: 'admin.finished-stock-management.selling.view' },\n                    { label: '批量下架', value: 'admin.finished-stock-management.selling.batch-off-shelf' },\n                    { label: '下架', value: 'admin.finished-stock-management.selling.off-shelf' },\n                    { label: '编辑', value: 'admin.finished-stock-management.selling.edit' },\n                    { label: '删除', value: 'admin.finished-stock-management.selling.delete' },\n                  ],\n                },\n                {\n                  label: '已售完',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "                    { label: '查看', value: 'admin.accessory-management.selling.view' },\n                    { label: '批量下架', value: 'admin.accessory-management.selling.batch-off-shelf' },\n                    { label: '下架', value: 'admin.accessory-management.selling.off-shelf' },\n                    { label: '编辑', value: 'admin.accessory-management.selling.edit' },\n                  ],\n                },\n                {\n                  label: '已下架',\n                  value: 'admin.accessory-management.off-shelf',\n                  actions: [\n                    { label: '查看', value: 'admin.accessory-management.off-shelf.view' },\n                    { label: '批量放回到仓库', value: 'admin.accessory-management.off-shelf.batch-restore' },\n                    { label: '详情', value: 'admin.accessory-management.off-shelf.detail' },\n                    { label: '放回仓库', value: 'admin.accessory-management.off-shelf.restore' },\n                    { label: '删除', value: 'admin.accessory-management.off-shelf.delete' },\n                  ],\n                },\n                {\n                  label: '已售完',\n",
+          "after": "                    { label: '查看', value: 'admin.accessory-management.selling.view' },\n                    { label: '批量下架', value: 'admin.accessory-management.selling.batch-off-shelf' },\n                    { label: '下架', value: 'admin.accessory-management.selling.off-shelf' },\n                    { label: '编辑', value: 'admin.accessory-management.selling.edit' },\n                    { label: '删除', value: 'admin.accessory-management.selling.delete' },\n                  ],\n                },\n                {\n                  label: '已售完',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "before": "import { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n  storeLevelModule,\n  storeFinishedStock,\n  storeAccessoryStock,\n  storePriceConfiguration,\n  storeCustomerManagement,\n} from './functionCatalogStoreData';\n",
           "after": "import { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n  storeLevelModule,\n  storeProducts,\n  storePriceConfiguration,\n  storeCustomerManagement,\n} from './functionCatalogStoreData';\n",
@@ -10884,6 +11308,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "                actions: [\n                  { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },\n                  { label: '下架', value: 'admin.slab-management.selling.off-shelf' },\n                  { label: '编辑', value: 'admin.slab-management.selling.edit' },\n                ],\n              },\n              {\n                label: '已下架',\n                value: 'admin.slab-management.off-shelf',\n                actions: [\n                  { label: '批量放回到仓库', value: 'admin.slab-management.off-shelf.batch-restore' },\n                  { label: '详情', value: 'admin.slab-management.off-shelf.detail' },\n                  { label: '放回仓库', value: 'admin.slab-management.off-shelf.restore' },\n                  { label: '删除', value: 'admin.slab-management.off-shelf.delete' },\n                ],\n              },\n              {\n                label: '已售完',\n",
+          "after": "                actions: [\n                  { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },\n                  { label: '下架', value: 'admin.slab-management.selling.off-shelf' },\n                  { label: '编辑', value: 'admin.slab-management.selling.edit' },\n                  { label: '删除', value: 'admin.slab-management.selling.delete' },\n                ],\n              },\n              {\n                label: '已售完',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
           "before": "                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.finished.edit' },\n                  {\n                    label: '停用/启用',\n                    value: 'admin.product-data-center.markup-configuration.finished.toggle-status',\n                  },\n                  { label: '排序', value: 'admin.product-data-center.markup-configuration.finished.sort' },\n                  { label: '删除', value: 'admin.product-data-center.markup-configuration.finished.delete' },\n                ],\n              },\n              {\n                label: '大板价格配置',\n                value: 'admin.product-data-center.markup-configuration.slab',\n                actions: [\n                  {\n                    label: '保存指导价',\n                    value: 'admin.product-data-center.markup-configuration.slab.guide-price.edit',\n                  },\n                  { label: '新增', value: 'admin.product-data-center.markup-configuration.slab.create' },\n                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.slab.edit' },\n                  {\n",
           "after": "                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.finished.edit' },\n                  {\n                    label: '停用/启用',\n                    value: 'admin.product-data-center.markup-configuration.finished.toggle-status',\n                  },\n                  { label: '排序', value: 'admin.product-data-center.markup-configuration.finished.sort' },\n                  { label: '删除', value: 'admin.product-data-center.markup-configuration.finished.delete' },\n                ],\n              },\n              {\n                label: '配件价格配置',\n                value: 'admin.product-data-center.markup-configuration.accessory',\n                actions: [\n                  {\n                    label: '保存指导价',\n                    value: 'admin.product-data-center.markup-configuration.accessory.guide-price.edit',\n                  },\n                  { label: '新增', value: 'admin.product-data-center.markup-configuration.accessory.create' },\n                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.accessory.edit' },\n                  {\n                    label: '停用/启用',\n                    value: 'admin.product-data-center.markup-configuration.accessory.toggle-status',\n                  },\n                  { label: '排序', value: 'admin.product-data-center.markup-configuration.accessory.sort' },\n                  { label: '删除', value: 'admin.product-data-center.markup-configuration.accessory.delete' },\n                ],\n              },\n              {\n                label: '大板价格配置',\n                value: 'admin.product-data-center.markup-configuration.slab',\n                actions: [\n                  {\n                    label: '保存指导价',\n                    value: 'admin.product-data-center.markup-configuration.slab.guide-price.edit',\n                  },\n                  { label: '新增', value: 'admin.product-data-center.markup-configuration.slab.create' },\n                  { label: '编辑', value: 'admin.product-data-center.markup-configuration.slab.edit' },\n                  {\n",
           "reason": "2026-10-22 用户确认三端配件管理和独立配件价格配置，复用成品现货对应界面与业务规则",
@@ -10895,6 +11325,18 @@
       "content": "39a9ce84ce5c5bedd35582287c540670fbd8ffb0774b8545fdaa553452199a08",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "              actions: [\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.selling.${code}` })),\n            },\n            {\n              label: '已下架',\n              value: 'store.finished-stock-management.off-shelf',\n              actions: [\n                ['batch-restore', '批量放回到仓库'],\n                ['detail', '详情'],\n                ['restore', '放回仓库'],\n                ['delete', '删除'],\n              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.off-shelf.${code}` })),\n            },\n            {\n              label: '已售完',\n              value: 'store.finished-stock-management.sold-out',\n",
+          "after": "              actions: [\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.selling.${code}` })),\n            },\n            {\n              label: '已售完',\n              value: 'store.finished-stock-management.sold-out',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "              actions: [\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n              ].map(([code, label]) => ({ label, value: `store.accessory-management.selling.${code}` })),\n            },\n            {\n              label: '已下架',\n              value: 'store.accessory-management.off-shelf',\n              actions: [\n                ['batch-restore', '批量放回到仓库'],\n                ['detail', '详情'],\n                ['restore', '放回仓库'],\n                ['delete', '删除'],\n              ].map(([code, label]) => ({ label, value: `store.accessory-management.off-shelf.${code}` })),\n            },\n            {\n              label: '已售完',\n              value: 'store.accessory-management.sold-out',\n",
+          "after": "              actions: [\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n              ].map(([code, label]) => ({ label, value: `store.accessory-management.selling.${code}` })),\n            },\n            {\n              label: '已售完',\n              value: 'store.accessory-management.sold-out',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "before": "  ],\n};\n\nexport const storeFinishedStock: FunctionModule = {\n  label: '成品现货管理',\n  value: 'store.finished-stock-management',\n  audiences: ['store'],\n",
           "after": "  ],\n};\n\nconst storeFinishedStock: FunctionModule = {\n  label: '成品现货管理',\n  value: 'store.finished-stock-management',\n  audiences: ['store'],\n",
@@ -10962,6 +11404,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "                ['publish', '发布商品'],\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n              ]),\n            },\n            {\n              label: '已下架',\n              value: `${prefix}.off-shelf`,\n              actions: actions('off-shelf', [\n                ['batch-restore', '批量放回到仓库'],\n                ['detail', '详情'],\n                ['restore', '放回仓库'],\n                ['delete', '删除'],\n              ]),\n            },\n            { label: '已售完', value: `${prefix}.sold-out`, actions: actions('sold-out', [['detail', '详情']]) },\n",
+          "after": "                ['publish', '发布商品'],\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n              ]),\n            },\n            { label: '已售完', value: `${prefix}.sold-out`, actions: actions('sold-out', [['detail', '详情']]) },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
           "before": "import type { FunctionAction, FunctionModule } from './functionCatalog';\n\nexport const supplyChainProducts: FunctionModule = {\n  label: '商品管理',\n  value: 'supply-chain.products',\n  audiences: ['supply-chain'],\n  menus: (['finished-stock-management', 'slab-management'] as const).map((key) => {\n    const prefix = `supply-chain.${key}`;\n    const actions = (tab: string, entries: [string, string][]): FunctionAction[] =>\n      entries.map(([value, label]) => ({ label, value: `${prefix}.${tab}.${value}` }));\n    return {\n      value: `${prefix}.menu`,\n      label: key === 'slab-management' ? '大板管理' : '成品现货管理',\n      direct: false,\n      pages: [\n        {\n          label: key === 'slab-management' ? '大板管理页' : '成品现货管理页',\n          value: prefix,\n          audiences: ['supply-chain'],\n          actions: [{ label: '操作日志', value: `${prefix}.operation-log.view` }],\n          tabs: [\n            {\n              label: '仓库中',\n              value: `${prefix}.warehouse`,\n              actions: actions('warehouse', [\n                ['publish', '发布商品'],\n                ['batch-shelf', '批量上架'],\n",
           "after": "import type { FunctionAction, FunctionModule } from './functionCatalog';\n\nexport const supplyChainProducts: FunctionModule = {\n  label: '商品管理',\n  value: 'supply-chain.products',\n  audiences: ['supply-chain'],\n  menus: (['finished-stock-management', 'accessory-management', 'slab-management'] as const).map((key) => {\n    const prefix = `supply-chain.${key}`;\n    const actions = (tab: string, entries: [string, string][]): FunctionAction[] =>\n      entries.map(([value, label]) => ({ label, value: `${prefix}.${tab}.${value}` }));\n    return {\n      value: `${prefix}.menu`,\n      label: key === 'slab-management' ? '大板管理' : key === 'accessory-management' ? '配件管理' : '成品现货管理',\n      direct: false,\n      pages: [\n        {\n          label:\n            key === 'slab-management' ? '大板管理页' : key === 'accessory-management' ? '配件管理页' : '成品现货管理页',\n          value: prefix,\n          audiences: ['supply-chain'],\n          actions: [{ label: '操作日志', value: `${prefix}.operation-log.view` }],\n          tabs: [\n            {\n              label: '仓库中',\n              value: `${prefix}.warehouse`,\n              actions: actions('warehouse', [\n                ['publish', '发布商品'],\n                ['batch-shelf', '批量上架'],\n",
           "reason": "2026-10-22 用户确认三端配件管理和独立配件价格配置，复用成品现货对应界面与业务规则",
@@ -11028,6 +11476,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "    expect(stateActivityColumns('soldOut').map((column) => column.title)).toEqual(['售完时间']);\n    for (const [state, titles] of Object.entries({\n      warehouse: ['入库人', '入库时间'],\n      selling: ['上架人', '上架时间'],\n      offShelf: ['下架人', '下架时间'],\n      recycle: ['移入人', '移入时间'],\n    })) {\n      expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);\n    }\n",
+          "after": "    expect(stateActivityColumns('soldOut').map((column) => column.title)).toEqual(['售完时间']);\n    for (const [state, titles] of Object.entries({\n      warehouse: ['入库人', '入库时间'],\n      selling: ['上架人', '上架时间'],\n      recycle: ['移入人', '移入时间'],\n    })) {\n      expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);\n    }\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
           "before": "import { describe, expect, it } from 'vitest';\nimport { sortByStateActivity, stateActivityColumns, stateSourceLabel } from './productStateActivity';\n\ndescribe('product state activity', () => {\n  it('puts recently transitioned old products ahead of newly created products without mutating input', () => {\n",
@@ -11045,6 +11499,12 @@
       "content": "7342589e51af41298d3f49d9895b2160e3ae2c77a62e9cde91dfaa86a75be53e",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "\nconst labels: Record<string, [string, string]> = {\n  warehouse: ['入库人', '入库时间'],\n  selling: ['上架人', '上架时间'],\n  offShelf: ['下架人', '下架时间'],\n  soldOut: ['', '售完时间'],\n  recycle: ['移入人', '移入时间'],\n};\nexport function stateActivityColumns(status: string): PrimaryTableCol<TableRowData>[] {\n",
+          "after": "\nconst labels: Record<string, [string, string]> = {\n  warehouse: ['入库人', '入库时间'],\n  selling: ['上架人', '上架时间'],\n  soldOut: ['', '售完时间'],\n  recycle: ['移入人', '移入时间'],\n};\nexport function stateActivityColumns(status: string): PrimaryTableCol<TableRowData>[] {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
@@ -11107,12 +11567,38 @@
     },
     "src/services/slabs.test.ts": {
       "content": "2c5eaa5f29db9aae618c79df80816706e548286c4fd17741b2864ab1d503a8b4",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "    expect(resolveSlabPublishTargetStatus('selling')).toBe('selling');\n  });\n\n  it('falls back to the warehouse when publishing is unavailable for the current tab', () => {\n    expect(resolveSlabPublishTargetStatus('offShelf')).toBe('warehouse');\n  });\n});\n",
+          "after": "    expect(resolveSlabPublishTargetStatus('selling')).toBe('selling');\n  });\n\n  it('falls back to the warehouse when publishing is unavailable for the current tab', () => {\n    expect(resolveSlabPublishTargetStatus('recycle')).toBe('warehouse');\n  });\n});\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        }
+      ]
     },
     "src/services/slabs.ts": {
       "content": "960012eecb4925652dee40c1c802efe7957160437910e2e5f10914109bc24c96",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "import { request } from './http';\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\nexport type SlabPublishTargetStatus = Extract<SlabStatus, 'warehouse' | 'selling'>;\nexport type SlabPublisherType = '平台发布' | '接口获取';\nexport interface SlabPrice {\n  storeLevelId: number;\n",
+          "after": "import { request } from './http';\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type SlabStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\nexport type SlabPublishTargetStatus = Extract<SlabStatus, 'warehouse' | 'selling'>;\nexport type SlabPublisherType = '平台发布' | '接口获取';\nexport interface SlabPrice {\n  storeLevelId: number;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "export interface SlabRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  operationsSnapshotMissing?: boolean;\n  operationsDeleted?: boolean;\n",
+          "after": "export interface SlabRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  operationsSnapshotMissing?: boolean;\n  operationsDeleted?: boolean;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "    body: JSON.stringify({ ids, action }),\n  });\n}\n\nexport function updateSlabStatuses(ids: number[], status: SlabStatus, reason?: string, detail?: string) {\n  return request<boolean>('/admin/slabs/batch-status', {\n    method: 'PUT',\n    body: JSON.stringify({ ids, status, reason, detail }),\n  });\n}\n\nexport function removeSlab(id: number, payload: { reason?: string; detail?: string } = {}) {\n",
+          "after": "    body: JSON.stringify({ ids, action }),\n  });\n}\n\nexport function updateSlabStatuses(ids: number[], status: SlabStatus | 'offShelf', reason?: string, detail?: string) {\n  return request<boolean>('/admin/slabs/batch-status', {\n    method: 'PUT',\n    body: JSON.stringify({\n      ids,\n      status: status === 'offShelf' ? 'warehouse' : status,\n      operation: status === 'offShelf' ? 'offShelf' : undefined,\n      reason,\n      detail,\n    }),\n  });\n}\n\nexport function removeSlab(id: number, payload: { reason?: string; detail?: string } = {}) {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
@@ -11135,6 +11621,24 @@
       "content": "65eac08f8d07f400e23212357ee2abf50d5d1e8a13787544e7c0568dc9b0f701",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "import { request } from './http';\nimport type { FinishedProductAttributeEntry, FinishedSpecDimension } from './finishedProducts';\n\nexport type StoreFinishedStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\n\nexport interface StoreSkuPrice {\n  skuId: number;\n  label: string;\n",
+          "after": "import { request } from './http';\nimport type { FinishedProductAttributeEntry, FinishedSpecDimension } from './finishedProducts';\n\nexport type StoreFinishedStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\n\nexport interface StoreSkuPrice {\n  skuId: number;\n  label: string;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "  specDimensions: FinishedSpecDimension[];\n  skus: StoreSkuPrice[];\n  createdByName?: string;\n  createdAt?: string;\n  offShelfReason?: string;\n  offShelfDetail?: string;\n  offShelfAt?: string;\n}\n",
+          "after": "  specDimensions: FinishedSpecDimension[];\n  skus: StoreSkuPrice[];\n  createdByName?: string;\n  createdAt?: string;\n  offShelfByName?: string;\n  offShelfReason?: string;\n  offShelfDetail?: string;\n  offShelfAt?: string;\n}\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
+        {
+          "before": "export const listStoreFinishedPool = () => request<StorePoolProduct[]>(`${base}/pool`);\nexport const selectStoreFinishedProducts = (productIds: number[]) =>\n  request<StoreFinishedProduct[]>(`${base}/select`, { method: 'POST', body: json({ productIds }) });\nexport const changeStoreFinishedStatus = (id: number, target: string, reason?: string, detail?: string) =>\n  request<StoreFinishedProduct>(`${base}/${id}/status`, { method: 'PUT', body: json({ target, reason, detail }) });\nexport const changeStoreFinishedStatusBatch = (ids: number[], target: string, reason?: string, detail?: string) =>\n  request<StoreFinishedProduct[]>(`${base}/status/batch`, {\n    method: 'PUT',\n    body: json({ ids, target, reason, detail }),\n  });\nexport const purgeStoreFinishedProduct = (id: number) => request<boolean>(`${base}/${id}`, { method: 'DELETE' });\nexport const purgeStoreFinishedProducts = (productIds: number[]) =>\n  request<boolean>(`${base}/batch`, { method: 'DELETE', body: json({ productIds }) });\n",
+          "after": "export const listStoreFinishedPool = () => request<StorePoolProduct[]>(`${base}/pool`);\nexport const selectStoreFinishedProducts = (productIds: number[]) =>\n  request<StoreFinishedProduct[]>(`${base}/select`, { method: 'POST', body: json({ productIds }) });\nexport const changeStoreFinishedStatus = (id: number, target: string, reason?: string, detail?: string) =>\n  request<StoreFinishedProduct>(`${base}/${id}/status`, {\n    method: 'PUT',\n    body: json({\n      target: target === 'offShelf' ? 'warehouse' : target,\n      operation: target === 'offShelf' ? 'offShelf' : undefined,\n      reason,\n      detail,\n    }),\n  });\nexport const changeStoreFinishedStatusBatch = (ids: number[], target: string, reason?: string, detail?: string) =>\n  request<StoreFinishedProduct[]>(`${base}/status/batch`, {\n    method: 'PUT',\n    body: json({\n      ids,\n      target: target === 'offShelf' ? 'warehouse' : target,\n      operation: target === 'offShelf' ? 'offShelf' : undefined,\n      reason,\n      detail,\n    }),\n  });\nexport const purgeStoreFinishedProduct = (id: number) => request<boolean>(`${base}/${id}`, { method: 'DELETE' });\nexport const purgeStoreFinishedProducts = (productIds: number[]) =>\n  request<boolean>(`${base}/batch`, { method: 'DELETE', body: json({ productIds }) });\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.1商品下架回仓PRD：取消已下架状态与入口，保留原有其余业务；增加已上架删除、仓库下架信息与新请求。"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",

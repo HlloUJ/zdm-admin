@@ -24,7 +24,6 @@ describe('product state activity', () => {
     for (const [state, titles] of Object.entries({
       warehouse: ['入库人', '入库时间'],
       selling: ['上架人', '上架时间'],
-      offShelf: ['下架人', '下架时间'],
       recycle: ['移入人', '移入时间'],
     })) {
       expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);

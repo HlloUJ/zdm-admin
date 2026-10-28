@@ -106,8 +106,7 @@ public class AccessoryLifecycleService {
     String source = (String) row.get("source_status");
     boolean allowed = switch (source) {
       case "warehouse" -> List.of("selling", "recycle").contains(target);
-      case "selling" -> "offShelf".equals(target);
-      case "offShelf" -> List.of("warehouse", "recycle").contains(target);
+      case "selling" -> List.of("offShelf", "recycle").contains(target);
       case "recycle" -> List.of("warehouse", "purged").contains(target);
       default -> false;
     };
@@ -146,6 +145,7 @@ public class AccessoryLifecycleService {
     requireSupplyChain();
     var row=lock(kind,id);
     String source=(String)row.get("source_status");
+    String nextState = "offShelf".equals(target) ? "warehouse" : target;
     validateSourceTransition(kind, id, row, target);
     if("offShelf".equals(target) && (reason==null || reason.isBlank())) { throw new IllegalArgumentException("请选择下架原因"); }
     if(reason!=null && reason.length()>80 || detail!=null && detail.length()>500) { throw new IllegalArgumentException("下架说明超出长度限制"); }
@@ -183,11 +183,16 @@ public class AccessoryLifecycleService {
     if ("warehouse".equals(target)) {
       jdbc.update("UPDATE "+kind.table+" SET source_status=? WHERE id=?",target,id);
     } else {
-      jdbc.update("UPDATE "+kind.table+" SET source_status=?,source_block_reason=? WHERE id=?",target,blockReason,id);
+      jdbc.update("UPDATE "+kind.table+" SET source_status=?,source_block_reason=? WHERE id=?",nextState,blockReason,id);
     }
     if("offShelf".equals(target)) {
       if(kind==Kind.ACCESSORY) { jdbc.update("UPDATE accessory_products SET source_off_shelf_reason=?,source_off_shelf_detail=?,source_off_shelf_at=NOW() WHERE id=?",reason,detail,id); }
       else { jdbc.update("INSERT INTO slab_off_shelf_records (slab_id,business_client_code,standard_reason,detail_reason,off_shelved_at,off_shelved_by_name,off_shelved_by_account_id) VALUES (?,'supply-chain',?,?,NOW(),?,?)",id,reason,detail,identities.require().displayName(),identities.require().accountId()); }
+    }
+    if (!"offShelf".equals(target)) {
+      if (kind == Kind.ACCESSORY) {
+        jdbc.update("UPDATE accessory_products SET source_off_shelf_reason=NULL,source_off_shelf_detail=NULL,source_off_shelf_at=NULL WHERE id=?", id);
+      }
     }
     if(recreate) {
       jdbc.update("UPDATE "+kind.table+" SET operations_deleted=FALSE,status='warehouse' WHERE id=?",id);
@@ -206,7 +211,7 @@ public class AccessoryLifecycleService {
     Map<String,Object> sourceChanges=new LinkedHashMap<>();
     if(reason!=null) { sourceChanges.put("下架原因",Map.of("before","","after",reason)); }
     if(detail!=null) { sourceChanges.put("详细说明",Map.of("before","","after",detail)); }
-    if (recordSourceLog) { record(kind,row,"supply-chain",type,label,source,target,sourceChanges); }
+    if (recordSourceLog) { record(kind,row,"supply-chain",type,label,source,nextState,sourceChanges); }
     if (kind == Kind.ACCESSORY) { storeUpstreamLogs.sourceChange(id, source, target); }
 
     // Restoring the source does not revive an existing downstream operations record.
@@ -215,7 +220,7 @@ public class AccessoryLifecycleService {
       String result=kind!=Kind.ACCESSORY ? null : publish ? "来源已上架，商品进入运营仓库并计算价格" :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
       Map<String,Object> changes=new LinkedHashMap<>();
-      changes.put("来源状态",Map.of("before",source,"after",target));
+      changes.put("来源状态",Map.of("before",source,"after",nextState));
       if(recreate && kind == Kind.SLAB) { changes.putAll(slabLogs.arrivalSnapshot(id)); }
       if (kind == Kind.SLAB && !List.of("offShelf", "purged").contains(target)) {
         changes.putAll(sourceChanges);

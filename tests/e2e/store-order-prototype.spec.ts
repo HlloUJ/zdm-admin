@@ -56,8 +56,8 @@ test('store order prototype has five status views and drill-down without busines
   await number.click();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await page.getByRole('button', { name: '详情', exact: true }).click();
-  await expect(page.getByText('金额计算过程', { exact: true })).toBeVisible();
-  await expect(page.getByText('操作记录', { exact: true })).toBeVisible();
+  await expect(page.getByRole('main').getByText('金额计算过程', { exact: true })).toBeVisible();
+  await expect(page.getByRole('main').getByText('操作记录', { exact: true })).toBeVisible();
   expect(writes).toEqual([]);
   expect(errors).toEqual([]);
 });

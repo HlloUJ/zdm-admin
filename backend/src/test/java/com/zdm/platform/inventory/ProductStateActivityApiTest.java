@@ -45,6 +45,7 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
     registry.add("spring.datasource.password", MYSQL::getPassword);
   }
   @Autowired private JdbcTemplate jdbc;
+  @Autowired private org.mybatis.spring.SqlSessionTemplate sqlSessions;
   @Autowired private MockMvc mvc;
   @Autowired private ObjectMapper json;
   @Autowired private ProductStateActivityService activities;
@@ -88,13 +89,13 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
   @ParameterizedTest @ValueSource(strings = {"finished", "accessory"})
   void transitionResponseMatchesPersistedActivityBeforeAnyListRefresh(String kind) throws Exception {
     identity("supply-chain"); product(kind, "selling");
-    for (String target : List.of("offShelf", "warehouse", "recycle", "warehouse")) {
+    for (String target : List.of("offShelf", "recycle", "warehouse")) {
       String body = mvc.perform(put("/api/admin/" + endpoint(kind) + "/99880")
           .contentType("application/json")
-          .content("{\"name\":\"状态时间商品\",\"status\":\"" + target + "\",\"offShelfReason\":\"价格调整\"}"))
+          .content("{\"name\":\"状态时间商品\",\"status\":\"" + ("offShelf".equals(target) ? "warehouse" : target) + "\",\"operation\":" + ("offShelf".equals(target) ? "\"offShelf\"" : "null") + ",\"offShelfReason\":\"价格调整\"}"))
           .andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
       JsonNode response = json.readTree(body).path("data");
-      var activity = jdbc.queryForMap("SELECT occurred_at, operator_account_id FROM product_state_activity WHERE kind=? AND business_client_code='supply-chain' AND record_id=99880 AND state=?", kind, target);
+      var activity = jdbc.queryForMap("SELECT occurred_at, operator_account_id FROM product_state_activity WHERE kind=? AND business_client_code='supply-chain' AND record_id=99880 AND state=?", kind, "offShelf".equals(target) ? "warehouse" : target);
       assertThat(response.path("stateOperatorName").isTextual()).isTrue();
       assertThat(response.path("stateOperatorName").asText()).isNotBlank();
       assertThat(response.path("stateOperatedAt").isTextual()).isTrue();
@@ -109,19 +110,19 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
       assertThat(refreshed).isNotNull();
       assertThat(response.path("stateOperatorName")).isEqualTo(refreshed.path("stateOperatorName"));
       assertThat(response.path("stateOperatedAt")).isEqualTo(refreshed.path("stateOperatedAt"));
-      assertThat(response.path("sourceStatus").asText()).isEqualTo(target);
+      assertThat(response.path("sourceStatus").asText()).isEqualTo("offShelf".equals(target) ? "warehouse" : target);
     }
   }
   @ParameterizedTest @ValueSource(strings = {"admin", "supply-chain"})
   void slabStatusMutationAndListReadSamePersistedActivity(String client) throws Exception {
     identity(client); product("slab", "selling");
-    for (String target : List.of("offShelf", "warehouse", "recycle", "warehouse")) {
+    for (String target : List.of("offShelf", "recycle", "warehouse")) {
       if ("recycle".equals(target)) {
         mvc.perform(post("/api/admin/slabs/99880/delete").contentType("application/json").content("{}"))
             .andExpect(status().isOk());
       } else {
         mvc.perform(put("/api/admin/slabs/batch-status").contentType("application/json")
-            .content("{\"ids\":[99880],\"status\":\"" + target + "\",\"reason\":\"价格调整\"}"))
+            .content("{\"ids\":[99880],\"status\":\"" + ("offShelf".equals(target) ? "warehouse" : target) + "\",\"operation\":" + ("offShelf".equals(target) ? "\"offShelf\"" : "null") + ",\"reason\":\"价格调整\"}"))
             .andExpect(status().isOk());
       }
       JsonNode actual = null;
@@ -131,7 +132,7 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
       }
       assertThat(actual).isNotNull();
       var activity = jdbc.queryForMap("SELECT state, occurred_at, operator_account_id FROM product_state_activity WHERE kind='slab' AND business_client_code=? AND record_id=99880", client);
-      assertThat(activity.get("state")).isEqualTo(target);
+      assertThat(activity.get("state")).isEqualTo("offShelf".equals(target) ? "warehouse" : target);
       assertThat(actual.path("stateOperatorName").isTextual()).isTrue();
       assertThat(actual.path("stateOperatorName").asText()).isNotBlank();
       assertThat(LocalDateTime.parse(actual.path("stateOperatedAt").asText().replace("Z", "")))
@@ -168,4 +169,42 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
     String body = mvc.perform(get("/api/admin/" + endpoint(kind) + "/operation-logs").param("operationType", "REENTRY")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
     assertThat(json.readTree(body).path("data").path("records")).hasSize(1);
   }
+  @ParameterizedTest
+  @org.junit.jupiter.params.provider.CsvSource({"finished,admin", "finished,supply-chain", "accessory,admin", "accessory,supply-chain", "slab,admin", "slab,supply-chain"})
+  void downShelfIsOneEventIntoWarehouseAndSellingDeleteIsIndependent(String kind, String client) throws Exception {
+    identity(client); product(kind, "selling");
+    String url = "/api/admin/" + endpoint(kind);
+    boolean slab = "slab".equals(kind);
+    String down = slab
+        ? "{\"ids\":[99880],\"status\":\"warehouse\",\"operation\":\"offShelf\",\"reason\":\"价格调整\",\"detail\":\"重新核价\"}"
+        : "{\"name\":\"状态时间商品\",\"status\":\"warehouse\",\"operation\":\"offShelf\",\"offShelfReason\":\"价格调整\",\"offShelfDetail\":\"重新核价\"}";
+    mvc.perform(put(url + (slab ? "/batch-status" : "/99880")).contentType("application/json").content(down))
+        .andExpect(status().isOk());
+    String state = "supply-chain".equals(client) ? "source_status" : "status";
+    assertThat(jdbc.queryForObject("SELECT " + state + " FROM " + table(kind) + " WHERE id=99880", String.class)).isEqualTo("warehouse");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND business_client_code=? AND operation_type='OFF_SHELF' AND before_status='selling' AND after_status='warehouse'", Long.class, client)).isEqualTo(1L);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND business_client_code=? AND operation_type IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')", Long.class, client)).isZero();
+    mvc.perform(put(url + (slab ? "/batch-status" : "/99880")).contentType("application/json").content(down))
+        .andExpect(status().isBadRequest());
+    jdbc.update("UPDATE " + table(kind) + " SET " + state + "='selling' WHERE id=99880");
+    sqlSessions.clearCache();
+    if (slab) {
+      mvc.perform(post(url + "/99880/delete").contentType("application/json").content("{}"))
+          .andExpect(status().isOk());
+    } else {
+      mvc.perform(put(url + "/99880").contentType("application/json").content("{\"name\":\"状态时间商品\",\"status\":\"recycle\"}"))
+          .andExpect(status().isOk());
+    }
+    assertThat(jdbc.queryForObject("SELECT " + state + " FROM " + table(kind) + " WHERE id=99880", String.class)).isEqualTo("recycle");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND business_client_code=? AND operation_type='DELETE_TO_RECYCLE' AND before_status='selling' AND after_status='recycle'", Long.class, client)).isEqualTo(1L);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND business_client_code=? AND operation_type='OFF_SHELF'", Long.class, client)).isEqualTo(1L);
+    if ("supply-chain".equals(client)) {
+      mvc.perform(post(url).contentType("application/json").content("{\"name\":\"取消状态校验\",\"status\":\"offShelf\"}"))
+          .andExpect(status().isBadRequest());
+    }
+    String canceled = slab ? "{\"ids\":[99880],\"status\":\"offShelf\"}" : "{\"status\":\"offShelf\"}";
+    mvc.perform(put(url + (slab ? "/batch-status" : "/99880")).contentType("application/json").content(canceled))
+        .andExpect(status().isBadRequest());
+  }
+
 }

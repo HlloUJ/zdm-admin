@@ -7,7 +7,7 @@ config.global.stubs.SalesLogFullscreen = { template: '<div><slot /></div>' };
 describe('edit log layout', () => {
   it.each([
     ['warehouse', 'selling', '仓库中', '已上架'],
-    ['selling', 'offShelf', '已上架', '已下架'],
+    ['selling', 'warehouse', '已上架', '仓库中'],
   ])(
     'renders source status %s → %s with consistent source and operations labels',
     (before, after, beforeLabel, afterLabel) => {

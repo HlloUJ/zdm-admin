@@ -33,10 +33,10 @@ export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter
     const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);
     const latestRecord = latestOffShelfRecord(item);
     const offShelfReasonMatched =
-      activeTab !== 'offShelf' || !filter.offShelfReason || latestRecord?.standardReason === filter.offShelfReason;
+      activeTab !== 'warehouse' || !filter.offShelfReason || latestRecord?.standardReason === filter.offShelfReason;
     const offShelvedByKeyword = filter.offShelvedBy.trim().toLowerCase();
     const offShelvedByMatched =
-      activeTab !== 'offShelf' ||
+      activeTab !== 'warehouse' ||
       !offShelvedByKeyword ||
       latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);
     return (

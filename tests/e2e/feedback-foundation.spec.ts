@@ -746,7 +746,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             widthMm: 1600,
             thicknessMm: 18,
             areaSquareMeter: 4.8,
-            status: 'offShelf',
+            status: 'warehouse',
             stateOperatorName: '王芳',
             stateOperatedAt: '2026-08-22T10:00:00Z',
             offShelfRecords: [
@@ -796,7 +796,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   let statusPayload: unknown;
   await page.route('**/api/admin/slabs/batch-status', async (route) => {
     statusPayload = route.request().postDataJSON();
-    slabStatus = 'offShelf';
+    slabStatus = 'warehouse';
     offShelfRecords.unshift({
       id: 2,
       slabId: 61,
@@ -845,31 +845,38 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
     .poll(() => statusPayload)
     .toEqual({
       ids: [61],
-      status: 'offShelf',
+      status: 'warehouse',
+      operation: 'offShelf',
       reason: '库存异常',
       detail: latestDetailReason,
     });
   await expect(dialog).toBeHidden();
   await expect(page.getByText('已批量下架“1 个大板”', { exact: true })).toBeVisible();
 
-  await page.getByText('已下架 2', { exact: true }).click();
+  await page.getByText('仓库中 2', { exact: true }).click();
   const filterCard = page.locator('.list-controls');
   await expect(filterCard.getByText('下架原因', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('下架人', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('下架时间', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('产地', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('纹理', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('色系', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('等级', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('供应商', { exact: true })).toHaveCount(0);
+  await expect(filterCard.getByText('产地', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('纹理', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('色系', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('等级', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('供应商', { exact: true })).toBeVisible();
   expect((await page.locator('.slab-list-layout thead th').allTextContents()).map((text) => text.trim())).toEqual([
     '',
     '商品主图',
     '大板名称/ID/编号',
     '品种',
+    '产地',
+    '纹理',
+    '色系',
+    '等级',
+    '尺寸',
+    '供应商',
+    '入库人',
+    '入库时间',
     '下架原因/详细说明',
-    '下架人',
-    '下架时间',
     '操作',
   ]);
   const offShelfRows = page.locator('.slab-list-layout tbody tr');
@@ -919,10 +926,14 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await historyDialog.getByRole('button', { name: '关闭', exact: true }).click();
   await expect(historyDialog).toBeHidden();
   expect((await offShelfRow.locator('.table-actions .t-link').allTextContents()).map((text) => text.trim())).toEqual([
-    '详情',
-    '放回仓库',
+    '上架',
+    '编辑',
     '删除',
   ]);
+  // Read-only detail remains covered from the retained recycle entry.
+  slabStatus = 'recycle';
+  await page.reload();
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '回收站' }).click();
   await offShelfRow.getByText('详情', { exact: true }).click();
   const detailDrawer = page.locator('.t-drawer').filter({ hasText: '大板详情' });
   await expect(detailDrawer).toBeVisible();

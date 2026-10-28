@@ -710,7 +710,7 @@ for (const operationType of ['SOURCE_OFF_SHELF', 'OPERATIONS_OFF_SHELF']) {
       operatedAt: '2026-10-08T10:00:00',
       beforeStatus: 'warehouse',
       afterStatus: 'warehouse',
-      changeDetails: JSON.stringify({ [source ? '来源状态' : '运营状态']: { before: 'selling', after: 'offShelf' } }),
+      changeDetails: JSON.stringify({ [source ? '来源状态' : '运营状态']: { before: 'selling', after: 'warehouse' } }),
     };
     await page.route('**/api/admin/store-finished-products**', (route) => {
       const path = new URL(route.request().url()).pathname;
@@ -733,7 +733,7 @@ for (const operationType of ['SOURCE_OFF_SHELF', 'OPERATIONS_OFF_SHELF']) {
     await expect(detail.getByRole('heading', { name: '来源状态', exact: true })).toBeVisible();
     await expect(detail.getByRole('heading', { name: '运营状态', exact: true })).toHaveCount(0);
     await expect(changes).toContainText('已上架');
-    await expect(changes).toContainText('已下架');
+    await expect(changes).toContainText('仓库中');
     await expect(changes.getByText('出售中', { exact: true })).toHaveCount(0);
   });
 }
@@ -884,15 +884,6 @@ test('store batch shelf matches shared confirmation and partial failure feedback
 
 for (const scenario of [
   {
-    tab: '已下架',
-    status: 'offShelf',
-    button: '批量放回到仓库',
-    icon: 'rollback',
-    theme: 'success',
-    description: '是否将所选成品现货放回仓库？',
-    success: '操作已完成',
-  },
-  {
     tab: '回收站',
     status: 'recycle',
     button: '批量放回到仓库',
@@ -994,7 +985,7 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
     if (path.endsWith('/status/batch')) {
       payload = route.request().postDataJSON();
       if (fail) return route.fulfill({ status: 400, json: { code: 400, message: '商品已售完，不能下架', data: null } });
-      records = [product({ status: 'offShelf', effectiveStatus: 'offShelf' })];
+      records = [product({ status: 'warehouse', effectiveStatus: 'warehouse' })];
       return route.fulfill({ json: ok(records) });
     }
     return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : records) });
@@ -1032,7 +1023,13 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
     .click();
   await expect(dialog).toHaveCount(0);
   await expect(page.getByText('商品已售完，不能下架', { exact: true })).toBeVisible();
-  expect(payload).toEqual({ ids: [41], target: 'offShelf', reason: '商品暂停售卖', detail: '门店调整' });
+  expect(payload).toEqual({
+    ids: [41],
+    target: 'warehouse',
+    operation: 'offShelf',
+    reason: '商品暂停售卖',
+    detail: '门店调整',
+  });
   await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(1);
   fail = false;
   await button.click();
@@ -1348,15 +1345,12 @@ test('supply price attention stays on its product row, can be dismissed and retu
   await expect(main.getByText('编辑', { exact: true }).first()).toBeEnabled();
 });
 
-for (const [status, tab] of [
-  ['offShelf', '已下架'],
-  ['recycle', '回收站'],
-] as const) {
+for (const [status, tab] of [['recycle', '回收站']] as const) {
   test(`${status} read-only detail shows latest supply SKUs without an edit action`, async ({ page }) => {
     await storeLogin(page);
     await page.addInitScript((state) => {
       const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
-      user.permissions.push(`store.finished-stock-management.${state === 'offShelf' ? 'off-shelf' : state}.detail`);
+      user.permissions.push(`store.finished-stock-management.${state}.detail`);
       localStorage.setItem('zdm-admin-user', JSON.stringify(user));
     }, status);
     const old = product({ status, effectiveStatus: status, salePriceAttention: true });
@@ -1422,7 +1416,7 @@ test('single off shelf marks the existing required reason and keeps details opti
     const path = new URL(route.request().url()).pathname;
     if (path.endsWith('/41/status') && route.request().method() === 'PUT') {
       payload = route.request().postDataJSON();
-      record = product({ status: 'offShelf', effectiveStatus: 'offShelf' });
+      record = product({ status: 'warehouse', effectiveStatus: 'warehouse' });
       return route.fulfill({ json: ok(record) });
     }
     if (path.endsWith('/categories')) return route.fulfill({ json: ok([]) });
@@ -1452,5 +1446,5 @@ test('single off shelf marks the existing required reason and keeps details opti
   await page.getByText('商品暂停售卖', { exact: true }).click();
   await dialog.getByRole('button', { name: '确认下架', exact: true }).click();
   await expect(dialog).toHaveCount(0);
-  expect(payload).toEqual({ target: 'offShelf', reason: '商品暂停售卖', detail: '' });
+  expect(payload).toEqual({ target: 'warehouse', operation: 'offShelf', reason: '商品暂停售卖', detail: '' });
 });

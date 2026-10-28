@@ -18,8 +18,8 @@ class AccessoryProductOffShelfOperatorTest {
   void usesCurrentBusinessLifecycleAndLatestOffShelfLog() {
     AccessoryProduct product = new AccessoryProduct();
     product.setId(7L);
-    product.setStatus("offShelf");
-    product.setSourceStatus("offShelf");
+    product.setStatus("warehouse");
+    product.setSourceStatus("warehouse");
     when(jdbc.queryForList(anyString(), eq(String.class), eq(7L), eq("admin")))
         .thenReturn(List.of("运营下架人"));
     when(jdbc.queryForList(anyString(), eq(String.class), eq(7L), eq("supply-chain")))
@@ -37,7 +37,7 @@ class AccessoryProductOffShelfOperatorTest {
   void neverFallsBackToCreatorAndClearsOtherStatuses() {
     AccessoryProduct product = new AccessoryProduct();
     product.setId(7L);
-    product.setStatus("offShelf");
+    product.setStatus("warehouse");
     product.setCreatedByName("创建人");
     service.attachOffShelfOperator(product);
     assertThat(product.getOffShelfByName()).isNull();

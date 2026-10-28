@@ -29,7 +29,7 @@
                         <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
                       </t-select>
                     </t-form-item>
-                    <template v-if="activeTab === 'offShelf'">
+                    <template v-if="activeTab === 'warehouse'">
                       <t-form-item label="下架原因">
                         <t-select
                           v-model="currentFilter.offShelfReason"
@@ -44,33 +44,31 @@
                         <t-input v-model="currentFilter.offShelvedBy" clearable placeholder="请输入下架人" />
                       </t-form-item>
                     </template>
-                    <template v-else>
-                      <t-form-item label="产地">
-                        <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择产地">
-                          <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
-                        </t-select>
-                      </t-form-item>
-                      <t-form-item label="纹理">
-                        <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择纹理">
-                          <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
-                        </t-select>
-                      </t-form-item>
-                      <t-form-item label="色系">
-                        <t-cascader
-                          v-model="currentFilter.color"
-                          :options="colorFilterCascaderOptions"
-                          :show-all-levels="false"
-                          :check-strictly="false"
-                          clearable
-                          filterable
-                          placeholder="请选择色系"
-                          trigger="hover"
-                          value-mode="onlyLeaf"
-                          value-type="single"
-                        />
-                      </t-form-item>
-                    </template>
-                    <t-form-item v-if="activeTab !== 'offShelf'" label="等级" class="grade-filter">
+                    <t-form-item label="产地">
+                      <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择产地">
+                        <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
+                      </t-select>
+                    </t-form-item>
+                    <t-form-item label="纹理">
+                      <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择纹理">
+                        <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
+                      </t-select>
+                    </t-form-item>
+                    <t-form-item label="色系">
+                      <t-cascader
+                        v-model="currentFilter.color"
+                        :options="colorFilterCascaderOptions"
+                        :show-all-levels="false"
+                        :check-strictly="false"
+                        clearable
+                        filterable
+                        placeholder="请选择色系"
+                        trigger="hover"
+                        value-mode="onlyLeaf"
+                        value-type="single"
+                      />
+                    </t-form-item>
+                    <t-form-item label="等级" class="grade-filter">
                       <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择等级">
                         <t-option
                           v-for="item in gradeFilterOptions"
@@ -80,11 +78,7 @@
                         />
                       </t-select>
                     </t-form-item>
-                    <t-form-item
-                      v-if="activeTab !== 'offShelf'"
-                      label="供应商"
-                      class="supplier-filter supplier-filter--aligned"
-                    >
+                    <t-form-item label="供应商" class="supplier-filter supplier-filter--aligned">
                       <t-select v-model="currentFilter.supplier" clearable filterable placeholder="请选择供应商">
                         <t-option
                           v-for="item in supplierFilterOptions"
@@ -299,6 +293,20 @@
             />
           </template>
         </AdminListLayout>
+        <t-alert
+          v-if="
+            editingRowId &&
+            tableData.find((item) => item.id === editingRowId)?.status === 'warehouse' &&
+            latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)
+          "
+          theme="warning"
+          title="最近下架信息"
+        >
+          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.standardReason }}
+          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.detailReason || '—' }}
+          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedByName || '未记录' }}
+          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedAt || '未记录' }}
+        </t-alert>
         <SlabProductFormLayout
           ref="productLayoutRef"
           v-model:visible="productDialogVisible"
@@ -1283,7 +1291,6 @@ const sourceBlocked = (row: SlabItem) => Boolean(row.sourceUnavailable);
 const slabPermissionScope: Record<SlabTab, string> = {
   warehouse: 'warehouse',
   selling: 'selling',
-  offShelf: 'off-shelf',
   soldOut: 'sold-out',
   recycle: 'recycle',
 };
@@ -1448,7 +1455,6 @@ const operationSourceLabel = (source: SlabOperationLogRecord['operationSource'])
 const operationStatusLabels: Record<string, string> = {
   warehouse: '仓库中',
   selling: '已上架',
-  offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',
   purged: '已彻底删除',
@@ -1514,14 +1520,12 @@ const supplierFilterOptions = computed(() =>
 const filters = reactive<Record<SlabTab, FilterState>>({
   warehouse: makeFilterState(),
   selling: makeFilterState(),
-  offShelf: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
 });
 const appliedFilters = reactive<Record<SlabTab, FilterState>>({
   warehouse: makeFilterState(),
   selling: makeFilterState(),
-  offShelf: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
 });
@@ -1536,13 +1540,12 @@ const paginations = reactive<
 >({
   warehouse: { current: 1, pageSize: 10 },
   selling: { current: 1, pageSize: 10 },
-  offShelf: { current: 1, pageSize: 10 },
   soldOut: { current: 1, pageSize: 10 },
   recycle: { current: 1, pageSize: 10 },
 });
 const tableData = ref<SlabItem[]>([]);
 const normalizeStatus = (status?: string): SlabStatus => {
-  if (status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle') return status;
+  if (status === 'selling' || status === 'soldOut' || status === 'recycle') return status;
   return 'warehouse';
 };
 const normalizePublisherType = (publisherType?: string): PublisherType =>
@@ -1769,29 +1772,11 @@ const { isValidMeasurement, isValidSalesNumber, salesRules, stockInputProps, pro
 // Fixed pixel widths; update only when the tab action buttons change.
 const operationWidths = {
   warehouse: 184,
-  selling: 148,
-  offShelf: 176,
+  selling: 208,
   soldOut: 104,
   recycle: 204,
 };
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
-  if (activeTab.value === 'offShelf') {
-    return [
-      { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
-      { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-      { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },
-      { colKey: 'variety', title: '品种', width: 140 },
-      { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },
-      ...stateActivityColumns(activeTab.value),
-      {
-        colKey: 'operation',
-        title: '操作',
-        width: operationWidths[activeTab.value],
-        align: 'left',
-        fixed: 'right',
-      },
-    ];
-  }
   const baseColumns: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
     { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
@@ -1805,6 +1790,8 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'tenant', title: '供应商', width: 180 },
     ...stateActivityColumns(activeTab.value),
   ];
+  if (activeTab.value === 'warehouse')
+    baseColumns.push({ colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });
   baseColumns.push({
     colKey: 'operation',
     title: '操作',
@@ -2505,13 +2492,13 @@ const refreshSlabItems = async (ids: number[]) => {
   const records = await listSlabs();
   records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);
 };
-const updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {
+const updateSlabStatus = async (id: number, status: SlabStatus | 'offShelf', reason?: string, detail?: string) => {
   const item = tableData.value.find((candidate) => candidate.id === id);
   if (!item) return;
   await updateSlabStatuses([id], status, reason, detail);
   await refreshSlabItems([id]);
 };
-const updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {
+const updateSelectedSlabStatuses = async (status: SlabStatus | 'offShelf', reason?: string, detail?: string) => {
   const selectedIds = [...selectedKeys.value];
   await updateSlabStatuses(selectedIds, status, reason, detail);
   await refreshSlabItems(selectedIds);

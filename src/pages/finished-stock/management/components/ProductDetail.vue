@@ -1,5 +1,9 @@
 <template>
   <t-space direction="vertical" size="large" class="product-detail">
+    <t-alert v-if="product.status === 'warehouse' && product.offShelfReason" theme="warning" title="最近下架信息">
+      {{ product.offShelfReason }} · {{ product.offShelfDetail || '—' }} {{ product.offShelfByName || '未记录' }} ·
+      {{ product.offShelfAt || '未记录' }}
+    </t-alert>
     <t-alert v-if="operations && product.sourceUnavailable" theme="warning" :message="sourceMessage" />
     <component
       :is="drawerLayout ? Card : AdminSectionCard"
@@ -190,6 +194,7 @@ interface DetailProduct {
   sourceMessage?: string;
   createdByName: string;
   createdAt?: string;
+  offShelfByName?: string;
   offShelfReason?: string;
   offShelfAt?: string;
   offShelfDetail?: string;

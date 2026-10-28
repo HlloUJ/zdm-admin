@@ -51,25 +51,25 @@ test('one tab hides rail and only grants requested row operation', async ({ page
   await expect(main.getByRole('radio', { name: '暂不上架', exact: true })).toBeEnabled();
 });
 for (const canViewPrice of [true, false]) {
-  test(`supply-chain off-shelf detail is ${canViewPrice ? 'read-only when granted' : 'hidden without permission'}`, async ({
+  test(`supply-chain warehouse actions are ${canViewPrice ? 'available when granted' : 'hidden without permission'}`, async ({
     page,
   }) => {
     await setup(
       page,
       [
-        'supply-chain.accessory-management.off-shelf.view',
-        'supply-chain.accessory-management.off-shelf.detail',
-        'supply-chain.accessory-management.off-shelf.restore',
-        'supply-chain.accessory-management.off-shelf.delete',
-        ...(canViewPrice ? ['supply-chain.accessory-management.off-shelf.price'] : []),
+        'supply-chain.accessory-management.warehouse.view',
+        'supply-chain.accessory-management.warehouse.edit',
+        'supply-chain.accessory-management.warehouse.shelf',
+        'supply-chain.accessory-management.warehouse.delete',
+        ...(canViewPrice ? ['supply-chain.accessory-management.warehouse.price'] : []),
       ],
       'supply-chain',
     );
     const product = {
       id: 72,
       name: '已下架成本商品',
-      status: 'offShelf',
-      sourceStatus: 'offShelf',
+      status: 'warehouse',
+      sourceStatus: 'warehouse',
       totalStock: 1,
       variants: [{ id: 821, variantLabel: '标准规格', displayMode: 'single', stock: 1, costPrice: 10 }],
       guidePrices: [{ skuId: 821, price: 20, priceCoefficient: 2 }],
@@ -80,7 +80,7 @@ for (const canViewPrice of [true, false]) {
     );
     await page.goto('/supply-chain/accessory-management');
     const main = page.getByRole('main');
-    await expect(main.locator('.table-actions .t-link')).toHaveText(['详情', '放回仓库', '删除']);
+    await expect(main.locator('.table-actions .t-link')).toHaveText(['上架', '编辑', '删除']);
     await expect(main.locator('.table-actions').getByText('价格', { exact: true })).toHaveCount(0);
   });
 }
@@ -118,7 +118,6 @@ test('log-only access does not expose unauthorized warehouse content', async ({ 
 });
 
 for (const [status, scope] of [
-  ['offShelf', 'off-shelf'],
   ['soldOut', 'sold-out'],
   ['recycle', 'recycle'],
 ]) {
@@ -264,7 +263,7 @@ test('operations role catalog exposes detail permission for all five finished st
   const rows = dialog.locator('.permission-matrix tbody tr');
   const first = rows.filter({ hasText: '配件管理页' }).first();
   const firstIndex = await first.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
-  const statusNames = ['仓库中', '已上架', '已下架', '已售完', '回收站'];
+  const statusNames = ['仓库中', '已上架', '已售完', '回收站'];
   for (const [index, label] of statusNames.entries()) {
     const statusRow = rows.nth(firstIndex + index + 1);
     await expect(statusRow.locator('.permission-tab-text')).toHaveText(label);
@@ -328,7 +327,6 @@ test('operations purge logs display actual previous state to permanently deleted
   const states = [
     ['warehouse', '仓库中'],
     ['selling', '已上架'],
-    ['offShelf', '已下架'],
     ['soldOut', '已售完'],
     ['recycle', '回收站'],
   ];

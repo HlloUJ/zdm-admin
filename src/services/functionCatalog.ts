@@ -155,17 +155,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                     { label: '批量下架', value: 'admin.finished-stock-management.selling.batch-off-shelf' },
                     { label: '下架', value: 'admin.finished-stock-management.selling.off-shelf' },
                     { label: '编辑', value: 'admin.finished-stock-management.selling.edit' },
-                  ],
-                },
-                {
-                  label: '已下架',
-                  value: 'admin.finished-stock-management.off-shelf',
-                  actions: [
-                    { label: '查看', value: 'admin.finished-stock-management.off-shelf.view' },
-                    { label: '批量放回到仓库', value: 'admin.finished-stock-management.off-shelf.batch-restore' },
-                    { label: '详情', value: 'admin.finished-stock-management.off-shelf.detail' },
-                    { label: '放回仓库', value: 'admin.finished-stock-management.off-shelf.restore' },
-                    { label: '删除', value: 'admin.finished-stock-management.off-shelf.delete' },
+                    { label: '删除', value: 'admin.finished-stock-management.selling.delete' },
                   ],
                 },
                 {
@@ -223,17 +213,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                     { label: '批量下架', value: 'admin.accessory-management.selling.batch-off-shelf' },
                     { label: '下架', value: 'admin.accessory-management.selling.off-shelf' },
                     { label: '编辑', value: 'admin.accessory-management.selling.edit' },
-                  ],
-                },
-                {
-                  label: '已下架',
-                  value: 'admin.accessory-management.off-shelf',
-                  actions: [
-                    { label: '查看', value: 'admin.accessory-management.off-shelf.view' },
-                    { label: '批量放回到仓库', value: 'admin.accessory-management.off-shelf.batch-restore' },
-                    { label: '详情', value: 'admin.accessory-management.off-shelf.detail' },
-                    { label: '放回仓库', value: 'admin.accessory-management.off-shelf.restore' },
-                    { label: '删除', value: 'admin.accessory-management.off-shelf.delete' },
+                    { label: '删除', value: 'admin.accessory-management.selling.delete' },
                   ],
                 },
                 {

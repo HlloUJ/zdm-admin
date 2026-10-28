@@ -20,7 +20,7 @@ export interface FinishedStockRowAction {
   id: string;
   label: string;
 }
-export type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type StockStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';
 export type PublisherType = '平台发布' | '接口获取';
 export type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
 export type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
@@ -79,6 +79,7 @@ export interface StockItem {
   guidePrice?: number;
   priceRange: string;
   status: StockStatus;
+  operation?: 'offShelf';
   offShelfReason?: string;
   offShelfAt?: string;
   offShelfDetail?: string;

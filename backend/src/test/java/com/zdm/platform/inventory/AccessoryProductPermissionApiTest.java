@@ -204,18 +204,18 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT detail FROM accessory_products WHERE id=?", String.class, id)).isEqualTo(storedDetail);
     identity("all", "warehouse.view", "warehouse.shelf", "selling.view", "selling.off-shelf", "off-shelf.view", "off-shelf.restore");
     String previousStatus = "selling";
-    for (String target : List.of("offShelf", "warehouse", "selling")) {
-      request.put("status", target).put("offShelfReason", "库存异常").put("offShelfDetail", "核对库存");
+    for (String target : List.of("offShelf", "selling")) {
+      request.put("status", "offShelf".equals(target) ? "warehouse" : target).put("operation", "offShelf".equals(target) ? "offShelf" : null).put("offShelfReason", "库存异常").put("offShelfDetail", "核对库存");
       JsonNode updated = data(mvc.perform(put("/api/admin/accessory-products/{id}", id).contentType("application/json").content(json.writeValueAsBytes(request))));
-      assertThat(updated.path("status").asText()).isEqualTo(target);
+      assertThat(updated.path("status").asText()).isEqualTo("offShelf".equals(target) ? "warehouse" : target);
       assertThat(updated.path("detail").asText()).contains("/api/open/media/").doesNotContain("media:");
       assertThat(jdbc.queryForObject("SELECT detail FROM accessory_products WHERE id=?", String.class, id)).isEqualTo(storedDetail);
       assertThat(jdbc.queryForList("SELECT field_key,media_id FROM media_references WHERE business_domain='ACCESSORY_PRODUCT' AND business_id=? ORDER BY field_key", id)).isEqualTo(mediaReferences);
       JsonNode statusLog = json.readTree(jdbc.queryForObject("SELECT change_details FROM accessory_operation_logs WHERE product_id=? ORDER BY id DESC LIMIT 1", String.class, id));
       assertThat(statusLog.path("状态").path("before").asText()).isEqualTo(previousStatus);
-      assertThat(statusLog.path("状态").path("after").asText()).isEqualTo(target);
+      assertThat(statusLog.path("状态").path("after").asText()).isEqualTo("offShelf".equals(target) ? "warehouse" : target);
       assertThat(statusLog.has("宝贝详情")).isFalse();
-      previousStatus = target;
+      previousStatus = "offShelf".equals(target) ? "warehouse" : target;
     }
     identity("all", "sold-out.view", "sold-out.price");
     mvc.perform(multipart("/api/admin/accessory-products/media").file(new MockMultipartFile("file", "test.png", "image/png", new byte[]{1})))
@@ -262,7 +262,7 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     ObjectNode created = sourceFixture("平台发布", "selling");
     long id = created.path("id").asLong();
     Long count = jdbc.queryForObject("SELECT COUNT(*) FROM accessory_operation_logs WHERE product_id=?", Long.class, id);
-    String[][] states = {{"warehouse", "warehouse"}, {"selling", "selling"}, {"offShelf", "off-shelf"}, {"soldOut", "sold-out"}, {"recycle", "recycle"}};
+    String[][] states = {{"warehouse", "warehouse"}, {"selling", "selling"}, {"soldOut", "sold-out"}, {"recycle", "recycle"}};
     for (String[] state : states) {
       jdbc.update("UPDATE accessory_products SET status=? WHERE id=?", state[0], id);
       sqlSession.clearCache();
@@ -276,7 +276,7 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
       identity("all", "warehouse.view", "selling.detail");
       mvc.perform(get("/api/admin/accessory-products/{id}", id)).andExpect(status().isForbidden());
     }
-    jdbc.update("UPDATE accessory_products SET status='warehouse', source_status='offShelf' WHERE id=?", id);
+    jdbc.update("UPDATE accessory_products SET status='warehouse', source_status='warehouse' WHERE id=?", id);
     sqlSession.clearCache();
     identity("self", "warehouse.view", "warehouse.edit");
     mvc.perform(get("/api/admin/accessory-products/{id}", id)).andExpect(status().isOk())
@@ -629,7 +629,7 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     return null;
   }
   private void sourceStatus(long id,String target) throws Exception {
-    ObjectNode row=sourceRecord(id);row.put("status",target).put("offShelfReason","库存异常");
+    ObjectNode row=sourceRecord(id);row.put("status","offShelf".equals(target) ? "warehouse" : target).put("operation", "offShelf".equals(target) ? "offShelf" : null).put("offShelfReason","库存异常");
     data(mvc.perform(put("/api/admin/accessory-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(row))));
   }
   @Test void sourcePricePermissionOnlyChangesWarehouseAndSellingCosts() throws Exception {
@@ -651,9 +651,9 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
       assertThat(jdbc.queryForObject("SELECT name FROM accessory_products WHERE id=?", String.class, id)).isEqualTo("跨端商品");
       assertThat(jdbc.queryForObject("SELECT source_status FROM accessory_products WHERE id=?", String.class, id)).isEqualTo(state[0]);
     }
-    jdbc.update("UPDATE accessory_products SET source_status='offShelf' WHERE id=?", id);
+    jdbc.update("UPDATE accessory_products SET source_status='recycle' WHERE id=?", id);
     sqlSession.clearCache();
-    identityFor("supply-chain", "all", "off-shelf.view", "off-shelf.edit");
+    identityFor("supply-chain", "all", "off-shelf.view", "recycle.edit");
     mvc.perform(put("/api/admin/accessory-products/{id}/source-costs", id)
         .contentType("application/json").content("{\"variants\":[{\"skuId\":" + skuId + ",\"costPrice\":22}]}"))
         .andExpect(status().isBadRequest());
@@ -681,7 +681,6 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
     assertThat(operationRecord(id).path("status").asText()).isEqualTo("selling");
     mvc.perform(put("/api/admin/accessory-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(ops))).andExpect(status().isBadRequest());
-    sourceStatus(id,"warehouse");
     assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
     sourceStatus(id,"selling");
     assertThat(operationRecord(id).path("sourceUnavailable").asBoolean()).isTrue();
@@ -690,8 +689,7 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     assertThat(operationRecord(id).path("status").asText()).isEqualTo("selling");
     sourceStatus(id,"offShelf");fullIdentity("admin");
     data(mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete("/api/admin/accessory-products/{id}",id)));
-    assertThat(operationRecord(id)).isNull();
-    sourceStatus(id,"warehouse");assertThat(operationRecord(id)).isNull();
+    assertThat(operationRecord(id)).isNull();assertThat(operationRecord(id)).isNull();
     ObjectNode row=sourceRecord(id);row.put("status","warehouse");((ObjectNode)row.path("variants").get(0)).put("costPrice",30);
     data(mvc.perform(put("/api/admin/accessory-products/{id}",id).contentType("application/json").content(json.writeValueAsBytes(row))));
     assertThat(operationRecord(id)).isNull();
@@ -710,7 +708,7 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     assertThat(operationRecord(id)).isNull();
   }
   @ParameterizedTest
-  @ValueSource(strings = {"warehouse", "selling", "offShelf", "soldOut", "recycle"})
+  @ValueSource(strings = {"warehouse", "selling", "soldOut", "recycle"})
   void operationPurgeRecordsActualPreviousStateAndPermanentDeletion(String operationStatus) throws Exception {
     long id = sourceFixture("平台发布", "selling").path("id").asLong();
     jdbc.update("UPDATE accessory_products SET status=? WHERE id=?", operationStatus, id);

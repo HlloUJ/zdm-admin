@@ -12,6 +12,6 @@ describe('resolveSlabPublishTargetStatus', () => {
   });
 
   it('falls back to the warehouse when publishing is unavailable for the current tab', () => {
-    expect(resolveSlabPublishTargetStatus('offShelf')).toBe('warehouse');
+    expect(resolveSlabPublishTargetStatus('recycle')).toBe('warehouse');
   });
 });

@@ -91,7 +91,7 @@ async function openEditor(page: Page) {
 }
 
 for (const canViewPrice of [true, false]) {
-  test(`supply-chain off-shelf slab price is ${canViewPrice ? 'read-only when granted' : 'hidden without permission'}`, async ({
+  test(`supply-chain warehouse slab price is ${canViewPrice ? 'read-only when granted' : 'hidden without permission'}`, async ({
     page,
   }) => {
     await installAdminApiMocks(page);
@@ -106,11 +106,11 @@ for (const canViewPrice of [true, false]) {
             name: '大板价格权限测试',
             roles: ['OPERATOR'],
             permissions: [
-              'supply-chain.slab-management.off-shelf.view',
-              'supply-chain.slab-management.off-shelf.detail',
-              'supply-chain.slab-management.off-shelf.restore',
-              'supply-chain.slab-management.off-shelf.delete',
-              ...(canViewPrice ? ['supply-chain.slab-management.off-shelf.price'] : []),
+              'supply-chain.slab-management.warehouse.view',
+              'supply-chain.slab-management.warehouse.edit',
+              'supply-chain.slab-management.warehouse.shelf',
+              'supply-chain.slab-management.warehouse.delete',
+              ...(canViewPrice ? ['supply-chain.slab-management.warehouse.price'] : []),
             ],
             dataPermission: 'all',
           }),
@@ -122,8 +122,8 @@ for (const canViewPrice of [true, false]) {
       id: 99601,
       name: '供应链已下架大板',
       serialNo: 'SLAB-COST',
-      status: 'offShelf',
-      sourceStatus: 'offShelf',
+      status: 'warehouse',
+      sourceStatus: 'warehouse',
       stock: 1,
       costPrice: 100,
       guidePrice: 200,
@@ -148,7 +148,7 @@ for (const canViewPrice of [true, false]) {
     );
     await page.goto('/supply-chain/slab-management');
     const main = page.getByRole('main');
-    await expect(main.locator('.table-actions .t-link')).toHaveText(['详情', '放回仓库', '删除']);
+    await expect(main.locator('.table-actions .t-link')).toHaveText(['上架', '编辑', '删除']);
     await expect(main.locator('.table-actions').getByText('价格', { exact: true })).toHaveCount(0);
   });
 }

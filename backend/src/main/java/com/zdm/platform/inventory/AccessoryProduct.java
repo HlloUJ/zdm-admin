@@ -116,6 +116,10 @@ public class AccessoryProduct extends BaseEntity implements com.zdm.platform.sec
   public String getOffShelfByName() { return offShelfByName; }
   public void setOffShelfByName(String value) { offShelfByName = value; }
 
+  @com.baomidou.mybatisplus.annotation.TableField(exist = false)
+  private String operation;
+  public String getOperation() { return operation; }
+  public void setOperation(String value) { operation = value; }
   private String offShelfReason;
   private java.time.LocalDateTime offShelfAt;
   public java.time.LocalDateTime getOffShelfAt() { return offShelfAt; }

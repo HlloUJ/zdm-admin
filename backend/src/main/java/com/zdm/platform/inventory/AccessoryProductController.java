@@ -54,7 +54,7 @@ public class AccessoryProductController extends AdminCrudController<AccessoryPro
     }
     permissionGuard.requireView(PERMISSION_PREFIX);
     permissionGuard.requireAnyPermission(permission("warehouse", "edit"), permission("selling", "edit"),
-        permission("off-shelf", "detail"), permission("sold-out", "detail"), permission("recycle", "detail"));
+        permission("sold-out", "detail"), permission("recycle", "detail"));
     permissionGuard.requireDataPermission();
     AccessoryProduct product = service.visibleDetail(id);
     if (product == null) { throw new IllegalArgumentException("配件不存在或不可访问"); }
@@ -164,12 +164,23 @@ public class AccessoryProductController extends AdminCrudController<AccessoryPro
   }
 
   private ApiResponse<AccessoryProduct> updateProduct(Long id, AccessoryProduct product, boolean editForm) {
+    if ("offShelf".equals(product.getStatus())) { throw new IllegalArgumentException("已下架状态已取消"); }
+    if (product.getOperation() != null && (!"offShelf".equals(product.getOperation()) || !"warehouse".equals(product.getStatus()))) {
+      throw new IllegalArgumentException("商品操作不正确");
+    }
     permissionGuard.requireDataPermission();
     AccessoryProduct existing = service.getById(id);
     if (existing == null) {
       throw new IllegalArgumentException("配件不存在或已被删除");
     }
     permissionGuard.requireData(existing);
+    if ("offShelf".equals(product.getOperation()) && !"selling".equals(isSupplyChain() ? existing.getSourceStatus() : existing.getStatus())) {
+      throw new IllegalArgumentException("只有已上架商品可以下架");
+    }
+    if ("selling".equals(isSupplyChain() ? existing.getSourceStatus() : existing.getStatus())
+        && "warehouse".equals(product.getStatus()) && !editForm && !"offShelf".equals(product.getOperation())) {
+      throw new org.springframework.security.access.AccessDeniedException("下架必须使用下架操作");
+    }
     if (isSupplyChain()) {
       if (editForm) {
         permissionGuard.requirePermission(permission(scope(existing.getSourceStatus()), "edit"));
@@ -182,7 +193,7 @@ public class AccessoryProductController extends AdminCrudController<AccessoryPro
           return ApiResponse.ok(visiblePrices(service.updateWithDetails(id, product, true)));
         }
         if("selling".equals(product.getStatus()) && permissionGuard.hasPermission(permission(scope(existing.getSourceStatus()),"edit"))) { return ApiResponse.ok(visiblePrices(service.updateWithDetails(id,product))); }
-        return ApiResponse.ok(visiblePrices(service.sourceTransition(id,product.getStatus(),product.getOffShelfReason(),product.getOffShelfDetail())));
+        return ApiResponse.ok(visiblePrices(service.sourceTransition(id,"offShelf".equals(product.getOperation()) ? "offShelf" : product.getStatus(),product.getOffShelfReason(),product.getOffShelfDetail())));
       }
       permissionGuard.requirePermission(permission(scope(existing.getSourceStatus()),"edit"));
       return ApiResponse.ok(visiblePrices(editForm
@@ -274,7 +285,6 @@ public class AccessoryProductController extends AdminCrudController<AccessoryPro
       return "warehouse";
     }
     return switch (status) {
-      case "offShelf" -> "off-shelf";
       case "soldOut" -> "sold-out";
       default -> status;
     };
@@ -290,13 +300,13 @@ public class AccessoryProductController extends AdminCrudController<AccessoryPro
     if ("warehouse".equals(source) && "selling".equals(target)) {
       return "shelf";
     }
-    if ("selling".equals(source) && "offShelf".equals(target)) {
+    if ("selling".equals(source) && "warehouse".equals(target)) {
       return "off-shelf";
     }
-    if (("offShelf".equals(source) || "recycle".equals(source)) && "warehouse".equals(target)) {
+    if ("recycle".equals(source) && "warehouse".equals(target)) {
       return "restore";
     }
-    if (("warehouse".equals(source) || "offShelf".equals(source)) && "recycle".equals(target)) {
+    if (("warehouse".equals(source) || "selling".equals(source)) && "recycle".equals(target)) {
       return "delete";
     }
     throw new org.springframework.security.access.AccessDeniedException("无权执行当前状态操作");

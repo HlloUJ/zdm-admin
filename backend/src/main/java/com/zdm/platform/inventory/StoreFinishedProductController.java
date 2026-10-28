@@ -27,9 +27,12 @@ public class StoreFinishedProductController {
           : Collections.unmodifiableList(new ArrayList<>(productIds));
     }
   }
-  public record TransitionRequest(@NotNull String target, String reason, String detail) {}
+  public record TransitionRequest(@NotNull String target, String reason, String detail, String operation) {
+    public TransitionRequest(String target, String reason, String detail) { this(target, reason, detail, null); }
+  }
   public record BatchRequest(@NotEmpty List<@NotNull Long> ids, @NotNull String target,
-      String reason, String detail) {
+      String reason, String detail, String operation) {
+    public BatchRequest(List<Long> ids, String target, String reason, String detail) { this(ids, target, reason, detail, null); }
     public BatchRequest {
       ids = ids == null ? null : Collections.unmodifiableList(new ArrayList<>(ids));
     }
@@ -110,8 +113,8 @@ public class StoreFinishedProductController {
       @Valid @RequestBody TransitionRequest request) {
     guard.requireDataPermission();
     var product = service.detail(id);
-    requireTransition(product, request.target(), false);
-    return ApiResponse.ok(service.changeStatus(id, request.target(), request.reason(), request.detail()));
+    requireTransition(product, command(request.target(), request.operation()), false);
+    return ApiResponse.ok(service.changeStatus(id, command(request.target(), request.operation()), request.reason(), request.detail()));
   }
 
   @PutMapping("/status/batch")
@@ -120,8 +123,8 @@ public class StoreFinishedProductController {
     guard.requireDataPermission();
     requireUniqueBatchIds(request.ids());
     var products = request.ids().stream().map(service::detail).toList();
-    products.forEach(product -> requireTransition(product, request.target(), true));
-    return ApiResponse.ok(service.changeStatusBatch(request.ids(), request.target(),
+    products.forEach(product -> requireTransition(product, command(request.target(), request.operation()), true));
+    return ApiResponse.ok(service.changeStatusBatch(request.ids(), command(request.target(), request.operation()),
         request.reason(), request.detail()));
   }
 
@@ -219,9 +222,15 @@ public class StoreFinishedProductController {
     guard.requirePermission(PREFIX + "." + current + "." + (batch ? "batch-" : "") + action);
   }
 
+  private static String command(String target, String operation) {
+    if ("offShelf".equals(target)) { throw new IllegalArgumentException("已下架状态已取消"); }
+    if (operation == null) { return target; }
+    if (!"offShelf".equals(operation) || !"warehouse".equals(target)) { throw new IllegalArgumentException("商品操作不正确"); }
+    return "offShelf";
+  }
+
   private static String scope(String status) {
     return switch (status) {
-      case "offShelf" -> "off-shelf";
       case "soldOut" -> "sold-out";
       default -> status;
     };

@@ -106,7 +106,7 @@ final class AccessoryProductListDetails {
 
   private Map<Long, String> listOffShelfOperators(List<AccessoryProduct> products) {
     List<Long> offShelfIds = products.stream()
-        .filter(product -> "offShelf".equals(lifecycle.isSupplyChain()
+        .filter(product -> "warehouse".equals(lifecycle.isSupplyChain()
             ? product.getSourceStatus() : product.getStatus()))
         .map(AccessoryProduct::getId).toList();
     if (offShelfIds.isEmpty()) {

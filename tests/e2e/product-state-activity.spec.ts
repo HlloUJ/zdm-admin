@@ -22,10 +22,10 @@ const surfaces = [
   { path: '/supply-chain/slab-management', client: 'supply-chain', kind: 'slab' },
   { path: '/store/finished-stock-management', client: 'store', kind: 'store' },
 ];
-const states = ['warehouse', 'selling', 'offShelf', 'soldOut', 'recycle'];
-const titles = ['仓库中', '已上架', '已下架', '已售完', '回收站'];
-const actorTitles = ['入库人', '上架人', '下架人', '', '移入人'];
-const timeTitles = ['入库时间', '上架时间', '下架时间', '售完时间', '移入时间'];
+const states = ['warehouse', 'selling', 'soldOut', 'recycle'];
+const titles = ['仓库中', '已上架', '已售完', '回收站'];
+const actorTitles = ['入库人', '上架人', '', '移入人'];
+const timeTitles = ['入库时间', '上架时间', '售完时间', '移入时间'];
 
 for (const surface of surfaces) {
   test(`${surface.path} shows state activity without source tags and keeps complete-list ordering`, async ({
@@ -145,9 +145,9 @@ for (const surface of surfaces) {
         name: `状态同步${id}`,
         sku: `SYNC-${id}`,
         serialNo: `SYNC-${id}`,
-        status: 'offShelf',
-        effectiveStatus: 'offShelf',
-        sourceStatus: surface.client === 'supply-chain' ? 'offShelf' : 'selling',
+        status: 'recycle',
+        effectiveStatus: 'recycle',
+        sourceStatus: surface.client === 'supply-chain' ? 'recycle' : 'selling',
         sourceUnavailable: false,
         stock: 2,
         totalStock: 2,
@@ -212,7 +212,7 @@ for (const surface of surfaces) {
       });
       await page.goto(surface.path);
       const main = page.getByRole('main');
-      await main.locator('.t-tabs__nav-item').filter({ hasText: '已下架' }).click();
+      await main.locator('.t-tabs__nav-item').filter({ hasText: '回收站' }).click();
       if (batch) {
         await main.locator('thead .t-checkbox').click();
         await main.getByRole('button', { name: '批量放回到仓库', exact: true }).click();
@@ -236,4 +236,92 @@ for (const surface of surfaces) {
       expect(unmocked).toEqual([]);
     });
   }
+}
+
+for (const surface of surfaces) {
+  test(`${surface.path} deletes selling directly to recycle without an intermediate down-shelf request`, async ({
+    page,
+  }) => {
+    await installStateMocks(page, surface.kind);
+    await page.addInitScript((client) => {
+      localStorage.setItem('zdm-admin-token', 'dev-token');
+      localStorage.setItem(
+        'zdm-admin-user',
+        JSON.stringify({
+          id: 1,
+          name: '删除流程测试员工',
+          clientCode: client === 'store' ? 'admin' : client,
+          roles: [client === 'store' ? 'STORE_ADMIN' : 'OPERATOR'],
+          permissions: ['all'],
+          dataPermission: 'all',
+          ...(client === 'store' ? { tenantId: 1, storeId: 2, storeType: 'cityPartner' } : {}),
+        }),
+      );
+    }, surface.client);
+    const endpoint =
+      surface.kind === 'slab'
+        ? 'slabs'
+        : surface.kind === 'store'
+          ? 'store-finished-products'
+          : surface.kind === 'store-accessory'
+            ? 'store-accessory-products'
+            : `${surface.kind}-products`;
+    const record = {
+      id: 801,
+      productId: 801,
+      name: '直接删除商品',
+      serialNo: 'DELETE-801',
+      status: 'selling',
+      effectiveStatus: 'selling',
+      sourceStatus: 'selling',
+      totalStock: 2,
+      stock: 2,
+      publisherType: '平台发布',
+      attributes: [],
+      variants: [],
+      skus: [],
+      guidePrices: [],
+      markupPrices: [],
+      offShelfRecords: [],
+      imageUrls: [],
+      mainImageUrls: [],
+      attributeNames: {},
+    };
+    let writes = 0;
+    await page.route(`**/api/admin/${endpoint}**`, async (route) => {
+      const request = route.request();
+      const path = new URL(request.url()).pathname;
+      if (path.endsWith('/action-check')) return route.fulfill({ json: { code: 0, data: true } });
+      if (request.method() !== 'GET') {
+        writes++;
+        const body = request.postDataJSON();
+        if (surface.kind === 'slab') expect(path).toBe(`/api/admin/${endpoint}/801/delete`);
+        else {
+          expect(body.target ?? body.status).toBe('recycle');
+          expect(body.operation).toBeUndefined();
+        }
+        record.status = record.effectiveStatus = 'recycle';
+        if (surface.client === 'supply-chain') record.sourceStatus = 'recycle';
+        return route.fulfill({ json: { code: 0, data: surface.kind === 'slab' ? true : record } });
+      }
+      if (path === `/api/admin/${endpoint}`) return route.fulfill({ json: { code: 0, data: [record] } });
+      if (path.endsWith('/801')) return route.fulfill({ json: { code: 0, data: record } });
+      if (path.endsWith('/categories') || path.endsWith('/attribute-template-options'))
+        return route.fulfill({ json: { code: 0, data: [] } });
+      return route.fallback();
+    });
+    await page.goto(surface.path);
+    const main = page.getByRole('main');
+    await expect(main.locator('.t-tabs__nav-item').filter({ hasText: '已下架' })).toHaveCount(0);
+    await main.locator('.t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+    await main.locator('tbody tr').filter({ hasText: '直接删除商品' }).getByText('删除', { exact: true }).click();
+    await page
+      .locator('.t-dialog:visible')
+      .getByRole('button', { name: /^确认删除(?:至回收站)?$/, exact: true })
+      .click();
+    await expect(main.locator('tbody tr').filter({ hasText: '直接删除商品' })).toHaveCount(0);
+    expect(writes).toBe(1);
+    await main.locator('.t-tabs__nav-item').filter({ hasText: '回收站' }).click();
+    await expect(main.locator('tbody tr').filter({ hasText: '直接删除商品' })).toHaveCount(1);
+  });
 }

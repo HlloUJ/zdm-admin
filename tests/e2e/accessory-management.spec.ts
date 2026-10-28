@@ -1144,7 +1144,7 @@ test('supply-chain layered product edit exposes cost for each specification', as
   await expectPriceTableStable(table, geometry);
 });
 
-test('restores the initial horizontal layout after visiting the off-shelf tab', async ({ page }) => {
+test('restores the initial horizontal layout after visiting the recycle tab', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
@@ -1156,7 +1156,7 @@ test('restores the initial horizontal layout after visiting the off-shelf tab', 
   const warehouse = await dimensions();
   await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
   const selling = await dimensions();
-  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已下架' }).click();
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '回收站' }).click();
   await expect
     .poll(async () => {
       const size = await dimensions();
@@ -2243,7 +2243,8 @@ for (const failSecond of [false, true]) {
       active += 1;
       maxActive = Math.max(maxActive, active);
       expect(route.request().postDataJSON()).toMatchObject({
-        status: 'offShelf',
+        status: 'warehouse',
+        operation: 'offShelf',
         offShelfReason: '价格调整',
         offShelfDetail: '批量调整',
       });
@@ -2251,8 +2252,8 @@ for (const failSecond of [false, true]) {
       active -= 1;
       if (failSecond && id === 72)
         return route.fulfill({ status: 400, json: { code: 400, message: '商品状态已变化', data: null } });
-      product.status = 'offShelf';
-      product.sourceStatus = 'offShelf';
+      product.status = 'warehouse';
+      product.sourceStatus = 'warehouse';
       product.stateOperatorName = `下架操作员${id}`;
       product.stateOperatedAt = '2026-10-27T06:01:27.644508Z';
       return route.fulfill({ json: { code: 0, data: product } });
@@ -2282,7 +2283,7 @@ for (const failSecond of [false, true]) {
       await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(0);
       await expect(main.getByText('批量下架商品73', { exact: true })).toHaveCount(0);
     }
-    await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已下架' }).click();
+    await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '仓库中' }).click();
     for (const id of failSecond ? [73] : [73, 72, 71]) {
       const row = main.locator('tbody tr').filter({ hasText: `批量下架商品${id}` });
       await expect(row).toContainText(`下架操作员${id}`);

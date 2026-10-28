@@ -39,15 +39,6 @@ export const supplyChainProducts: FunctionModule = {
                 ['batch-off-shelf', '批量下架'],
                 ['off-shelf', '下架'],
                 ['edit', '编辑'],
-              ]),
-            },
-            {
-              label: '已下架',
-              value: `${prefix}.off-shelf`,
-              actions: actions('off-shelf', [
-                ['batch-restore', '批量放回到仓库'],
-                ['detail', '详情'],
-                ['restore', '放回仓库'],
                 ['delete', '删除'],
               ]),
             },

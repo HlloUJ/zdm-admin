@@ -174,6 +174,10 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     record(product, before, after, "UPDATE");
   }
 
+  public void recordOperation(AccessoryProduct product, Map<String, Object> before, Map<String, Object> after, String type) {
+    record(product, before, after, type);
+  }
+
   private void record(AccessoryProduct product, Map<String, Object> before, Map<String, Object> after, String forcedType) {
     Map<String, Object> changes = new LinkedHashMap<>();
     Map<String, Object> source = after == null ? before : after;

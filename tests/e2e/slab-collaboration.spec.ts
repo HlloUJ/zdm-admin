@@ -33,7 +33,7 @@ async function setup(page: Page, status: string, sourceStatus = 'selling', detai
     name: '协同大板',
     serialNo: 'SLAB-COLLAB',
     status,
-    sourceStatus,
+    sourceStatus: sourceStatus === 'offShelf' ? 'warehouse' : sourceStatus,
     sourceUnavailable: !['selling', 'soldOut'].includes(sourceStatus),
     sourceMessage: !['selling', 'soldOut'].includes(sourceStatus) ? sourceBlockMessage(sourceStatus) : null,
     stock: 2,
@@ -61,7 +61,7 @@ async function setup(page: Page, status: string, sourceStatus = 'selling', detai
   await page.goto('/slab-management');
   await expect(page.getByRole('main').getByText('协同大板', { exact: true })).toBeVisible();
 }
-for (const status of ['offShelf', 'soldOut', 'recycle']) {
+for (const status of ['soldOut', 'recycle']) {
   test(`运营 ${status} 详情读取最新数据且不提供编辑`, async ({ page }) => {
     await setup(page, status);
     await page.getByRole('main').locator('.table-actions').getByText('详情', { exact: true }).click();
@@ -127,7 +127,7 @@ test('运营角色候选目录五个状态均显示详情且默认不勾选', as
   const rows = dialog.locator('.permission-matrix tbody tr');
   const first = rows.filter({ hasText: '大板管理页' }).first();
   const index = await first.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
-  for (const [offset, label] of ['仓库中', '已上架', '已下架', '已售完', '回收站'].entries()) {
+  for (const [offset, label] of ['仓库中', '已上架', '已售完', '回收站'].entries()) {
     const row = rows.nth(index + offset + 1);
     await expect(row.locator('.permission-tab-text')).toHaveText(label);
     await expect(row.getByRole('checkbox', { name: offset < 2 ? '编辑' : '详情', exact: true })).not.toBeChecked();
@@ -162,7 +162,7 @@ test('操作时来源已下架会刷新遮罩并清除旧选择', async ({ page 
             name: '协同大板',
             serialNo: 'SLAB-COLLAB',
             status: 'selling',
-            sourceStatus: 'offShelf',
+            sourceStatus: 'warehouse',
             sourceUnavailable: true,
             sourceMessage: sourceBlockMessage('offShelf'),
           },
@@ -208,7 +208,7 @@ test('操作时来源不可用直接刷新遮罩，不显示 toast 或确认弹�
             name: '协同大板',
             serialNo: 'SLAB-COLLAB',
             status: 'selling',
-            sourceStatus: 'offShelf',
+            sourceStatus: 'warehouse',
             sourceUnavailable: true,
             sourceMessage: sourceBlockMessage('offShelf'),
           },
@@ -259,10 +259,6 @@ for (const [status, actions] of Object.entries({
   selling: [
     ['编辑', 'edit'],
     ['下架', 'off-shelf'],
-  ],
-  offShelf: [
-    ['详情', 'detail'],
-    ['放回仓库', 'restore'],
     ['删除', 'delete'],
   ],
   recycle: [
@@ -294,7 +290,7 @@ for (const [status, actions] of Object.entries({
                 name: '协同大板',
                 serialNo: 'SLAB-COLLAB',
                 status,
-                sourceStatus: 'offShelf',
+                sourceStatus: 'warehouse',
                 sourceUnavailable: true,
                 sourceMessage: sourceBlockMessage('offShelf'),
               },
@@ -337,7 +333,7 @@ test('批量上架部分成功，失败横幅可关闭并在页面刷新后清�
       return route.fulfill({ json: { code: 0, data: true } });
     }
     if (id === 99603) {
-      records[2].sourceStatus = 'offShelf';
+      records[2].sourceStatus = 'warehouse';
       records[2].sourceUnavailable = true;
       records[2].sourceMessage = sourceBlockMessage('offShelf');
     }
@@ -574,7 +570,7 @@ for (const sourceRestored of [true, false]) {
       name: '协同大板',
       serialNo: 'SLAB-COLLAB',
       status: 'selling',
-      sourceStatus: sourceRestored ? 'selling' : 'offShelf',
+      sourceStatus: sourceRestored ? 'selling' : 'warehouse',
       sourceUnavailable: true,
       sourceMessage: '该商品已被供应链下架',
       stock: 2,

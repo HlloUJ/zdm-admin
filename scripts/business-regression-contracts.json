@@ -18,7 +18,11 @@
         "backend/src/main/java/com/zdm/platform/inventory/StateActivityTime.java",
         "src/services/finishedMarkupConfigurations.ts",
         "src/services/accessoryMarkupConfigurations.ts",
-        "src/services/slabMarkupConfigurations.ts"
+        "src/services/slabMarkupConfigurations.ts",
+        "src/services/functionCatalog.ts",
+        "src/services/functionCatalogAdminData.ts",
+        "src/services/functionCatalogStoreData.ts",
+        "src/services/functionCatalogSupplyData.ts"
       ],
       "tables": [
         "product_state_activity",
@@ -110,6 +114,7 @@
         "backend/src/main/java/com/zdm/platform/supplier/SupplierService.java",
         "backend/src/main/java/com/zdm/platform/tenant/TenantController.java",
         "backend/src/main/java/com/zdm/platform/tenant/TenantService.java",
+        "src/components/permission/PermissionAssignmentMatrix.vue",
         "src/composables/useCommodityModule.ts",
         "src/modules/accessory/routes.ts",
         "src/pages/finished-stock/management/components/FinishedCreationSnapshot.vue",
@@ -135,7 +140,13 @@
         "src/pages/finished-stock/store/storeOperationLog.ts",
         "src/pages/finished-stock/store/useStoreFinishedLogs.ts",
         "src/pages/finished-stock/supply-chain/index.vue",
+        "src/pages/order/prototype/SalesOrderList.vue",
+        "src/pages/order/prototype/index.vue",
+        "src/pages/order/prototype/resources.ts",
+        "src/pages/permission/employee/index.vue",
+        "src/pages/permission/terminal-function/index.vue",
         "src/pages/product/markup-configuration/index.vue",
+        "src/pages/role/management/index.vue",
         "src/pages/slab/management/index.vue",
         "src/pages/slab/shared/slabFormRules.ts",
         "src/pages/slab/shared/slabListFilter.ts",
@@ -150,11 +161,16 @@
         "src/services/accessoryProducts.ts",
         "src/services/finishedMarkupConfigurations.ts",
         "src/services/finishedProducts.ts",
+        "src/services/functionCatalog.ts",
+        "src/services/functionCatalogAdminData.ts",
+        "src/services/functionCatalogStoreData.ts",
+        "src/services/functionCatalogSupplyData.ts",
         "src/services/productStateActivity.ts",
         "src/services/slabMarkupConfigurations.ts",
         "src/services/slabs.ts",
         "src/services/storeAccessoryStock.ts",
-        "src/services/storeFinishedStock.ts"
+        "src/services/storeFinishedStock.ts",
+        "src/services/terminalFunctionPolicies.ts"
       ],
       "browserTests": [
         "tests/e2e/accessory-management.spec.ts",
@@ -176,7 +192,9 @@
         "tests/e2e/slab-publish-layout.spec.ts",
         "tests/e2e/store-accessory-management.spec.ts",
         "tests/e2e/store-finished-stock.spec.ts",
-        "tests/e2e/store-product-menu.spec.ts"
+        "tests/e2e/store-product-menu.spec.ts",
+        "tests/e2e/pagination-responsive.spec.ts",
+        "tests/e2e/store-order-prototype.spec.ts"
       ],
       "backendTests": [
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
@@ -184,38 +202,57 @@
         "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
-        "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java"
+        "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java",
+        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java"
       ],
       "protectedTests": {
-        "tests/e2e/product-state-activity.spec.ts": "f1113b5a247e70570295c0ae102448220c495f7e45f1254cdc0dbb1f3b70648f",
-        "tests/e2e/finished-stock.spec.ts": "71f18a2f430aa51df9cc0cf9773f08584502ed14177331b91335e15336f42d50",
-        "tests/e2e/accessory-management.spec.ts": "572a2937b59cd5a01fb0706751f853ccee772f5022ee370a37348f9fdb641903",
-        "tests/e2e/slab-collaboration.spec.ts": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
-        "tests/e2e/store-finished-stock.spec.ts": "922ff10f1c9f988a9a9259faed91513f02578ee56df7baba49dbfd46dfdcc94a",
-        "tests/e2e/store-accessory-management.spec.ts": "573eb6f864dbeba824a3b0f413be0b06159d2c0eb538b5820aa21c9ba505b6df",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "74b7b07dad5e8e7cfae7631328e60caa89ef7f01dc326fb29fa2fa96b6aded32",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "c709eac72b931fe72162c2a3c2bb7c1e9c347af055b6153e44d1dd673d057329",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "11588ee1bee96cf996873095eb4f764b62d90623ddcfa6eb17e98572a2f83dad",
+        "tests/e2e/product-state-activity.spec.ts": "61b331414921d1ced597c0405515031b877dec8f27fe5c613edc78fe6cae1318",
+        "tests/e2e/finished-stock.spec.ts": "3c022fef1f37b123147914c34f8c65bc96275c65d74f8b7a678f98234bd1ce87",
+        "tests/e2e/accessory-management.spec.ts": "c8501bae4ff414db1ba4105f9f0344ea3421c21cd9b4ad2b054188c96a029516",
+        "tests/e2e/slab-collaboration.spec.ts": "cd53c43eceffbfd446ccf1fd216baac52e5ea087cbe18247c3abb7853da3ea52",
+        "tests/e2e/store-finished-stock.spec.ts": "2d632ff009e86b304f1c4a5b380b13c7aeccacb9e3ad09d8c97b202d121b7a83",
+        "tests/e2e/store-accessory-management.spec.ts": "457271f209aea19f8481a2a061f18d9155f2968b69311b8522d02f59b4bd0f61",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "7ed302daa5d817c09f3258894b03893f808e05f64dfbc4b1375216f7ef795aad",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "80709b6a8571b70ef9b40624f90f89e89c0f42913094e2a85ad712bfd5b33fd4",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "9d7e89a1542e607bbfff8ba59a834651f930cb12b376be5f291022e274620240",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "0f511eb1a551cb8e795a52a463c204231c4f6da60525a1653acb1318a0b51ff2",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "00afc65311b86b46d943b5fdbf375f5362483fe495dffc6f21c953ff7d334f6f",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "a719033e240e5671452c05f23a44ba4e2806b9e4f65c9a1c5ab027daeb14731b",
-        "tests/e2e/accessory-permissions.spec.ts": "8e2ebbaf06b34827b8413f2f036e9ab6c7461597d9c3693d66fc69a465eef1dc",
-        "tests/e2e/admin-foundation.spec.ts": "92c1d6fe48013d207a9006f66049f22b8164af4a0263f998f6d4742e8212dd8f",
+        "tests/e2e/accessory-permissions.spec.ts": "d088c5bc7c3dd02a723e45534f3877ac6d0605cc763288622b69501e49e90a09",
+        "tests/e2e/admin-foundation.spec.ts": "b875b68ca2919268cd75520ce7eab4379207b0e389a6b027b187596b78d15a8a",
         "tests/e2e/collapsed-menu-hover.spec.ts": "a51200c9d155d1e2389eaeb727b129ac52dab42121d86fc25e3a7e04b7893e50",
-        "tests/e2e/feedback-foundation.spec.ts": "74114444a974d28f566a7c6403124365a0e515ea7a1d675bfec84b5119f052e6",
-        "tests/e2e/finished-stock-permissions.spec.ts": "a9a22198ed96331cb3cb052d44729bb7a49e36fba04f23c07d5a864248fc777e",
+        "tests/e2e/feedback-foundation.spec.ts": "acdbe722f21b77a351f4cd811a49047481ceb9ada9e43bce61fe811ef92c43f5",
+        "tests/e2e/finished-stock-permissions.spec.ts": "4ef1e34ae7814e9feb803caaf6a975781a912e75fa2018448351879cd9148a04",
         "tests/e2e/login.spec.ts": "95a37dab5cf03f2bbd14a2bba406aa2b3bbdaad59bb42985436ff85bd7827958",
         "tests/e2e/markup-configuration.spec.ts": "5ba9ef84aef59fcec2465399ec0d6638fd006902f851e85e8f1ef141e63012f9",
         "tests/e2e/media-upload-standard.spec.ts": "fddf7c1bef1d9e4a0da25b1151866a1c12727ce6c434714a18e2bb33c6271f0d",
-        "tests/e2e/permission-center.spec.ts": "3ab23b4c807f89c55420477a5adf6353d24a6ec67a4bf280c4f0a3a95198152a",
+        "tests/e2e/permission-center.spec.ts": "5716c9bd0fcd3cbcabb601eb371cebc85bbbd7a8cfd0da03e720392fef8e201d",
         "tests/e2e/query-responsive.spec.ts": "906a79b2ee6e3749db2a81746e8100a358ff5f7cce4937b02fa065bd49b2e699",
-        "tests/e2e/slab-price-editor.spec.ts": "2731aae413d8618179e5cf80ddfc86869873ded9fb9372faa2a35fb256892600",
+        "tests/e2e/slab-price-editor.spec.ts": "318148b28dd4191e8502c594c4c6c877a877a32fdafe2fb32088366c1e35ac73",
         "tests/e2e/slab-publish-layout.spec.ts": "336b5cf9915015361f5597143c534fe6971a83434c99a3d5f06c6151d9b2f39e",
         "tests/e2e/store-product-menu.spec.ts": "c1e98722a53c712895b02a6c32bae07b9ad491deac1ff79d7253fa974a9532ae",
         "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
         "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
-        "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156"
+        "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156",
+        "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "752403c60269e0d67a0701829e38ae971d3d474a489b5b36209d92bd7cc9b720",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java": "a96eecb919ee227cb1db0a3207c33ac9f4b53e5be3e2a9da04088e1f0def7de7",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java": "070e539aca7eb6fbe8da2c7bfa2173707994ad62f1e5dc7087042331335edce9",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "879235a0faee60b6fbd2b4fa7089bc0cd4b54caf413fea9dae70108fb39bb58f",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "b4e3e2589d6b6972da99285b3642853a00cc3c7ef1c5b9fc0ff980cd8f5d468d",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "90f6ce04efa8698d667167458de92baff1a0cdce262759f428e16254d175615e",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "62101df16f1623f4f3fcc17c68364f6820d30ef5e54d08bd83018fc3bd5726cf",
+        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "ea2e528f739d304c957d87672f9bc59fadbd815b4456e32c9194a6e5e4f9f265",
+        "tests/e2e/accessory-api-mocks.ts": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
+        "tests/e2e/pagination-responsive.spec.ts": "58b17d0767df10f71b821d4b7379567a17a9d419282325ab7a25fbcc370a3991",
+        "tests/e2e/store-order-prototype.spec.ts": "e9abcbb1ae989a747a2d6abe9c76fe51cb3757eb62f756c144afaf61ceb1fe42"
       },
       "testChanges": [
         {
@@ -283,6 +320,108 @@
           "before": "7c4073b72f4b0ad69ce09c038cd40677f4a59cddf0b126272c4284cfc073bbe8",
           "after": "5ba9ef84aef59fcec2465399ec0d6638fd006902f851e85e8f1ef141e63012f9",
           "reason": "正式交付CI40614012479定位配件初始化请求未Mock：仅补齐专用配件/认证/指导价夹具，新增未Mock API必须失败断言；原业务断言、超时、覆盖及零重试逐项保留。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "572a2937b59cd5a01fb0706751f853ccee772f5022ee370a37348f9fdb641903",
+          "after": "c8501bae4ff414db1ba4105f9f0344ea3421c21cd9b4ad2b054188c96a029516",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/accessory-permissions.spec.ts",
+          "before": "8e2ebbaf06b34827b8413f2f036e9ab6c7461597d9c3693d66fc69a465eef1dc",
+          "after": "d088c5bc7c3dd02a723e45534f3877ac6d0605cc763288622b69501e49e90a09",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "92c1d6fe48013d207a9006f66049f22b8164af4a0263f998f6d4742e8212dd8f",
+          "after": "b875b68ca2919268cd75520ce7eab4379207b0e389a6b027b187596b78d15a8a",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/feedback-foundation.spec.ts",
+          "before": "74114444a974d28f566a7c6403124365a0e515ea7a1d675bfec84b5119f052e6",
+          "after": "acdbe722f21b77a351f4cd811a49047481ceb9ada9e43bce61fe811ef92c43f5",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/finished-stock-permissions.spec.ts",
+          "before": "a9a22198ed96331cb3cb052d44729bb7a49e36fba04f23c07d5a864248fc777e",
+          "after": "4ef1e34ae7814e9feb803caaf6a975781a912e75fa2018448351879cd9148a04",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "71f18a2f430aa51df9cc0cf9773f08584502ed14177331b91335e15336f42d50",
+          "after": "3c022fef1f37b123147914c34f8c65bc96275c65d74f8b7a678f98234bd1ce87",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/permission-center.spec.ts",
+          "before": "3ab23b4c807f89c55420477a5adf6353d24a6ec67a4bf280c4f0a3a95198152a",
+          "after": "5716c9bd0fcd3cbcabb601eb371cebc85bbbd7a8cfd0da03e720392fef8e201d",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/product-state-activity.spec.ts",
+          "before": "f1113b5a247e70570295c0ae102448220c495f7e45f1254cdc0dbb1f3b70648f",
+          "after": "61b331414921d1ced597c0405515031b877dec8f27fe5c613edc78fe6cae1318",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
+          "after": "cd53c43eceffbfd446ccf1fd216baac52e5ea087cbe18247c3abb7853da3ea52",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/slab-price-editor.spec.ts",
+          "before": "2731aae413d8618179e5cf80ddfc86869873ded9fb9372faa2a35fb256892600",
+          "after": "318148b28dd4191e8502c594c4c6c877a877a32fdafe2fb32088366c1e35ac73",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "573eb6f864dbeba824a3b0f413be0b06159d2c0eb538b5820aa21c9ba505b6df",
+          "after": "457271f209aea19f8481a2a061f18d9155f2968b69311b8522d02f59b4bd0f61",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "922ff10f1c9f988a9a9259faed91513f02578ee56df7baba49dbfd46dfdcc94a",
+          "after": "2d632ff009e86b304f1c4a5b380b13c7aeccacb9e3ad09d8c97b202d121b7a83",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
+          "after": "7ed302daa5d817c09f3258894b03893f808e05f64dfbc4b1375216f7ef795aad",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "74b7b07dad5e8e7cfae7631328e60caa89ef7f01dc326fb29fa2fa96b6aded32",
+          "after": "80709b6a8571b70ef9b40624f90f89e89c0f42913094e2a85ad712bfd5b33fd4",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
+          "after": "9d7e89a1542e607bbfff8ba59a834651f930cb12b376be5f291022e274620240",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "c709eac72b931fe72162c2a3c2bb7c1e9c347af055b6153e44d1dd673d057329",
+          "after": "0f511eb1a551cb8e795a52a463c204231c4f6da60525a1653acb1318a0b51ff2",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "11588ee1bee96cf996873095eb4f764b62d90623ddcfa6eb17e98572a2f83dad",
+          "after": "00afc65311b86b46d943b5fdbf375f5362483fe495dffc6f21c953ff7d334f6f",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
         }
       ],
       "routes": [
@@ -321,7 +460,8 @@
       "supportFiles": [
         "tests/e2e/admin-api-mocks.ts",
         "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java",
-        "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java"
+        "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java",
+        "tests/e2e/accessory-api-mocks.ts"
       ]
     }
   ]

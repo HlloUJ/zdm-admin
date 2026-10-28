@@ -35,7 +35,7 @@ public class StoreAccessoryProductService {
       List<AccessoryProductAttributeEntry> attributes, List<AccessorySpecDimension> specDimensions,
       List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, String offShelfReason,
       String offShelfDetail, LocalDateTime offShelfAt, Map<String, String> attributeNames,
-      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt) {
+      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt, String offShelfByName) {
     public ProductView {
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
@@ -351,8 +351,7 @@ public class StoreAccessoryProductService {
     }
     boolean allowed = switch (current) {
       case "warehouse" -> List.of("selling", "recycle").contains(target);
-      case "selling" -> "offShelf".equals(target);
-      case "offShelf" -> List.of("warehouse", "recycle").contains(target);
+      case "selling" -> List.of("offShelf", "recycle").contains(target);
       case "recycle" -> "warehouse".equals(target);
       default -> false;
     };
@@ -368,12 +367,13 @@ public class StoreAccessoryProductService {
     if (reason != null && reason.length() > 80 || detail != null && detail.length() > 500) {
       throw new IllegalArgumentException("下架说明超出长度限制");
     }
+    String nextState = "offShelf".equals(target) ? "warehouse" : target;
     jdbc.update("""
         UPDATE store_accessory_products
         SET status = ?, off_shelf_reason = ?, off_shelf_detail = ?,
           off_shelf_at = CASE WHEN ? = 'offShelf' THEN CURRENT_TIMESTAMP ELSE NULL END
         WHERE id = ? AND tenant_id = ? AND store_id = ?
-        """, target, "offShelf".equals(target) ? reason : null,
+        """, nextState, "offShelf".equals(target) ? reason : null,
         "offShelf".equals(target) ? detail : null, target, id, store.tenantId(), store.storeId());
     String type = switch (target) {
       case "selling" -> "SHELF";
@@ -388,13 +388,13 @@ public class StoreAccessoryProductService {
       default -> "删除至回收站";
     };
     Map<String, Object> changes = new LinkedHashMap<>();
-    changes.put("状态", Map.of("before", current, "after", target));
+    changes.put("状态", Map.of("before", current, "after", nextState));
     if ("offShelf".equals(target)) {
       changes.put("下架原因", reason);
       if (detail != null && !detail.isBlank()) { changes.put("详细说明", detail); }
     }
     log(store, id, number(listing.get("accessory_product_id")), (String) source.get("name"),
-        type, summary, current, target, changes);
+        type, summary, current, nextState, changes);
     return detail(id);
   }
 
@@ -676,12 +676,19 @@ public class StoreAccessoryProductService {
             .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName, number(listing.get("store_category_id")),
         pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))), flag(listing.get("sale_price_attention")),
         effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_name") : null,
-        effective.equals(listing.get("activity_state")) ? timestamp(listing.get("state_operated_at")) : null);
+        effective.equals(listing.get("activity_state")) ? timestamp(listing.get("state_operated_at")) : null,
+        "warehouse".equals(status) && listing.get("off_shelf_at") != null ? latestOffShelfActor(listing) : null);
     return legacyHistoricalView(listing, rendered);
   }
 
   // Pre-migration invalid records have no invalidation-time snapshot. Use their genuine
   // selection snapshot, explicitly labelled; never pretend current source prices are historical.
+  private String latestOffShelfActor(Map<String, Object> listing) {
+    List<String> names = jdbc.queryForList("SELECT operator_name FROM store_accessory_operation_logs WHERE tenant_id=? AND store_id=? AND listing_id=? AND (operation_type='OFF_SHELF' OR (operation_type='SOURCE_UPDATE' AND before_status='selling' AND after_status='warehouse')) ORDER BY operated_at DESC,id DESC LIMIT 1",
+        String.class, listing.get("tenant_id"), listing.get("store_id"), listing.get("id"));
+    return names.isEmpty() ? null : names.getFirst();
+  }
+
   private ProductView legacyHistoricalView(Map<String, Object> listing, ProductView current) {
     if (!invalidated(listing) || listing.get("invalidated_snapshot") != null) { return current; }
     List<String> logs = jdbc.queryForList("""
@@ -801,7 +808,7 @@ public class StoreAccessoryProductService {
       reasons.add("该商品已被运营管理平台彻底删除");
     } else if ("recycle".equals(source.get("status"))) {
       reasons.add("该商品已被运营管理平台删除至回收站");
-    } else if ("offShelf".equals(source.get("status"))) {
+    } else if ("warehouse".equals(source.get("status"))) {
       reasons.add("该商品已被运营管理平台下架");
     } else if ("warehouse".equals(source.get("status"))) {
       reasons.add("该商品当前未在运营管理平台上架");

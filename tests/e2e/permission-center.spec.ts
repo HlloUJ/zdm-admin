@@ -1115,23 +1115,22 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('商品管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(37);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(34);
   const finishedRows = roleMatrix.locator('tbody tr');
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
     ['查看', '批量上架', '上架', '编辑', '删除'],
-    ['查看', '批量下架', '下架', '编辑'],
-    ['查看', '批量放回到仓库', '详情', '放回仓库', '删除'],
+    ['查看', '批量下架', '下架', '编辑', '删除'],
     ['查看', '详情'],
     ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],
   ];
   for (const [index, labels] of expectedFinishedActions.entries()) {
     await expect(finishedRows.nth(index).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
   }
-  await expect(finishedRows.nth(6)).toContainText('配件管理页');
+  await expect(finishedRows.nth(5)).toContainText('配件管理页');
   for (const [index, labels] of expectedFinishedActions.entries()) {
-    await expect(finishedRows.nth(index + 6).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
+    await expect(finishedRows.nth(index + 5).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
   }
   await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(adminProductSecondMenuLabels);
   await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
@@ -1331,7 +1330,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
       await expect(matrix.locator('tbody .permission-menu-cell')).toHaveText(['成品现货管理', '配件管理']);
       await expect(matrix.getByText('成品现货管理页', { exact: true })).toBeVisible();
       await expect(matrix.getByText('配件管理页', { exact: true })).toBeVisible();
-      for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
+      for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
         await expect(matrix.getByText(tab, { exact: true })).toHaveCount(2);
       }
       await moduleList.getByText('客户管理', { exact: true }).click();
@@ -1402,7 +1401,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
   await expect(matrix.locator('.module-allocation-count')).toHaveText('已下放 14 / 14');
 });
 
-test('assigns supply-chain off-shelf detail rights separately for finished stock, accessories and slabs', async ({
+test('assigns supply-chain selling delete rights separately for finished stock, accessories and slabs', async ({
   page,
 }) => {
   await page.goto('/terminal-function-allocation');
@@ -1413,13 +1412,13 @@ test('assigns supply-chain off-shelf detail rights separately for finished stock
   await expect(matrix.getByText('成品现货管理页', { exact: true })).toBeVisible();
   await expect(matrix.getByText('大板管理页', { exact: true })).toBeVisible();
   const offShelf = matrix.locator('tbody tr').filter({
-    has: page.locator('.permission-tab-cell').getByText('已下架', { exact: true }),
+    has: page.locator('.permission-tab-cell').getByText('已上架', { exact: true }),
   });
   await expect(offShelf).toHaveCount(3);
   for (let index = 0; index < 3; index += 1) {
-    const detail = offShelf.nth(index).getByRole('checkbox', { name: '详情', exact: true });
+    const detail = offShelf.nth(index).getByRole('checkbox', { name: '删除', exact: true });
     await expect(detail).toBeEnabled();
-    await offShelf.nth(index).getByText('详情', { exact: true }).click();
+    await offShelf.nth(index).getByText('删除', { exact: true }).click();
   }
 
   const saved = page.waitForRequest(
@@ -1427,9 +1426,9 @@ test('assigns supply-chain off-shelf detail rights separately for finished stock
   );
   await main.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
   const permissions = (await saved).postDataJSON().functionPermissions.split(',');
-  expect(permissions).toContain('supply-chain.finished-stock-management.off-shelf.detail');
-  expect(permissions).toContain('supply-chain.accessory-management.off-shelf.detail');
-  expect(permissions).toContain('supply-chain.slab-management.off-shelf.detail');
+  expect(permissions).toContain('supply-chain.finished-stock-management.selling.delete');
+  expect(permissions).toContain('supply-chain.accessory-management.selling.delete');
+  expect(permissions).toContain('supply-chain.slab-management.selling.delete');
 });
 
 for (const storeType of ['cityPartner', 'slabSupplier']) {

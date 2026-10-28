@@ -134,6 +134,8 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   await expect(page.locator('.filter-fields .t-form__label')).toHaveText([
     '大板：',
     '品种：',
+    '下架原因：',
+    '下架人：',
     '产地：',
     '纹理：',
     '色系：',
@@ -148,12 +150,20 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   const keywordBox = (await page.locator('.slab-keyword-filter').boundingBox())!;
   const supplierBox = (await page.locator('.supplier-filter').boundingBox())!;
   const searchBox = (await page.getByRole('button', { name: '查询', exact: true }).boundingBox())!;
-  expect(supplierBox.x).toBeCloseTo(keywordBox.x, 0);
+  const queryColumns = await page
+    .locator('.filter-fields')
+    .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+  const firstRowPeer = await page
+    .locator('.filter-fields .t-form__item')
+    .nth(8 % queryColumns)
+    .boundingBox();
+  expect(supplierBox.x).toBeCloseTo(firstRowPeer!.x, 0);
   expect(supplierBox.y).toBeGreaterThan(keywordBox.y);
   expect(searchBox.y).toBeCloseTo(keywordBox.y, 0);
-  expect(searchBox.x).toBeGreaterThan(supplierBox.x + supplierBox.width);
+  const supplierControl = (await page.locator('.supplier-filter .t-input').boundingBox())!;
+  expect(searchBox.x).toBeGreaterThan(supplierControl.x + supplierControl.width);
 
-  for (const tabLabel of ['仓库中 1', '已上架', '已下架', '已售完', '回收站 2']) {
+  for (const tabLabel of ['仓库中 1', '已上架', '已售完', '回收站 2']) {
     await page.getByText(tabLabel, { exact: true }).click();
     await expect(keywordInput).toBeVisible();
   }
@@ -184,14 +194,14 @@ for (const client of ['admin', 'supply-chain'] as const) {
     ];
     for (const [width, columns] of sizes) {
       await page.setViewportSize({ width, height: 1080 });
-      for (const tab of ['仓库中', '已下架']) {
+      for (const tab of ['仓库中', '已上架']) {
         await page
           .locator('.status-tabs')
           .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))
           .click();
         const fields = page.locator('.filter-fields');
         const items = fields.locator('.t-form__item');
-        await expect(items).toHaveCount(tab === '已下架' ? 4 : 7);
+        await expect(items).toHaveCount(tab === '仓库中' ? 9 : 7);
         const boxes = await items.evaluateAll((elements) =>
           elements.map((el) => {
             const { x, y, width } = el.getBoundingClientRect();
@@ -241,7 +251,7 @@ for (const client of ['admin', 'supply-chain'] as const) {
           .locator('.t-form__controls')
           .boundingBox())!;
         expect(search.x).toBeGreaterThan(lastControl.x + lastControl.width);
-        if (tab === '已下架') {
+        if (tab === '仓库中') {
           await expect(fields.locator('.off-shelf-date-filter')).toHaveCount(0);
           for (const input of await fields.locator('.t-form__controls').all()) {
             expect((await input.boundingBox())!.width).toBeGreaterThanOrEqual(134);
@@ -567,7 +577,7 @@ test('resets category browsing and keeps the four-level filter popup stable', as
 test('keeps slab filters inside the card across status tabs', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.goto('/slab-management');
-  for (const tab of ['已下架', '仓库中', '已上架', '已售完', '回收站']) {
+  for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
     await page
       .locator('.status-tabs')
       .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))
@@ -581,8 +591,18 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
     });
     expect(overflow, tab).toBe(false);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tab).toBe(true);
-    if (tab === '已下架') {
-      await expect(fields.locator('.t-form__label')).toHaveText(['大板：', '品种：', '下架原因：', '下架人：']);
+    if (tab === '仓库中') {
+      await expect(fields.locator('.t-form__label')).toHaveText([
+        '大板：',
+        '品种：',
+        '下架原因：',
+        '下架人：',
+        '产地：',
+        '纹理：',
+        '色系：',
+        '等级：',
+        '供应商：',
+      ]);
     } else {
       await expect(fields.locator('.t-form__label')).toHaveText([
         '大板：',
@@ -597,7 +617,7 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
   }
 });
 
-test('shows off-shelf actor and reason before time instead of creator metadata', async ({ page }) => {
+test('shows warehouse actor and retained down-shelf reason instead of creator metadata', async ({ page }) => {
   await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
     route.fulfill({ json: { code: 0, data: [] } }),
   );
@@ -610,7 +630,7 @@ test('shows off-shelf actor and reason before time instead of creator metadata',
             id: 71,
             name: '下架展示测试商品',
             sku: 'OFF-71',
-            status: 'offShelf',
+            status: 'warehouse',
             createdByName: '商品创建者',
             createdAt: '2026-07-01T01:00:00',
             offShelfByName: '实际下架人',
@@ -627,10 +647,10 @@ test('shows off-shelf actor and reason before time instead of creator metadata',
   await page.goto('/finished-stock-management');
   await page
     .locator('.status-tabs')
-    .getByText(/^已下架(?: [0-9]+)?$/)
+    .getByText(/^仓库中(?: [0-9]+)?$/)
     .click();
   const headers = await page.locator('thead th').allTextContents();
-  expect(headers.join('|')).toContain('下架原因/详细说明|下架人|下架时间');
+  expect(headers.join('|')).toContain('下架原因/详细说明|入库人|入库时间');
   expect(headers.join('|')).not.toContain('创建人');
   expect(headers.join('|')).not.toContain('创建时间');
   const row = page.locator('tbody tr').filter({ hasText: '下架展示测试商品' });
@@ -643,7 +663,7 @@ test('does not add empty-cell padding to the finished stock horizontal scroll wi
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [] } }));
   await page.goto('/finished-stock-management');
-  for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
+  for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
     await page.locator('.status-tabs').getByText(tab, { exact: true }).click();
     const table = page.locator('.finished-stock-table');
     await expect(table.getByText('暂无数据')).toBeVisible();
@@ -660,7 +680,7 @@ test('does not add empty-cell padding to the finished stock horizontal scroll wi
     });
     expect(sizes.scrollWidth, tab).toBeLessThanOrEqual(sizes.expectedWidth + 1);
     expect(sizes.emptyLeft, tab).toBeCloseTo(sizes.contentLeft, 0);
-    if (tab === '已下架') {
+    if (tab === '仓库中') {
       const operation = table.locator('thead th').last();
       await expect
         .poll(async () => {

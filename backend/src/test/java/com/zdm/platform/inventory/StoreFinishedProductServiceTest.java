@@ -58,6 +58,36 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     SecurityContextHolder.clearContext();
   }
 
+  @Test
+  @Transactional
+  void downShelfEndpointsRequireActionPermissionAndPersistWarehouse() throws Exception {
+    jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES(99791,1,'下架接口门店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO finished_products(id,name,total_stock,status,source_status,operations_deleted) VALUES(99791,'下架接口成品',2,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO store_finished_products(id,tenant_id,store_id,finished_product_id,status,selected_by_account_id) VALUES(99791,1,99791,99791,'selling',1)");
+    for (boolean batch : List.of(false, true)) {
+      jdbc.update("UPDATE store_finished_products SET status='selling' WHERE id=99791");
+      String path = "/api/admin/store-finished-products/" + (batch ? "status/batch" : "99791/status");
+      String body = (batch ? "{\"ids\":[99791]," : "{")
+          + "\"target\":\"warehouse\",\"operation\":\"offShelf\",\"reason\":\"商品信息调整\",\"detail\":\"更新图片\"}";
+      identityWithPermissions(99791L, "store.finished-stock-management.warehouse.restore");
+      mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+          .contentType("application/json").content(body)).andExpect(status().isForbidden());
+      identityWithPermissions(99791L, "store.finished-stock-management.selling." + (batch ? "batch-" : "") + "off-shelf");
+      mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+          .contentType("application/json").content(body.replace("\"warehouse\"", "\"offShelf\"")))
+          .andExpect(status().isBadRequest());
+      int logsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=99791", Integer.class);
+      mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+          .contentType("application/json").content(body)).andExpect(status().isOk())
+          .andExpect(jsonPath(batch ? "$.data[0].status" : "$.data.status").value("warehouse"))
+          .andExpect(jsonPath(batch ? "$.data[0].offShelfReason" : "$.data.offShelfReason").value("商品信息调整"))
+          .andExpect(jsonPath(batch ? "$.data[0].offShelfByName" : "$.data.offShelfByName").value("门店测试员工"));
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=99791", Integer.class)).isEqualTo(logsBefore + 1);
+      assertThat(jdbc.queryForObject("SELECT operation_type FROM store_finished_operation_logs WHERE listing_id=99791 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("OFF_SHELF");
+      assertThat(jdbc.queryForObject("SELECT after_status FROM store_finished_operation_logs WHERE listing_id=99791 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("warehouse");
+    }
+  }
+
   @Autowired private ProductStateActivityService stateActivities;
 
   @Test
@@ -74,11 +104,11 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     identity(99941L);
     var selected=products.select(List.of(99941L)).getFirst();
     products.saveEdit(selected.id(),99941L,List.of(new StoreFinishedProductService.SalePriceInput(99941L,new BigDecimal("40"),"manual",new BigDecimal("2"))));
-    for (String target : List.of("selling", "offShelf", "warehouse", "recycle", "warehouse")) {
+    for (String target : List.of("selling", "offShelf", "recycle", "warehouse")) {
       var response=products.changeStatus(selected.id(),target,"商品暂停售卖",null);
       assertThat(response.stateOperatorName()).isNotBlank();
       assertThat(response.stateOperatedAt()).isNotNull();
-      assertThat(response.effectiveStatus()).isEqualTo(target);
+      assertThat(response.effectiveStatus()).isEqualTo("offShelf".equals(target) ? "warehouse" : target);
       var refreshed=products.detail(selected.id());
       assertThat(response.stateOperatorName()).isEqualTo(refreshed.stateOperatorName());
       assertThat(response.stateOperatedAt()).isEqualTo(refreshed.stateOperatedAt());
@@ -280,7 +310,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThatThrownBy(() -> products.poolDetail(99751L)).isInstanceOf(IllegalArgumentException.class);
     identityWithPermissions(99752L, "store.finished-stock-management.warehouse.select");
     assertThat(products.poolDetail(99751L).id()).isEqualTo(99751L);
-    jdbc.update("UPDATE finished_products SET status='offShelf' WHERE id=99751");
+    jdbc.update("UPDATE finished_products SET status='warehouse' WHERE id=99751");
     assertThatThrownBy(() -> products.poolDetail(99751L)).isInstanceOf(IllegalArgumentException.class);
   }
 
@@ -385,7 +415,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     jdbc.update("INSERT INTO stores (id,tenant_id,name,type,status) VALUES (99861,1,'详情权限门店','cityPartner','enabled'),(99862,1,'其他门店','cityPartner','enabled')");
     jdbc.update("INSERT INTO finished_products (id,name,total_stock,status,source_status,operations_deleted) VALUES (99861,'详情权限商品',1,'selling','selling',FALSE)");
     jdbc.update("INSERT INTO store_finished_products (id,tenant_id,store_id,finished_product_id,status,selected_by_account_id) VALUES (99861,1,99861,99861,'warehouse',1)");
-    for (String tab : List.of("warehouse", "selling", "offShelf", "soldOut", "recycle")) {
+    for (String tab : List.of("warehouse", "selling", "soldOut", "recycle")) {
       String scope = switch (tab) {
         case "offShelf" -> "off-shelf";
         case "soldOut" -> "sold-out";
@@ -397,9 +427,9 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
       for (String upstream : List.of("source_status", "status")) {
         jdbc.update("UPDATE finished_products SET status='selling',source_status='selling' WHERE id=99861");
         if ("source_status".equals(upstream)) {
-          jdbc.update("UPDATE finished_products SET source_status='offShelf' WHERE id=99861");
+          jdbc.update("UPDATE finished_products SET source_status='warehouse',source_block_reason='OFF_SHELF' WHERE id=99861");
         } else {
-          jdbc.update("UPDATE finished_products SET status='offShelf' WHERE id=99861");
+          jdbc.update("UPDATE finished_products SET status='warehouse' WHERE id=99861");
         }
         identityWithPermissions(99861L, "store.finished-stock-management." + scope + ".view");
         mvc.perform(get("/api/admin/store-finished-products/99861"))
@@ -416,7 +446,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
           "store.finished-stock-management." + scope + "." + action);
       mvc.perform(get("/api/admin/store-finished-products/99861")).andExpect(status().isOk());
     }
-    jdbc.update("UPDATE finished_products SET source_status='offShelf' WHERE id=99861");
+    jdbc.update("UPDATE finished_products SET source_status='warehouse',source_block_reason='OFF_SHELF' WHERE id=99861");
     identityWithPermissions(99862L, "store.finished-stock-management.recycle.view");
     assertThatThrownBy(() -> products.detail(99861L)).isInstanceOf(IllegalArgumentException.class);
   }
@@ -425,7 +455,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   @Transactional
   void unavailablePurgeUsesVisibleTabGrantWhileOrdinaryRecycleStillNeedsPurgeGrant() throws Exception {
     jdbc.update("INSERT INTO stores (id,tenant_id,name,type,status) VALUES (99851,1,'权限测试门店','cityPartner','enabled')");
-    jdbc.update("INSERT INTO finished_products (id,name,total_stock,status,source_status,operations_deleted) VALUES (99851,'不可用商品',1,'selling','offShelf',FALSE),(99852,'正常商品',1,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO finished_products (id,name,total_stock,status,source_status,operations_deleted) VALUES (99851,'不可用商品',1,'selling','warehouse',FALSE),(99852,'正常商品',1,'selling','selling',FALSE)");
     jdbc.update("INSERT INTO store_finished_products (id,tenant_id,store_id,finished_product_id,status,selected_by_account_id) VALUES (99851,1,99851,99851,'selling',1),(99852,1,99851,99852,'recycle',1)");
 
     identityWithPermissions(99851L, "store.finished-stock-management.operation-log.view");
@@ -471,7 +501,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     products.saveEdit(listingId, 99801L, List.of(new StoreFinishedProductService.SalePriceInput(99811L, new BigDecimal("50"), "manual", new BigDecimal("0.25"))));
     assertThat(products.detail(listingId).skus().getFirst().salePrice()).isEqualByComparingTo("50");
     products.changeStatus(listingId, "selling", null, null);
-    jdbc.update("UPDATE finished_products SET source_status='offShelf' WHERE id=99801");
+    jdbc.update("UPDATE finished_products SET source_status='warehouse',source_block_reason='OFF_SHELF' WHERE id=99801");
     assertThat(products.detail(listingId).sourceUnavailable()).isTrue();
     assertThatThrownBy(() -> products.changeStatus(listingId, "offShelf", "其他", null))
         .isInstanceOf(IllegalArgumentException.class);
@@ -484,7 +514,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
           .isInstanceOf(IllegalArgumentException.class);
     }
     jdbc.update("UPDATE finished_products SET source_status='selling' WHERE id=99801");
-    for (String operationsStatus : List.of("warehouse", "offShelf", "recycle")) {
+    for (String operationsStatus : List.of("warehouse", "recycle")) {
       jdbc.update("UPDATE finished_products SET status=? WHERE id=99801", operationsStatus);
       assertThat(products.detail(listingId).sourceUnavailable()).isTrue();
       assertThatThrownBy(() -> products.changeStatus(listingId, "offShelf", "其他", null))
@@ -527,11 +557,10 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     identity(99831L);
     long historicalId = products.select(List.of(99831L)).getFirst().id();
     jdbc.update("INSERT INTO store_finished_sale_prices (listing_id,sku_id,sale_price,price_mode,updated_by_account_id) VALUES (?,99841,12,'manual',1)", historicalId);
-    jdbc.update("UPDATE finished_products SET source_status='offShelf',status='recycle',operations_deleted=TRUE WHERE id=99831");
+    jdbc.update("UPDATE finished_products SET source_status='warehouse',source_block_reason='OFF_SHELF',status='recycle',operations_deleted=TRUE WHERE id=99831");
     jdbc.update("UPDATE store_finished_products SET invalidated_at=NOW(),invalidated_reason='来源已失效' WHERE id=?", historicalId);
 
     upstreamIdentity("supply-chain");
-    lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99831L, "warehouse");
     lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED, 99831L, "selling");
 
     identity(99831L);
@@ -565,7 +594,8 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
     upstreamIdentity("admin");
     FinishedProduct offShelf = new FinishedProduct();
-    offShelf.setStatus("offShelf");
+    offShelf.setStatus("warehouse");
+    offShelf.setOperation("offShelf");
     offShelf.setOffShelfReason("其他");
     finishedProducts.updateOperationWithDetails(99821L, offShelf, false);
     FinishedProduct recycle = new FinishedProduct();
@@ -711,7 +741,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
           (id,tenant_id,store_id,finished_product_id,product_name,operation_type,
            operation_summary,before_status,after_status,change_details,operator_name,operated_at)
         VALUES (99894,1,99894,99894,'时间测试商品','OFF_SHELF','下架商品',
-          'selling','offShelf','{}','时间测试员工','2026-10-09 10:34:02')
+          'selling','warehouse','{}','时间测试员工','2026-10-09 10:34:02')
         """);
     identity(99894L);
     var expected = java.time.LocalDateTime.of(2026, 10, 9, 10, 34, 2);
@@ -1116,7 +1146,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   }
 
   @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"warehouse", "selling", "offShelf", "recycle"})
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"warehouse", "selling", "recycle"})
   @Transactional
   void supplyEditSynchronizesFullHistoryAcrossClientsWithoutLeakingStoreCosts(String listingStatus) throws Exception {
     Long listing = salePriceFixture();
@@ -1179,7 +1209,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
   }
 
   @org.junit.jupiter.params.ParameterizedTest
-  @org.junit.jupiter.params.provider.ValueSource(strings = {"warehouse", "selling", "offShelf", "recycle"})
+  @org.junit.jupiter.params.provider.ValueSource(strings = {"warehouse", "selling", "recycle"})
   @Transactional
   void supplyNewSkuWithoutCoefficientPersistsAttentionAndOnlyDownshelvesSelling(String status) throws Exception {
     Long listing = salePriceFixture();
@@ -1188,13 +1218,14 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     jdbc.update("DELETE FROM store_price_rules WHERE store_id=99601 AND kind='price'");
     var event = addSupplySku();
     supplyEditAudit.record(event.product(), event.context(), event.after());
-    String expected = "selling".equals(status) ? "offShelf" : status;
+    String expected = "selling".equals(status) ? "warehouse" : status;
     assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, listing)).isEqualTo(expected);
     assertThat(jdbc.queryForObject("SELECT sale_price_attention FROM store_finished_products WHERE id=?", Boolean.class, listing)).isTrue();
     var log = new com.fasterxml.jackson.databind.ObjectMapper().readTree(jdbc.queryForObject("SELECT change_details FROM store_finished_operation_logs WHERE listing_id=? AND operation_type='SOURCE_UPDATE'", String.class, listing));
     assertThat(log.path("销售规格").path("after").get(0).path("salePrice").decimalValue()).isEqualByComparingTo("125");
     assertThat(log.path("销售规格").path("after").get(2).path("salePrice").isNull()).isTrue();
     identity(99601L);
+    if ("selling".equals(status)) { assertThat(products.detail(listing).offShelfByName()).isEqualTo("上游测试人员"); }
     assertThat(products.detail(listing).salePriceAttention()).isTrue();
     assertThat(products.detail(listing).sourceUnavailable()).isFalse();
     assertThat(products.detail(listing).skus()).hasSize(3);
@@ -1240,7 +1271,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT sale_price FROM store_finished_sale_prices WHERE listing_id=? AND sku_id=99601", BigDecimal.class, listing)).isEqualByComparingTo("125");
     assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, listing)).isEqualTo("selling");
     assertThat(jdbc.queryForObject("SELECT sale_price_attention FROM store_finished_products WHERE id=?", Boolean.class, listing)).isFalse();
-    assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, other)).isEqualTo("offShelf");
+    assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, other)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT off_shelf_reason FROM store_finished_products WHERE id=?", String.class, other)).isEqualTo(StoreFinishedSalePriceService.ATTENTION);
   }
 
@@ -1255,7 +1286,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     var savepoint = connection.setSavepoint();
     var event = addSupplySku();
     supplyEditAudit.record(event.product(), event.context(), event.after());
-    assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, listing)).isEqualTo("offShelf");
+    assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, listing)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=? AND operation_type='SOURCE_UPDATE'", Integer.class, listing)).isEqualTo(1);
     connection.rollback(savepoint);
     sqlSession.clearCache();

@@ -541,24 +541,21 @@ const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`)
 const statusLabels: Record<string, string> = {
   warehouse: '仓库中',
   selling: '已上架',
-  offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',
   purged: '已彻底删除',
 };
-const tabOrder: StoreFinishedStatus[] = ['warehouse', 'selling', 'offShelf', 'soldOut', 'recycle'];
+const tabOrder: StoreFinishedStatus[] = ['warehouse', 'selling', 'soldOut', 'recycle'];
 const tabs = computed(() =>
   tabOrder
-    .filter((tab) => can(tab === 'offShelf' ? 'off-shelf' : tab === 'soldOut' ? 'sold-out' : tab, 'view'))
+    .filter((tab) => can(tab === 'soldOut' ? 'sold-out' : tab, 'view'))
     .map((value) => ({
       value,
       label: `${statusLabels[value]}（${rows.value.filter((item) => item.effectiveStatus === value).length}）`,
     })),
 );
 const activeTab = ref<StoreFinishedStatus>('warehouse');
-const activeScope = computed(() =>
-  activeTab.value === 'offShelf' ? 'off-shelf' : activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value,
-);
+const activeScope = computed(() => (activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value));
 const rows = ref<StoreFinishedProduct[]>([]);
 const loading = ref(false);
 const page = ref(1);
@@ -763,7 +760,6 @@ const {
 const batchActions: Record<string, { kind: ActionKind | 'off-shelf'; label: string; permission: string }> = {
   warehouse: { kind: 'batch-shelf', label: '批量上架', permission: 'batch-shelf' },
   selling: { kind: 'off-shelf', label: '批量下架', permission: 'batch-off-shelf' },
-  offShelf: { kind: 'batch-restore', label: '批量放回到仓库', permission: 'batch-restore' },
   recycle: { kind: 'batch-restore', label: '批量放回到仓库', permission: 'batch-restore' },
 };
 const batchAction = computed(() => {
@@ -837,15 +833,14 @@ const baseColumns: PrimaryTableCol<TableRowData>[] = [
 ];
 const operationWidths: Record<StoreFinishedStatus, number> = {
   warehouse: 190,
-  selling: 152,
-  offShelf: 180,
+  selling: 208,
   soldOut: 104,
   recycle: 208,
 };
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...baseColumns,
   ...stateActivityColumns(activeTab.value),
-  ...(activeTab.value === 'offShelf' ? [{ colKey: 'offShelfReason', title: '下架原因', minWidth: 140 }] : []),
+  ...(activeTab.value === 'warehouse' ? [{ colKey: 'offShelfReason', title: '下架原因', minWidth: 140 }] : []),
   { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },
 ]);
 const poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [

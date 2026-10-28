@@ -1,7 +1,7 @@
 import { request } from './http';
 import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
-export type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type SlabStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';
 export type SlabPublishTargetStatus = Extract<SlabStatus, 'warehouse' | 'selling'>;
 export type SlabPublisherType = '平台发布' | '接口获取';
 export interface SlabPrice {
@@ -31,7 +31,7 @@ export interface SlabRecord {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
-  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
+  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
   sourceMessage?: string;
   operationsSnapshotMissing?: boolean;
@@ -261,10 +261,16 @@ export function checkSlabAction(
   });
 }
 
-export function updateSlabStatuses(ids: number[], status: SlabStatus, reason?: string, detail?: string) {
+export function updateSlabStatuses(ids: number[], status: SlabStatus | 'offShelf', reason?: string, detail?: string) {
   return request<boolean>('/admin/slabs/batch-status', {
     method: 'PUT',
-    body: JSON.stringify({ ids, status, reason, detail }),
+    body: JSON.stringify({
+      ids,
+      status: status === 'offShelf' ? 'warehouse' : status,
+      operation: status === 'offShelf' ? 'offShelf' : undefined,
+      reason,
+      detail,
+    }),
   });
 }
 

@@ -156,7 +156,7 @@ class AccessoryProductRichTextApiTest extends SpringContainerTestSupport {
     assertThat(cleared.path("sku").isNull()).isTrue();
     assertThat(jdbc.queryForObject("SELECT sku FROM accessory_products WHERE id = ?", String.class, secondId)).isNull();
     jdbc.update("UPDATE accessory_products SET source_status='selling' WHERE id=?",secondId);
-    payload.put("status", "offShelf");
+    payload.put("status", "warehouse").put("operation", "offShelf");
     payload.put("offShelfReason", "价格调整");
     payload.put("offShelfDetail", "供应商调整价格，待复核");
     LocalDateTime beforeOffShelf = LocalDateTime.now().minusSeconds(1);
@@ -169,9 +169,9 @@ class AccessoryProductRichTextApiTest extends SpringContainerTestSupport {
         .isEqualTo("供应商调整价格，待复核");
     payload.putNull("offShelfDetail");
     mvc.perform(put("/api/admin/accessory-products/{id}",secondId).header("Authorization",token)
-        .contentType("application/json").content(json.writeValueAsBytes(payload))).andExpect(status().isForbidden());
+        .contentType("application/json").content(json.writeValueAsBytes(payload))).andExpect(status().isBadRequest());
     assertThat(jdbc.queryForObject("SELECT source_off_shelf_detail FROM accessory_products WHERE id=?",String.class,secondId)).isEqualTo("供应商调整价格，待复核");
-    payload.put("status", "recycle");
+    payload.put("status", "recycle").remove("operation");
     data(mvc.perform(put("/api/admin/accessory-products/{id}", secondId).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     data(mvc.perform(delete("/api/admin/accessory-products/{id}", secondId).header("Authorization", token)));
@@ -282,7 +282,7 @@ class AccessoryProductRichTextApiTest extends SpringContainerTestSupport {
     JsonNode updated = data(mvc.perform(put("/api/admin/accessory-products/{id}", id).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     assertThat(updated.path("specDimensions")).isEqualTo(payload.path("specDimensions"));
-    payload.put("status", "recycle");
+    payload.put("status", "recycle").remove("operation");
     data(mvc.perform(put("/api/admin/accessory-products/{id}", id).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     data(mvc.perform(delete("/api/admin/accessory-products/{id}", id).header("Authorization", token)));

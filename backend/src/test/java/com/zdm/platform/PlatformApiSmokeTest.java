@@ -6296,7 +6296,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
               .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
-                  {"ids":[%d,%d],"status":"offShelf","reason":"价格调整","detail":"批量调整指导价"}
+                  {"ids":[%d,%d],"status":"warehouse","operation":"offShelf","reason":"价格调整","detail":"批量调整指导价"}
                   """.formatted(slabId, interfaceSlabId)))
           .andExpect(status().isOk());
       Map<String, Object> offShelfRecord = jdbcTemplate.queryForMap(
@@ -6307,17 +6307,12 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           WHERE inventory.id = ?
           """,
           slabId);
-      assertThat(offShelfRecord.get("status")).isEqualTo("offShelf");
+      assertThat(offShelfRecord.get("status")).isEqualTo("warehouse");
       assertThat(offShelfRecord.get("standard_reason")).isEqualTo("价格调整");
       assertThat(offShelfRecord.get("detail_reason")).isEqualTo("批量调整指导价");
       assertThat(offShelfRecord.get("off_shelved_by_name")).isEqualTo("超级管理员");
-      mockMvc.perform(put("/api/admin/slabs/batch-status")
-              .header("Authorization", "Bearer " + supplyChainToken())
-              .contentType("application/json")
-              .content("""
-                  {"ids":[%d,%d],"status":"warehouse"}
-                  """.formatted(slabId, interfaceSlabId)))
-          .andExpect(status().isOk());
+      assertThat(jdbcTemplate.queryForObject("SELECT status FROM slab_inventory WHERE id=?", String.class, slabId)).isEqualTo("warehouse");
+      assertThat(jdbcTemplate.queryForObject("SELECT status FROM slab_inventory WHERE id=?", String.class, interfaceSlabId)).isEqualTo("warehouse");
       Integer retainedHistoryCount = jdbcTemplate.queryForObject(
           "SELECT COUNT(*) FROM slab_off_shelf_records WHERE slab_id = ?",
           Integer.class,
@@ -6334,7 +6329,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
               .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
               .content("""
-                  {"ids":[%d],"status":"offShelf","reason":"库存异常","detail":"盘点数量不一致"}
+                  {"ids":[%d],"status":"warehouse","operation":"offShelf","reason":"库存异常","detail":"盘点数量不一致"}
                   """.formatted(slabId)))
           .andExpect(status().isOk());
       List<Map<String, Object>> offShelfHistory = jdbcTemplate.queryForList(
@@ -6418,8 +6413,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           String.class,
           slabId)).isEqualTo("1.6000:160.00");
 
-      mockMvc.perform(put("/api/admin/slabs/batch-status").header("Authorization","Bearer "+supplyChainToken())
-          .contentType("application/json").content("{\"ids\":["+slabId+"],\"status\":\"warehouse\"}")).andExpect(status().isOk());
+      assertThat(jdbcTemplate.queryForObject("SELECT source_status FROM slab_inventory WHERE id=?", String.class, slabId)).isEqualTo("warehouse");
       mockMvc.perform(put("/api/admin/slabs/{id}", slabId)
               .header("Authorization", "Bearer " + supplyChainToken())
               .contentType("application/json")
@@ -6558,7 +6552,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "15926628996",
         "大板共享操作员",
         "supply-chain.slab-management.view,supply-chain.slab-management.warehouse.publish,"
-            + "supply-chain.slab-management.warehouse.edit,supply-chain.slab-management.off-shelf.restore,"
+            + "supply-chain.slab-management.warehouse.edit,supply-chain.slab-management.recycle.restore,"
             + "supply-chain.slab-management.warehouse.delete,supply-chain.slab-management.recycle.purge,"
             + "supply-chain.slab-management.operation-log.view");
     jdbcTemplate.update("UPDATE employees SET data_permission = 'all' WHERE id = ?", operatorId);
@@ -6628,7 +6622,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           .andExpect(jsonPath("$.data.name").value("其他用户大板-已编辑"))
           .andExpect(jsonPath("$.data.createdByAccountId").value(1));
 
-      jdbcTemplate.update("UPDATE slab_inventory SET source_status = 'offShelf' WHERE id = ?", slabId);
+      jdbcTemplate.update("UPDATE slab_inventory SET source_status = 'recycle' WHERE id = ?", slabId);
       mockMvc.perform(put("/api/admin/slabs/batch-status")
               .header("Authorization", "Bearer " + token)
               .contentType("application/json")

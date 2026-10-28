@@ -173,7 +173,6 @@ export const tabs: {
 }[] = [
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '已上架' },
-  { value: 'offShelf', label: '已下架' },
   { value: 'soldOut', label: '已售完' },
   { value: 'recycle', label: '回收站' },
 ];

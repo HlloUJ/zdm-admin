@@ -275,6 +275,14 @@
           </AdminListLayout> </template
         ><template v-else-if="formPageVisible">
           <section ref="productFormRoot" class="form-shell">
+            <t-alert
+              v-if="editingProduct?.status === 'warehouse' && editingProduct.offShelfReason"
+              theme="warning"
+              title="最近下架信息"
+            >
+              {{ editingProduct.offShelfReason }} · {{ editingProduct.offShelfDetail || '—' }}
+              {{ editingProduct.offShelfByName || '未记录' }} · {{ editingProduct.offShelfAt || '未记录' }}
+            </t-alert>
             <AdminSectionCard class="form-heading-card" aria-label="发布商品信息">
               <div class="form-title-row">
                 <div>
@@ -1205,7 +1213,6 @@ import { useRoute, useRouter } from 'vue-router';
 const tabs: TabConfig[] = [
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '已上架' },
-  { value: 'offShelf', label: '已下架' },
   { value: 'soldOut', label: '已售完' },
   { value: 'recycle', label: '回收站' },
 ];
@@ -1217,7 +1224,6 @@ const activeTab = ref<StockStatus>('warehouse');
 const finishedScope: Record<StockStatus, string> = {
   warehouse: 'warehouse',
   selling: 'selling',
-  offShelf: 'off-shelf',
   soldOut: 'sold-out',
   recycle: 'recycle',
 };
@@ -1511,21 +1517,18 @@ const defaultFilter = (): FilterState => ({
 const filters = reactive<Record<StockStatus, FilterState>>({
   warehouse: defaultFilter(),
   selling: defaultFilter(),
-  offShelf: defaultFilter(),
   soldOut: defaultFilter(),
   recycle: defaultFilter(),
 });
 const appliedFilters = reactive<Record<StockStatus, FilterState>>({
   warehouse: defaultFilter(),
   selling: defaultFilter(),
-  offShelf: defaultFilter(),
   soldOut: defaultFilter(),
   recycle: defaultFilter(),
 });
 const paginations = reactive<Record<StockStatus, PaginationState>>({
   warehouse: { current: 1, pageSize: 10 },
   selling: { current: 1, pageSize: 10 },
-  offShelf: { current: 1, pageSize: 10 },
   soldOut: { current: 1, pageSize: 10 },
   recycle: { current: 1, pageSize: 10 },
 });
@@ -1679,12 +1682,11 @@ const supplierOptions = computed(() => {
 const countByStatus = computed<Record<StockStatus, number>>(() => ({
   warehouse: dataItems.value.filter((item) => item.status === 'warehouse').length,
   selling: dataItems.value.filter((item) => item.status === 'selling').length,
-  offShelf: dataItems.value.filter((item) => item.status === 'offShelf').length,
   soldOut: dataItems.value.filter((item) => item.status === 'soldOut').length,
   recycle: dataItems.value.filter((item) => item.status === 'recycle').length,
 }));
 const normalizeStatus = (status?: string): StockStatus =>
-  status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';
+  status === 'selling' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';
 const normalizePublisherType = (value?: string): PublisherType => (value === '接口获取' ? '接口获取' : '平台发布');
 const categoryPathById = (categoryId?: number) => {
   if (!categoryId) return '未分类';
@@ -1774,6 +1776,7 @@ const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): Fini
     attributes: nextItem.attributes,
     variants: nextItem.variants,
     specDimensions: nextItem.specDimensions,
+    operation: nextItem.operation,
     offShelfReason: nextItem.offShelfReason,
     offShelfDetail: nextItem.offShelfDetail,
     status: nextItem.status,
@@ -1891,7 +1894,6 @@ const batchButtons = computed(() => {
       { action: 'publish', label: '发布商品', icon: 'add' },
       { action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' },
     ],
-    offShelf: [{ action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' }],
     soldOut: [],
     recycle: [
       { action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' },
@@ -1919,8 +1921,7 @@ const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
 // Fixed pixel widths; update only when the tab action buttons change.
 const operationWidths = {
   warehouse: 190,
-  selling: 152,
-  offShelf: 180,
+  selling: 208,
   soldOut: 104,
   recycle: 208,
 };
@@ -1934,7 +1935,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   if (activeTab.value !== 'soldOut') {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
-  if (activeTab.value === 'offShelf') {
+  if (activeTab.value === 'warehouse') {
     base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });
   }
   base.push({
@@ -2740,14 +2741,15 @@ const closeImagePreview = () => {
   imagePreviewVisible.value = false;
   imagePreviewSrc.value = '';
 };
-const updateProductStatus = async (id: number, status: StockStatus, reason?: string, detail?: string) => {
+const updateProductStatus = async (id: number, status: StockStatus | 'offShelf', reason?: string, detail?: string) => {
   const item = dataItems.value.find((product) => product.id === id);
   if (!item) return;
   const afterStock = status === 'soldOut' ? 0 : item.stock;
   const updated = await updateFinishedProduct(
     id,
     toProductPayload(item, {
-      status,
+      status: status === 'offShelf' ? 'warehouse' : status,
+      operation: status === 'offShelf' ? 'offShelf' : undefined,
       stock: afterStock,
       offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,
       offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,

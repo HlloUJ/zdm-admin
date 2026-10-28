@@ -13,7 +13,7 @@ export function listFinishedProductFormOptions() {
 
 import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
-export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type FinishedProductStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';
 
 export interface FinishedProductPrice {
   priceSource?: 'auto' | 'manual';
@@ -64,7 +64,7 @@ export interface FinishedProductRecord {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
-  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
+  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
   sourceMessage?: string;
   sourceOffShelfReason?: string;
@@ -125,6 +125,7 @@ export interface FinishedProductPayload {
   offShelfAt?: string;
   offShelfDetail?: string;
   status: FinishedProductStatus;
+  operation?: 'offShelf';
 }
 
 export function listFinishedProducts() {
