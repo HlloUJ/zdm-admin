@@ -18,7 +18,7 @@
       "dynamicImports": 0
     },
     "ci/browser-image.lock.json": {
-      "digest": "367941415e670847bf2d6a38021c8a9b9ef057d794d06b1854c3bd966d342f4e",
+      "digest": "9cc1be8ca5851404d4d5fabd069ba416900197acec8d7a06f999fdad2549cfc3",
       "imports": [],
       "dynamicImports": 0
     },
@@ -962,7 +962,7 @@
       "dynamicImports": 0
     },
     "scripts/vite-watch.test.mjs": {
-      "digest": "4f4aa3de8396a626da8c8fcecb7c078ca38ce8f649dd298e394bc93e10ef102a",
+      "digest": "47686cdc91b7c81af6c665e8c8bee45e0a9d09e484cb7ee783c81070c862bffc",
       "imports": ["vite.config.js"],
       "dynamicImports": 0
     },

@@ -22,21 +22,36 @@ test(
       configFile: false,
       root,
       logLevel: 'silent',
-      server: { host: '127.0.0.1', port: 0, watch },
+      server: { host: '127.0.0.1', port: 0, watch: { ...watch, ignoreInitial: false } },
     });
     t.after(async () => {
       await server.close();
       rmSync(root, { recursive: true });
     });
-    const ready = new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Source watcher failed to become ready')), 5000);
-      server.watcher.once('ready', () => {
-        clearTimeout(timer);
-        resolve();
-      });
-    });
+    const ready = Promise.all([
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Source watcher failed to become ready')), 5000);
+        server.watcher.once('ready', () => {
+          clearTimeout(timer);
+          resolve();
+        });
+      }),
+      new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('Source watcher failed to become ready')), 5000);
+        // Global ready can precede the recursive source registration on Linux.
+        const onAdd = (file) => {
+          if (file !== source) return;
+          clearTimeout(timer);
+          server.watcher.off('add', onAdd);
+          resolve();
+        };
+        server.watcher.on('add', onAdd);
+        if (server.watcher.getWatched()[path.dirname(source)]?.includes(path.basename(source))) onAdd(source);
+      }),
+    ]);
     await server.listen();
     await ready;
+    assert.ok(server.watcher.getWatched()[path.dirname(source)]?.includes(path.basename(source)));
     const watched = Object.keys(server.watcher.getWatched());
     for (const folder of ['backend/target', '.task-verification', '.task-runtime'])
       assert.ok(!watched.some((directory) => directory.startsWith(path.join(root, folder))), folder);
