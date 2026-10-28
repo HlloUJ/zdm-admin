@@ -105,7 +105,6 @@ test('verification helpers and their tests are full scope without runtime startu
     'scripts/backend-test-plan.test.mjs',
     'scripts/backend-runtime.test.mjs',
     'scripts/dev-task.test.mjs',
-    'scripts/task-preview-service.test.mjs',
     'scripts/dev-status.mjs',
     'scripts/dev-unknown.mjs',
     'scripts/backend-unknown.mjs',
@@ -122,7 +121,6 @@ test('known runtime launch and routing scripts retain runtime checks', () => {
     'scripts/dev-task.mjs',
     'scripts/backend-runtime.mjs',
     'scripts/ensure-backend.mjs',
-    'scripts/task-preview-service.mjs',
     'scripts/macos/launchd-dev.mjs',
     '.codex/zdm-project-workflow.yaml',
   ]) {
@@ -145,4 +143,20 @@ test('root Maven and environment inputs are runtime while dependency helpers are
     'scripts/task-dependencies.test.mjs',
   ])
     assert.equal(flags([file]).runtime, false, file);
+});
+
+test('audited preview control narrows business domains while preserving engineering and runtime checks', () => {
+  for (const [file, runtime] of [
+    ['scripts/task-preview-service.mjs', true],
+    ['scripts/task-preview-service.test.mjs', false],
+  ]) {
+    assert.deepEqual(flags([file]), {
+      frontend: false,
+      backend: false,
+      engineering: true,
+      docsOnly: false,
+      full: false,
+      runtime,
+    });
+  }
 });

@@ -5,6 +5,7 @@ import { createBackendTestPlan } from './backend-test-plan.mjs';
 import { createScriptTestPlan } from './script-test-plan.mjs';
 import { createBrowserTestPlan } from './affected-test-inputs.mjs';
 import { classifyChangedFiles } from './verification-impact.mjs';
+import { engineeringOnlyProof } from './engineering-impact.mjs';
 
 const SCRIPT_EXTENSIONS = ['.js', '.mjs', '.cjs', '.ts', '.tsx', '.vue'];
 const TYPECHECK_EXTENSIONS = ['.ts', '.tsx', '.vue'];
@@ -49,7 +50,7 @@ export function createValidationPlan(files, fileExists = () => true, { root } = 
       !/^(?:src|tests\/e2e|public|backend)\//.test(file) &&
       !(file.startsWith('scripts/') && hasExtension(file, SCRIPT_EXTENSIONS)),
   );
-  if (unscopedInputs.some((file) => classifyChangedFiles([file]).full)) {
+  if (!engineeringOnlyProof(root, files).proven && unscopedInputs.some((file) => classifyChangedFiles([file]).full)) {
     return {
       tasks: [{ name: 'shared configuration checks', args: ['run', 'verify:local'], kind: 'orchestration' }],
       e2eFiles: [],

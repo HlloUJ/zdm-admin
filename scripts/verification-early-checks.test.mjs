@@ -88,3 +88,31 @@ test('each verifier run shares one local diagnostic identity across its phases a
   }
   assert.notEqual(runs[0], runs[1]);
 });
+
+test('CI-backed readiness passes its single diagnostic identity into the existing targeted entry', async (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'readiness-diagnostic-'));
+  t.after(() => rmSync(root, { recursive: true }));
+  const task = (name, args) => ({ root, name, args, env: { PATH: process.env.PATH } });
+  const plan = {
+    preflight: task('format', []),
+    contractPreflight: task('contract', ['run', 'test:ci-reuse']),
+    frontend: [task('targeted', ['run', 'test:scripts:files', '--', 'scripts/completion-session.test.mjs'])],
+    backend: [],
+    engineering: [],
+  };
+  const identities = [];
+  assert.equal(
+    await executeVerification(plan, {
+      capture: () => ({}),
+      report: () => {},
+      run: async (step) => {
+        if (['contract', 'targeted'].includes(step.name)) identities.push(step.localDiagnostics);
+        return { exitCode: 0 };
+      },
+    }),
+    0,
+  );
+  assert.equal(identities.length, 2);
+  assert.ok(identities[0]);
+  assert.deepEqual(identities[0], identities[1]);
+});

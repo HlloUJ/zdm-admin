@@ -459,11 +459,11 @@ test('status stays healthy after an idle control socket expires during synchrono
          type: 'zdm-task-preview-service', phase: 'running', worktree: '/tmp/retained-preview'
        }));
      });
-     server.keepAliveTimeout = 5000;
+     server.keepAliveTimeout = 0;
      parentPort.on('message', () => {
        const notify = () => { Atomics.store(closed, 0, 1); Atomics.notify(closed, 0); };
        if (idleSocket.destroyed) notify();
-       else idleSocket.end(notify);
+       else { idleSocket.once('close', notify); idleSocket.destroy(); }
      });
      server.listen(workerData.socketFile, () => parentPort.postMessage('ready'));`,
     { eval: true, workerData: { socketFile, closed: closed.buffer } },
@@ -481,7 +481,7 @@ test('status stays healthy after an idle control socket expires during synchrono
   assert.equal((await readServiceStatus(paths)).phase, 'running');
   // Let Node return the first socket to its pool before blocking this client only.
   await new Promise((resolve) => setImmediate(resolve));
-  // Wait for actual server FIN while the client cannot process it.
+  // Wait for actual server close while the client cannot process it.
   worker.postMessage('expire');
   assert.notEqual(Atomics.wait(closed, 0, 0, 5000), 'timed-out');
   const status = await readServiceStatus(paths);

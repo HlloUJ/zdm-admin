@@ -75,7 +75,7 @@
     "test:source-guards": "node scripts/run-frontend-tests.mjs source-guards",
     "check:engineering-inputs": "node scripts/script-test-plan.mjs --check-reviewed",
     "test:engineering": "node scripts/run-script-tests.mjs --engineering",
-    "test:scripts:files": "node scripts/run-script-tests.mjs --files",
+    "test:scripts:files": "node scripts/run-targeted-script-tests.mjs",
     "check:ui-templates": "node --test scripts/ui-template-policy.test.mjs",
     "test:ci-reuse": "node scripts/run-ci-diagnostics.mjs",
     "check:business-regressions": "node scripts/business-regression.mjs",

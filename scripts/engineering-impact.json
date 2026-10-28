@@ -1,0 +1,670 @@
+{
+  "version": 1,
+  "inputs": {
+    "scripts/completion-cli.mjs": {
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-flow.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-preview.mjs",
+        "scripts/completion-process.mjs",
+        "scripts/completion-recovery.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/completion-status.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/start-micro-task.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-cli.test.mjs": {
+      "imports": [
+        "scripts/completion-cli.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-flow.mjs": {
+      "imports": ["scripts/completion-session.mjs", "scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-handoff.mjs": {
+      "imports": [
+        "scripts/completion-session.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/start-micro-task.mjs",
+        "scripts/task-batch.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-preview.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/task-data-environment.mjs", "scripts/task-preview-service.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-preview.test.mjs": {
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-session.test.mjs": {
+      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-service.mjs": {
+      "imports": ["scripts/task-data-environment.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-service.test.mjs": {
+      "imports": ["scripts/task-preview-service.mjs"],
+      "dynamicImports": 2
+    },
+    "scripts/wait-quality.mjs": {
+      "imports": [],
+      "dynamicImports": 0
+    }
+  },
+  "consumers": {
+    "scripts/backend-runtime.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/git-workflow-core.mjs", "scripts/integration-handoff-state.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/backend-runtime.test.mjs": {
+      "imports": ["scripts/backend-runtime.mjs", "scripts/dev-task.mjs", "scripts/ensure-backend.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/business-regression.test.mjs": {
+      "imports": [
+        "scripts/business-regression.mjs",
+        "scripts/check-changed-plan.mjs",
+        "scripts/check-changed.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/check-changed-plan.mjs": {
+      "imports": [
+        "scripts/affected-test-inputs.mjs",
+        "scripts/backend-test-plan.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/check-changed-plan.test.mjs": {
+      "imports": ["scripts/check-changed-plan.mjs", "scripts/verification-impact.test.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/check-changed.mjs": {
+      "imports": [
+        "scripts/business-regression.mjs",
+        "scripts/check-changed-plan.mjs",
+        "scripts/task-timing.mjs",
+        "scripts/verification-evidence.mjs",
+        "scripts/verification-runner.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/check-changed.test.mjs": {
+      "imports": ["scripts/check-changed-plan.mjs", "scripts/check-changed.mjs", "scripts/verification-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/check-managed-branch-commit.mjs": {
+      "imports": ["scripts/git-workflow-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/ci-backend-equivalence.test.mjs": {
+      "imports": [
+        "scripts/ci-backend-equivalence.mjs",
+        "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/ci-equivalence.test.mjs": {
+      "imports": [
+        "scripts/ci-equivalence-environment.mjs",
+        "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/ci-quality-evidence.mjs": {
+      "imports": [
+        "scripts/backend-test-evidence.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/ci-backend-equivalence.mjs",
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/ci-equivalence.mjs",
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/run-script-tests.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/ci-quality-evidence.test.mjs": {
+      "imports": [
+        "scripts/ci-quality-evidence.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/ci-report-contract.test.mjs": {
+      "imports": [
+        "scripts/ci-backend-equivalence.mjs",
+        "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs",
+        "scripts/ci-report-contract.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-ci-evidence.mjs": {
+      "imports": ["scripts/ci-equivalence.mjs", "scripts/ci-quality-evidence.mjs", "scripts/verification-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-cli.mjs": {
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-flow.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-preview.mjs",
+        "scripts/completion-process.mjs",
+        "scripts/completion-recovery.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/completion-status.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/start-micro-task.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-cli.test.mjs": {
+      "imports": [
+        "scripts/completion-cli.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-flow.mjs": {
+      "imports": ["scripts/completion-session.mjs", "scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-handoff.mjs": {
+      "imports": [
+        "scripts/completion-session.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/start-micro-task.mjs",
+        "scripts/task-batch.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-preview.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/task-data-environment.mjs", "scripts/task-preview-service.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-preview.test.mjs": {
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-recovery.mjs": {
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-process.mjs",
+        "scripts/completion-session.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-recovery.test.mjs": {
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/completion-recovery.mjs",
+        "scripts/completion-session.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/completion-session.test.mjs": {
+      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-status.mjs": {
+      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-status.test.mjs": {
+      "imports": ["scripts/completion-session.mjs", "scripts/completion-status.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-launcher.mjs": {
+      "imports": [
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-dependencies.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-launcher.test.mjs": {
+      "imports": [
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/dev-task.test.mjs",
+        "scripts/sync-integration.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/dev-all.mjs": {
+      "imports": ["scripts/backend-runtime.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/dev-task.mjs": {
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/task-dependencies.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/dev-task.test.mjs": {
+      "imports": [
+        "scripts/backend-test-plan.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/dev-task.test.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-runtime-state.mjs",
+        "vite.config.js"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/engineering-impact.mjs": {
+      "imports": [
+        "scripts/completion-cli.mjs",
+        "scripts/completion-cli.test.mjs",
+        "scripts/completion-flow.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-preview.mjs",
+        "scripts/completion-preview.test.mjs",
+        "scripts/completion-session.test.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-preview-service.test.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/engineering-impact.test.mjs": {
+      "imports": [
+        "scripts/absent.mjs",
+        "scripts/check-changed-plan.mjs",
+        "scripts/consumer.mjs",
+        "scripts/dynamic.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/new-consumer.mjs",
+        "scripts/new-module.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/unknown.mjs",
+        "scripts/verification-impact.mjs",
+        "scripts/verify.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 2
+    },
+    "scripts/ensure-backend.mjs": {
+      "imports": ["scripts/backend-runtime.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/git-workflow-core.mjs": {
+      "imports": ["scripts/verification-impact.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/git-workflow-core.test.mjs": {
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/backend-test-evidence.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/git-workflow-state.mjs": {
+      "imports": ["scripts/git-workflow-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/integration-handoff-state.mjs": {
+      "imports": ["scripts/runtime-file-scope.mjs", "scripts/task-runtime-state.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/macos/launchd-dev.mjs": {
+      "imports": ["scripts/backend-runtime.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/preview-probe.test.mjs": {
+      "imports": ["scripts/dev-task.mjs"],
+      "dynamicImports": 2
+    },
+    "scripts/run-integration.mjs": {
+      "imports": ["scripts/git-workflow-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/runtime-file-scope.mjs": {
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-all.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/macos/launchd-dev.mjs",
+        "scripts/run-integration.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-runtime-state.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/runtime-file-scope.test.mjs": {
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-all.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/macos/launchd-dev.mjs",
+        "scripts/run-integration.mjs",
+        "scripts/runtime-file-scope.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/script-test-plan.test.mjs": {
+      "imports": [
+        "scripts/consumer.mjs",
+        "scripts/consumer.test.mjs",
+        "scripts/feedback-foundation.test.mjs",
+        "scripts/helper.mjs",
+        "scripts/helper.test.mjs",
+        "scripts/new.test.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/unrelated.test.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/start-micro-task.mjs": {
+      "imports": ["scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/start-micro-task.test.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/start-micro-task.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/sync-integration.mjs": {
+      "imports": [
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/sync-integration.test.mjs": {
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-runtime-state.mjs"
+      ],
+      "dynamicImports": 2
+    },
+    "scripts/task-completion.mjs": {
+      "imports": ["scripts/completion-cli.mjs", "scripts/dev-task.mjs", "scripts/task-batch.mjs", "scripts/verify.mjs"],
+      "dynamicImports": 1
+    },
+    "scripts/task-dependencies.test.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/task-dependencies.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-service.mjs": {
+      "imports": ["scripts/task-data-environment.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-service.test.mjs": {
+      "imports": ["scripts/task-preview-service.mjs"],
+      "dynamicImports": 2
+    },
+    "scripts/task-timing.test.mjs": {
+      "imports": ["scripts/check-changed.mjs", "scripts/task-timing.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/test-support/completion-preview-fixture.mjs": {
+      "imports": [
+        "scripts/completion-preview.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/test-support/task-data-environment.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/verification-early-checks.test.mjs": {
+      "imports": ["scripts/backend-test-evidence.mjs", "scripts/completion-session.test.mjs", "scripts/verify.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-evidence.test.mjs": {
+      "imports": [
+        "scripts/run-frontend-tests.mjs",
+        "scripts/verification-evidence.mjs",
+        "scripts/verification-runner.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 10
+    },
+    "scripts/verification-impact.mjs": {
+      "imports": [
+        "scripts/business-regression.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/runtime-file-scope.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/verification-impact.test.mjs": {
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/backend-runtime.test.mjs",
+        "scripts/backend-test-evidence.mjs",
+        "scripts/backend-test-evidence.test.mjs",
+        "scripts/backend-test-plan.mjs",
+        "scripts/backend-test-plan.test.mjs",
+        "scripts/backend-unknown.mjs",
+        "scripts/dev-status.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/dev-task.test.mjs",
+        "scripts/dev-unknown.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/macos/launchd-dev.mjs",
+        "scripts/task-dependencies.mjs",
+        "scripts/task-dependencies.test.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-preview-service.test.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/task-runtime-state.test.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/verification-policy.test.mjs": {
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/e2e-shards.mjs",
+        "scripts/playwright-evidence-reporter.mjs",
+        "scripts/verification-policy.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/verify.mjs": {
+      "imports": [
+        "scripts/backend-test-evidence.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/check-changed-plan.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/task-timing.mjs",
+        "scripts/verification-evidence.mjs",
+        "scripts/verification-impact.mjs",
+        "scripts/verification-performance.mjs",
+        "scripts/verification-policy.mjs",
+        "scripts/verification-runner.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/wait-quality.mjs": {
+      "imports": [],
+      "dynamicImports": 0
+    }
+  },
+  "externalReaders": {
+    ".codex/zdm-project-workflow.yaml": "87062459fc0f554429fbf997360e02a438d79f6d32e6cb11435f17f6aa3eb2db",
+    ".github/workflows/quality.yml": "ecf675947984bbcd891000d49ffa0593ca7009143cdb845fb93ba829f8fa2103",
+    "package.json": "955531cb040cd129a1b090c7651258d98d936a1297156ecc11437a11834d21a3"
+  },
+  "reflectiveReaders": {
+    "scripts/affected-test-inputs.mjs": "d83b00dc2e28d410bb334756596ac9290becea33e3df1f6fca318e3fd8c24bb3",
+    "scripts/affected-test-inputs.test.mjs": "93243f89d9114e3788f9254ee76c90a767abe0587d1d43f86d59ae40ac7362e4",
+    "scripts/backend-runtime.mjs": "f74af9e9d5a54c8717d7b779754da9827642ca930bc595d566b913350c7293e2",
+    "scripts/backend-runtime.test.mjs": "c67534152b95a8a3bad918512fec98edb48accb855b54f3e5e3adb9b12642009",
+    "scripts/backend-test-evidence.mjs": "44e7ee7142bceb0323b80a8786de21e9b2dc601854a96e4a78d05720e4a41e77",
+    "scripts/backend-test-evidence.test.mjs": "12472dddd2c0a9b6486d5a24b9093c6d22f19c749dfbe948c9a15423df629a1b",
+    "scripts/business-regression.mjs": "9d5ff5e8a490880eaf4c7783cdfbf2246964ab898d46b54c1e6ab51840206f17",
+    "scripts/business-regression.test.mjs": "4722db1080d475f82b93b84665b249f21d6afa1219c818771611f2a3b44e4a4d",
+    "scripts/check-changed.mjs": "536fb07a25bad97de56fb43b74a267c8b4929edc0885485816f4bdc84ffca0ce",
+    "scripts/check-changed.test.mjs": "f8ce3b8948c20a56026e6e24eddbb537a5497d0a587d21620678ab4bc789318b",
+    "scripts/check-managed-branch-commit.mjs": "27a6eb589ce8214f1c9557073969bc7efead5a7be8b3dacbacb23e6e353fa107",
+    "scripts/ci-backend-equivalence.mjs": "a17fbffa02b472c98cde389b5b358ddccc4cb352d46ec7be36d396eb590f6d32",
+    "scripts/ci-backend-equivalence.test.mjs": "baf90fce0eb083e466c7243a789da8f10d9c532a437c82f9ca3cb1e9dab11454",
+    "scripts/ci-browser-image.mjs": "33ab3a6917c579ab7c271be8e38202deb670b5652157b14874e4b97aa4ea0d22",
+    "scripts/ci-browser-image.test.mjs": "4499ae9406ce3e54cf8559f955612db60e3c13f06d26feda44c67ba92e326cf7",
+    "scripts/ci-chrome-preparation.mjs": "c275a419fb36854a10ed8b6454e7ef54bdb7c9e67836882a0111107b3b7305d7",
+    "scripts/ci-chrome-preparation.test.mjs": "6c2a64a184512726a34f046f1cd95ff9b0404e90d5b5a3e59e39a100ed4843b7",
+    "scripts/ci-diagnostic-evidence.mjs": "208cb10771ff4e73302737129c46eb33840044785ba4e177d2f52c85dd90fceb",
+    "scripts/ci-diagnostic-evidence.test.mjs": "766d0e56bb29bdfb2075a2320640adae1a7c4729f8bb6f2468d426b72280602e",
+    "scripts/ci-equivalence-environment.mjs": "65483d5d50f79c9499517d67c69dcd23da47fc1c6f981ebcfea7cf08d1e1e889",
+    "scripts/ci-equivalence.mjs": "d73d91922c7fe61d4ee60803b8ee94067ae28c4ef612987e71cbbcb42e4f6c42",
+    "scripts/ci-equivalence.test.mjs": "8ce9b78814bfd8248f0fa704b2a9604396268c78c0b1419ac218aa64a1ad94d8",
+    "scripts/ci-quality-evidence.mjs": "462ba05f2d46ef7961a613dc68ab7fadc7b8d3158cef28793c72eecd896eb910",
+    "scripts/ci-quality-evidence.test.mjs": "66f360aa9d2f15113f24989ecb0fdb1cdbd08dd68b41093d561031b82774b7d0",
+    "scripts/ci-report-contract.mjs": "faff33c1ff3accf8a04d99a7e3b8380a23450a2141dd59b8d5d1509282c229b7",
+    "scripts/ci-report-contract.test.mjs": "e107480e8e5223f939ff0751748051ff966406f1cf81f39ac5091d30f657ad75",
+    "scripts/completion-ci-evidence.mjs": "b1e12aa217bbc0d3b0364521907570545a5f3cb6fb14114b85807935b1ab880f",
+    "scripts/completion-process.mjs": "b5cbcc97a62e5ad94efb60185285a9fe04accb67358d1728b640981e91200399",
+    "scripts/completion-recovery.mjs": "25028a3975cf28e74f33c4f95bb1875151624942f019ba10690e64cfd7cab401",
+    "scripts/completion-recovery.test.mjs": "62bf48e30221444a315b7de06c694afc1a918c9c27bd01ae0a58db10ed4dd090",
+    "scripts/completion-session.mjs": "d164ddf1261b87726727e442a8835fc006062470e6f54acefc31b2323b28717d",
+    "scripts/completion-status.mjs": "2bdf7886d73eee11c11431f2890db0afdb2795501a4c52f954c26e0d6d43256c",
+    "scripts/completion-status.test.mjs": "553b4239b04159544044d3daff18a6fb7e7cf5a6da31f4b580feeb64ed1b6e2c",
+    "scripts/delivery-launcher.mjs": "e17ac3c93f7bccc47634e254c6a6bcc52eb1f9adcab2458d97446fc8c6057750",
+    "scripts/delivery-launcher.test.mjs": "27fa92cb4a260eb3cb356d3410b5fe624b7f2c55656e207dea26be5c43f89c71",
+    "scripts/dev-all.mjs": "b49b19cc1672700483f9faabbc226a8a67a3f6a9df7a25bfa321d1b39b74613a",
+    "scripts/dev-task.mjs": "bca74ea153986507be2990c5458ebcd0b3221fd172f5864216fe01b1e9775904",
+    "scripts/dev-task.test.mjs": "b0cbd6ed45190abd53ecec9d1558f3a1d8addee8b1bf9a68ecaafb0edc894c8b",
+    "scripts/e2e-app.mjs": "43be4592e267ce46388e9f52aae93b8b4ab1c2ef7389f09e21b2bc2211d0d842",
+    "scripts/e2e-app.test.mjs": "daa02ca398e63a78402b36d3a08d702baf936cc323709e46e268f32008f0eced",
+    "scripts/e2e-performance.mjs": "bd011dd48fd3206186d9a298db0ebe1b973d7eba416160ac3517bef4ea04e847",
+    "scripts/e2e-resources.mjs": "08627a2ecd7b26df03206375c373cf9652e2284eae8714031b2f3d5b86c4f670",
+    "scripts/e2e-shards.mjs": "9875ad9f1cafe500d0b97eacece49eeb9a36679c399d4b5c33d4a9fad4515b3c",
+    "scripts/e2e-shards.test.mjs": "97c1ca3cedb76e69ad769799f02e7f9eb93b810c754fcb48f9c7e7f3bf08e213",
+    "scripts/engineering-impact.mjs": "e96b6ad162e58d3b2cbf2eae9dc8326cfce7a79dd8751bab819a085d9ef96fae",
+    "scripts/engineering-impact.test.mjs": "180df21e622ea12ed187b5de544ada5dca36e77656689413f030e76e7f1e1c4b",
+    "scripts/feedback-foundation.test.mjs": "1f2ef424f1f40a1bab3de86dbb9ea63c8dda690f33e7a0b7377413313e1a44eb",
+    "scripts/frontend-test-evidence.test.mjs": "dbf1c4d5205429923786bdf142a3f1f4d529fe9951285b08082140fb06a0eec5",
+    "scripts/git-workflow-state.mjs": "47dd3bc4764d43c5ae94c04709e1099706be30595bf984eceef70083fe6acc51",
+    "scripts/integration-handoff-state.mjs": "04c7d57f628b5f99e08a188d2a1378ffebefeb19f6d0b4b4fe73759a6d09c5f6",
+    "scripts/lint-policy.test.mjs": "8b986d61c1a5329838876480e702cab9346e2e751991c2c21a29d38f95dc21af",
+    "scripts/local-diagnostic-evidence.mjs": "296fa25f35053083025b05c2adebf9a5ed57902bc6b993419dc01c1c046d5863",
+    "scripts/local-diagnostic-evidence.test.mjs": "b96b6fde52ce0c4fa621c471e278723779d96fbcdd78c5ae554777382561ab19",
+    "scripts/local-test-entrypoints.test.mjs": "e372ca0c9ffe4b26cfc170dcbd0d62a721e189042ba3af32bf5f97d181606f78",
+    "scripts/macos/launchd-dev.mjs": "204f774a76d8fd9a76f80a7d7def8ec34d3d1bffcdda821770086a283f9b464a",
+    "scripts/node-source-evidence-reporter.mjs": "beaba30a3ab3254c4ed184e63e4ba09ed219a01a3371d7fa4c36a988393cb569",
+    "scripts/playwright-evidence-reporter.mjs": "598843cbf8a26d7831045a434d939ce3872879c58175684681f174f11794b0cf",
+    "scripts/preview-probe.test.mjs": "a3bbd347a98c48261441a9cb1728fde3c9a23bddae7b2b04bea6c59161b0d300",
+    "scripts/run-ci-diagnostics.mjs": "6648816e67dab008fd35f4041d7ef6f15bcd9e35fc736f15cdc59233248677d3",
+    "scripts/run-frontend-tests.mjs": "80c3eccd7827af02d52c93fe89c5d8e9fb89cdf72af3410f5efedefbe8be4166",
+    "scripts/run-integration.mjs": "739ac07a2873b7d9ded1fc52c6561a148c0798a90635fb4b163f371a7a0d295f",
+    "scripts/run-playwright-tests.mjs": "398c32dc3ac6d3765de10caf760553dfd7af9c27f0c36e8ac28d713207878234",
+    "scripts/run-script-tests.mjs": "b3a1c22c3a48b5fcd779186ff33063d77bcc4d5992b482746a0200ac397ee8df",
+    "scripts/run-script-tests.test.mjs": "1da62ec746b249940761270a0b5dac76b59912310003c985dda3d1493e48744f",
+    "scripts/run-targeted-script-tests.mjs": "51598df15e1cdfb1e9cf938d0cbe8fac27a4d2ccea7815c6659a88602efe9874",
+    "scripts/run-targeted-script-tests.test.mjs": "00990d0be32acd942df28227f6e7fe50c4f07cc7149df32d976de62009ce82c1",
+    "scripts/runtime-file-scope.test.mjs": "11f89134c0dfdb18b2561e6855bc721f0a0e54e4d5b87c2921d25807524676af",
+    "scripts/script-test-plan.mjs": "b916d5effe5c71fad031c122d97732b976d761c3094ecca6dff5870468c3292d",
+    "scripts/script-test-plan.test.mjs": "3416caa0c979314d1e1f031bb111c96a7a388cfd00cfcde1d79c5103f432737c",
+    "scripts/start-micro-task.mjs": "026984384613c4ac9b54c8bf778b7d33ecd6ee88e2adf522cdb0f19d99f4d269",
+    "scripts/start-micro-task.test.mjs": "f8e3b2106739d710edb093e7e54ae33f5a39d861170a4f5f75f4df1fce04e41c",
+    "scripts/sync-integration.mjs": "ac1c9e22eb0382b9d63b0eaf9d549b138ca18e38b3fadaec2f6e75393eeafd09",
+    "scripts/sync-integration.test.mjs": "43931f15522ced4b1a2b5a55972ce94e696c3608c67e3fa492e5353228c9179b",
+    "scripts/task-batch.mjs": "fe62c1b6f965c4695a954f00161678b8ca6a087a05783cb464b8c46043b3256d",
+    "scripts/task-batch.test.mjs": "110f8903a85d06d3c0017b003dbe646a431046650ae27b08d510bfd502741920",
+    "scripts/task-completion.mjs": "057a376e11bc48dee4aaf30bdd35c9ddc36415ae8f8af7d585852a5df5d0a449",
+    "scripts/task-dependencies.mjs": "e771583db66522283935becd001598f9dd4dbb75b7cb8568e964403666125fbe",
+    "scripts/task-dependencies.test.mjs": "9ad11fa8bf8ca9e796a6efdfcf7914feb61002a9ad067e9822658e0e1a63009f",
+    "scripts/task-runtime-state.mjs": "70ecda8bcaadce54f2c7c8f8348c3b680010c09969447c287179f2cc6274c950",
+    "scripts/task-runtime-state.test.mjs": "cb42075a957b4faa2deb11f773857924dba67d89b5b71cd8240c384da0d13280",
+    "scripts/task-timing.mjs": "3037e3cbbc7346891f100e2f75aafb0f3af26bef0b0b97bc90efb2188d6e1cae",
+    "scripts/task-timing.test.mjs": "b39b2cff24b759fe0678dbff0bed979eb3cf5fa0b97090fbe74740881e448677",
+    "scripts/test-support/completion-preview-fixture.mjs": "105eb6830136372c99c99d8999d66625caddda423ed4e423f137c31f16b82e84",
+    "scripts/ui-template-policy.test.mjs": "40a60676941ae380f0e6109b1c4c02360044ddb2c5068cb1a50e6236c8c3b60e",
+    "scripts/verification-early-checks.test.mjs": "0604b1fc782ec24728c531aa9814e43e9559e96a71814efaed16cfadf9ae5b3a",
+    "scripts/verification-evidence.mjs": "2cb68ed446e5768f5f89afdbfc3acc5d5feca23431c9a639eb79348e88c1ebde",
+    "scripts/verification-evidence.test.mjs": "2ce98b06c12d165a2def70c12e2eb46f6965f1d1b692beea7f61bafa804701bb",
+    "scripts/verification-performance.mjs": "059530cf8f43cad4b3fe4cf4c9835aaebac5d83e562c13d0830a7f671d8b475b",
+    "scripts/verification-performance.test.mjs": "e7dda6c54c465a9da224bdbfcdd676585cae3a7f1b6f4948413ebe966b961520",
+    "scripts/verification-policy.mjs": "054f4060c3079464306dff2a34b48dc44301438e01f03c2beb59db97b774ba77",
+    "scripts/verification-runner.mjs": "b8cbb490b81bed68145a3febc4e8f691435df94418b7cbd47c5cea91bccc53b7",
+    "scripts/verification-scope.test.mjs": "ba48064c072e1217e39896476dadc88267cb4bb4c577ceefc10f67c145599956",
+    "scripts/verify.mjs": "bfc351a9e66694e6820f9f004018894d054e64fe777fd197cac4ffdd15ba57c7",
+    "scripts/vite-watch.test.mjs": "47686cdc91b7c81af6c665e8c8bee45e0a9d09e484cb7ee783c81070c862bffc",
+    "scripts/vitest-evidence-reporter.mjs": "1bfd049f64888dd3224b23de9a870caff9234728bde7723941f8b753f495741f"
+  }
+}

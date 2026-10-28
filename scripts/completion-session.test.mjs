@@ -365,3 +365,81 @@ test('closed phase requires successful main CI and every final stage; local read
   assert.equal(completionPhase(s), 'delivered');
   assert.throws(() => pauseCompletion(s, { now: 101 }), /Closed/);
 });
+
+test('terminal job failure releases the waiter without waiting for unrelated E2E or rewriting run status', async () => {
+  let waits = 0;
+  const head = 'a'.repeat(40);
+  await assert.rejects(
+    waitQuality({
+      runId: 42,
+      expectedHead: head,
+      readRun: async () => ({
+        id: 42,
+        head_sha: head,
+        run_attempt: 1,
+        path: '.github/workflows/quality.yml',
+        status: 'in_progress',
+        conclusion: null,
+      }),
+      readJobs: async () => [
+        {
+          id: 1,
+          run_id: 42,
+          head_sha: head,
+          run_attempt: 1,
+          name: 'Engineering tests',
+          status: 'completed',
+          conclusion: 'failure',
+          completed_at: '2026-10-28T03:22:54Z',
+        },
+        { name: 'Frontend E2E 1/2', status: 'in_progress', conclusion: null },
+      ],
+      wait: async () => {
+        waits++;
+      },
+      report: () => {},
+    }),
+    (error) => error.ciFailure?.status === 'in_progress' && error.ciFailure.failedJob.id === 1,
+  );
+  assert.equal(waits, 0, 'No remaining E2E wait, workflow retry, cancellation or delivery action');
+});
+
+for (const patch of [
+  { run_id: 43 },
+  { head_sha: 'b'.repeat(40) },
+  { run_attempt: 2 },
+  { id: null },
+  { completed_at: null },
+]) {
+  test(`invalid early failure identity remains blocked: ${JSON.stringify(patch)}`, async () => {
+    const head = 'a'.repeat(40);
+    await assert.rejects(
+      waitQuality({
+        runId: 42,
+        expectedHead: head,
+        readRun: async () => ({
+          id: 42,
+          head_sha: head,
+          run_attempt: 1,
+          path: '.github/workflows/quality.yml',
+          status: 'in_progress',
+        }),
+        readJobs: async () => [
+          {
+            id: 1,
+            run_id: 42,
+            head_sha: head,
+            run_attempt: 1,
+            name: 'Engineering tests',
+            status: 'completed',
+            conclusion: 'failure',
+            completed_at: '2026-10-28T03:22:54Z',
+            ...patch,
+          },
+        ],
+        wait: async () => assert.fail('Invalid failure proof must block'),
+        report: () => {},
+      }),
+    );
+  });
+}
