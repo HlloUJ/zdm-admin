@@ -36,6 +36,7 @@ export function localDiagnosticIdentity(root, env = process.env) {
     implementation: hashPaths(path.dirname(fileURLToPath(import.meta.url)), [
       'local-diagnostic-evidence.mjs',
       'run-script-tests.mjs',
+      'run-targeted-script-tests.mjs',
       'verification-evidence.mjs',
       'ci-diagnostic-evidence.mjs',
       'frontend-test-evidence.mjs',

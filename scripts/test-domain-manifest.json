@@ -58,7 +58,7 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "24a1b104337151f14da464bb94768b39a4b9f920bb981a9cdb9cb6c6c55eaabc",
+      "digest": "955531cb040cd129a1b090c7651258d98d936a1297156ecc11437a11834d21a3",
       "imports": [],
       "dynamicImports": 0
     },
@@ -580,7 +580,7 @@
       "dynamicImports": 0
     },
     "scripts/local-diagnostic-evidence.mjs": {
-      "digest": "59d1feaa81967bf4328296e0dd032b1478b7458b7567e240b87a85906fed5ef9",
+      "digest": "9b76770de3878f6349789da7bcce72c787d6f6f6433b5dfc1d44200319efe3ad",
       "imports": [
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -716,6 +716,27 @@
     "scripts/run-script-tests.test.mjs": {
       "digest": "1da62ec746b249940761270a0b5dac76b59912310003c985dda3d1493e48744f",
       "imports": ["scripts/example.test.mjs", "scripts/run-script-tests.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/run-targeted-script-tests.mjs": {
+      "digest": "8f6c74ec5ec35059faa44652fb47d7d99a57c2063a9a14338110fbcdf84db83c",
+      "imports": [
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/local-diagnostic-evidence.mjs",
+        "scripts/run-script-tests.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/run-targeted-script-tests.test.mjs": {
+      "digest": "27ffb0142e6e790d8644c919d7ee012e82ae3e97c581bd2b4900423e68c7f885",
+      "imports": [
+        "outside.test.mjs",
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/remaining.test.mjs",
+        "scripts/run-script-tests.mjs",
+        "scripts/run-targeted-script-tests.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/runtime-file-scope.mjs": {
