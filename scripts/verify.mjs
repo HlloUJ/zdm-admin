@@ -1,3 +1,4 @@
+import { refreshCurrentTiming } from './batch-timing-runtime.mjs';
 import { observeTaskTiming } from './task-timing.mjs';
 import { randomUUID } from 'node:crypto';
 import { performanceSummary, savePerformanceSummary, phaseEvidence } from './verification-performance.mjs';
@@ -306,6 +307,7 @@ export async function main(args = process.argv.slice(2)) {
     );
     return 0;
   }
+  if (!args.includes('--list')) refreshCurrentTiming(process.cwd());
   if (existsSync(path.join(process.cwd(), CONTRACT_FILE))) {
     validateContracts(process.cwd());
     validateChangedBusinessCoverage(process.cwd(), changedBusinessFiles(process.cwd()));

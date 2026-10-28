@@ -1,3 +1,5 @@
+import { refreshCurrentTiming, timingCommon, currentTimingSummary } from './batch-timing-runtime.mjs';
+import { readTimingSummary } from './batch-timing-store.mjs';
 // Observation only. No execution policy, cache decision, approval or task status depends on this report.
 import {
   createReadStream,
@@ -305,6 +307,13 @@ export async function recordTaskTiming(
 }
 export async function observeTaskTiming(root, report = console.log) {
   try {
+    const batch = refreshCurrentTiming(root);
+    if (batch.summary) {
+      report(
+        `Batch timing snapshot: ${batch.file}; ${batch.summary.status}; ${batch.summary.wallMs}ms since authorization`,
+      );
+      return;
+    }
     const result = await recordTaskTiming(root);
     if (result.file) report(`Task timing snapshot: ${result.file}`);
     else report(`Task timing unavailable: ${result.reason}`);
@@ -317,12 +326,35 @@ export async function observeTaskTiming(root, report = console.log) {
   }
 }
 export async function main(args = process.argv.slice(2)) {
+  let requestedBatch = null;
+  const batchIndex = args.indexOf('--batch');
+  if (batchIndex >= 0) {
+    requestedBatch = args[batchIndex + 1];
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(requestedBatch ?? '')) throw Error('Exact timing batch required');
+    args = args.filter((_, index) => index !== batchIndex && index !== batchIndex + 1);
+  }
   if (args.some((arg) => !['--json', '--last-completed', '--help'].includes(arg)))
     throw Error('Unknown task timing argument');
   if (args.includes('--help')) {
     console.log(
-      'Usage: npm run task:timing -- [--json] [--last-completed]\nReads the current thread event metadata and existing local observations. Does not run checks or change task state.',
+      'Usage: npm run task:timing -- [--batch batch-id] [--json] [--last-completed]\nReads the current thread event metadata and existing local observations. Does not run checks or change task state.',
     );
+    return 0;
+  }
+  if (requestedBatch) {
+    const summary = readTimingSummary(timingCommon(process.cwd()), requestedBatch);
+    console.log(
+      JSON.stringify(
+        summary ?? { status: 'unavailable', batch: requestedBatch, reason: 'No native batch boundary captured' },
+        null,
+        2,
+      ),
+    );
+    return summary ? 0 : 1;
+  }
+  const batch = args.includes('--last-completed') ? null : currentTimingSummary(process.cwd());
+  if (batch) {
+    console.log(JSON.stringify(batch, null, 2));
     return 0;
   }
   const result = await recordTaskTiming(process.cwd(), { lastCompleted: args.includes('--last-completed') });

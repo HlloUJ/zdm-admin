@@ -1,3 +1,5 @@
+import { requireBatchTiming } from './batch-timing-runtime.mjs';
+import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs';
 import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -104,6 +106,8 @@ export async function completionCommand(
     assert.ok(existsSync(path.join(directory, 'completion-session.json')), 'No recorded completion interval');
     return {
       ...completionSummary(openCompletion(directory, requestedBatch, { formal: false })),
+      timingScope: 'formal-delivery-only',
+      batchTiming: readTimingSummary(common, requestedBatch) ?? { status: 'legacy-unavailable', wallMs: null },
       deliveryStatus: deliveryStatus(directory, requestedBatch, registry),
     };
   }
@@ -441,6 +445,7 @@ export async function completionCommand(
       },
       cleanup: {
         run: () => {
+          requireBatchTiming(common, batch.id);
           if (existsSync(batch.worktree)) assert.equal(execute(batch.worktree, 'git', ['status', '--porcelain']), '');
           process.chdir(anchor);
           if (existsSync(batch.worktree)) execute(anchor, 'git', ['worktree', 'remove', batch.worktree]);
@@ -469,6 +474,8 @@ export async function completionCommand(
     checkedAt: new Date().toISOString(),
     source: 'fetch-and-exact-live-ci-identity',
   };
+  if (readTimeline(common, batch.id)) result.batchTiming = refreshTimeline(common, batch.id).summary;
+  result.summary.timingScope = 'formal-delivery-only';
   writeReceipt(path.join(directory, 'completion-receipt.json'), result);
   result.deliveryStatus = backfillDeliveryStatus(
     directory,
