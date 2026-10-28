@@ -1,0 +1,571 @@
+{
+  "version": 1,
+  "inputs": {
+    "scripts/completion-cli.mjs": {
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-flow.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-preview.mjs",
+        "scripts/completion-process.mjs",
+        "scripts/completion-recovery.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/completion-status.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/start-micro-task.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-cli.test.mjs": {
+      "imports": [
+        "scripts/completion-cli.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-flow.mjs": {
+      "imports": ["scripts/completion-session.mjs", "scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-handoff.mjs": {
+      "imports": [
+        "scripts/completion-session.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/start-micro-task.mjs",
+        "scripts/task-batch.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-preview.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/task-data-environment.mjs", "scripts/task-preview-service.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-preview.test.mjs": {
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-session.test.mjs": {
+      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-service.mjs": {
+      "imports": ["scripts/task-data-environment.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-service.test.mjs": {
+      "imports": ["scripts/task-preview-service.mjs"],
+      "dynamicImports": 2
+    },
+    "scripts/wait-quality.mjs": {
+      "imports": [],
+      "dynamicImports": 0
+    }
+  },
+  "consumers": {
+    "scripts/backend-runtime.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/git-workflow-core.mjs", "scripts/integration-handoff-state.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/backend-runtime.test.mjs": {
+      "imports": ["scripts/backend-runtime.mjs", "scripts/dev-task.mjs", "scripts/ensure-backend.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/business-regression.test.mjs": {
+      "imports": [
+        "scripts/business-regression.mjs",
+        "scripts/check-changed-plan.mjs",
+        "scripts/check-changed.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/check-changed-plan.mjs": {
+      "imports": [
+        "scripts/affected-test-inputs.mjs",
+        "scripts/backend-test-plan.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/check-changed-plan.test.mjs": {
+      "imports": ["scripts/check-changed-plan.mjs", "scripts/verification-impact.test.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/check-changed.mjs": {
+      "imports": [
+        "scripts/business-regression.mjs",
+        "scripts/check-changed-plan.mjs",
+        "scripts/task-timing.mjs",
+        "scripts/verification-evidence.mjs",
+        "scripts/verification-runner.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/check-changed.test.mjs": {
+      "imports": ["scripts/check-changed-plan.mjs", "scripts/check-changed.mjs", "scripts/verification-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/check-managed-branch-commit.mjs": {
+      "imports": ["scripts/git-workflow-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/ci-backend-equivalence.test.mjs": {
+      "imports": [
+        "scripts/ci-backend-equivalence.mjs",
+        "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/ci-equivalence.test.mjs": {
+      "imports": [
+        "scripts/ci-equivalence-environment.mjs",
+        "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/ci-quality-evidence.mjs": {
+      "imports": [
+        "scripts/backend-test-evidence.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/ci-backend-equivalence.mjs",
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/ci-equivalence.mjs",
+        "scripts/frontend-test-evidence.mjs",
+        "scripts/run-script-tests.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/ci-quality-evidence.test.mjs": {
+      "imports": [
+        "scripts/ci-quality-evidence.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/ci-report-contract.test.mjs": {
+      "imports": [
+        "scripts/ci-backend-equivalence.mjs",
+        "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs",
+        "scripts/ci-report-contract.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-ci-evidence.mjs": {
+      "imports": ["scripts/ci-equivalence.mjs", "scripts/ci-quality-evidence.mjs", "scripts/verification-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-cli.mjs": {
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-flow.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-preview.mjs",
+        "scripts/completion-process.mjs",
+        "scripts/completion-recovery.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/completion-status.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/start-micro-task.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-cli.test.mjs": {
+      "imports": [
+        "scripts/completion-cli.mjs",
+        "scripts/task-batch.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-flow.mjs": {
+      "imports": ["scripts/completion-session.mjs", "scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-handoff.mjs": {
+      "imports": [
+        "scripts/completion-session.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/start-micro-task.mjs",
+        "scripts/task-batch.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-preview.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/task-data-environment.mjs", "scripts/task-preview-service.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-preview.test.mjs": {
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-recovery.mjs": {
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-process.mjs",
+        "scripts/completion-session.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-recovery.test.mjs": {
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/completion-recovery.mjs",
+        "scripts/completion-session.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/completion-session.test.mjs": {
+      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-status.mjs": {
+      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-status.test.mjs": {
+      "imports": ["scripts/completion-session.mjs", "scripts/completion-status.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-launcher.mjs": {
+      "imports": [
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-dependencies.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-launcher.test.mjs": {
+      "imports": [
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/dev-task.test.mjs",
+        "scripts/sync-integration.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/dev-all.mjs": {
+      "imports": ["scripts/backend-runtime.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/dev-task.mjs": {
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/task-dependencies.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/dev-task.test.mjs": {
+      "imports": [
+        "scripts/backend-test-plan.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/dev-task.test.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-runtime-state.mjs",
+        "vite.config.js"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/engineering-impact.mjs": {
+      "imports": [
+        "scripts/completion-cli.mjs",
+        "scripts/completion-cli.test.mjs",
+        "scripts/completion-flow.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-preview.mjs",
+        "scripts/completion-preview.test.mjs",
+        "scripts/completion-session.test.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-preview-service.test.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/engineering-impact.test.mjs": {
+      "imports": [
+        "scripts/check-changed-plan.mjs",
+        "scripts/consumer.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/new-consumer.mjs",
+        "scripts/new-module.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/unknown.mjs",
+        "scripts/verification-impact.mjs",
+        "scripts/verify.mjs",
+        "scripts/wait-quality.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/ensure-backend.mjs": {
+      "imports": ["scripts/backend-runtime.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/git-workflow-core.mjs": {
+      "imports": ["scripts/verification-impact.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/git-workflow-core.test.mjs": {
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/backend-test-evidence.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/git-workflow-state.mjs": {
+      "imports": ["scripts/git-workflow-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/integration-handoff-state.mjs": {
+      "imports": ["scripts/runtime-file-scope.mjs", "scripts/task-runtime-state.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/macos/launchd-dev.mjs": {
+      "imports": ["scripts/backend-runtime.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/preview-probe.test.mjs": {
+      "imports": ["scripts/dev-task.mjs"],
+      "dynamicImports": 2
+    },
+    "scripts/run-integration.mjs": {
+      "imports": ["scripts/git-workflow-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/runtime-file-scope.mjs": {
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-all.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/macos/launchd-dev.mjs",
+        "scripts/run-integration.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-runtime-state.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/runtime-file-scope.test.mjs": {
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-all.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/macos/launchd-dev.mjs",
+        "scripts/run-integration.mjs",
+        "scripts/runtime-file-scope.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/script-test-plan.test.mjs": {
+      "imports": [
+        "scripts/consumer.mjs",
+        "scripts/consumer.test.mjs",
+        "scripts/feedback-foundation.test.mjs",
+        "scripts/helper.mjs",
+        "scripts/helper.test.mjs",
+        "scripts/new.test.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/unrelated.test.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/start-micro-task.mjs": {
+      "imports": ["scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/start-micro-task.test.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/start-micro-task.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/sync-integration.mjs": {
+      "imports": [
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/sync-integration.test.mjs": {
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-runtime-state.mjs"
+      ],
+      "dynamicImports": 2
+    },
+    "scripts/task-completion.mjs": {
+      "imports": ["scripts/completion-cli.mjs", "scripts/dev-task.mjs", "scripts/task-batch.mjs", "scripts/verify.mjs"],
+      "dynamicImports": 1
+    },
+    "scripts/task-dependencies.test.mjs": {
+      "imports": ["scripts/dev-task.mjs", "scripts/task-dependencies.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-service.mjs": {
+      "imports": ["scripts/task-data-environment.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-service.test.mjs": {
+      "imports": ["scripts/task-preview-service.mjs"],
+      "dynamicImports": 2
+    },
+    "scripts/task-timing.test.mjs": {
+      "imports": ["scripts/check-changed.mjs", "scripts/task-timing.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/test-support/completion-preview-fixture.mjs": {
+      "imports": [
+        "scripts/completion-preview.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/test-support/task-data-environment.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/verification-early-checks.test.mjs": {
+      "imports": ["scripts/backend-test-evidence.mjs", "scripts/verify.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-evidence.test.mjs": {
+      "imports": [
+        "scripts/run-frontend-tests.mjs",
+        "scripts/verification-evidence.mjs",
+        "scripts/verification-runner.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 10
+    },
+    "scripts/verification-impact.mjs": {
+      "imports": [
+        "scripts/business-regression.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/runtime-file-scope.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/verification-impact.test.mjs": {
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/backend-runtime.test.mjs",
+        "scripts/backend-test-evidence.mjs",
+        "scripts/backend-test-evidence.test.mjs",
+        "scripts/backend-test-plan.mjs",
+        "scripts/backend-test-plan.test.mjs",
+        "scripts/backend-unknown.mjs",
+        "scripts/dev-status.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/dev-task.test.mjs",
+        "scripts/dev-unknown.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/macos/launchd-dev.mjs",
+        "scripts/task-dependencies.mjs",
+        "scripts/task-dependencies.test.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-preview-service.test.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/task-runtime-state.test.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/verification-policy.test.mjs": {
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/e2e-shards.mjs",
+        "scripts/playwright-evidence-reporter.mjs",
+        "scripts/verification-policy.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/verify.mjs": {
+      "imports": [
+        "scripts/backend-test-evidence.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/check-changed-plan.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/task-timing.mjs",
+        "scripts/verification-evidence.mjs",
+        "scripts/verification-impact.mjs",
+        "scripts/verification-performance.mjs",
+        "scripts/verification-policy.mjs",
+        "scripts/verification-runner.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/wait-quality.mjs": {
+      "imports": [],
+      "dynamicImports": 0
+    }
+  },
+  "externalReaders": {
+    ".codex/zdm-project-workflow.yaml": "87062459fc0f554429fbf997360e02a438d79f6d32e6cb11435f17f6aa3eb2db",
+    ".github/workflows/quality.yml": "ecf675947984bbcd891000d49ffa0593ca7009143cdb845fb93ba829f8fa2103",
+    "package.json": "955531cb040cd129a1b090c7651258d98d936a1297156ecc11437a11834d21a3"
+  }
+}

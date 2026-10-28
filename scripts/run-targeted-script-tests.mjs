@@ -6,7 +6,8 @@ import { fileURLToPath } from 'node:url';
 import { DIAGNOSTIC_FILES } from './ci-diagnostic-evidence.mjs';
 import { localDiagnosticIdentity, loadLocalDiagnosticPacket } from './local-diagnostic-evidence.mjs';
 import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
-import { runScriptTests } from './run-script-tests.mjs';
+import { runScriptTests, validateNodeTestSummary } from './run-script-tests.mjs';
+import { nodeTestReport } from './node-test-evidence.mjs';
 
 export function targetedScriptPlan(files) {
   assert.ok(files.length, 'Targeted tests require explicit files');
@@ -53,6 +54,15 @@ export function runTargetedScriptTests(
     if (result !== 0) return result;
     const report = JSON.parse(readFileSync(path.join(targetDirectory, 'scripts-results.json')));
     validateFrontendTestReport(report, { kind: 'scripts', runId: report.runId });
+    assert.match(report.runId, /^[a-f0-9-]{36}$/);
+    const raw = JSON.parse(readFileSync(path.join(targetDirectory, `scripts-${report.runId}-raw.json`)));
+    const { summary, ...normalized } = report;
+    assert.deepEqual(
+      normalized,
+      nodeTestReport(raw, plan.remaining, root, 'scripts'),
+      'Targeted report differs from raw execution',
+    );
+    validateNodeTestSummary(summary);
     assert.deepEqual(report.files, plan.remaining, 'Incomplete targeted remainder');
     reports.push(report);
   }
