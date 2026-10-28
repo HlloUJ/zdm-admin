@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { ENGINEERING_EXTRA_INPUTS, captureReviewedScriptInputs } from './script-test-plan.mjs';
@@ -73,6 +73,7 @@ for (const fault of [
   'omitted-consumer',
   'new-consumer',
   'external-consumer',
+  'external-script',
   'dynamic-external',
   'dependency',
   'entrypoint',
@@ -87,6 +88,8 @@ for (const fault of [
     }
     if (fault === 'new-consumer') f.write('scripts/new-consumer.mjs', "import './wait-quality.mjs';");
     if (fault === 'external-consumer') f.write('src/new-consumer.ts', "import '../scripts/wait-quality.mjs';");
+    if (fault === 'external-script')
+      f.write('scripts/reader.py', 'subprocess.run(["node", "scripts/wait-quality.mjs"])');
     if (fault === 'dynamic-external') f.write('src/dynamic.ts', 'export const value = import(process.env.TARGET);');
     if (fault === 'dependency') f.write('scripts/wait-quality.mjs', "import './new-module.mjs';");
     if (fault === 'entrypoint')

@@ -634,7 +634,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.mjs": {
-      "digest": "2631da57136d5c65f3b172a04e763734734ed84230165fb96f5b62deeb8c7ff9",
+      "digest": "7b04168ee7235694575d979c7535710a2a3f695e752847f0cbc70abebf1336c7",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-cli.test.mjs",
@@ -651,7 +651,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.test.mjs": {
-      "digest": "132ec44b65f482564ea1d1cb9e9e009e7d6a44553193cf0ac404c4b86317e4d4",
+      "digest": "c1fa51ddb49a49fb9cfec5318b3ffffdf9ef989f626e4a83c0aabce46c267726",
       "imports": [
         "scripts/check-changed-plan.mjs",
         "scripts/consumer.mjs",

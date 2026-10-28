@@ -45,7 +45,11 @@ export function engineeringExternalReaders(root, consumers) {
   const names = consumers.map((file) => path.posix.basename(file));
   const readers = {};
   for (const file of [...new Set(files)].sort()) {
-    if (file.startsWith('scripts/') || !/\.(?:[cm]?[jt]sx?|vue|java|json|ya?ml|html|xml|sh)$/.test(file)) continue;
+    if (
+      file.startsWith('scripts/') ||
+      !/\.(?:[cm]?[jt]sx?|vue|java|json|ya?ml|html|xml|sh|py|rb|go|rs|toml|properties|ps1)$/.test(file)
+    )
+      continue;
     const source = readFileSync(path.join(root, file), 'utf8');
     if (
       /\.(?:[cm]?[jt]sx?|vue)$/.test(file) &&
