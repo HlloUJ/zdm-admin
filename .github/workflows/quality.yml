@@ -23,7 +23,7 @@ env:
 jobs:
   scope:
     name: Validation scope
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       frontend: ${{ steps.scope.outputs.frontend }}
       backend: ${{ steps.scope.outputs.backend }}
@@ -35,7 +35,7 @@ jobs:
           fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
       - run: npm run check:engineering-inputs
       - run: npm run check:business-regressions -- --changed
       # Pure Node/Git diagnostics run before any costly quality jobs; no npm install or services.
@@ -54,14 +54,14 @@ jobs:
   formatting:
     name: Repository formatting
     needs: scope
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     env:
       CI_EQUIVALENCE_ELIGIBLE: 'true'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
       - id: equivalent
@@ -86,12 +86,12 @@ jobs:
     name: Engineering tests
     needs: scope
     if: ${{ needs.scope.outputs.engineering == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
           cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
       - uses: actions/download-artifact@v4
@@ -117,18 +117,32 @@ jobs:
     name: Frontend static checks
     needs: scope
     if: ${{ needs.scope.outputs.frontend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    container:
+      image: ${{ needs.scope.outputs.browser_image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --shm-size=2g --user 1001:1001 --cap-drop=ALL --security-opt=no-new-privileges
+    permissions:
+      contents: read
+      actions: read
+      pull-requests: read
+      packages: read
+    defaults:
+      run:
+        shell: bash
     env:
       CI_EQUIVALENCE_ELIGIBLE: 'true'
+      CI_BROWSER_IMAGE: ${{ needs.scope.outputs.browser_image }}
+      LANG: C.UTF-8
+      LC_ALL: C.UTF-8
       PLAYWRIGHT_CHANNEL: chrome
       PLAYWRIGHT_JSON_OUTPUT_NAME: ${{ github.workspace }}/coverage/ci-evidence/all-tests.json
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
       - run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
+      - run: node scripts/ci-quality-evidence.mjs run browser-image -- node scripts/ci-browser-image.mjs verify
       - id: equivalent
         run: node scripts/ci-equivalence.mjs
         env:
@@ -282,12 +296,12 @@ jobs:
     name: Frontend quality
     if: always()
     needs: [scope, formatting, engineering, frontend_static, frontend_e2e_1, frontend_e2e_2]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
       - uses: actions/download-artifact@v4
         with:
           name: ci-validation-scope
@@ -322,12 +336,12 @@ jobs:
       pull-requests: read
     needs: scope
     if: ${{ needs.scope.outputs.backend == 'true' }}
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -366,12 +380,12 @@ jobs:
     name: Backend quality
     if: always()
     needs: [scope, formatting, engineering, backend_full]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.23.4
       - uses: actions/download-artifact@v4
         with:
           name: ci-validation-scope
