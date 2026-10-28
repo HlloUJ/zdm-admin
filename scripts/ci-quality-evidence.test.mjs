@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { classifyChangedFiles } from './verification-impact.mjs';
@@ -505,4 +505,81 @@ test('actual frontend aggregate rejects a business omission even when list and b
     () => verifyFrontendEvidence(state.needs, state.groups, { requiredBehaviors: required }),
     /Missing or duplicate executed business behavior/,
   );
+});
+
+test('engineering forwarding CLI checks actual checkout, run, producer and report without rewriting evidence', (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'engineering-forward-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const { scope, identity } = scopeFixture(['scripts/task-batch.mjs']);
+  const git = (arg) => spawnSync('git', arg, { encoding: 'utf8' }).stdout.trim();
+  const candidate = git(['rev-parse', 'HEAD']);
+  const tree = git(['rev-parse', 'HEAD^{tree}']);
+  const event = { after: candidate, before: identity.baseSha };
+  Object.assign(identity, { candidateSha: candidate, sourceHeadSha: candidate, treeSha: tree });
+  scope.identity = identity;
+  const files = scriptTestFiles(process.cwd(), 'engineering');
+  const metadata = {
+    ...identity,
+    job: 'scope',
+    status: 'success',
+    engineeringTests: files,
+    engineeringResults: {
+      runId: 'run',
+      files,
+      summary: { tests: 1, suites: 0, pass: 1, fail: 0, cancelled: 0, skipped: 0, todo: 0 },
+    },
+    phases: [
+      { name: 'npm-ci', command: ['npm', 'ci'], exitCode: 0 },
+      { name: 'light-checks', command: ['node', 'scripts/ci-light-checks.mjs'], exitCode: 0 },
+      { name: 'engineering-tests', runId: 'run', command: ['npm', 'run', 'test:engineering'], exitCode: 0 },
+    ],
+  };
+  writeFileSync(path.join(root, 'event.json'), JSON.stringify(event));
+  writeFileSync(path.join(root, 'scope.json'), JSON.stringify(scope));
+  const env = {
+    ...process.env,
+    GITHUB_EVENT_PATH: path.join(root, 'event.json'),
+    GITHUB_EVENT_NAME: 'push',
+    GITHUB_RUN_ID: identity.workflowRunId,
+    GITHUB_RUN_ATTEMPT: identity.attempt,
+    GITHUB_SHA: candidate,
+    CI_EVIDENCE_DIR: root,
+  };
+  for (const mutation of [
+    null,
+    (x) => (x.job = 'engineering'),
+    (x) => (x.workflowRunId = 'different'),
+    (x) => (x.engineeringResults.summary.skipped = 1),
+    (x) => (x.engineeringTests = []),
+    (x) => x.phases[2].command.push('--skip'),
+  ]) {
+    const value = structuredClone(metadata);
+    if (mutation) mutation(value);
+    const raw = JSON.stringify(value);
+    writeFileSync(path.join(root, 'metadata.json'), raw);
+    const result = spawnSync(process.execPath, ['scripts/ci-quality-evidence.mjs', 'verify-engineering'], {
+      env,
+      encoding: 'utf8',
+    });
+    assert.equal(result.status, mutation ? 1 : 0, result.stdout + result.stderr);
+    assert.equal(readFileSync(path.join(root, 'metadata.json'), 'utf8'), raw);
+  }
+});
+
+test('workflow executes diagnostics and remaining engineering on one Runner and only forwards downstream', () => {
+  const text = readFileSync(new URL('../.github/workflows/quality.yml', import.meta.url), 'utf8');
+  const scope = text.split('  scope:\n')[1].split('\n  formatting:')[0];
+  const engineering = text.split('  engineering:\n')[1].split('\n  frontend_static:')[0];
+  assert.ok(
+    scope.indexOf('npm run test:ci-reuse') < scope.indexOf('run engineering-tests -- npm run test:engineering'),
+  );
+  assert.match(scope, /CI_DIAGNOSTIC_DIRECTORY: \$\{\{ github.workspace \}\}\/coverage\/ci-evidence/);
+  assert.ok(
+    scope.indexOf('run light-checks -- node scripts/ci-light-checks.mjs') < scope.indexOf('npm run test:ci-reuse'),
+  );
+  assert.equal((text.match(/run engineering-tests -- npm run test:engineering/g) ?? []).length, 1);
+  assert.doesNotMatch(engineering, /npm ci|test:engineering|CI_EVIDENCE_JOB/);
+  assert.match(engineering, /scripts\/ci-quality-evidence\.mjs verify-engineering/);
+  assert.match(engineering, /name: ci-validation-scope/);
+  assert.match(engineering, /name: ci-engineering/);
 });

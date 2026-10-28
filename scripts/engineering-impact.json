@@ -144,6 +144,10 @@
       ],
       "dynamicImports": 1
     },
+    "scripts/ci-light-checks.mjs": {
+      "imports": ["scripts/ci-quality-evidence.mjs", "scripts/verification-policy.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/ci-quality-evidence.mjs": {
       "imports": [
         "scripts/backend-test-evidence.mjs",
@@ -151,6 +155,7 @@
         "scripts/ci-backend-equivalence.mjs",
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/ci-equivalence.mjs",
+        "scripts/ci-light-checks.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/run-script-tests.mjs",
         "scripts/script-test-plan.mjs",
@@ -160,6 +165,7 @@
     },
     "scripts/ci-quality-evidence.test.mjs": {
       "imports": [
+        "scripts/ci-light-checks.mjs",
         "scripts/ci-quality-evidence.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/task-batch.mjs",
@@ -536,10 +542,18 @@
     },
     "scripts/verification-policy.test.mjs": {
       "imports": [
+        "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/ci-light-checks.mjs",
+        "scripts/ci-quality-evidence.mjs",
         "scripts/completion-process.mjs",
         "scripts/dev-task.mjs",
         "scripts/e2e-shards.mjs",
+        "scripts/format.mjs",
+        "scripts/light.mjs",
         "scripts/playwright-evidence-reporter.mjs",
+        "scripts/remaining.test.mjs",
+        "scripts/run-script-tests.mjs",
+        "scripts/run-targeted-script-tests.mjs",
         "scripts/verification-policy.mjs",
         "scripts/verify.mjs"
       ],
@@ -567,7 +581,7 @@
   },
   "externalReaders": {
     ".codex/zdm-project-workflow.yaml": "87062459fc0f554429fbf997360e02a438d79f6d32e6cb11435f17f6aa3eb2db",
-    ".github/workflows/quality.yml": "ecf675947984bbcd891000d49ffa0593ca7009143cdb845fb93ba829f8fa2103",
+    ".github/workflows/quality.yml": "744fecb594f4d1e5f4e8fc8772739689b1b408d77dbdfd28d27184dffa9ca136",
     "package.json": "955531cb040cd129a1b090c7651258d98d936a1297156ecc11437a11834d21a3"
   },
   "reflectiveReaders": {
@@ -591,10 +605,11 @@
     "scripts/ci-diagnostic-evidence.mjs": "208cb10771ff4e73302737129c46eb33840044785ba4e177d2f52c85dd90fceb",
     "scripts/ci-diagnostic-evidence.test.mjs": "766d0e56bb29bdfb2075a2320640adae1a7c4729f8bb6f2468d426b72280602e",
     "scripts/ci-equivalence-environment.mjs": "65483d5d50f79c9499517d67c69dcd23da47fc1c6f981ebcfea7cf08d1e1e889",
-    "scripts/ci-equivalence.mjs": "d73d91922c7fe61d4ee60803b8ee94067ae28c4ef612987e71cbbcb42e4f6c42",
-    "scripts/ci-equivalence.test.mjs": "8ce9b78814bfd8248f0fa704b2a9604396268c78c0b1419ac218aa64a1ad94d8",
-    "scripts/ci-quality-evidence.mjs": "462ba05f2d46ef7961a613dc68ab7fadc7b8d3158cef28793c72eecd896eb910",
-    "scripts/ci-quality-evidence.test.mjs": "66f360aa9d2f15113f24989ecb0fdb1cdbd08dd68b41093d561031b82774b7d0",
+    "scripts/ci-equivalence.mjs": "da51a51841e27ca45bb1eeed9e04e1a1560622a440d7f47a848d78afaec0bd51",
+    "scripts/ci-equivalence.test.mjs": "0f1f2b5eeadcfd57154fa436a6a2ceb9e824dc9dbb43eded7c71c514293b2880",
+    "scripts/ci-light-checks.mjs": "ac1843722e30995eb764615bb37329b663b4941e40eeb9ea184c4b6f1f68f4ec",
+    "scripts/ci-quality-evidence.mjs": "acca1d362fcf1782cb3717da1aca66444474c627d7c52ce5e016cb0faa1ae7bd",
+    "scripts/ci-quality-evidence.test.mjs": "52cb2f6ccbfb19716464586a95d36f679c1068d50cfe960b6edca4a3e83e147c",
     "scripts/ci-report-contract.mjs": "faff33c1ff3accf8a04d99a7e3b8380a23450a2141dd59b8d5d1509282c229b7",
     "scripts/ci-report-contract.test.mjs": "e107480e8e5223f939ff0751748051ff966406f1cf81f39ac5091d30f657ad75",
     "scripts/completion-ci-evidence.mjs": "b1e12aa217bbc0d3b0364521907570545a5f3cb6fb14114b85807935b1ab880f",
@@ -635,7 +650,7 @@
     "scripts/run-playwright-tests.mjs": "398c32dc3ac6d3765de10caf760553dfd7af9c27f0c36e8ac28d713207878234",
     "scripts/run-script-tests.mjs": "b3a1c22c3a48b5fcd779186ff33063d77bcc4d5992b482746a0200ac397ee8df",
     "scripts/run-script-tests.test.mjs": "1da62ec746b249940761270a0b5dac76b59912310003c985dda3d1493e48744f",
-    "scripts/run-targeted-script-tests.mjs": "51598df15e1cdfb1e9cf938d0cbe8fac27a4d2ccea7815c6659a88602efe9874",
+    "scripts/run-targeted-script-tests.mjs": "350c2a591ea8f428004f1e53d92627065e63b616701558bbaabd51d737a6dfae",
     "scripts/run-targeted-script-tests.test.mjs": "00990d0be32acd942df28227f6e7fe50c4f07cc7149df32d976de62009ce82c1",
     "scripts/runtime-file-scope.test.mjs": "11f89134c0dfdb18b2561e6855bc721f0a0e54e4d5b87c2921d25807524676af",
     "scripts/script-test-plan.mjs": "b916d5effe5c71fad031c122d97732b976d761c3094ecca6dff5870468c3292d",
@@ -660,10 +675,11 @@
     "scripts/verification-evidence.test.mjs": "2ce98b06c12d165a2def70c12e2eb46f6965f1d1b692beea7f61bafa804701bb",
     "scripts/verification-performance.mjs": "059530cf8f43cad4b3fe4cf4c9835aaebac5d83e562c13d0830a7f671d8b475b",
     "scripts/verification-performance.test.mjs": "e7dda6c54c465a9da224bdbfcdd676585cae3a7f1b6f4948413ebe966b961520",
-    "scripts/verification-policy.mjs": "054f4060c3079464306dff2a34b48dc44301438e01f03c2beb59db97b774ba77",
+    "scripts/verification-policy.mjs": "ecb9f801edead107adb315dbb9306fed827352043325cea489d35b4ff96fc44f",
+    "scripts/verification-policy.test.mjs": "e25a222c62dac6a0864e90885628e8fd07b408b221aa12d7cf765ab09e21bfbd",
     "scripts/verification-runner.mjs": "b8cbb490b81bed68145a3febc4e8f691435df94418b7cbd47c5cea91bccc53b7",
     "scripts/verification-scope.test.mjs": "ba48064c072e1217e39896476dadc88267cb4bb4c577ceefc10f67c145599956",
-    "scripts/verify.mjs": "bfc351a9e66694e6820f9f004018894d054e64fe777fd197cac4ffdd15ba57c7",
+    "scripts/verify.mjs": "dab5854a356c90949031f0afdb16a4b8411e669471e734be39a1c66ecc8e6ddd",
     "scripts/vite-watch.test.mjs": "47686cdc91b7c81af6c665e8c8bee45e0a9d09e484cb7ee783c81070c862bffc",
     "scripts/vitest-evidence-reporter.mjs": "1bfd049f64888dd3224b23de9a870caff9234728bde7723941f8b753f495741f"
   }
