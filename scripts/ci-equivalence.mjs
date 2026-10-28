@@ -17,6 +17,16 @@ import { SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import { environmentProof, environmentObservation, validateEnvironmentProof } from './ci-equivalence-environment.mjs';
 export { executionEnvironment, environmentProof } from './ci-equivalence-environment.mjs';
 
+export const STATIC_PHASE_COMMANDS = {
+  'npm-ci': ['npm', 'ci'],
+  'browser-image': ['node', 'scripts/ci-browser-image.mjs', 'verify'],
+  'frontend-quality': ['npm', 'run', 'quality:static'],
+  'frontend-unit': ['npm', 'run', 'test:unit'],
+  'frontend-source-guards': ['npm', 'run', 'test:source-guards'],
+  'frontend-build': ['npm', 'run', 'build:app'],
+  'frontend-test-list': ['npx', 'playwright', 'test', '--list', '--reporter=json'],
+};
+
 export const REUSABLE_JOBS = {
   backend_full: 'ci-backend-full',
   formatting: 'ci-formatting',
@@ -44,14 +54,7 @@ export function validateProvenance({ current, original, run, pull, commit, repos
   const required = {
     backend_full: ['backend-quality'],
     formatting: ['npm-ci', 'formatting'],
-    frontend_static: [
-      'npm-ci',
-      'frontend-quality',
-      'frontend-unit',
-      'frontend-source-guards',
-      'frontend-build',
-      'frontend-test-list',
-    ],
+    frontend_static: Object.keys(STATIC_PHASE_COMMANDS),
     frontend_e2e_1: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-app', 'e2e-1'],
     frontend_e2e_2: ['npm-ci', 'browser-image', 'chrome-browser', 'chrome-dependencies', 'e2e-app', 'e2e-2'],
   }[original.job];
@@ -60,6 +63,9 @@ export function validateProvenance({ current, original, run, pull, commit, repos
     required,
     'Source phase inventory differs',
   );
+  if (original.job === 'frontend_static')
+    for (const phase of original.phases)
+      assert.deepEqual(phase.command, STATIC_PHASE_COMMANDS[phase.name], `Unexpected static command: ${phase.name}`);
   if (original.job === 'backend_full') {
     assert.deepEqual(original.phases[0].command, BACKEND_COMMAND);
     assert.ok(original.backendEvidence, 'Complete backend evidence missing');

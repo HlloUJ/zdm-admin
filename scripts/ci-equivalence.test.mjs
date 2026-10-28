@@ -14,6 +14,7 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import {
+  STATIC_PHASE_COMMANDS,
   executionEnvironment,
   readCommitParents,
   validateProvenance,
@@ -669,6 +670,7 @@ test('all four job contracts acquire and replay original reports, then pass the 
       formatting: ['npm-ci', 'formatting'],
       frontend_static: [
         'npm-ci',
+        'browser-image',
         'frontend-quality',
         'frontend-unit',
         'frontend-source-guards',
@@ -681,6 +683,7 @@ test('all four job contracts acquire and replay original reports, then pass the 
     f.original.phases = names.map((name) => ({
       name,
       exitCode: 0,
+      ...(job === 'frontend_static' ? { command: STATIC_PHASE_COMMANDS[name] } : {}),
       ...(name === 'frontend-unit'
         ? { runId: 'unit', command: ['npm', 'run', 'test:unit'] }
         : name === 'frontend-source-guards'
@@ -811,5 +814,28 @@ test('static container v3 rejects older proofs and still binds kernel, toolchain
   for (const key of ['kernel', 'packages', 'systemFiles', 'environment']) {
     const changed = { ...base, [key]: key === 'kernel' ? 'other-kernel' : 'e'.repeat(64) };
     assert.notDeepEqual(environmentProofFromSnapshot('frontend_static', changed), proof);
+  }
+});
+
+// Read the actual workflow wrapper commands, not a copy of the validator's phase list.
+test('static provenance matches every real workflow phase and rejects missing or altered commands', () => {
+  const workflow = readFileSync(new URL('../.github/workflows/quality.yml', import.meta.url), 'utf8');
+  const section = workflow.split('  frontend_static:\n')[1].split('\n  frontend_e2e_1:')[0];
+  const commands = [...section.matchAll(/run: node scripts\/ci-quality-evidence\.mjs run ([\w-]+) -- (.+)/g)].map(
+    (match) => [match[1], match[2].split(' ')],
+  );
+  assert.deepEqual(Object.fromEntries(commands), STATIC_PHASE_COMMANDS);
+  const f = fixture();
+  f.original.job = 'frontend_static';
+  f.original.environmentProof = f.proof = environmentProofFromSnapshot('frontend_static', snapshot());
+  f.original.phases = commands.map(([name, command]) => ({ name, command, exitCode: 0 }));
+  assert.equal(validateProvenance(f), true);
+  for (let i = 0; i < commands.length; i++) {
+    const missing = structuredClone(f);
+    missing.original.phases.splice(i, 1);
+    assert.throws(() => validateProvenance(missing), /phase inventory/);
+    const altered = structuredClone(f);
+    altered.original.phases[i].command.push('--skip');
+    assert.throws(() => validateProvenance(altered), /Unexpected static command/);
   }
 });
