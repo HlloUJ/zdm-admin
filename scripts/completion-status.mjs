@@ -1,3 +1,4 @@
+import { readTimingSummary } from './batch-timing-store.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
@@ -35,7 +36,19 @@ export function deliveryStatus(directory, batch, registry) {
   assert.equal(state.batch, batch);
   const phase = completionPhase(state),
     summary = completionSummary(state);
-  const result = { version: 1, batch, phase, label: labels[phase], formalDeliveryComplete: false, summary };
+  const common = path.dirname(path.dirname(directory));
+  const batchTiming = readTimingSummary(common, batch) ?? { status: 'legacy-unavailable', wallMs: null };
+  const result = {
+    version: 1,
+    batch,
+    phase,
+    label: labels[phase],
+    formalDeliveryComplete: false,
+    summary,
+    timingScope: 'formal-delivery-only',
+    batchTiming,
+    timingComplete: batchTiming.status === 'completed',
+  };
   if (phase !== 'delivered') return result;
   assert.ok(registry?.closedAt, 'Closure registry missing; retain pending state');
   assert.equal(registry.id, batch);

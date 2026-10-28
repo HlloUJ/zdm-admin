@@ -1,4 +1,4 @@
-import { refreshCurrentTiming, timingCommon } from './batch-timing-runtime.mjs';
+import { refreshCurrentTiming, timingCommon, currentTimingSummary } from './batch-timing-runtime.mjs';
 import { readTimingSummary } from './batch-timing-store.mjs';
 // Observation only. No execution policy, cache decision, approval or task status depends on this report.
 import {
@@ -351,6 +351,11 @@ export async function main(args = process.argv.slice(2)) {
       ),
     );
     return summary ? 0 : 1;
+  }
+  const batch = args.includes('--last-completed') ? null : currentTimingSummary(process.cwd());
+  if (batch) {
+    console.log(JSON.stringify(batch, null, 2));
+    return 0;
   }
   const result = await recordTaskTiming(process.cwd(), { lastCompleted: args.includes('--last-completed') });
   if (args.includes('--json')) console.log(JSON.stringify(result, null, 2));

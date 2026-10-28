@@ -3,6 +3,8 @@
   "inputs": {
     "scripts/completion-cli.mjs": {
       "imports": [
+        "scripts/batch-timing-runtime.mjs",
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
@@ -22,6 +24,7 @@
     },
     "scripts/completion-cli.test.mjs": {
       "imports": [
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-cli.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-completion.mjs",
@@ -189,6 +192,8 @@
     },
     "scripts/completion-cli.mjs": {
       "imports": [
+        "scripts/batch-timing-runtime.mjs",
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
@@ -208,6 +213,7 @@
     },
     "scripts/completion-cli.test.mjs": {
       "imports": [
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-cli.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-completion.mjs",
@@ -263,7 +269,11 @@
       "dynamicImports": 0
     },
     "scripts/completion-status.mjs": {
-      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs"],
+      "imports": [
+        "scripts/batch-timing-store.mjs",
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-session.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-status.test.mjs": {
@@ -595,9 +605,9 @@
     "scripts/backend-test-evidence.test.mjs": "12472dddd2c0a9b6486d5a24b9093c6d22f19c749dfbe948c9a15423df629a1b",
     "scripts/batch-timing-core.test.mjs": "00701550f1002aab498b57298724f09cd6579a075aa522cbad09f9de53d7cdfe",
     "scripts/batch-timing-observer.mjs": "087239687a3d4b18a6e618c17bde5ad5869e6a59807234c01b5b2c024915780d",
-    "scripts/batch-timing-runtime.mjs": "95fabcae72585558df7009d2af55bd042a066368bbe5896367db9c95612a4582",
-    "scripts/batch-timing-runtime.test.mjs": "2b0761eb1de383de20a587847095cc7c2117920f13cb36d1ba4677da3960b065",
-    "scripts/batch-timing-store.mjs": "d8e8e1a31e3bdbdcb3b354f4f43b8ddeeb9b2262c8a0d00ec93b3ffdf5c1faed",
+    "scripts/batch-timing-runtime.mjs": "137e44d5b34f0f3829c29822861ba4e82c2accaab485d35a7e5bc099c3454c86",
+    "scripts/batch-timing-runtime.test.mjs": "13b9ce78736e9c00f327e4eb58aa8460a4e0cd04cc83d6b75679adb7db07bdab",
+    "scripts/batch-timing-store.mjs": "78e25efc6e7fa9df22d8a77d5358d192113b989a2aadecd153f9af68a6f924fe",
     "scripts/batch-timing-store.test.mjs": "25519006e27b643fb01755c1040fe6c4b3ca8b83c4d8cfd5d8c7315544ce0aa6",
     "scripts/business-regression.mjs": "9d5ff5e8a490880eaf4c7783cdfbf2246964ab898d46b54c1e6ab51840206f17",
     "scripts/business-regression.test.mjs": "4722db1080d475f82b93b84665b249f21d6afa1219c818771611f2a3b44e4a4d",
@@ -625,7 +635,7 @@
     "scripts/completion-recovery.mjs": "25028a3975cf28e74f33c4f95bb1875151624942f019ba10690e64cfd7cab401",
     "scripts/completion-recovery.test.mjs": "62bf48e30221444a315b7de06c694afc1a918c9c27bd01ae0a58db10ed4dd090",
     "scripts/completion-session.mjs": "d164ddf1261b87726727e442a8835fc006062470e6f54acefc31b2323b28717d",
-    "scripts/completion-status.mjs": "2bdf7886d73eee11c11431f2890db0afdb2795501a4c52f954c26e0d6d43256c",
+    "scripts/completion-status.mjs": "45f74fb596abd3fe95b42db14c90115917011d0c383d41c0d199af0a0edac9d1",
     "scripts/completion-status.test.mjs": "553b4239b04159544044d3daff18a6fb7e7cf5a6da31f4b580feeb64ed1b6e2c",
     "scripts/delivery-launcher.mjs": "e17ac3c93f7bccc47634e254c6a6bcc52eb1f9adcab2458d97446fc8c6057750",
     "scripts/delivery-launcher.test.mjs": "27fa92cb4a260eb3cb356d3410b5fe624b7f2c55656e207dea26be5c43f89c71",
@@ -674,7 +684,7 @@
     "scripts/task-dependencies.test.mjs": "9ad11fa8bf8ca9e796a6efdfcf7914feb61002a9ad067e9822658e0e1a63009f",
     "scripts/task-runtime-state.mjs": "70ecda8bcaadce54f2c7c8f8348c3b680010c09969447c287179f2cc6274c950",
     "scripts/task-runtime-state.test.mjs": "cb42075a957b4faa2deb11f773857924dba67d89b5b71cd8240c384da0d13280",
-    "scripts/task-timing.mjs": "c4db2b9b1193cfd59e426ea51bbecc8a5b798e790d7f2ea8fed10181ea9036da",
+    "scripts/task-timing.mjs": "1b2603f8c9502e2c00e591f20b9038c6250ad48dd5e809a2091178452515b30d",
     "scripts/task-timing.test.mjs": "b39b2cff24b759fe0678dbff0bed979eb3cf5fa0b97090fbe74740881e448677",
     "scripts/test-support/completion-preview-fixture.mjs": "105eb6830136372c99c99d8999d66625caddda423ed4e423f137c31f16b82e84",
     "scripts/ui-template-policy.test.mjs": "40a60676941ae380f0e6109b1c4c02360044ddb2c5068cb1a50e6236c8c3b60e",

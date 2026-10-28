@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 import { readActiveBatch } from './task-batch.mjs';
 import {
   bindBatchTiming,
@@ -9,6 +10,8 @@ import {
   ensureObserver,
   timingDirectory,
   recordValidationTiming,
+  timingRequiredFile,
+  readTimingSummary as readTimingSummaryFor,
 } from './batch-timing-store.mjs';
 import { assertTimingReady } from './batch-timing-core.mjs';
 
@@ -45,8 +48,15 @@ export function refreshCurrentTiming(root, { env = process.env, bind = false, re
 export function requireBatchTiming(common, batch, { now = Date.now(), legacyAllowed = true } = {}) {
   const state = readTimeline(common, batch);
   if (!state) {
-    assert.ok(legacyAllowed, 'New batch timing proof missing');
+    assert.ok(legacyAllowed && !existsSync(timingRequiredFile(common, batch)), 'New batch timing proof missing');
     return { status: 'legacy-no-batch-timing', wallMs: null };
+  }
+  const marker = timingRequiredFile(common, batch);
+  if (existsSync(marker)) {
+    const proof = JSON.parse(readFileSync(marker));
+    assert.equal(proof.batch, batch);
+    assert.equal(proof.authorizedAt, state.authorizedAt, 'Authorization boundary changed');
+    assert.equal(proof.requestId, state.requestId, 'Authorization identity changed');
   }
   const result = refreshTimeline(common, batch, { now });
   const summary = assertTimingReady(result.state, { now, completion: result.completion });
@@ -62,4 +72,10 @@ export function observeValidationTiming(root, attempt, env = process.env) {
   } catch (error) {
     console.error('Batch validation timing unavailable: ' + error.message);
   }
+}
+
+export function currentTimingSummary(root) {
+  const batch = readActiveBatch(root);
+  if (!batch) return null;
+  return readTimingSummaryFor(batch.repository.commonDir, batch.id);
 }

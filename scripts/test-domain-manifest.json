@@ -128,12 +128,12 @@
       "dynamicImports": 0
     },
     "scripts/batch-timing-runtime.mjs": {
-      "digest": "95fabcae72585558df7009d2af55bd042a066368bbe5896367db9c95612a4582",
+      "digest": "137e44d5b34f0f3829c29822861ba4e82c2accaab485d35a7e5bc099c3454c86",
       "imports": ["scripts/batch-timing-core.mjs", "scripts/batch-timing-store.mjs", "scripts/task-batch.mjs"],
       "dynamicImports": 0
     },
     "scripts/batch-timing-runtime.test.mjs": {
-      "digest": "2b0761eb1de383de20a587847095cc7c2117920f13cb36d1ba4677da3960b065",
+      "digest": "13b9ce78736e9c00f327e4eb58aa8460a4e0cd04cc83d6b75679adb7db07bdab",
       "imports": [
         "scripts/batch-timing-runtime.mjs",
         "scripts/batch-timing-store.mjs",
@@ -144,7 +144,7 @@
       "dynamicImports": 0
     },
     "scripts/batch-timing-store.mjs": {
-      "digest": "d8e8e1a31e3bdbdcb3b354f4f43b8ddeeb9b2262c8a0d00ec93b3ffdf5c1faed",
+      "digest": "78e25efc6e7fa9df22d8a77d5358d192113b989a2aadecd153f9af68a6f924fe",
       "imports": ["scripts/batch-timing-core.mjs", "scripts/batch-timing-observer.mjs"],
       "dynamicImports": 0
     },
@@ -367,8 +367,10 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "435ad67b3927dacbe980549056aede854e697b2628d14d1398eca3b816a64daa",
+      "digest": "ac338f525246b2a8849a893b96dc1e530ebf1f9afb9ed543aa73952866de527d",
       "imports": [
+        "scripts/batch-timing-runtime.mjs",
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
@@ -387,8 +389,9 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.test.mjs": {
-      "digest": "36e77f78d31bbb2e2c8668bf5025bd38fd1e5f693ab0a720454f3d690e62b1fd",
+      "digest": "ceaee38fcfcf363c5bc935917c2e374977e0a521c1b2f3bb2b41c34adc7f321a",
       "imports": [
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-cli.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-completion.mjs",
@@ -461,8 +464,12 @@
       "dynamicImports": 0
     },
     "scripts/completion-status.mjs": {
-      "digest": "2bdf7886d73eee11c11431f2890db0afdb2795501a4c52f954c26e0d6d43256c",
-      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs"],
+      "digest": "45f74fb596abd3fe95b42db14c90115917011d0c383d41c0d199af0a0edac9d1",
+      "imports": [
+        "scripts/batch-timing-store.mjs",
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-session.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-status.test.mjs": {
@@ -575,7 +582,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "846ba910ac1925c406eb75f0d9644e5e94b9afa3166cb92a717b2d57b439891f",
+      "digest": "090c1501f76d5dfd2fd26346259274cf51427d3da304af46459202ca19621edc",
       "imports": [
         "scripts/absent.mjs",
         "scripts/affected-test-inputs.mjs",
@@ -1108,7 +1115,7 @@
       "dynamicImports": 0
     },
     "scripts/task-timing.mjs": {
-      "digest": "c4db2b9b1193cfd59e426ea51bbecc8a5b798e790d7f2ea8fed10181ea9036da",
+      "digest": "1b2603f8c9502e2c00e591f20b9038c6250ad48dd5e809a2091178452515b30d",
       "imports": [
         "scripts/batch-timing-runtime.mjs",
         "scripts/batch-timing-store.mjs",

@@ -125,3 +125,21 @@ test('wrong thread cannot silently observe or take over an active batch', (t) =>
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /not bound/);
 });
+
+test('a new timing record cannot disappear into legacy compatibility or silently reset its authorization', (t) => {
+  const f = fixture(t);
+  rmSync(path.join(f.common, 'task-timing/timing/timeline.json'));
+  assert.throws(() => requireBatchTiming(f.common, 'timing'), /New batch timing proof missing/);
+  const result = f.cli('./task-batch.mjs', ['register', '--id', 'timing', '--kind', 'infrastructure']);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /never reset authorization/);
+});
+
+test('authorization tampering cannot pass the report/cleanup proof', (t) => {
+  const f = fixture(t),
+    file = path.join(f.common, 'task-timing/timing/timeline.json'),
+    state = JSON.parse(readFileSync(file));
+  state.authorizedAt += 10;
+  writeFileSync(file, JSON.stringify(state));
+  assert.throws(() => requireBatchTiming(f.common, 'timing'), /Authorization boundary changed/);
+});

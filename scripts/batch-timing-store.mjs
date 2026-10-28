@@ -177,6 +177,8 @@ export function refreshTimeline(common, batch, { now = Date.now() } = {}) {
   return lock(directory, () => {
     const state = readTimeline(common, batch);
     assert.ok(state, 'Batch timing not initialized');
+    assert.equal(state.common, common, 'Timing repository identity changed');
+    assert.equal(state.batch, batch, 'Timing batch identity changed');
     const completion = completionFor(state);
     for (const source of state.sources) consumeSource(state, source);
     const summary = summarizeBatch(state, { now, completion });
@@ -203,8 +205,12 @@ export function bindBatchTiming(
   const file = sources[0];
   const identity = inspectNativeSource(file, { thread: env.CODEX_THREAD_ID, common });
   const directory = timingDirectory(common, batch.id);
+  const marker = timingRequiredFile(common, batch.id);
   lock(directory, () => {
     let state = readTimeline(common, batch.id);
+    if (!state) {
+      assert.ok(!existsSync(marker), 'Required timing state missing; never reset authorization time');
+    }
     if (!state)
       state = newTimeline({
         batch: batch.id,
@@ -232,6 +238,12 @@ export function bindBatchTiming(
       });
     }
     atomic(path.join(directory, 'timeline.json'), state);
+    const markerDirectory = path.dirname(marker);
+    safe(markerDirectory);
+    mkdirSync(markerDirectory, { recursive: true, mode: 0o700 });
+    const proof = { version: 1, batch: batch.id, authorizedAt: state.authorizedAt, requestId: state.requestId };
+    if (existsSync(marker)) assert.deepEqual(JSON.parse(readFileSync(marker)), proof, 'Authorization marker differs');
+    else atomic(marker, proof);
     atomic(
       path.join(directory, 'subscriptions.json'),
       state.sources.map((source) => source.file),
@@ -327,4 +339,9 @@ export function recordValidationTiming(common, batch, attempt) {
     atomic(path.join(directory, 'timeline.json'), state);
     atomic(path.join(directory, 'observations.json'), { id: next.id, finishedAt: next.finishedAt });
   });
+}
+
+export function timingRequiredFile(common, batch) {
+  timingDirectory(common, batch);
+  return path.join(common, 'task-batches/timing-required', batch + '.json');
 }
