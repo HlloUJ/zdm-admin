@@ -1,4 +1,5 @@
 import { businessImpact } from './business-regression.mjs';
+import { isRuntimeFile } from './runtime-file-scope.mjs';
 // Fail closed: this only omits a domain after every changed path has a known scope.
 const DOC = /(?:\.md$|^docs\/.*\.(?:png|jpe?g|gif|webp|svg|pdf)$)/i;
 const FRONTEND = /^(?:src\/|tests\/e2e\/|public\/)/;
@@ -10,24 +11,6 @@ const PRODUCT =
 const SENSITIVE = /(?:auth|security|permission|functionCatalog|adminPermissions|contract|(?:^|\/)shared(?:\/|$))/i;
 const BACKEND_SHARED = /\/(?:config|dto|api|contract|web|exception)\/|Application\.java$/;
 const BACKEND_CONTRACT = /(?:Controller|Request|Response|Dto|DTO)\.java$|^backend\/src\/main\/resources\//;
-const RUNTIME_FILES = new Set([
-  '.codex/zdm-project-workflow.yaml',
-  'scripts/backend-runtime.mjs',
-  'scripts/task-runtime-state.mjs',
-  'scripts/dev-all.mjs',
-  'scripts/dev-task.mjs',
-  'scripts/ensure-backend.mjs',
-  'scripts/run-integration.mjs',
-  'scripts/sync-integration.mjs',
-  'scripts/delivery-launcher.mjs',
-  'scripts/integration-handoff-state.mjs',
-  'scripts/task-preview-service.mjs',
-  'scripts/macos/launchd-dev.mjs',
-  'scripts/macos/启动装点猫.command',
-  'scripts/macos/停止装点猫.command',
-  'scripts/macos/com.zdm.admin.dev.plist',
-]);
-const RUNTIME = /^(?:backend\/|docker(?:[./-]|$)|Dockerfile|compose[.-]|pom\.xml$|\.env(?:\.|$)|\.mvn\/)/;
 
 export function classifyChangedFiles(files, { engineeringProof = { proven: false }, root = process.cwd() } = {}) {
   const result = {
@@ -60,7 +43,7 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
       docs = true;
       continue;
     }
-    const runtime = !file.startsWith('backend/src/test/') && (RUNTIME.test(file) || RUNTIME_FILES.has(file));
+    const runtime = isRuntimeFile(file);
     if (PRODUCT.test(file)) {
       full(`商品状态与生命周期跨端契约：${file}`, runtime);
     } else if (FRONTEND.test(file)) {

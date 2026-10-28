@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { collectDeliveryChanges, createVerificationPlan } from './verify.mjs';
 import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
+import { requestResponse } from './dev-task.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const knownOutput =
@@ -101,20 +102,40 @@ export function previewContract(record, commonDir) {
     unavailablePolicy: '503-no-integration-fallback',
   };
 }
-export async function checkCompletionRuntime(root, commonDir) {
+export async function checkCompletionRuntime(
+  root,
+  commonDir,
+  { allowPreviewUnavailable = false, request = requestResponse } = {},
+) {
   const file = path.join(commonDir, 'preview-environment/environment.json');
   assert.ok(lstatSync(file).isFile() && !lstatSync(file).isSymbolicLink(), 'Unsafe preview registration');
   const result = previewContract(JSON.parse(readFileSync(file, 'utf8')), commonDir);
+  let previewHealthy = false;
   for (const url of [
     'http://127.0.0.1:5173',
     'http://127.0.0.1:8080/actuator/health',
     'http://127.0.0.1:5175/__zdm_task_preview_api_health__',
   ]) {
-    const response = await fetch(url, { signal: AbortSignal.timeout(15000) });
-    assert.equal(response.status, 200, `Runtime unavailable: ${url}`);
-    if (url.includes('health')) assert.equal((await response.json()).status, 'UP');
+    const response = await request(url, 15000);
+    const isPreview = url.includes(':5175/');
+    let healthy = response.statusCode === 200;
+    if (healthy && url.includes('health')) {
+      try {
+        healthy = JSON.parse(response.body).status === 'UP';
+      } catch {
+        healthy = false;
+      }
+    }
+    if (isPreview) previewHealthy = healthy;
+    assert.ok(healthy || (isPreview && allowPreviewUnavailable), `Runtime unavailable: ${url}`);
   }
-  return { ...result, runtimeHealthy: true, servicesChanged: false };
+  return {
+    ...result,
+    integrationHealthy: true,
+    previewHealthy,
+    runtimeHealthy: previewHealthy,
+    servicesChanged: false,
+  };
 }
 
 async function main(args) {

@@ -2,7 +2,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { runtimeDigest, taskBackendSourceIdentity } from './task-runtime-state.mjs';
-import { classifyChangedFiles } from './verification-impact.mjs';
+import { isRuntimeFile } from './runtime-file-scope.mjs';
 
 export function normalizeDockerMountPath(mountPath) {
   return process.platform === 'darwin' && mountPath.startsWith('/host_mnt/')
@@ -48,7 +48,7 @@ export function integrationSourceIdentity(root, tree) {
   const runtimeTree = tree.split('\0').filter((entry) => {
     const separator = entry.indexOf('\t');
     if (separator < 0) throw new Error('无法确认集成 Git 文件清单');
-    return classifyChangedFiles([entry.slice(separator + 1)]).runtime;
+    return isRuntimeFile(entry.slice(separator + 1));
   });
   return runtimeDigest(
     JSON.stringify([

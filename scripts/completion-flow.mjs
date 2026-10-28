@@ -11,7 +11,7 @@ export async function runCompletionFlow(
   root,
   batch,
   head,
-  { execute, state, save, dispatch, checkRuntime, common, inventoryAssets },
+  { execute, state, save, dispatch, checkRuntime, common, inventoryAssets, previewControl },
 ) {
   assert.match(head, /^[a-f0-9]{40}$/);
   const anchor = batch.repository.anchor;
@@ -40,9 +40,11 @@ export async function runCompletionFlow(
       assets.every((a) => a.kind !== 'blocked'),
       'Unknown or private asset remains; retain task before pushing',
     );
-    const integration = parseWorktreePorcelain(git(root, 'worktree', 'list', '--porcelain')).find(
-      (w) => w.branch === 'codex/integration-current',
-    )?.path;
+    const worktrees = parseWorktreePorcelain(git(root, 'worktree', 'list', '--porcelain'));
+    const integration = worktrees.find((w) => w.branch === 'codex/integration-current')?.path;
+    const preview = worktrees.find((w) => w.branch === 'codex/preview-current')?.path;
+    assert.ok(preview, 'Registered retained preview required');
+    await previewControl.assertOwner({ task: batch.worktree, preview, common });
     assert.ok(integration, 'Registered integration worktree required');
     assert.equal(
       existsSync(path.join(integration, 'backups/task-preview/active-database-task.json')),
@@ -54,8 +56,11 @@ export async function runCompletionFlow(
     assert.equal(protection.required_status_checks?.strict, true);
     for (const name of ['Frontend quality', 'Backend quality'])
       assert.ok(protection.required_status_checks.contexts.includes(name));
-    const runtime = await checkRuntime(root, common);
-    assert.ok(runtime.runtimeHealthy && runtime.backupRetained, 'Runtime or backup preflight failed');
+    const runtime = await checkRuntime(root, common, { allowPreviewUnavailable: true });
+    assert.ok(
+      (runtime.integrationHealthy ?? runtime.runtimeHealthy) && runtime.backupRetained,
+      'Runtime or backup preflight failed',
+    );
     if (state.previewFingerprint) assert.equal(runtime.profileFingerprint, state.previewFingerprint);
     return { head, protectionChecked: true, runtimePreflight: true, assets };
   });
