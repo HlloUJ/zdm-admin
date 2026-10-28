@@ -12,11 +12,19 @@ test('expired idle connection plus synchronous work reproduces ECONNRESET; probe
      const { parentPort, workerData } = require('node:worker_threads');
      const closed = new Int32Array(workerData.closed);
      let idleSocket;
-     const server = http.createServer((req,res) => { idleSocket=req.socket; res.end('{}'); });
-     server.keepAliveTimeout=5000;
-     parentPort.on('message', () => idleSocket.end(() => {
+     const expired = new WeakSet();
+     const server = http.createServer((req,res) => {
+       idleSocket=req.socket;
+       if (expired.has(req.socket)) { req.socket.destroy(); return; }
+       res.end('{}');
+     });
+     server.keepAliveTimeout=0;
+     parentPort.on('message', () => {
+       // Reject the actual expired socket on reuse, after the request write. This
+       // deterministically produces native ECONNRESET instead of OS-dependent EPIPE.
+       expired.add(idleSocket);
        Atomics.store(closed,0,1); Atomics.notify(closed,0);
-     }));
+     });
      server.listen(0,'127.0.0.1',()=>parentPort.postMessage(server.address().port));`,
     { eval: true, workerData: { closed: closed.buffer } },
   );
@@ -34,7 +42,7 @@ test('expired idle connection plus synchronous work reproduces ECONNRESET; probe
     });
   assert.equal((await old()).status, 200);
   await new Promise(setImmediate);
-  // Block only the client until the server has sent FIN; no guessed scheduler delay.
+  // Block only the client until the server marks this exact idle connection expired; no guessed delay.
   worker.postMessage('expire');
   assert.notEqual(Atomics.wait(closed, 0, 0, 5000), 'timed-out');
   assert.deepEqual(await old(), { code: 'ECONNRESET', reusedSocket: true });

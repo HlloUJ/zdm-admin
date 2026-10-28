@@ -628,7 +628,7 @@
     "scripts/macos/launchd-dev.mjs": "204f774a76d8fd9a76f80a7d7def8ec34d3d1bffcdda821770086a283f9b464a",
     "scripts/node-source-evidence-reporter.mjs": "beaba30a3ab3254c4ed184e63e4ba09ed219a01a3371d7fa4c36a988393cb569",
     "scripts/playwright-evidence-reporter.mjs": "598843cbf8a26d7831045a434d939ce3872879c58175684681f174f11794b0cf",
-    "scripts/preview-probe.test.mjs": "d2865fe2b5cb9636f7cd355175031efef8a0469194b679f5fdb2f66293260efe",
+    "scripts/preview-probe.test.mjs": "a3bbd347a98c48261441a9cb1728fde3c9a23bddae7b2b04bea6c59161b0d300",
     "scripts/run-ci-diagnostics.mjs": "6648816e67dab008fd35f4041d7ef6f15bcd9e35fc736f15cdc59233248677d3",
     "scripts/run-frontend-tests.mjs": "80c3eccd7827af02d52c93fe89c5d8e9fb89cdf72af3410f5efedefbe8be4166",
     "scripts/run-integration.mjs": "739ac07a2873b7d9ded1fc52c6561a148c0798a90635fb4b163f371a7a0d295f",
