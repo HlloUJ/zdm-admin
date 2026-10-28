@@ -60,6 +60,20 @@ export function engineeringExternalReaders(root, consumers) {
   }
   return readers;
 }
+export function reflectiveEngineeringReaders(root, manifest, inputs) {
+  return Object.fromEntries(
+    Object.keys(manifest.files)
+      .sort()
+      .filter((file) => file.startsWith('scripts/') && file.endsWith('.mjs') && !inputs.includes(file))
+      .filter((file) => {
+        const source = readFileSync(path.join(root, file), 'utf8');
+        return (
+          manifest.files[file].dynamicImports > 0 || /node:fs|readFile|readdir|execFile|spawn|node:vm/.test(source)
+        );
+      })
+      .map((file) => [file, hash(readFileSync(path.join(root, file)))]),
+  );
+}
 export function engineeringOnlyProof(root, files) {
   const full = (reason) => ({ proven: false, reason });
   try {
@@ -83,6 +97,11 @@ export function engineeringOnlyProof(root, files) {
       if (!entry || JSON.stringify(topology(entry)) !== JSON.stringify(expected))
         return full('Audited input dependency changed: ' + file);
     }
+    if (
+      JSON.stringify(reflectiveEngineeringReaders(root, manifest, inputs)) !==
+      JSON.stringify(registry.reflectiveReaders)
+    )
+      return full('Unproven reflective engineering reader added, changed or omitted');
     const consumers = engineeringConsumers(manifest, inputs);
     if (JSON.stringify(consumers) !== JSON.stringify(Object.keys(registry.consumers).sort()))
       return full('Associated engineering consumer omitted or added');

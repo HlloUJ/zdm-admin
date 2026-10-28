@@ -525,9 +525,11 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "1ffe56167a09efc1cc851d49fc923dc417e8ba93265ad5dffd0ecc881f490a54",
+      "digest": "132e8327e2ac9a81b105146bd85ab3b12dd72d2372899458f324917aa5ce4583",
       "imports": [
+        "scripts/absent.mjs",
         "scripts/affected-test-inputs.mjs",
+        "scripts/affected-test-inputs.test.mjs",
         "scripts/backend-runtime.mjs",
         "scripts/backend-runtime.test.mjs",
         "scripts/backend-test-evidence.mjs",
@@ -544,7 +546,12 @@
         "scripts/check-managed-branch-commit.mjs",
         "scripts/ci-backend-equivalence.mjs",
         "scripts/ci-backend-equivalence.test.mjs",
+        "scripts/ci-browser-image.mjs",
+        "scripts/ci-browser-image.test.mjs",
+        "scripts/ci-chrome-preparation.mjs",
+        "scripts/ci-chrome-preparation.test.mjs",
         "scripts/ci-diagnostic-evidence.mjs",
+        "scripts/ci-diagnostic-evidence.test.mjs",
         "scripts/ci-equivalence-environment.mjs",
         "scripts/ci-equivalence.mjs",
         "scripts/ci-equivalence.test.mjs",
@@ -575,27 +582,44 @@
         "scripts/dev-task.mjs",
         "scripts/dev-task.test.mjs",
         "scripts/dev-unknown.mjs",
+        "scripts/dynamic.mjs",
+        "scripts/e2e-app.mjs",
+        "scripts/e2e-app.test.mjs",
+        "scripts/e2e-performance.mjs",
+        "scripts/e2e-resources.mjs",
         "scripts/e2e-shards.mjs",
+        "scripts/e2e-shards.test.mjs",
         "scripts/engineering-impact.mjs",
         "scripts/engineering-impact.test.mjs",
         "scripts/ensure-backend.mjs",
         "scripts/feedback-foundation.test.mjs",
         "scripts/frontend-test-evidence.mjs",
+        "scripts/frontend-test-evidence.test.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/git-workflow-core.test.mjs",
         "scripts/git-workflow-state.mjs",
         "scripts/helper.mjs",
         "scripts/helper.test.mjs",
         "scripts/integration-handoff-state.mjs",
+        "scripts/lint-policy.test.mjs",
+        "scripts/local-diagnostic-evidence.mjs",
+        "scripts/local-diagnostic-evidence.test.mjs",
+        "scripts/local-test-entrypoints.test.mjs",
         "scripts/macos/launchd-dev.mjs",
         "scripts/new-consumer.mjs",
         "scripts/new-module.mjs",
         "scripts/new.test.mjs",
+        "scripts/node-source-evidence-reporter.mjs",
         "scripts/playwright-evidence-reporter.mjs",
         "scripts/preview-probe.test.mjs",
+        "scripts/run-ci-diagnostics.mjs",
         "scripts/run-frontend-tests.mjs",
         "scripts/run-integration.mjs",
+        "scripts/run-playwright-tests.mjs",
         "scripts/run-script-tests.mjs",
+        "scripts/run-script-tests.test.mjs",
+        "scripts/run-targeted-script-tests.mjs",
+        "scripts/run-targeted-script-tests.test.mjs",
         "scripts/runtime-file-scope.mjs",
         "scripts/runtime-file-scope.test.mjs",
         "scripts/script-test-plan.mjs",
@@ -605,6 +629,7 @@
         "scripts/sync-integration.mjs",
         "scripts/sync-integration.test.mjs",
         "scripts/task-batch.mjs",
+        "scripts/task-batch.test.mjs",
         "scripts/task-completion.mjs",
         "scripts/task-data-environment.mjs",
         "scripts/task-dependencies.mjs",
@@ -617,6 +642,7 @@
         "scripts/task-timing.test.mjs",
         "scripts/test-support/completion-preview-fixture.mjs",
         "scripts/test-support/task-data-environment.mjs",
+        "scripts/ui-template-policy.test.mjs",
         "scripts/unknown.mjs",
         "scripts/unrelated.test.mjs",
         "scripts/verification-early-checks.test.mjs",
@@ -625,16 +651,20 @@
         "scripts/verification-impact.mjs",
         "scripts/verification-impact.test.mjs",
         "scripts/verification-performance.mjs",
+        "scripts/verification-performance.test.mjs",
         "scripts/verification-policy.mjs",
         "scripts/verification-policy.test.mjs",
         "scripts/verification-runner.mjs",
+        "scripts/verification-scope.test.mjs",
         "scripts/verify.mjs",
+        "scripts/vite-watch.test.mjs",
+        "scripts/vitest-evidence-reporter.mjs",
         "scripts/wait-quality.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/engineering-impact.mjs": {
-      "digest": "7b04168ee7235694575d979c7535710a2a3f695e752847f0cbc70abebf1336c7",
+      "digest": "e96b6ad162e58d3b2cbf2eae9dc8326cfce7a79dd8751bab819a085d9ef96fae",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-cli.test.mjs",
@@ -651,10 +681,12 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.test.mjs": {
-      "digest": "c1fa51ddb49a49fb9cfec5318b3ffffdf9ef989f626e4a83c0aabce46c267726",
+      "digest": "180df21e622ea12ed187b5de544ada5dca36e77656689413f030e76e7f1e1c4b",
       "imports": [
+        "scripts/absent.mjs",
         "scripts/check-changed-plan.mjs",
         "scripts/consumer.mjs",
+        "scripts/dynamic.mjs",
         "scripts/engineering-impact.mjs",
         "scripts/new-consumer.mjs",
         "scripts/new-module.mjs",
@@ -664,7 +696,7 @@
         "scripts/verify.mjs",
         "scripts/wait-quality.mjs"
       ],
-      "dynamicImports": 1
+      "dynamicImports": 2
     },
     "scripts/ensure-backend.mjs": {
       "digest": "ae854fe788487dc280ac3c5ec45237ccbe669a79ebc0c2f588642d0a4b674aaa",
@@ -723,7 +755,7 @@
       "dynamicImports": 0
     },
     "scripts/local-diagnostic-evidence.mjs": {
-      "digest": "9b76770de3878f6349789da7bcce72c787d6f6f6433b5dfc1d44200319efe3ad",
+      "digest": "296fa25f35053083025b05c2adebf9a5ed57902bc6b993419dc01c1c046d5863",
       "imports": [
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -862,7 +894,7 @@
       "dynamicImports": 0
     },
     "scripts/run-targeted-script-tests.mjs": {
-      "digest": "3a27d73b0ed4de82f7aad7e8bfcb09e26e77585b2046556f5a41e7d65922d70a",
+      "digest": "51598df15e1cdfb1e9cf938d0cbe8fac27a4d2ccea7815c6659a88602efe9874",
       "imports": [
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -873,7 +905,7 @@
       "dynamicImports": 0
     },
     "scripts/run-targeted-script-tests.test.mjs": {
-      "digest": "27ffb0142e6e790d8644c919d7ee012e82ae3e97c581bd2b4900423e68c7f885",
+      "digest": "00990d0be32acd942df28227f6e7fe50c4f07cc7149df32d976de62009ce82c1",
       "imports": [
         "outside.test.mjs",
         "scripts/ci-diagnostic-evidence.mjs",
@@ -1059,8 +1091,8 @@
       "dynamicImports": 4
     },
     "scripts/verification-early-checks.test.mjs": {
-      "digest": "06251bc670a41e73fa4367ab187305302e00e0f2a2c9c485f51651af9a29a4d7",
-      "imports": ["scripts/backend-test-evidence.mjs", "scripts/verify.mjs"],
+      "digest": "0604b1fc782ec24728c531aa9814e43e9559e96a71814efaed16cfadf9ae5b3a",
+      "imports": ["scripts/backend-test-evidence.mjs", "scripts/completion-session.test.mjs", "scripts/verify.mjs"],
       "dynamicImports": 0
     },
     "scripts/verification-evidence.mjs": {
@@ -1146,7 +1178,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "a32ec0e43aea3546041fc90370a041dfda124c0a1968096c4c8a1e61ca3aa7dd",
+      "digest": "b8cbb490b81bed68145a3febc4e8f691435df94418b7cbd47c5cea91bccc53b7",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -1164,7 +1196,7 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "4666d1e58fd6426a60baeaf77ccb8f50cb5b6ebaa8dff222d7b422e4382632a4",
+      "digest": "bfc351a9e66694e6820f9f004018894d054e64fe777fd197cac4ffdd15ba57c7",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/business-regression.mjs",

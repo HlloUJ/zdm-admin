@@ -1,20 +1,31 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, unlinkSync, existsSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  unlinkSync,
+  existsSync,
+  realpathSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { DIAGNOSTIC_FILES } from './ci-diagnostic-evidence.mjs';
 import { runScriptTests } from './run-script-tests.mjs';
 import { runTargetedScriptTests } from './run-targeted-script-tests.mjs';
 function fixture(t, fault) {
-  const root = mkdtempSync(path.join(os.tmpdir(), 'targeted-union-'));
+  const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'targeted-union-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   mkdirSync(path.join(root, 'scripts'));
   mkdirSync(path.join(root, '.task-verification'));
   writeFileSync(path.join(root, '.gitignore'), '.task-verification/\n');
   const source = (name, extra = '') =>
-    `import test from 'node:test';import fs from 'node:fs';test(${JSON.stringify('fixture case: ' + name)},()=>{fs.appendFileSync('.task-verification/calls',${JSON.stringify(name + '\n')});${extra}});`;
+    `import test from 'node:test';
+import { randomUUID } from 'node:crypto';import fs from 'node:fs';test(${JSON.stringify('fixture case: ' + name)},()=>{fs.appendFileSync('.task-verification/calls',${JSON.stringify(name + '\n')});${extra}});`;
   for (const [i, file] of DIAGNOSTIC_FILES.entries())
     writeFileSync(
       path.join(root, file),
@@ -80,3 +91,23 @@ test('invalid selected path cannot start diagnostics or escape the repository', 
   assert.throws(() => runTargetedScriptTests(['../outside.test.mjs'], f));
   assert.equal(existsSync(path.join(f.root, '.task-verification/calls')), false);
 });
+
+for (const missing of [false, true])
+  test(`same-executor preflight is reused by targeted consumers; missing=${missing}`, (t) => {
+    const f = fixture(t);
+    const run = randomUUID(),
+      directory = path.join(f.root, '.task-verification/local-diagnostics', run);
+    mkdirSync(directory, { recursive: true });
+    const env = {
+      ...f.env,
+      LOCAL_DIAGNOSTIC_RUN: run,
+      LOCAL_DIAGNOSTIC_DIRECTORY: directory,
+      CI_EVIDENCE_DIR: directory,
+    };
+    assert.equal(runScriptTests('--diagnostic', [], { root: f.root, env }), 0);
+    if (missing) unlinkSync(path.join(directory, 'local-diagnostic-packet.json'));
+    if (missing) assert.throws(() => runTargetedScriptTests(requested, { root: f.root, env }), /Incomplete or invalid/);
+    else assert.equal(runTargetedScriptTests(requested, { root: f.root, env }), 0);
+    assert.equal(f.calls().length, DIAGNOSTIC_FILES.length + (missing ? 0 : 1));
+    assert.equal(new Set(f.calls()).size, f.calls().length, 'Preflight was not executed a second time');
+  });

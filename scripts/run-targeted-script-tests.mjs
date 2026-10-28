@@ -31,9 +31,13 @@ export function runTargetedScriptTests(
   const plan = targetedScriptPlan(files);
   if (!plan.diagnostics.length || env.CI || env.GITHUB_ACTIONS === 'true')
     return execute('--files', plan.requested, { root, env });
-  const run = randomUUID();
+  const shared = Boolean(env.LOCAL_DIAGNOSTIC_RUN || env.LOCAL_DIAGNOSTIC_DIRECTORY);
+  const run = shared ? env.LOCAL_DIAGNOSTIC_RUN : randomUUID();
+  assert.match(run ?? '', /^[a-f0-9-]{36}$/);
+  if (shared)
+    assert.equal(env.LOCAL_DIAGNOSTIC_DIRECTORY, path.join(root, '.task-verification/local-diagnostics', run));
   const directory = path.join(root, '.task-verification/targeted-scripts', run);
-  const diagnostics = path.join(directory, 'diagnostics');
+  const diagnostics = shared ? env.LOCAL_DIAGNOSTIC_DIRECTORY : path.join(directory, 'diagnostics');
   mkdirSync(diagnostics, { recursive: true });
   const localEnv = {
     ...env,
@@ -42,8 +46,10 @@ export function runTargetedScriptTests(
     CI_EVIDENCE_DIR: diagnostics,
   };
   const identity = localDiagnosticIdentity(root, localEnv);
-  const code = execute('--diagnostic', [], { root, env: localEnv });
-  if (code !== 0) return code;
+  if (!shared) {
+    const code = execute('--diagnostic', [], { root, env: localEnv });
+    if (code !== 0) return code;
+  }
   assert.deepEqual(localDiagnosticIdentity(root, localEnv), identity, 'Targeted diagnostic inputs changed');
   const packet = loadLocalDiagnosticPacket(diagnostics, identity);
   assert.ok(packet, 'Incomplete or invalid diagnostic execution; never silently execute overlapping tests');

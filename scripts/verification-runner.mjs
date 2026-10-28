@@ -74,9 +74,9 @@ function diagnosticExecutionEnv(task) {
   assert.ok(!env.CI && env.GITHUB_ACTIONS !== 'true', 'Local diagnostics cannot enter CI');
   assert.ok(
     /npm(?:\.cmd)?$/.test(task.command) &&
-      task.args.length === 2 &&
       task.args[0] === 'run' &&
-      ['test:ci-reuse', 'test:engineering'].includes(task.args[1]),
+      ((task.args.length === 2 && ['test:ci-reuse', 'test:engineering'].includes(task.args[1])) ||
+        (task.args[1] === 'test:scripts:files' && task.args[2] === '--' && task.args.length > 3)),
     'Unsupported diagnostic coordination command',
   );
   assert.match(run, /^[a-f0-9-]{36}$/);

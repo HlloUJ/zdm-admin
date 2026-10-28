@@ -9,6 +9,7 @@ import {
   REVIEWED_DELIVERY_INPUTS,
   engineeringConsumers,
   engineeringExternalReaders,
+  reflectiveEngineeringReaders,
   engineeringOnlyProof,
 } from './engineering-impact.mjs';
 import { createValidationPlan } from './check-changed-plan.mjs';
@@ -44,6 +45,7 @@ function fixture(t) {
     inputs: Object.fromEntries(REVIEWED_DELIVERY_INPUTS.map((f) => [f, topology(f)])),
     consumers: Object.fromEntries(consumers.map((f) => [f, topology(f)])),
     externalReaders: engineeringExternalReaders(root, consumers),
+    reflectiveReaders: reflectiveEngineeringReaders(root, manifest, REVIEWED_DELIVERY_INPUTS),
   };
   const saveRegistry = () => write('scripts/engineering-impact.json', JSON.stringify(registry));
   saveRegistry();
@@ -74,6 +76,8 @@ for (const fault of [
   'new-consumer',
   'external-consumer',
   'external-script',
+  'reflective-script',
+  'omitted-reflective',
   'dynamic-external',
   'dependency',
   'entrypoint',
@@ -90,6 +94,12 @@ for (const fault of [
     if (fault === 'external-consumer') f.write('src/new-consumer.ts', "import '../scripts/wait-quality.mjs';");
     if (fault === 'external-script')
       f.write('scripts/reader.py', 'subprocess.run(["node", "scripts/wait-quality.mjs"])');
+    if (fault === 'reflective-script')
+      f.write('scripts/dynamic.mjs', 'export const module = import(process.env.MODULE);');
+    if (fault === 'omitted-reflective') {
+      f.registry.reflectiveReaders['scripts/absent.mjs'] = 'bad';
+      f.saveRegistry();
+    }
     if (fault === 'dynamic-external') f.write('src/dynamic.ts', 'export const value = import(process.env.TARGET);');
     if (fault === 'dependency') f.write('scripts/wait-quality.mjs', "import './new-module.mjs';");
     if (fault === 'entrypoint')

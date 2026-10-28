@@ -174,7 +174,9 @@ export async function executeVerification(
   // One UUID per executor, never inherited from a previous run or sent to CI.
   const localDiagnostics =
     plan.contractPreflight &&
-    plan.engineering?.some((task) => task.args.includes('test:engineering')) &&
+    [...(plan.engineering ?? []), ...(plan.frontend ?? [])].some(
+      (task) => task.args.includes('test:engineering') || task.args.includes('test:scripts:files'),
+    ) &&
     !(plan.preflight.env?.CI || plan.preflight.env?.GITHUB_ACTIONS === 'true') &&
     existsSync(plan.preflight.root)
       ? { run: randomUUID() }
@@ -217,7 +219,10 @@ export async function executeVerification(
   const execute = async (task) => {
     const phaseStart = performance.now();
     const diagnosticTask =
-      localDiagnostics && (task === plan.contractPreflight || task.args.includes('test:engineering'))
+      localDiagnostics &&
+      (task === plan.contractPreflight ||
+        task.args.includes('test:engineering') ||
+        task.args.includes('test:scripts:files'))
         ? { ...task, localDiagnostics: localDiagnostics }
         : task;
     const result = await run(diagnosticTask, { force, report });
