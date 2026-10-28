@@ -17,7 +17,7 @@ import { hashPaths } from './verification-evidence.mjs';
 
 export const JOB_ENVIRONMENT_CONTRACTS = {
   formatting: 'formatting-node-v2',
-  frontend_static: 'frontend-static-linux-v2',
+  frontend_static: 'frontend-static-container-v3',
   frontend_e2e_1: 'browser-functional-container-v5',
   frontend_e2e_2: 'browser-functional-container-v5',
 };
@@ -48,7 +48,7 @@ export function validateEnvironmentProof(proof, job) {
   assert.ok(JOB_ENVIRONMENT_CONTRACTS[job], 'Unsupported environment contract');
   assert.equal(
     proof?.version,
-    job.startsWith('frontend_e2e') ? 5 : 2,
+    job.startsWith('frontend_e2e') ? 5 : job === 'frontend_static' ? 3 : 2,
     'Old or unknown environment contract cannot grant reuse',
   );
   assert.equal(proof.contract, JOB_ENVIRONMENT_CONTRACTS[job]);
@@ -56,6 +56,7 @@ export function validateEnvironmentProof(proof, job) {
   assert.deepEqual(proof.platform, ['linux', 'x64', 'ubuntu24']);
   assert.equal(proof.resources, RESOURCE_PROFILE);
   const browser = job.startsWith('frontend_e2e');
+  const containerized = browser || job === 'frontend_static';
   const system = job !== 'formatting';
   const keys = [
     'version',
@@ -67,7 +68,8 @@ export function validateEnvironmentProof(proof, job) {
     'inputs',
     'environment',
     ...(system ? ['image', 'kernel', 'packages', 'systemFiles'] : []),
-    ...(browser ? ['browser', 'container', 'sharding', 'application'] : []),
+    ...(containerized ? ['container'] : []),
+    ...(browser ? ['browser', 'sharding', 'application'] : []),
   ];
   assert.deepEqual(Object.keys(proof).sort(), keys.sort(), 'Missing or unreviewed proof fields');
   assert.ok(Array.isArray(proof.node) && proof.node.length === 2);
@@ -80,7 +82,7 @@ export function validateEnvironmentProof(proof, job) {
     ...(browser ? [proof.browser, proof.sharding, proof.application] : []),
   ])
     assert.match(value ?? '', /^[a-f0-9]{64}$/);
-  if (browser) {
+  if (containerized) {
     assert.deepEqual(Object.keys(proof.container).sort(), ['image', 'origin']);
     assert.match(proof.container.image, /^ghcr\.io\/hllouj\/zdm-admin-browser@sha256:[a-f0-9]{64}$/);
     assert.match(proof.container.origin, /^[a-f0-9]{64}$/);
@@ -109,8 +111,9 @@ export function environmentProofFromSnapshot(job, snapshot) {
   );
   const system = job !== 'formatting';
   const browser = job.startsWith('frontend_e2e');
+  const containerized = browser || job === 'frontend_static';
   const proof = {
-    version: browser ? 5 : 2,
+    version: browser ? 5 : containerized ? 3 : 2,
     contract: JOB_ENVIRONMENT_CONTRACTS[job],
     job,
     platform: [snapshot.platform, snapshot.arch, snapshot.imageOS],
@@ -126,10 +129,10 @@ export function environmentProofFromSnapshot(job, snapshot) {
           systemFiles: snapshot.systemFiles,
         }
       : {}),
+    ...(containerized ? { container: snapshot.container } : {}),
     ...(browser
       ? {
           browser: snapshot.browser,
-          container: snapshot.container,
           sharding: snapshot.sharding,
           application: snapshot.application,
         }
@@ -150,8 +153,9 @@ export function environmentProof(env = process.env) {
   );
   const system = job !== 'formatting';
   const browser = job.startsWith('frontend_e2e');
+  const containerized = browser || job === 'frontend_static';
   let container;
-  if (browser) {
+  if (containerized) {
     assert.ok(existsSync('/opt/google/chrome/chrome'), 'Actual Chrome runtime cannot be proven');
     const lock = readImageLock();
     validateIsolation(runtimeIsolation());
@@ -162,8 +166,8 @@ export function environmentProof(env = process.env) {
     runnerEnvironment: env.RUNNER_ENVIRONMENT,
     platform: process.platform,
     arch: process.arch,
-    imageOS: browser ? 'ubuntu24' : env.ImageOS,
-    imageVersion: browser ? container.image : env.ImageVersion,
+    imageOS: containerized ? 'ubuntu24' : env.ImageOS,
+    imageVersion: containerized ? container.image : env.ImageVersion,
     hardware: environmentObservation(),
     node: [process.version, sha(readFileSync(process.execPath))],
     inputs: hashPaths(process.cwd(), ['node_modules'], { dependency: true }),
@@ -178,10 +182,10 @@ export function environmentProof(env = process.env) {
           ),
         }
       : {}),
+    ...(containerized ? { container } : {}),
     ...(browser
       ? {
           browser: hashPaths('/', ['/opt/google/chrome']),
-          container,
           sharding: readShardPlan(process.cwd()).digest,
           application: sha(JSON.stringify(readApplicationProof())),
         }

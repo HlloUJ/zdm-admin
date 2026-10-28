@@ -128,8 +128,10 @@ export async function waitQuality({
     }
     if (now() - lastProgress >= progressIntervalMs) {
       lastProgress = now();
+      let observedJobs;
       try {
         const jobs = await readJobs();
+        observedJobs = jobs;
         const summary = jobs
           .map((j) => ({
             name: j.name,
@@ -147,6 +149,32 @@ export async function waitQuality({
         networkObservations.push({ kind: 'progress-unavailable', observedAt: now(), recovered: null });
         // Progress is advisory. The final required-gate query above remains mandatory.
         report(`CI ${runId} progress unavailable; retain the same run and verify final gates.`);
+      }
+      const failedJob = observedJobs?.find((job) => job.status === 'completed' && job.conclusion === 'failure');
+      if (failedJob) {
+        // A terminal failure cannot turn green later in this attempt. Bind the evidence
+        // before releasing the waiter; other jobs may legitimately still be running.
+        assert.equal(String(failedJob.run_id), String(runId), 'Failed job belongs to another CI run');
+        assert.equal(failedJob.head_sha, expectedHead, 'Failed job belongs to another candidate');
+        assert.equal(failedJob.run_attempt, 1, 'Retried job cannot grant delivery evidence');
+        assert.ok(Number.isSafeInteger(failedJob.id) && failedJob.id > 0, 'Invalid failed job identity');
+        assert.ok(Number.isFinite(Date.parse(failedJob.completed_at)), 'Missing failed job completion time');
+        throw Object.assign(new Error(`CI ${runId} job ${failedJob.name} failed; diagnose before a new candidate`), {
+          networkObservations,
+          ciFailure: {
+            runId: String(runId),
+            headSha: expectedHead,
+            attempt: 1,
+            conclusion: 'failure',
+            status: run.status,
+            failedJob: {
+              id: failedJob.id,
+              name: failedJob.name,
+              completedAt: failedJob.completed_at,
+              conclusion: failedJob.conclusion,
+            },
+          },
+        });
       }
     }
     await wait(20000);

@@ -587,7 +587,7 @@ for (const job of ['formatting', 'frontend_static', 'frontend_e2e_1', 'frontend_
     assert.notDeepEqual(environmentProofFromSnapshot(job, node), proof);
     for (const field of ['imageVersion', 'kernel', 'packages', 'systemFiles', 'browser']) {
       const b = structuredClone(a);
-      if (field === 'imageVersion' && job.startsWith('frontend_e2e')) {
+      if (field === 'imageVersion' && (job.startsWith('frontend_e2e') || job === 'frontend_static')) {
         b.container.image = b.imageVersion = 'ghcr.io/hllouj/zdm-admin-browser@sha256:' + 'e'.repeat(64);
       } else b[field] = ['packages', 'systemFiles', 'browser'].includes(field) ? 'b'.repeat(64) : 'other';
       const affected = job !== 'formatting' && (field !== 'browser' || job.startsWith('frontend_e2e'));
@@ -798,4 +798,18 @@ test('automatic wait selection binds event, branch and exact head and refuses am
     assert.throws(() => selectQualityRun([{ ...run, ...change }], selection));
   assert.throws(() => selectQualityRun([run, { ...run, databaseId: 43 }], selection));
   assert.throws(() => selectQualityRun([], selection));
+});
+
+test('static container v3 rejects older proofs and still binds kernel, toolchain and immutable image', () => {
+  const base = snapshot();
+  const proof = environmentProofFromSnapshot('frontend_static', base);
+  assert.equal(proof.version, 3);
+  assert.throws(() =>
+    validateEnvironmentProof({ ...proof, version: 2, contract: 'frontend-static-linux-v2' }, 'frontend_static'),
+  );
+  assert.throws(() => environmentProofFromSnapshot('frontend_static', { ...base, container: undefined }));
+  for (const key of ['kernel', 'packages', 'systemFiles', 'environment']) {
+    const changed = { ...base, [key]: key === 'kernel' ? 'other-kernel' : 'e'.repeat(64) };
+    assert.notDeepEqual(environmentProofFromSnapshot('frontend_static', changed), proof);
+  }
 });

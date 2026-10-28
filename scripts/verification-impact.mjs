@@ -1,5 +1,6 @@
 import { businessImpact } from './business-regression.mjs';
 import { isRuntimeFile } from './runtime-file-scope.mjs';
+import { engineeringOnlyProof } from './engineering-impact.mjs';
 // Fail closed: this only omits a domain after every changed path has a known scope.
 const DOC = /(?:\.md$|^docs\/.*\.(?:png|jpe?g|gif|webp|svg|pdf)$)/i;
 const FRONTEND = /^(?:src\/|tests\/e2e\/|public\/)/;
@@ -22,6 +23,7 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
     runtime: false,
     reasons: [],
   };
+  const engineeringScope = engineeringOnlyProof(root, files);
   let docs = false;
   const full = (reason, runtime) => {
     result.frontend = result.backend = result.engineering = result.full = true;
@@ -44,7 +46,14 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
       continue;
     }
     const runtime = isRuntimeFile(file);
-    if (PRODUCT.test(file)) {
+    if (
+      engineeringScope.proven &&
+      (engineeringScope.files.includes(file) || file === 'scripts/test-domain-manifest.json')
+    ) {
+      result.engineering = true;
+      result.runtime ||= runtime;
+      result.reasons.push(engineeringScope.reason + ': ' + file);
+    } else if (PRODUCT.test(file)) {
       full(`商品状态与生命周期跨端契约：${file}`, runtime);
     } else if (FRONTEND.test(file)) {
       if (SENSITIVE.test(file) || /^src\/services\//.test(file) || file === 'tests/e2e/admin-api-mocks.ts') {
@@ -74,7 +83,7 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
       full(`依赖、CI、验证工具或未知路径：${file}；未据此推断重挂运行环境。`, false);
     }
   }
-  result.docsOnly = docs && !result.frontend && !result.backend;
+  result.docsOnly = docs && !result.frontend && !result.backend && !engineeringScope.proven;
   if (result.docsOnly) result.reasons.push('仅文档及明确的文档资产；执行格式检查。');
   return result;
 }

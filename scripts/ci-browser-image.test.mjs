@@ -168,5 +168,26 @@ test('container isolation fails closed for root, added capabilities, privilege e
   ])
     assert.throws(() => validateIsolation({ ...value, ...change }));
   const text = readFileSync(new URL('../.github/workflows/quality.yml', import.meta.url), 'utf8');
-  assert.equal((text.match(/--user 1001:1001 --cap-drop=ALL --security-opt=no-new-privileges/g) || []).length, 2);
+  assert.equal((text.match(/--user 1001:1001 --cap-drop=ALL --security-opt=no-new-privileges/g) || []).length, 3);
+});
+
+test('static checks use the released immutable image, and hosted Node stays pinned to its exact baseline', () => {
+  const quality = readFileSync(new URL('../.github/workflows/quality.yml', import.meta.url), 'utf8');
+  const lock = JSON.parse(readFileSync(new URL('../ci/browser-image.lock.json', import.meta.url)));
+  const versions = [...quality.matchAll(/node-version: ([^\n]+)/g)].map((match) => match[1]);
+  assert.ok(versions.length > 0);
+  assert.ok(versions.every((version) => version === lock.origin.inventory.node.slice(1)));
+  assert.doesNotMatch(quality, /runs-on: ubuntu-latest/);
+  const section = quality.split('  frontend_static:\n')[1].split(/\n {2}[a-z0-9_]+:\n/)[0];
+  assert.match(section, /image: \$\{\{ needs\.scope\.outputs\.browser_image \}\}/);
+  assert.match(section, /run browser-image -- node scripts\/ci-browser-image\.mjs verify/);
+  assert.doesNotMatch(section, /actions\/setup-node/);
+  for (const command of [
+    'frontend-quality',
+    'frontend-unit',
+    'frontend-source-guards',
+    'frontend-build',
+    'frontend-test-list',
+  ])
+    assert.ok(section.includes('run ' + command + ' --'));
 });
