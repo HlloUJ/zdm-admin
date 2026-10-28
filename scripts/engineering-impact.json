@@ -3,6 +3,8 @@
   "inputs": {
     "scripts/completion-cli.mjs": {
       "imports": [
+        "scripts/batch-timing-runtime.mjs",
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
@@ -22,6 +24,7 @@
     },
     "scripts/completion-cli.test.mjs": {
       "imports": [
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-cli.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-completion.mjs",
@@ -108,6 +111,7 @@
     },
     "scripts/check-changed.mjs": {
       "imports": [
+        "scripts/batch-timing-runtime.mjs",
         "scripts/business-regression.mjs",
         "scripts/check-changed-plan.mjs",
         "scripts/task-timing.mjs",
@@ -188,6 +192,8 @@
     },
     "scripts/completion-cli.mjs": {
       "imports": [
+        "scripts/batch-timing-runtime.mjs",
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
@@ -207,6 +213,7 @@
     },
     "scripts/completion-cli.test.mjs": {
       "imports": [
+        "scripts/batch-timing-store.mjs",
         "scripts/completion-cli.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-completion.mjs",
@@ -262,7 +269,11 @@
       "dynamicImports": 0
     },
     "scripts/completion-status.mjs": {
-      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs"],
+      "imports": [
+        "scripts/batch-timing-store.mjs",
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-session.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-status.test.mjs": {
@@ -440,7 +451,7 @@
       "dynamicImports": 1
     },
     "scripts/start-micro-task.mjs": {
-      "imports": ["scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
+      "imports": ["scripts/batch-timing-store.mjs", "scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
       "dynamicImports": 0
     },
     "scripts/start-micro-task.test.mjs": {
@@ -562,6 +573,7 @@
     "scripts/verify.mjs": {
       "imports": [
         "scripts/backend-test-evidence.mjs",
+        "scripts/batch-timing-runtime.mjs",
         "scripts/business-regression.mjs",
         "scripts/check-changed-plan.mjs",
         "scripts/script-test-plan.mjs",
@@ -591,9 +603,15 @@
     "scripts/backend-runtime.test.mjs": "c67534152b95a8a3bad918512fec98edb48accb855b54f3e5e3adb9b12642009",
     "scripts/backend-test-evidence.mjs": "44e7ee7142bceb0323b80a8786de21e9b2dc601854a96e4a78d05720e4a41e77",
     "scripts/backend-test-evidence.test.mjs": "12472dddd2c0a9b6486d5a24b9093c6d22f19c749dfbe948c9a15423df629a1b",
+    "scripts/batch-timing-core.test.mjs": "00701550f1002aab498b57298724f09cd6579a075aa522cbad09f9de53d7cdfe",
+    "scripts/batch-timing-observer.mjs": "087239687a3d4b18a6e618c17bde5ad5869e6a59807234c01b5b2c024915780d",
+    "scripts/batch-timing-runtime.mjs": "137e44d5b34f0f3829c29822861ba4e82c2accaab485d35a7e5bc099c3454c86",
+    "scripts/batch-timing-runtime.test.mjs": "13b9ce78736e9c00f327e4eb58aa8460a4e0cd04cc83d6b75679adb7db07bdab",
+    "scripts/batch-timing-store.mjs": "78e25efc6e7fa9df22d8a77d5358d192113b989a2aadecd153f9af68a6f924fe",
+    "scripts/batch-timing-store.test.mjs": "25519006e27b643fb01755c1040fe6c4b3ca8b83c4d8cfd5d8c7315544ce0aa6",
     "scripts/business-regression.mjs": "9d5ff5e8a490880eaf4c7783cdfbf2246964ab898d46b54c1e6ab51840206f17",
     "scripts/business-regression.test.mjs": "4722db1080d475f82b93b84665b249f21d6afa1219c818771611f2a3b44e4a4d",
-    "scripts/check-changed.mjs": "536fb07a25bad97de56fb43b74a267c8b4929edc0885485816f4bdc84ffca0ce",
+    "scripts/check-changed.mjs": "962ff66d57347eff5d40dfd618bf7ce8ede6c46eb379759641cdc9b4dff0a1a1",
     "scripts/check-changed.test.mjs": "f8ce3b8948c20a56026e6e24eddbb537a5497d0a587d21620678ab4bc789318b",
     "scripts/check-managed-branch-commit.mjs": "27a6eb589ce8214f1c9557073969bc7efead5a7be8b3dacbacb23e6e353fa107",
     "scripts/ci-backend-equivalence.mjs": "a17fbffa02b472c98cde389b5b358ddccc4cb352d46ec7be36d396eb590f6d32",
@@ -617,7 +635,7 @@
     "scripts/completion-recovery.mjs": "25028a3975cf28e74f33c4f95bb1875151624942f019ba10690e64cfd7cab401",
     "scripts/completion-recovery.test.mjs": "62bf48e30221444a315b7de06c694afc1a918c9c27bd01ae0a58db10ed4dd090",
     "scripts/completion-session.mjs": "d164ddf1261b87726727e442a8835fc006062470e6f54acefc31b2323b28717d",
-    "scripts/completion-status.mjs": "2bdf7886d73eee11c11431f2890db0afdb2795501a4c52f954c26e0d6d43256c",
+    "scripts/completion-status.mjs": "45f74fb596abd3fe95b42db14c90115917011d0c383d41c0d199af0a0edac9d1",
     "scripts/completion-status.test.mjs": "553b4239b04159544044d3daff18a6fb7e7cf5a6da31f4b580feeb64ed1b6e2c",
     "scripts/delivery-launcher.mjs": "e17ac3c93f7bccc47634e254c6a6bcc52eb1f9adcab2458d97446fc8c6057750",
     "scripts/delivery-launcher.test.mjs": "27fa92cb4a260eb3cb356d3410b5fe624b7f2c55656e207dea26be5c43f89c71",
@@ -655,18 +673,18 @@
     "scripts/runtime-file-scope.test.mjs": "11f89134c0dfdb18b2561e6855bc721f0a0e54e4d5b87c2921d25807524676af",
     "scripts/script-test-plan.mjs": "b916d5effe5c71fad031c122d97732b976d761c3094ecca6dff5870468c3292d",
     "scripts/script-test-plan.test.mjs": "3416caa0c979314d1e1f031bb111c96a7a388cfd00cfcde1d79c5103f432737c",
-    "scripts/start-micro-task.mjs": "026984384613c4ac9b54c8bf778b7d33ecd6ee88e2adf522cdb0f19d99f4d269",
-    "scripts/start-micro-task.test.mjs": "f8e3b2106739d710edb093e7e54ae33f5a39d861170a4f5f75f4df1fce04e41c",
+    "scripts/start-micro-task.mjs": "e54dbc5ccd61944eafdd88a7e900d6145e7d363b67391d8fa6b41c928f5dd75b",
+    "scripts/start-micro-task.test.mjs": "2355fbe9cadf89480503775c81e7e4db11120085ef05c389fd216672ff009044",
     "scripts/sync-integration.mjs": "ac1c9e22eb0382b9d63b0eaf9d549b138ca18e38b3fadaec2f6e75393eeafd09",
     "scripts/sync-integration.test.mjs": "43931f15522ced4b1a2b5a55972ce94e696c3608c67e3fa492e5353228c9179b",
-    "scripts/task-batch.mjs": "fe62c1b6f965c4695a954f00161678b8ca6a087a05783cb464b8c46043b3256d",
+    "scripts/task-batch.mjs": "2a49301086662648fdbefaa726a23bdfef31e50450b2b22e50c8bd568a687566",
     "scripts/task-batch.test.mjs": "110f8903a85d06d3c0017b003dbe646a431046650ae27b08d510bfd502741920",
     "scripts/task-completion.mjs": "057a376e11bc48dee4aaf30bdd35c9ddc36415ae8f8af7d585852a5df5d0a449",
     "scripts/task-dependencies.mjs": "e771583db66522283935becd001598f9dd4dbb75b7cb8568e964403666125fbe",
     "scripts/task-dependencies.test.mjs": "9ad11fa8bf8ca9e796a6efdfcf7914feb61002a9ad067e9822658e0e1a63009f",
     "scripts/task-runtime-state.mjs": "70ecda8bcaadce54f2c7c8f8348c3b680010c09969447c287179f2cc6274c950",
     "scripts/task-runtime-state.test.mjs": "cb42075a957b4faa2deb11f773857924dba67d89b5b71cd8240c384da0d13280",
-    "scripts/task-timing.mjs": "3037e3cbbc7346891f100e2f75aafb0f3af26bef0b0b97bc90efb2188d6e1cae",
+    "scripts/task-timing.mjs": "1b2603f8c9502e2c00e591f20b9038c6250ad48dd5e809a2091178452515b30d",
     "scripts/task-timing.test.mjs": "b39b2cff24b759fe0678dbff0bed979eb3cf5fa0b97090fbe74740881e448677",
     "scripts/test-support/completion-preview-fixture.mjs": "105eb6830136372c99c99d8999d66625caddda423ed4e423f137c31f16b82e84",
     "scripts/ui-template-policy.test.mjs": "40a60676941ae380f0e6109b1c4c02360044ddb2c5068cb1a50e6236c8c3b60e",
@@ -677,9 +695,9 @@
     "scripts/verification-performance.test.mjs": "e7dda6c54c465a9da224bdbfcdd676585cae3a7f1b6f4948413ebe966b961520",
     "scripts/verification-policy.mjs": "ecb9f801edead107adb315dbb9306fed827352043325cea489d35b4ff96fc44f",
     "scripts/verification-policy.test.mjs": "e25a222c62dac6a0864e90885628e8fd07b408b221aa12d7cf765ab09e21bfbd",
-    "scripts/verification-runner.mjs": "b8cbb490b81bed68145a3febc4e8f691435df94418b7cbd47c5cea91bccc53b7",
+    "scripts/verification-runner.mjs": "fa1c0807a6e5ca16aef6eb55bc0f31b5843a4c339a59470d24a7d64e518c326d",
     "scripts/verification-scope.test.mjs": "ba48064c072e1217e39896476dadc88267cb4bb4c577ceefc10f67c145599956",
-    "scripts/verify.mjs": "dab5854a356c90949031f0afdb16a4b8411e669471e734be39a1c66ecc8e6ddd",
+    "scripts/verify.mjs": "41c0edecba6f825a3875b642376cdf7cb029317381a19252cf881229741a2148",
     "scripts/vite-watch.test.mjs": "47686cdc91b7c81af6c665e8c8bee45e0a9d09e484cb7ee783c81070c862bffc",
     "scripts/vitest-evidence-reporter.mjs": "1bfd049f64888dd3224b23de9a870caff9234728bde7723941f8b753f495741f"
   }

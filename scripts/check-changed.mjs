@@ -1,3 +1,4 @@
+import { refreshCurrentTiming } from './batch-timing-runtime.mjs';
 import { observeTaskTiming } from './task-timing.mjs';
 import { validateChangedBusinessCoverage } from './business-regression.mjs';
 import { spawnSync } from 'node:child_process';
@@ -132,6 +133,8 @@ With file arguments, checks only files from the current task.
 
 export async function main(args = process.argv.slice(2), options = {}) {
   const parsed = parseChangedArgs(args);
+  if (!parsed.listOnly && !parsed.showHelp && (!options.run || options.run === runVerificationTask))
+    refreshCurrentTiming(options.root ?? process.cwd());
   try {
     return await executeChangedChecks(args, options);
   } finally {

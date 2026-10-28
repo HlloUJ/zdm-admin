@@ -1,3 +1,5 @@
+import { bindBatchTiming, readTimingSummary, timingRequiredFile } from './batch-timing-store.mjs';
+import { appendFileSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
@@ -699,4 +701,73 @@ test('matching integration proof does not skip stopping an old task still select
   assert.equal(result.launcherReused, false);
   assert.equal(f.launches(), 2);
   assert.equal(live.starts, 1);
+});
+
+test('batch timing gate blocks actual cleanup when required native state is missing', async (t) => {
+  const f = fixture(t);
+  await prepare(f);
+  const marker = timingRequiredFile(f.common, 'example');
+  mkdirSync(path.dirname(marker), { recursive: true });
+  writeFileSync(marker, JSON.stringify({ batch: 'example', version: 1 }));
+  await assert.rejects(
+    completionCommand(f.task, ['settle', 'example', f.main, '42'], f.options),
+    /New batch timing proof missing/,
+  );
+  assert.ok(existsSync(f.task));
+  assert.ok(readActiveBatch(f.anchor));
+  assert.ok(f.git(f.anchor, 'show-ref', '--verify', 'refs/heads/codex/task'));
+});
+
+test('batch report automatically seals after real closure and final native event without rewriting the receipt', async (t) => {
+  const f = fixture(t);
+  await prepare(f);
+  const sessions = path.join(f.common, 'native-sessions');
+  mkdirSync(sessions);
+  const thread = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    source = path.join(sessions, 'rollout-closure-' + thread + '.jsonl'),
+    at = Date.now() - 50;
+  const row = (type, payload, time) =>
+    JSON.stringify({ timestamp: new Date(time).toISOString(), type, payload }) + '\n';
+  writeFileSync(
+    source,
+    row('session_meta', { id: thread, cwd: f.anchor }, at - 1) +
+      row('event_msg', { type: 'task_started', turn_id: 'closing' }, at) +
+      row('turn_context', { turn_id: 'closing', cwd: f.task }, at) +
+      row(
+        'event_msg',
+        { type: 'item_completed', turn_id: 'closing', item: { type: 'UserMessage', id: 'request', content: [] } },
+        at + 1,
+      ),
+  );
+  bindBatchTiming(f.task, readActiveBatch(f.task), { sessionsRoot: sessions, env: { CODEX_THREAD_ID: thread } });
+  const owner = JSON.parse(readFileSync(path.join(f.common, 'task-timing/example/observer.json')));
+  t.after(() => {
+    try {
+      process.kill(owner.pid, 'SIGTERM');
+    } catch {
+      /* exited */
+    }
+  });
+  const result = await completionCommand(f.task, ['settle', 'example', f.main, '42'], f.options);
+  assert.equal(existsSync(f.task), false);
+  assert.equal(result.batchTiming.status, 'awaiting-turn-end');
+  assert.equal(result.batchTiming.finalReplyCompleteAt, null);
+  const receipt = path.join(f.common, 'task-delivery/example/completion-receipt.json'),
+    original = readFileSync(receipt, 'utf8');
+  appendFileSync(source, row('event_msg', { type: 'task_complete', turn_id: 'closing' }, Date.now()));
+  let summary;
+  const deadline = Date.now() + 5000;
+  while (Date.now() < deadline) {
+    summary = readTimingSummary(f.common, 'example');
+    if (summary?.status === 'completed') break;
+    await new Promise((resolve) => setTimeout(resolve, 20));
+  }
+  assert.equal(summary.status, 'completed');
+  assert.ok(summary.wallMs > 0);
+  assert.ok(summary.finalReplyCompleteAt);
+  assert.equal(readFileSync(receipt, 'utf8'), original);
+  const report = await completionCommand(f.anchor, ['report', 'example'], f.options);
+  assert.equal(report.timingScope, 'formal-delivery-only');
+  assert.equal(report.batchTiming.status, 'completed');
+  assert.equal(report.deliveryStatus.timingComplete, true);
 });

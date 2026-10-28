@@ -117,6 +117,10 @@ function fixture({ active = null, cwd = '/repo', preview = null, existing = [] }
       state.active = { id, kind, branch: taskBranchForSlug(id), worktree: root };
       return state.active;
     },
+    bindTiming(root, batch, options) {
+      events.push(['timing', root, batch.id, options]);
+      return { status: 'snapshot' };
+    },
     findManagedWorktrees(root) {
       events.push(['managed', root]);
       return {
@@ -220,7 +224,8 @@ test('without active batch creation fetches current main, creates the worktree a
     ([event, command, args]) => event === 'run' && command === 'git' && args[0] === 'worktree',
   );
   const preview = f.events.findIndex(([event, , args]) => event === 'run' && args[1] === 'switch');
-  assert.ok(creation < registration && registration < preview);
+  const timing = f.events.findIndex(([event]) => event === 'timing');
+  assert.ok(creation < registration && registration < timing && timing < preview);
 });
 
 test('missing slug without a batch fails before network or preview operations', () => {
@@ -439,6 +444,7 @@ test('real registered batch resumes across worktrees and preserves an unpushed c
   const output = [];
   const result = main(['--slug', 'module-b'], {
     cwd: f.other,
+    bindTiming: () => ({ status: 'fixture' }),
     queryPreviewStatus: () => ({ worktree: f.task }),
     run(command, args) {
       assert.equal(command, process.execPath, 'restoring a real batch must never execute Git writes or fetch');
