@@ -154,9 +154,8 @@ export async function finalHandoff(root, batch, main, options) {
             },
             { save },
           );
-        const ready = () => {
-          const snapshot = runtimeSnapshot(plan.integration),
-            proof = runtimeProof(plan.integration);
+        const snapshotReady = (snapshot) => {
+          const proof = runtimeProof(plan.integration);
           return (
             integrationProofMatches(proof, snapshot) &&
             snapshot.worktreeClean &&
@@ -165,7 +164,8 @@ export async function finalHandoff(root, batch, main, options) {
             !existsSync(path.join(plan.integration, 'backups/task-preview/active-database-task.json'))
           );
         };
-        const reused = ready();
+        const beforeSnapshot = runtimeSnapshot(plan.integration);
+        const reused = snapshotReady(beforeSnapshot);
         if (!reused)
           execute(plan.anchor, process.execPath, [
             path.join(plan.anchor, 'scripts/delivery-launcher.mjs'),
@@ -173,8 +173,10 @@ export async function finalHandoff(root, batch, main, options) {
             '--task',
             batch.branch,
           ]);
-        assert.ok(ready(), 'Published runtime handoff proof missing');
-        execute(root, 'git', ['merge-base', '--is-ancestor', main, runtimeSnapshot(plan.integration).integrationHead]);
+        // Keep fresh before/after runtime checks, then use the final snapshot for ancestry too.
+        const afterSnapshot = runtimeSnapshot(plan.integration);
+        assert.ok(snapshotReady(afterSnapshot), 'Published runtime handoff proof missing');
+        execute(root, 'git', ['merge-base', '--is-ancestor', main, afterSnapshot.integrationHead]);
         assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview differs from published main');
         const after = await checkRuntime(root, common);
         assert.ok(after.runtimeHealthy && after.backupRetained, 'Runtime health or backup changed');

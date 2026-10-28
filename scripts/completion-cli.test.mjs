@@ -590,3 +590,31 @@ test('pause boundary commands record intent without CI, process, Git delivery or
     ),
   );
 });
+
+test('handoff takes only fresh before/after snapshots and reuses the final snapshot for ancestry', async (t) => {
+  const f = handoffFixture(t);
+  await prepare(f);
+  const snapshot = f.options.runtimeSnapshot;
+  let calls = 0;
+  f.options.runtimeSnapshot = () => {
+    calls++;
+    return snapshot();
+  };
+  await completionCommand(f.task, ['final-handoff', f.main], f.options);
+  // Two production snapshots plus one fixture snapshot to construct the launched proof.
+  assert.equal(calls, 3);
+  calls = 0;
+  await completionCommand(f.anchor, ['final-handoff', f.main], f.options);
+  assert.equal(calls, 2);
+});
+test('container drift between the fresh handoff snapshots still blocks completion', async (t) => {
+  const f = handoffFixture(t);
+  await prepare(f);
+  await completionCommand(f.task, ['final-handoff', f.main], f.options);
+  const snapshot = f.options.runtimeSnapshot;
+  let calls = 0;
+  f.options.runtimeSnapshot = () => ({ ...snapshot(), containerIdentity: ++calls === 1 ? 'i' : 'changed-container' });
+  await assert.rejects(completionCommand(f.anchor, ['final-handoff', f.main], f.options), /handoff proof missing/);
+  assert.ok(existsSync(f.task));
+  assert.ok(readActiveBatch(f.anchor));
+});

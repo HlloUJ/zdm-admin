@@ -335,7 +335,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.test.mjs": {
-      "digest": "e060d68245b9b94ee4fe2428f3797e00aab44ef8cf02e672c6153a8aa764c63d",
+      "digest": "9c7ff0d2fa112783544b036a98bba7e7b0678fc1018ccc03a3ae9d02e2bb5278",
       "imports": ["scripts/completion-cli.mjs", "scripts/task-batch.mjs", "scripts/task-completion.mjs"],
       "dynamicImports": 0
     },
@@ -345,7 +345,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-handoff.mjs": {
-      "digest": "81580b06a1610c48cd665381d6c0621c5a809972d6f66e329bd70acd015d6f73",
+      "digest": "12649a9fa8cfe8fce2919ebb715392c99c7bd2e546130744a95853775fdbc862",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/delivery-launcher.mjs",
@@ -550,8 +550,8 @@
       "dynamicImports": 0
     },
     "scripts/integration-handoff-state.mjs": {
-      "digest": "cf7252b1ae1e1cfcc3b4cf48a1df200d382ac2f0214b42fdd0e031c7dd3d1012",
-      "imports": ["scripts/task-runtime-state.mjs", "scripts/verification-impact.mjs"],
+      "digest": "04c7d57f628b5f99e08a188d2a1378ffebefeb19f6d0b4b4fe73759a6d09c5f6",
+      "imports": ["scripts/runtime-file-scope.mjs", "scripts/task-runtime-state.mjs"],
       "dynamicImports": 0
     },
     "scripts/lint-policy.test.mjs": {
@@ -697,6 +697,43 @@
       "digest": "1da62ec746b249940761270a0b5dac76b59912310003c985dda3d1493e48744f",
       "imports": ["scripts/example.test.mjs", "scripts/run-script-tests.mjs"],
       "dynamicImports": 0
+    },
+    "scripts/runtime-file-scope.mjs": {
+      "digest": "020e1a98c74b7f4bb53f5b81ca267ca18cce9b0a933bbc8ff61dc07f1e7e8114",
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-all.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/macos/launchd-dev.mjs",
+        "scripts/run-integration.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-runtime-state.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/runtime-file-scope.test.mjs": {
+      "digest": "11f89134c0dfdb18b2561e6855bc721f0a0e54e4d5b87c2921d25807524676af",
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/business-regression.mjs",
+        "scripts/delivery-launcher.mjs",
+        "scripts/dev-all.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/ensure-backend.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/macos/launchd-dev.mjs",
+        "scripts/run-integration.mjs",
+        "scripts/runtime-file-scope.mjs",
+        "scripts/sync-integration.mjs",
+        "scripts/task-preview-service.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/verification-impact.mjs"
+      ],
+      "dynamicImports": 1
     },
     "scripts/script-test-plan.mjs": {
       "digest": "b916d5effe5c71fad031c122d97732b976d761c3094ecca6dff5870468c3292d",
@@ -852,21 +889,8 @@
       "dynamicImports": 10
     },
     "scripts/verification-impact.mjs": {
-      "digest": "0cbf0215d3744ffe25eb123eeb5d360bae4e4e78cabe57faee10c21cf6103fde",
-      "imports": [
-        "scripts/backend-runtime.mjs",
-        "scripts/business-regression.mjs",
-        "scripts/delivery-launcher.mjs",
-        "scripts/dev-all.mjs",
-        "scripts/dev-task.mjs",
-        "scripts/ensure-backend.mjs",
-        "scripts/integration-handoff-state.mjs",
-        "scripts/macos/launchd-dev.mjs",
-        "scripts/run-integration.mjs",
-        "scripts/sync-integration.mjs",
-        "scripts/task-preview-service.mjs",
-        "scripts/task-runtime-state.mjs"
-      ],
+      "digest": "dfb814e3386b789f682bb77730074c96a6f77e38b6a7611cf51b7944d6f28ada",
+      "imports": ["scripts/business-regression.mjs", "scripts/runtime-file-scope.mjs"],
       "dynamicImports": 0
     },
     "scripts/verification-impact.test.mjs": {
