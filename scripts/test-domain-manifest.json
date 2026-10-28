@@ -112,6 +112,31 @@
       "imports": [],
       "dynamicImports": 0
     },
+    "scripts/batch-timing-core.mjs": {
+      "digest": "a6f8074d2f54937397ac3c7fe8f4bcab06d42ede224793ccaf632c2fd5057c69",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/batch-timing-core.test.mjs": {
+      "digest": "00701550f1002aab498b57298724f09cd6579a075aa522cbad09f9de53d7cdfe",
+      "imports": ["scripts/batch-timing-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/batch-timing-observer.mjs": {
+      "digest": "bbec5bf957d08b7ff3e6d82a336151b9e89457c55981013699e4624be6d2a7d6",
+      "imports": ["scripts/batch-timing-store.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/batch-timing-store.mjs": {
+      "digest": "7676ab43c1f39f7f105166830aa6f75ef200591bc610d7d7926db59a443d6e3c",
+      "imports": ["scripts/batch-timing-core.mjs", "scripts/batch-timing-observer.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/batch-timing-store.test.mjs": {
+      "digest": "25519006e27b643fb01755c1040fe6c4b3ca8b83c4d8cfd5d8c7315544ce0aa6",
+      "imports": ["scripts/batch-timing-store.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/business-regression-contracts.json": {
       "digest": "9a484730c4085390dc26018ffb18bcc87aa8ec99bf9ff8f84e3aa83b3b11aca4",
       "imports": [],
@@ -1067,6 +1092,11 @@
     "scripts/task-timing.test.mjs": {
       "digest": "b39b2cff24b759fe0678dbff0bed979eb3cf5fa0b97090fbe74740881e448677",
       "imports": ["scripts/check-changed.mjs", "scripts/task-timing.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/test-support/batch-timing-replay.json": {
+      "digest": "1e3272b695b956f21814b9cd482b7725d2f5fd35ef9a7781584eeed1afb76379",
+      "imports": [],
       "dynamicImports": 0
     },
     "scripts/test-support/completion-preview-fixture.mjs": {
