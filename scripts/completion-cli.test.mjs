@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { completionCommand, verifyPreservation } from './completion-cli.mjs';
+import { previewFixture } from './test-support/completion-preview-fixture.mjs';
 import { preserveAssets } from './task-completion.mjs';
 import {
   registerBatch,
@@ -113,6 +114,11 @@ function fixture(t, scenario = 'normal') {
   };
   const options = {
     preserveAssets,
+    previewControl: {
+      assertOwner: async () => ({}),
+      ensure: async () => ({ reused: true }),
+      check: async () => ({ ready: true }),
+    },
     execute,
     waitQuality: async () => ci,
     runtimeSnapshot: () => ({
@@ -589,4 +595,108 @@ test('pause boundary commands record intent without CI, process, Git delivery or
         command === 'gh' || (command === 'git' && ['push', 'merge', 'commit', 'worktree'].includes(args[0])),
     ),
   );
+});
+
+test('handoff takes only fresh before/after snapshots and reuses the final snapshot for ancestry', async (t) => {
+  const f = handoffFixture(t);
+  await prepare(f);
+  const snapshot = f.options.runtimeSnapshot;
+  let calls = 0;
+  f.options.runtimeSnapshot = () => {
+    calls++;
+    return snapshot();
+  };
+  await completionCommand(f.task, ['final-handoff', f.main], f.options);
+  // Two production snapshots plus one fixture snapshot to construct the launched proof.
+  assert.equal(calls, 3);
+  calls = 0;
+  await completionCommand(f.anchor, ['final-handoff', f.main], f.options);
+  assert.equal(calls, 2);
+});
+test('container drift between the fresh handoff snapshots still blocks completion', async (t) => {
+  const f = handoffFixture(t);
+  await prepare(f);
+  await completionCommand(f.task, ['final-handoff', f.main], f.options);
+  const snapshot = f.options.runtimeSnapshot;
+  let calls = 0;
+  f.options.runtimeSnapshot = () => ({ ...snapshot(), containerIdentity: ++calls === 1 ? 'i' : 'changed-container' });
+  await assert.rejects(completionCommand(f.anchor, ['final-handoff', f.main], f.options), /handoff proof missing/);
+  assert.ok(existsSync(f.task));
+  assert.ok(readActiveBatch(f.anchor));
+});
+
+for (const problem of [
+  'foreign-owner',
+  'startup',
+  '503',
+  'wrong-worktree',
+  'frontend-mode',
+  'integration-api',
+  'data-binding',
+])
+  test(`retained preview ${problem} prevents both final handoff and Git cleanup through real probes`, async (t) => {
+    const f = handoffFixture(t);
+    await prepare(f);
+    const live = await previewFixture(t, { anchor: f.anchor, task: f.task, preview: f.preview, common: f.common });
+    f.options.previewControl = live.control;
+    if (problem === 'foreign-owner') live.state.worktree = '/another/task';
+    if (problem === 'startup') live.failStart = true;
+    if (problem === '503') live.health = 503;
+    if (problem === 'wrong-worktree') live.metadata.workspaceRoot = '/another/task';
+    if (problem === 'frontend-mode') live.metadata.mode = 'frontend';
+    if (problem === 'integration-api') live.metadata.apiTarget = 'http://127.0.0.1:8080';
+    if (problem === 'data-binding') live.failData = true;
+    await assert.rejects(completionCommand(f.task, ['final-handoff', f.main], f.options));
+    await assert.rejects(completionCommand(f.anchor, ['settle', 'example', f.main, '42'], f.options));
+    assert.ok(existsSync(f.task));
+    assert.ok(readActiveBatch(f.anchor));
+    assert.equal(f.git(f.anchor, 'rev-parse', 'codex/task'), f.head);
+    const state = JSON.parse(readFileSync(path.join(f.common, 'task-delivery/example/completion-session.json')));
+    assert.equal(
+      state.events.some((event) => ['cleanup', 'close'].includes(event.name)),
+      false,
+    );
+    if (problem === 'foreign-owner') {
+      assert.equal(live.starts, 0);
+      assert.equal(f.launches(), 0);
+    }
+  });
+
+test('missing preview can reach automatic full startup and successful closure, while healthy recovery does not restart', async (t) => {
+  const f = handoffFixture(t);
+  await prepare(f);
+  const live = await previewFixture(t, { anchor: f.anchor, task: f.task, preview: f.preview, common: f.common });
+  f.options.previewControl = live.control;
+  const check = f.options.checkRuntime;
+  f.options.checkRuntime = async (...args) => ({
+    ...(await check()),
+    ...(args[2]?.allowPreviewUnavailable ? { integrationHealthy: true, runtimeHealthy: false } : {}),
+  });
+  await completionCommand(f.task, ['final-handoff', f.main], f.options);
+  assert.equal(live.starts, 1);
+  await completionCommand(f.anchor, ['final-handoff', f.main], f.options);
+  assert.equal(live.starts, 1);
+  await completionCommand(f.anchor, ['settle', 'example', f.main, '42'], f.options);
+  assert.equal(existsSync(f.task), false);
+  assert.equal(readActiveBatch(f.anchor), null);
+});
+
+test('matching integration proof does not skip stopping an old task still selected by the supervisor', async (t) => {
+  const f = handoffFixture(t);
+  await prepare(f);
+  await completionCommand(f.task, ['final-handoff', f.main], f.options);
+  const live = await previewFixture(t, { anchor: f.anchor, task: f.task, preview: f.preview, common: f.common });
+  Object.assign(live.state, { worktree: f.task, phase: 'running', childPid: 42 });
+  f.options.previewControl = live.control;
+  const execute = f.options.execute;
+  f.options.execute = (root, command, args) => {
+    const result = execute(root, command, args);
+    if (command === process.execPath)
+      Object.assign(live.state, { worktree: null, phase: 'preview-unavailable', childPid: null });
+    return result;
+  };
+  const result = await completionCommand(f.anchor, ['final-handoff', f.main], f.options);
+  assert.equal(result.launcherReused, false);
+  assert.equal(f.launches(), 2);
+  assert.equal(live.starts, 1);
 });
