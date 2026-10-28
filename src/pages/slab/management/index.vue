@@ -244,17 +244,9 @@
                   <template #offShelvedAt="{ row }">
                     {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
                   </template>
-                  <template #stateOperatorName="{ row }">
-                    <t-space size="small">
-                      <span>{{ row.stateOperatorName || '历史记录未记录' }}</span>
-                      <t-tag
-                        v-if="stateSourceLabel(row.stateOperatorClientCode, 'admin')"
-                        size="small"
-                        variant="light"
-                        >{{ stateSourceLabel(row.stateOperatorClientCode, 'admin') }}</t-tag
-                      >
-                    </t-space>
-                  </template>
+                  <template #stateOperatorName="{ row }"
+                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
+                  >
                   <template #stateOperatedAt="{ row }">{{
                     row.stateOperatedAt ? formatDateTime(row.stateOperatedAt) : '历史记录未记录'
                   }}</template>
@@ -865,6 +857,11 @@
                     {{ row.after }}
                   </t-descriptions-item>
                 </t-descriptions>
+                <t-alert
+                  v-if="legacyArrivalPrices"
+                  theme="info"
+                  message="历史日志仅记录已生成的价格，未记录完整价格层级"
+                />
                 <t-table
                   class="operation-log-detail__prices"
                   row-key="label"
@@ -872,9 +869,16 @@
                   :columns="creationLogPriceColumns"
                   bordered
                 >
+                  <template #coefficient="{ row }">
+                    <t-typography-text v-if="row.missingReason && row.coefficient === '未填写'" theme="error">
+                      {{ row.coefficient }}
+                    </t-typography-text>
+                    <span v-else>{{ row.coefficient }}</span>
+                  </template>
                   <template #price="{ row }">
                     <t-space align="center" size="small">
-                      <span>{{ row.price }}</span>
+                      <t-typography-text v-if="row.missingReason" theme="error">{{ row.price }}</t-typography-text>
+                      <span v-else>{{ row.price }}</span>
                       <PriceSourceToggle v-if="row.priceSource" :source="row.priceSource" :available="false" readonly />
                     </t-space>
                   </template>
@@ -1168,7 +1172,7 @@ import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
-import { stateActivityColumns, stateSourceLabel } from '@/services/productStateActivity';
+import { stateActivityColumns } from '@/services/productStateActivity';
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber, toSlabPayload } from '../shared/slabPageMapping';
 import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
@@ -1400,6 +1404,14 @@ const {
   () => markupConfigurations.value,
   () => operationStatusLabels,
 );
+const legacyArrivalPrices = computed(() => {
+  if (operationLogDetail.value?.operationType !== 'SOURCE_SHELF') return false;
+  try {
+    return JSON.parse(operationLogDetail.value.changeDetails || '{}')['价格层级']?.complete !== true;
+  } catch {
+    return true;
+  }
+});
 const creationLogPriceColumns = computed(() => [
   { colKey: 'label', title: '价格层级' },
   { colKey: 'coefficient', title: '价格系数' },
@@ -1416,6 +1428,7 @@ const creationLogPrices = computed(() => {
       label: tier.label,
       coefficient: tier.afterCoefficient,
       price: tier.afterPrice,
+      missingReason: tier.afterMissingReason,
       priceSource:
         value(`${tier.label}价格来源`) === '跟随配置'
           ? ('auto' as const)
@@ -1596,7 +1609,6 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     publisherType: normalizePublisherType(record.publisherType),
     stateOperatorName: record.stateOperatorName,
     stateOperatedAt: record.stateOperatedAt,
-    stateOperatorClientCode: record.stateOperatorClientCode,
     createdByName: record.createdByName?.trim() || '-',
     createdAt: record.createdAt || '',
     price: {
@@ -2488,20 +2500,21 @@ const releasePendingUpload = (removed: AdminMediaValue) => {
     uploadPreviewType.value = 'image';
   }
 };
+const refreshSlabItems = async (ids: number[]) => {
+  const selected = new Set(ids);
+  const records = await listSlabs();
+  records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);
+};
 const updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {
   const item = tableData.value.find((candidate) => candidate.id === id);
   if (!item) return;
   await updateSlabStatuses([id], status, reason, detail);
-  item.status = status;
+  await refreshSlabItems([id]);
 };
 const updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {
   const selectedIds = [...selectedKeys.value];
   await updateSlabStatuses(selectedIds, status, reason, detail);
-  const selectedIdSet = new Set(selectedIds);
-  tableData.value.forEach((item) => {
-    if (!selectedIdSet.has(item.id)) return;
-    item.status = status;
-  });
+  await refreshSlabItems(selectedIds);
 };
 const shelfBlockingMessage = (row: SlabItem) => {
   if (!row.mainImageMediaId || !row.scanImageMediaId || !row.designImageMediaId) {
@@ -2648,7 +2661,7 @@ const handleConfirmSubmit = async () => {
     if (type === 'shelf' && row) await updateSlabStatus(row.id, 'selling');
     if (type === 'delete' && row) {
       await removeSlab(row.id);
-      row.status = 'recycle';
+      await refreshSlabItems([row.id]);
     }
     if (type === 'restore' && row) await updateSlabStatus(row.id, 'warehouse');
     if (type === 'savePrice' && row) {
@@ -2736,17 +2749,19 @@ const handleConfirmSubmit = async () => {
     if (type === 'purge' && row) {
       await deleteSlab(row.id);
       tableData.value = tableData.value.filter((item) => item.id !== row.id);
-      if (sourceBlocked(row)) await loadSlabs();
+      await loadSlabs();
     }
     if (type === 'batchPurge') {
       const selectedIds = [...selectedKeys.value];
       await deleteSlabs(selectedIds);
       const deletedIds = new Set(selectedIds);
       tableData.value = tableData.value.filter((item) => !deletedIds.has(item.id));
+      await loadSlabs();
     }
     if (type === 'clearRecycle') {
       await clearRecycleSlabs();
       tableData.value = tableData.value.filter((item) => item.status !== 'recycle');
+      await loadSlabs();
     }
     if (type !== 'savePrice') {
       selectedKeys.value = [];

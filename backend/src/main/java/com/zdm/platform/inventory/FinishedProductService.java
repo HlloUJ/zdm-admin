@@ -377,7 +377,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
   @Transactional
   public FinishedProduct sourceTransition(Long id, String target, String reason, String detail) {
     lifecycle.sourceTransition(ProductLifecycleService.Kind.FINISHED,id,target,reason,detail);
-    return attachDetails(getById(id));
+    return withDetails(getById(id));
   }
 
   public boolean cleanupTemporaryMedia(Long mediaId) {

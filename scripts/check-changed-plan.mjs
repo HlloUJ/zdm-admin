@@ -1,3 +1,4 @@
+import { businessImpact } from './business-regression.mjs';
 import path from 'node:path';
 
 import { createBackendTestPlan } from './backend-test-plan.mjs';
@@ -79,7 +80,32 @@ export function createValidationPlan(files, fileExists = () => true, { root } = 
   const relatedSourceFiles = existingFiles.filter(
     (file) => file.startsWith('src/') && !unitTestFiles.includes(file) && hasExtension(file, TYPECHECK_EXTENSIONS),
   );
+  const contracts = businessImpact(root, files);
   const tasks = [];
+  if (contracts.length) {
+    tasks.push({ name: 'business consumers and preserved regressions', args: ['run', 'check:business-regressions'] });
+    if (backendPlan.mode === 'none')
+      tasks.push({
+        name: 'associated product API regressions',
+        args: [
+          'run',
+          'backend:test',
+          '--',
+          '-Dtest=' +
+            [
+              ...new Set(
+                contracts.flatMap((contract) =>
+                  contract.backendTests.map((file) => file.split('/').at(-1).replace('.java', '')),
+                ),
+              ),
+            ].join(','),
+        ],
+      });
+    tasks.push({
+      name: 'associated product UI regressions',
+      args: ['run', 'test:e2e:chrome', '--', ...new Set(contracts.flatMap((contract) => contract.browserTests))],
+    });
+  }
   if (files.some((file) => file.startsWith('src/')))
     tasks.push({ name: 'source guards', args: ['run', 'test:source-guards'] });
   if (files.some((file) => file.startsWith('scripts/') && hasExtension(file, SCRIPT_EXTENSIONS))) {

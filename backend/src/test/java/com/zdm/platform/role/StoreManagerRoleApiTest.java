@@ -37,7 +37,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker=true)
 @Transactional
 class StoreManagerRoleApiTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL=new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL=com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("manager_test").withUsername("test").withPassword("test");
   @DynamicPropertySource static void database(DynamicPropertyRegistry r) {
     r.add("spring.datasource.url",MYSQL::getJdbcUrl); r.add("spring.datasource.username",MYSQL::getUsername);

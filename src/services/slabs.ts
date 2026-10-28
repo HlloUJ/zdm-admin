@@ -30,7 +30,6 @@ export interface SlabOffShelfRecord {
 export interface SlabRecord {
   stateOperatorName?: string;
   stateOperatedAt?: string;
-  stateOperatorClientCode?: string;
 
   sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
@@ -159,6 +158,7 @@ export type SlabOperationType =
   | 'PHYSICAL_DELETE'
   | 'PURGE'
   | 'STATUS_UPDATE'
+  | 'REENTRY'
   | 'SOURCE_SHELF'
   | 'SOURCE_OFF_SHELF'
   | 'SOURCE_DELETE'

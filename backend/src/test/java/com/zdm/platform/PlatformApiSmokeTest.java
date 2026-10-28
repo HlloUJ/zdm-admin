@@ -50,7 +50,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
       System.getProperty("java.io.tmpdir"), "zdm-media-smoke-" + UUID.randomUUID());
 
   @Container
-  private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("zdm_admin_test")
       .withUsername("zdm_admin")
       .withPassword("zdm_admin_pwd");

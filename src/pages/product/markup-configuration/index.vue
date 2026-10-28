@@ -489,12 +489,8 @@ const submitForm = async () => {
       if (editingId.value) await commodityPricing.value.updateFinishedMarkupConfiguration(editingId.value, payload);
       else await commodityPricing.value.createFinishedMarkupConfiguration(payload);
     } else {
-      const result = editingId.value
-        ? await updateSlabMarkupConfiguration(editingId.value, payload)
-        : await createSlabMarkupConfiguration(payload);
-      if ((result.synchronizedPriceCount ?? 0) > 0) {
-        adminFeedback.success(`已同步更新${result.synchronizedPriceCount}条大板自动价格`);
-      }
+      if (editingId.value) await updateSlabMarkupConfiguration(editingId.value, payload);
+      else await createSlabMarkupConfiguration(payload);
     }
     const wasEditing = Boolean(editingId.value);
     await loadData();

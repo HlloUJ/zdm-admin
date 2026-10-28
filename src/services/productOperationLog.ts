@@ -32,6 +32,7 @@ export const productOperationTypes: Record<string, string> = {
   PURGE: '彻底删除',
   SOLD_OUT: '售完',
   STATUS_UPDATE: '状态变更',
+  REENTRY: '重新入仓',
   SOURCE_SHELF: '供应链上架',
   SOURCE_OFF_SHELF: '供应链下架',
   SOURCE_DELETE: '供应链彻底删除',
@@ -124,7 +125,7 @@ export function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'stor
     ...(client === 'supply-chain'
       ? ['CREATE', 'UPDATE', ...commonActions]
       : client === 'admin'
-        ? [...commonActions, ...upstreamActions]
+        ? [...commonActions, 'REENTRY', ...upstreamActions]
         : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),
   ]);
 }

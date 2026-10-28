@@ -12,6 +12,7 @@ export interface OperationLogPriceTierRow {
   afterPrice: string;
   beforeSource?: 'auto' | 'manual';
   afterSource?: 'auto' | 'manual';
+  afterMissingReason?: string;
 }
 
 export const formatSlabPriceTierChanges = (value: unknown, configurations: PriceLevelName[]): string | null => {
@@ -56,12 +57,14 @@ const normalizePriceTierChanges = (value: unknown, configurations: PriceLevelNam
       markupRate?: number;
       price?: number;
       priceSource?: 'auto' | 'manual';
+      missingReason?: string;
     };
     const levelId = price.storeLevelId ?? price.configurationId;
     const key = String(levelId ?? 'unknown');
     return [
       {
         key,
+        missingReason: price.missingReason,
         source: price.priceSource,
         label:
           price.storeLevelName ||
@@ -73,7 +76,7 @@ const normalizePriceTierChanges = (value: unknown, configurations: PriceLevelNam
               ? '未填写'
               : (1 + Number(price.markupRate) / 100).toFixed(2)
             : Number(price.priceCoefficient).toFixed(2),
-        price: price.price == null ? '未填写' : Number(price.price).toFixed(2),
+        price: price.missingReason || (price.price == null ? '未填写' : Number(price.price).toFixed(2)),
       },
     ];
   });
@@ -98,6 +101,7 @@ export const buildSlabPriceTierComparison = (
       afterPrice: afterTier?.price || '未填写',
       beforeSource: beforeTier?.source,
       afterSource: afterTier?.source,
+      ...(afterTier?.missingReason ? { afterMissingReason: afterTier.missingReason } : {}),
     };
   });
 };

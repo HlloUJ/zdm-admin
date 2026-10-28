@@ -92,7 +92,10 @@ export const useSlabOperationLogPresentation = (
     media?.message || (media ? '历史媒体已不可用' : '未填写');
   const operationLogIsCreate = computed(() => {
     const log = detail.value;
-    return log?.operationType === 'CREATE' || (log?.operationType === 'SOURCE_SHELF' && !log.beforeStatus);
+    return (
+      log?.operationType === 'CREATE' ||
+      (['SOURCE_SHELF', 'REENTRY'].includes(log?.operationType || '') && !log?.beforeStatus)
+    );
   });
   const operationLogChangeRows = computed<OperationLogChangeRow[]>(() => {
     const details = detail.value?.changeDetails;

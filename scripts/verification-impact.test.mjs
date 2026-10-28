@@ -28,13 +28,13 @@ test('business frontend stays frontend-only without runtime recovery', () => {
     runtime: false,
   });
 });
-test('backend internals select the backend domain and runtime', () => {
+test('product internals select both business domains and runtime', () => {
   assert.deepEqual(flags(['backend/src/main/java/com/zdm/platform/inventory/SlabLogChanges.java']), {
-    frontend: false,
+    frontend: true,
     backend: true,
-    engineering: false,
+    engineering: true,
     docsOnly: false,
-    full: false,
+    full: true,
     runtime: true,
   });
 });

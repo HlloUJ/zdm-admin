@@ -60,7 +60,6 @@ export interface DetailMediaItem {
 export interface SlabItem {
   stateOperatorName?: string;
   stateOperatedAt?: string;
-  stateOperatorClientCode?: string;
 
   sourceUnavailable?: boolean;
   sourceStatus?: string;

@@ -52,3 +52,12 @@ it('keeps supply edit summaries and exposes the finished-only upstream edit filt
   expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);
   expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);
 });
+
+it('offers reentry only in operations and keeps its real trigger summary', () => {
+  const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';
+  expect(productOperationTypeLabel('REENTRY')).toBe('重新入仓');
+  expect(productLogFilterOptions('admin')).toContainEqual({ value: 'REENTRY', label: '重新入仓' });
+  expect(productLogFilterOptions('supply-chain').some((item) => item.value === 'REENTRY')).toBe(false);
+  expect(productLogFilterOptions('store').some((item) => item.value === 'REENTRY')).toBe(false);
+  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(reason);
+});

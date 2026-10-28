@@ -604,7 +604,12 @@ test('format failure stops early; runtime is sequential; two pipelines preserve 
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(calls.slice(0, 3), ['format check', 'CI reuse contract preflight', 'task runtime identity']);
+  assert.deepEqual(calls.slice(0, 4), [
+    'format check',
+    'backend test discovery',
+    'CI reuse contract preflight',
+    'task runtime identity',
+  ]);
   assert.equal(calls.includes('backend static quality'), false);
   assert.equal(calls.includes('browser tests'), true);
 });
@@ -754,7 +759,72 @@ test('failed CI contract preflight prevents expensive checks and runtime actions
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(called, ['format check', 'CI reuse contract preflight']);
+  assert.deepEqual(called, ['format check', 'backend test discovery', 'CI reuse contract preflight']);
   const ordinary = createVerificationPlan({ root: '/fixture', affected: true, files: ['src/views/ExampleView.vue'] });
   assert.equal(ordinary.contractPreflight, null);
+});
+
+test('tool trace changes reuse success; sandbox, unknown variables and failed runs still invalidate or block', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root);
+  const env = {
+    ...step.env,
+    CODEX_TOOL_CALL_ID: 'first',
+    CODEX_SANDBOX: 'restricted',
+    PRIVATE_VALUE: 'never-print-this',
+  };
+  const first = await runVerificationTask({ ...step, env }, silent);
+  const second = await runVerificationTask({ ...step, env: { ...env, CODEX_TOOL_CALL_ID: 'second' } }, silent);
+  assert.equal(second.reused, true);
+  const secretRecord = readFileSync(first.evidence, 'utf8');
+  assert.ok(!secretRecord.includes('never-print-this'));
+  const changed = await runVerificationTask({ ...step, env: { ...env, CODEX_SANDBOX: 'unrestricted' } }, silent);
+  assert.equal(changed.reused, false);
+  assert.match(record(changed).cacheMissReason, /CODEX_SANDBOX/);
+  assert.equal(
+    (await runVerificationTask({ ...step, env: { ...env, UNKNOWN_BUSINESS_SETTING: 'new' } }, silent)).reused,
+    false,
+  );
+});
+
+test('changing an invocation trace cannot retry a failed check', async (t) => {
+  const { root } = fixture(t);
+  const step = task(root, failFirstScript);
+  const first = await runVerificationTask({ ...step, env: { ...step.env, CODEX_TOOL_CALL_ID: 'first' } }, silent);
+  assert.equal(first.exitCode, 1);
+  const second = await runVerificationTask({ ...step, env: { ...step.env, CODEX_TOOL_CALL_ID: 'second' } }, silent);
+  assert.equal(second.exitCode, 1);
+  assert.equal(record(second).executed, false);
+  assert.equal(record(second).firstFailure.attemptId, record(first).attemptId);
+});
+
+test('changing only local diagnostic run and output directory cannot clear a failed engineering execution', async (t) => {
+  const { root } = fixture(t);
+  writeFileSync(
+    path.join(root, 'package.json'),
+    JSON.stringify({ scripts: { 'test:engineering': 'node failing-engineering.cjs' } }),
+  );
+  writeFileSync(
+    path.join(root, 'failing-engineering.cjs'),
+    `const fs=require('node:fs');const p='.task-verification/nonce-count';const n=fs.existsSync(p)?Number(fs.readFileSync(p)):0;fs.writeFileSync(p,String(n+1));process.exit(n===0?1:0);`,
+  );
+  const step = {
+    root,
+    name: 'nonce engineering',
+    command: 'npm',
+    args: ['run', 'test:engineering'],
+    env: { PATH: process.env.PATH, HOME: os.homedir() },
+    reuse: false,
+  };
+  const coordinate = (run) => ({
+    ...step,
+    localDiagnostics: { run, directory: path.join(root, '.task-verification/local-diagnostics', run) },
+  });
+  const first = await runVerificationTask(coordinate('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'), silent);
+  assert.equal(first.exitCode, 1);
+  const second = await runVerificationTask(coordinate('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb'), silent);
+  assert.equal(second.exitCode, 1);
+  assert.equal(record(second).executed, false);
+  assert.equal(record(second).firstFailure.attemptId, record(first).attemptId);
+  assert.equal(readFileSync(path.join(root, '.task-verification/nonce-count'), 'utf8'), '1');
 });

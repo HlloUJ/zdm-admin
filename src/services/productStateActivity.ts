@@ -14,14 +14,6 @@ export function stateActivityColumns(status: string): PrimaryTableCol<TableRowDa
     { colKey: 'stateOperatedAt', title: time, width: 180, align: 'center' },
   ];
 }
-export function stateSourceLabel(source: string | undefined, business: string) {
-  if (!source || source === business || source === 'system') return '';
-  return (
-    ({ 'supply-chain': '供应链', admin: '运营', store: '门店', 'external-api': '外部系统' } as Record<string, string>)[
-      source
-    ] || ''
-  );
-}
 interface ActivityRecord {
   id: number;
   stateOperatedAt?: string;

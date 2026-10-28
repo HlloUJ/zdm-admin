@@ -8,5 +8,4 @@ public interface StateActivityAware {
  String getSourceStatus();
  void setStateOperatedAt(LocalDateTime value);
  void setStateOperatorName(String value);
- void setStateOperatorClientCode(String value);
 }

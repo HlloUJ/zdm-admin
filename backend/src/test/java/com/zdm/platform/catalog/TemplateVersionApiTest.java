@@ -32,7 +32,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Transactional
 class TemplateVersionApiTest extends SpringContainerTestSupport {
   @Container
-  private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("zdm_template_version_test");
   @Autowired private MockMvc mvc;
   @Autowired private ObjectMapper json;

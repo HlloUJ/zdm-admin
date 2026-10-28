@@ -1,4 +1,10 @@
 import {
+  localDiagnosticIdentity,
+  loadLocalDiagnosticPacket,
+  sealLocalDiagnosticPacket,
+  mergeLocalDiagnosticReport,
+} from './local-diagnostic-evidence.mjs';
+import {
   assertDependencyFreeSource,
   DIAGNOSTIC_FILES,
   diagnosticEnvironment,
@@ -73,6 +79,19 @@ export function runScriptTests(mode, args = [], { root = process.cwd(), env = pr
   }
   assert.ok(files.length, 'Script test inventory is empty');
   const allFiles = [...files];
+  const localEnv = env;
+  let localIdentity = null,
+    localPacket = null;
+  if (['--diagnostic', '--engineering'].includes(mode) && env.LOCAL_DIAGNOSTIC_RUN && env.LOCAL_DIAGNOSTIC_DIRECTORY) {
+    try {
+      localIdentity = localDiagnosticIdentity(root, env);
+    } catch {
+      /* Unproven identity runs original inventory. */
+    }
+    if (mode === '--engineering' && localIdentity)
+      localPacket = loadLocalDiagnosticPacket(env.LOCAL_DIAGNOSTIC_DIRECTORY, localIdentity);
+    if (localPacket) files = files.filter((file) => !DIAGNOSTIC_FILES.includes(file));
+  }
   let identity = null,
     packet = null;
   if (['--engineering', '--diagnostic'].includes(mode)) {
@@ -87,12 +106,14 @@ export function runScriptTests(mode, args = [], { root = process.cwd(), env = pr
     }
     if (mode === '--engineering' && identity && env.CI_DIAGNOSTIC_DIRECTORY)
       packet = loadDiagnosticPacket(env.CI_DIAGNOSTIC_DIRECTORY, identity);
-    if (packet) files = files.filter((file) => !DIAGNOSTIC_FILES.includes(file));
+    if (packet && !localPacket) files = files.filter((file) => !DIAGNOSTIC_FILES.includes(file));
     if (mode === '--engineering')
       console.log(
-        packet
-          ? `Reused complete same-run diagnostics: ${DIAGNOSTIC_FILES.length} files`
-          : 'Diagnostic equivalence unavailable: executing original full engineering inventory',
+        localPacket
+          ? `Reused complete same-local-execution diagnostics: ${localPacket.report.tests.length} cases, ${DIAGNOSTIC_FILES.length} files`
+          : packet
+            ? `Reused complete same-run diagnostics: ${DIAGNOSTIC_FILES.length} files`
+            : 'Diagnostic equivalence unavailable: executing original full engineering inventory',
       );
     env = diagnosticEnvironment(env);
   }
@@ -124,6 +145,22 @@ export function runScriptTests(mode, args = [], { root = process.cwd(), env = pr
   if (packet) {
     assert.deepEqual(diagnosticIdentity(root, process.env), identity, 'Engineering inputs changed');
     report = mergeDiagnosticReport(report, packet, identity);
+  }
+  if (localPacket) {
+    assert.deepEqual(
+      localDiagnosticIdentity(root, localEnv),
+      localIdentity,
+      'Local diagnostic inputs changed during engineering execution',
+    );
+    report = mergeLocalDiagnosticReport(report, localPacket, localIdentity);
+  }
+  if (mode === '--diagnostic' && localIdentity) {
+    assert.deepEqual(
+      localDiagnosticIdentity(root, localEnv),
+      localIdentity,
+      'Local diagnostic inputs changed during execution',
+    );
+    sealLocalDiagnosticPacket(localEnv.LOCAL_DIAGNOSTIC_DIRECTORY, localIdentity, report, raw);
   }
   if (mode === '--diagnostic' && identity) {
     assert.deepEqual(diagnosticIdentity(root, process.env), identity, 'Diagnostic inputs changed');

@@ -12,7 +12,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @Testcontainers(disabledWithoutDocker = true)
 class CustomerAssignmentRetirementMigrationTest {
   @Container
-  private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("customer_assignment_retirement_test");
 
   @Test

@@ -1,3 +1,4 @@
+import { requireBrowserBehaviors, browserBehaviorTitles, CONTRACT_FILE } from './business-regression.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -42,6 +43,15 @@ export function runPlaywrightTests(args, { root = process.cwd(), env = process.e
   if (result.status !== 0) return result.status ?? 1;
   const report = JSON.parse(readFileSync(reportFile, 'utf8'));
   const summary = validatePlaywrightTestReport(report, runId);
+  if (
+    existsSync(path.join(root, CONTRACT_FILE)) &&
+    (args.length === 0 || args.every((arg) => /^--workers=/.test(arg)))
+  ) {
+    requireBrowserBehaviors(
+      report.tests.map((test) => test.name),
+      browserBehaviorTitles(),
+    );
+  }
   writeFileSync(path.join(directory, 'playwright-results.json'), JSON.stringify(report, null, 2) + '\n');
   console.log(`playwright: ${summary.tests} selected tests passed without skipped or retried cases`);
   return 0;

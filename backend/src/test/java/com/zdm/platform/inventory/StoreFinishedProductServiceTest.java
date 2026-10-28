@@ -31,7 +31,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 @AutoConfigureMockMvc(addFilters = false)
 @Testcontainers(disabledWithoutDocker = true)
 class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
-  @Container private static final MySQLContainer<?> MYSQL = new MySQLContainer<>("mysql:8.0")
+  @Container private static final MySQLContainer<?> MYSQL = com.zdm.platform.support.MySqlTestDatabase.create()
       .withDatabaseName("store_finished_test").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   @Autowired private JdbcTemplate jdbc;
   @Autowired private StoreFinishedProductService products;
@@ -62,13 +62,37 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
 
   @Test
   @Transactional
+  void statusResponseImmediatelyMatchesPersistedActorAndTime() {
+    jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES(99941,1,'状态测试店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO finished_products(id,name,sku,total_stock,status,source_status,operations_deleted) VALUES(99941,'状态测试商品','state-store-test',2,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO store_levels(id,name,sort_order) VALUES(99941,'状态价格级别',1)");
+    jdbc.update("UPDATE stores SET store_level_id=99941 WHERE id=99941");
+    jdbc.update("INSERT INTO finished_product_variants(id,finished_product_id,variant_label,stock,cost_price) VALUES(99941,99941,'规格',2,10)");
+    jdbc.update("INSERT INTO finished_product_prices(finished_product_id,sku_id,variant_label,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source) VALUES(99941,99941,'规格',99941,'状态价格级别',2,10,20,'manual')");
+    jdbc.update("INSERT INTO finished_product_guide_prices(finished_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES(99941,99941,'规格',3,10,30)");
+    jdbc.update("INSERT INTO store_categories(id,store_id,scope,name) VALUES(99941,99941,'finished','状态分类')");
+    identity(99941L);
+    var selected=products.select(List.of(99941L)).getFirst();
+    products.saveEdit(selected.id(),99941L,List.of(new StoreFinishedProductService.SalePriceInput(99941L,new BigDecimal("40"),"manual",new BigDecimal("2"))));
+    for (String target : List.of("selling", "offShelf", "warehouse", "recycle", "warehouse")) {
+      var response=products.changeStatus(selected.id(),target,"商品暂停售卖",null);
+      assertThat(response.stateOperatorName()).isNotBlank();
+      assertThat(response.stateOperatedAt()).isNotNull();
+      assertThat(response.effectiveStatus()).isEqualTo(target);
+      var refreshed=products.detail(selected.id());
+      assertThat(response.stateOperatorName()).isEqualTo(refreshed.stateOperatorName());
+      assertThat(response.stateOperatedAt()).isEqualTo(refreshed.stateOperatedAt());
+      assertThat(response.createdAt()).isEqualTo(selected.createdAt());
+    }
+  }
+  @Test
+  @Transactional
   void stateActivityKeepsCreationAndFreezesAutomaticSoldOutTime() {
     jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES(99941,1,'状态测试店','cityPartner','enabled')");
     jdbc.update("INSERT INTO finished_products(id,name,sku,total_stock,status,source_status,operations_deleted) VALUES(99941,'状态测试商品','state-store-test',2,'selling','selling',FALSE)");
     identity(99941L);
     var selected=products.select(List.of(99941L)).getFirst();
     assertThat(selected.stateOperatedAt()).isNotNull();
-    assertThat(selected.stateOperatorClientCode()).isEqualTo("store");
     var created=selected.createdAt();
     jdbc.update("UPDATE store_finished_products SET status='selling' WHERE id=?",selected.id());
     stateActivities.record("store-finished","store",selected.id(),"warehouse","selling",1L,"store");
@@ -79,7 +103,6 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(sold.stateOperatedAt()).isNotNull();
     assertThat(sold.stateOperatorName()).isEqualTo("系统");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=? AND operation_type='SOLD_OUT'",Long.class,selected.id())).isEqualTo(1L);
-    assertThat(sold.stateOperatorClientCode()).isEqualTo("system");
     assertThat(sold.createdAt()).isEqualTo(created);
     assertThat(products.list().getFirst().stateOperatedAt()).isEqualTo(sold.stateOperatedAt());
     stateActivities.storeStockChanged(99941L,0,0);

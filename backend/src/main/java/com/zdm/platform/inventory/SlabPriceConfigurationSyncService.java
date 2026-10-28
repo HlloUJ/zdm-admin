@@ -55,11 +55,11 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
     return count == null ? 0L : count;
   }
 
-  public int backfillMissingPrices(SlabMarkupConfiguration configuration) {
+  public void backfillMissingPrices(SlabMarkupConfiguration configuration) {
     if (!"enabled".equals(configuration.getStatus())) {
-      return 0;
+      return;
     }
-    return jdbcTemplate.update(
+    jdbcTemplate.update(
         """
         INSERT INTO slab_prices
           (slab_id, store_level_id, store_level_name, price_coefficient, cost_price, price,
@@ -75,6 +75,7 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
           ON price.slab_id = inventory.id AND price.store_level_id = configuration.store_level_id
         WHERE inventory.cost_price IS NOT NULL AND price.id IS NULL
           AND inventory.operations_invalidated_at IS NULL
+          AND inventory.operations_deleted = FALSE
           AND (level.status = 'enabled'
             OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND configuration.status = 'enabled'
@@ -82,11 +83,11 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
         configuration.getId());
   }
 
-  public int refreshAutoPrices(SlabMarkupConfiguration configuration) {
+  public void refreshAutoPrices(SlabMarkupConfiguration configuration) {
     if (!"enabled".equals(configuration.getStatus())) {
-      return 0;
+      return;
     }
-    return jdbcTemplate.update(
+    jdbcTemplate.update(
         """
         UPDATE slab_prices price
         INNER JOIN slab_inventory inventory ON inventory.id = price.slab_id
@@ -101,6 +102,7 @@ public class SlabPriceConfigurationSyncService implements StoreLevelPriceSynchro
             OR EXISTS (SELECT 1 FROM stores store WHERE store.store_level_id = level.id))
           AND inventory.cost_price IS NOT NULL
           AND inventory.operations_invalidated_at IS NULL
+          AND inventory.operations_deleted = FALSE
         """,
         configuration.getPriceCoefficient(),
         configuration.getPriceCoefficient(),

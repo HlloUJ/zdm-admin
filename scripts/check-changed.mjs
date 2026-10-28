@@ -1,3 +1,5 @@
+import { observeTaskTiming } from './task-timing.mjs';
+import { validateChangedBusinessCoverage } from './business-regression.mjs';
 import { spawnSync } from 'node:child_process';
 import { existsSync, lstatSync } from 'node:fs';
 import path from 'node:path';
@@ -64,7 +66,7 @@ function sameCandidate(left, right) {
   return ['digest', 'baseline', 'mergeBase', 'mutationStamp'].every((field) => left[field] === right[field]);
 }
 
-export async function main(
+async function executeChangedChecks(
   args = process.argv.slice(2),
   { root = process.cwd(), capture = captureSource, run = runVerificationTask, report = console.log } = {},
 ) {
@@ -89,6 +91,7 @@ With file arguments, checks only files from the current task.
     report('No changed files require validation.');
     return 0;
   }
+  validateChangedBusinessCoverage(root, files);
   const plan = createValidationPlan(files, (file) => existsSync(path.resolve(root, file)), { root });
   report(`Changed files: ${files.length}`);
   for (const task of plan.tasks)
@@ -125,6 +128,16 @@ With file arguments, checks only files from the current task.
   if (results.some((result) => result.exitCode !== 0)) return 1;
   report('Changed-file checks passed.');
   return 0;
+}
+
+export async function main(args = process.argv.slice(2), options = {}) {
+  const parsed = parseChangedArgs(args);
+  try {
+    return await executeChangedChecks(args, options);
+  } finally {
+    if ((!options.run || options.run === runVerificationTask) && !parsed.listOnly && !parsed.showHelp)
+      await observeTaskTiming(options.root ?? process.cwd(), options.report ?? console.log);
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

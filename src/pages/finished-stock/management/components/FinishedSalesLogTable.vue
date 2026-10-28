@@ -23,7 +23,7 @@
 import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';
 import { getLoginUser } from '@/services/auth';
 import PriceSourceToggle from './PriceSourceToggle.vue';
-import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
+import { Text as TypographyText, type PrimaryTableCol, type TableRowData } from 'tdesign-vue-next';
 import { layeredCellSpan, orderLayeredRows } from '../layeredSpecs';
 import type {
   FinishedSpecDimension,
@@ -254,7 +254,9 @@ const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
     title: props.storeMode ? `${name}价` : name,
     minWidth: 170,
     cell: (_h: unknown, { row }: { row: TableRowData }) =>
-      priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),
+      row[`level_${id}`]?.missingReason
+        ? h(TypographyText, { theme: 'error' }, () => row[`level_${id}`].missingReason)
+        : priceCell(row[`level_${id}`]?.priceCoefficient, row[`level_${id}`]?.price, row[`level_${id}`]?.priceSource),
   })),
   ...(props.storeMode &&
   [...variants.value, ...(props.supplyEdit ? [] : otherList<LoggedVariant>('销售规格'))].some(
