@@ -265,6 +265,8 @@ function requestJson({ paths, method = 'GET', requestPath = '/status', payload =
     const request = http.request(
       {
         socketPath: paths.socketFile,
+        // Synchronous delivery work can delay FIN handling beyond the server idle timeout.
+        agent: false,
         path: requestPath,
         method,
         headers: body ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } : undefined,
