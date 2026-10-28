@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { Worker } from 'node:worker_threads';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
@@ -437,4 +440,42 @@ test('offline stop and unknown-owner switch do not kickstart or mutate service s
   };
   await assert.rejects(main(['stop'], dependencies), /服务离线/);
   await assert.rejects(main(['switch', '--worktree', '/repo/task'], dependencies), /任务归属未知/);
+});
+
+test('status stays healthy after an idle control socket expires during synchronous work', async (t) => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'zdm-ctrl-'));
+  const socketFile = path.join(directory, 's.sock');
+  const worker = new Worker(
+    `const { parentPort, workerData } = require('node:worker_threads');
+     const http = require('node:http');
+     const server = http.createServer((request, response) => {
+       response.setHeader('content-type', 'application/json');
+       response.setHeader('keep-alive', 'timeout=5');
+       response.end(JSON.stringify({
+         type: 'zdm-task-preview-service', phase: 'running', worktree: '/tmp/retained-preview'
+       }));
+     });
+     server.keepAliveTimeout = 50;
+     server.keepAliveTimeoutBuffer = 0;
+     server.listen(workerData.socketFile, () => parentPort.postMessage('ready'));`,
+    { eval: true, workerData: { socketFile } },
+  );
+  t.after(async () => {
+    await worker.terminate();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  await once(worker, 'message');
+  const paths = {
+    socketFile,
+    configFile: path.join(directory, 'absent-config.json'),
+    launchAgentFile: path.join(directory, 'absent-agent.plist'),
+  };
+  assert.equal((await readServiceStatus(paths)).phase, 'running');
+  // Let Node return the first socket to its pool before blocking this client only.
+  await new Promise((resolve) => setImmediate(resolve));
+  // The independent server closes idle sockets while the client cannot process FIN.
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 300);
+  const status = await readServiceStatus(paths);
+  assert.equal(status.phase, 'running', status.lastError);
+  assert.equal(status.worktree, '/tmp/retained-preview');
 });

@@ -831,14 +831,14 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
-      "digest": "70fead2f46d58a844805f9746cc001f405e5a43bd0778d72e99437c9be24373f",
+      "digest": "1db713a63fa7b761abae26b081096ff3a35a14f9b0b029528b499d6d80f36e5e",
       "imports": ["scripts/task-data-environment.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-preview-service.test.mjs": {
-      "digest": "acba23fbc54f14601357204609e613d01f4f88739f17bb153f52fdf1c8b14e6d",
+      "digest": "4a43fd0fb3b292f6f68eb791110b5a89a3ac3ee246d19ec0bc9bc816c553f180",
       "imports": ["scripts/task-preview-service.mjs"],
-      "dynamicImports": 0
+      "dynamicImports": 2
     },
     "scripts/task-runtime-state.mjs": {
       "digest": "70ecda8bcaadce54f2c7c8f8348c3b680010c09969447c287179f2cc6274c950",
