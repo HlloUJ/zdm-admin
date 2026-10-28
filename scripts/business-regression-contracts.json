@@ -221,7 +221,7 @@
         "tests/e2e/store-accessory-management.spec.ts": "457271f209aea19f8481a2a061f18d9155f2968b69311b8522d02f59b4bd0f61",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "7ed302daa5d817c09f3258894b03893f808e05f64dfbc4b1375216f7ef795aad",
         "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "80709b6a8571b70ef9b40624f90f89e89c0f42913094e2a85ad712bfd5b33fd4",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "9d7e89a1542e607bbfff8ba59a834651f930cb12b376be5f291022e274620240",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "a684d07fb036f3fd112502225fdbc06f57b7bcc8ed8602deb830323db56a000b",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "0f511eb1a551cb8e795a52a463c204231c4f6da60525a1653acb1318a0b51ff2",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "00afc65311b86b46d943b5fdbf375f5362483fe495dffc6f21c953ff7d334f6f",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
@@ -422,6 +422,18 @@
           "before": "11588ee1bee96cf996873095eb4f764b62d90623ddcfa6eb17e98572a2f83dad",
           "after": "00afc65311b86b46d943b5fdbf375f5362483fe495dffc6f21c953ff7d334f6f",
           "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "9d7e89a1542e607bbfff8ba59a834651f930cb12b376be5f291022e274620240",
+          "after": "a684d07fb036f3fd112502225fdbc06f57b7bcc8ed8602deb830323db56a000b",
+          "reason": "用户确认商品下架回仓PRD：移除已下架状态与Tab，改为下架直接入仓、已上架可删除；同步实际请求和精确断言，保留其余权限、媒体、日志和下游回归，并新增独立事件断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
+          "after": "a684d07fb036f3fd112502225fdbc06f57b7bcc8ed8602deb830323db56a000b",
+          "reason": "用户确认商品下架回仓PRD：保留已有断言，并补齐配件门店单条和批量下架真实API回归、独立动作权限及唯一日志断言。"
         }
       ],
       "routes": [

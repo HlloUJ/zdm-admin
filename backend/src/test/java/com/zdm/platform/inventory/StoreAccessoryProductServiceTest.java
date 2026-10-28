@@ -58,6 +58,36 @@ class StoreAccessoryProductServiceTest extends SpringContainerTestSupport {
     SecurityContextHolder.clearContext();
   }
 
+  @Test
+  @Transactional
+  void downShelfEndpointsRequireActionPermissionAndPersistWarehouse() throws Exception {
+    jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES(99791,1,'下架接口门店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO accessory_products(id,name,total_stock,status,source_status,operations_deleted) VALUES(99791,'下架接口配件',2,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO store_accessory_products(id,tenant_id,store_id,accessory_product_id,status,selected_by_account_id) VALUES(99791,1,99791,99791,'selling',1)");
+    for (boolean batch : List.of(false, true)) {
+      jdbc.update("UPDATE store_accessory_products SET status='selling' WHERE id=99791");
+      String path = "/api/admin/store-accessory-products/" + (batch ? "status/batch" : "99791/status");
+      String body = (batch ? "{\"ids\":[99791]," : "{")
+          + "\"target\":\"warehouse\",\"operation\":\"offShelf\",\"reason\":\"商品信息调整\",\"detail\":\"更新图片\"}";
+      identityWithPermissions(99791L, "store.accessory-management.warehouse.restore");
+      mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+          .contentType("application/json").content(body)).andExpect(status().isForbidden());
+      identityWithPermissions(99791L, "store.accessory-management.selling." + (batch ? "batch-" : "") + "off-shelf");
+      mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+          .contentType("application/json").content(body.replace("\"warehouse\"", "\"offShelf\"")))
+          .andExpect(status().isBadRequest());
+      int logsBefore = jdbc.queryForObject("SELECT COUNT(*) FROM store_accessory_operation_logs WHERE listing_id=99791", Integer.class);
+      mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
+          .contentType("application/json").content(body)).andExpect(status().isOk())
+          .andExpect(jsonPath(batch ? "$.data[0].status" : "$.data.status").value("warehouse"))
+          .andExpect(jsonPath(batch ? "$.data[0].offShelfReason" : "$.data.offShelfReason").value("商品信息调整"))
+          .andExpect(jsonPath(batch ? "$.data[0].offShelfByName" : "$.data.offShelfByName").value("门店测试员工"));
+      assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_accessory_operation_logs WHERE listing_id=99791", Integer.class)).isEqualTo(logsBefore + 1);
+      assertThat(jdbc.queryForObject("SELECT operation_type FROM store_accessory_operation_logs WHERE listing_id=99791 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("OFF_SHELF");
+      assertThat(jdbc.queryForObject("SELECT after_status FROM store_accessory_operation_logs WHERE listing_id=99791 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("warehouse");
+    }
+  }
+
   @Autowired private AccessoryStateActivityService stateActivities;
 
   @Test
