@@ -1,30 +1,27 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import http from 'node:http';
-import { spawn, spawnSync } from 'node:child_process';
+import { Worker } from 'node:worker_threads';
 import { once } from 'node:events';
 import { requestResponse, taskPreviewControlRequest, inspectManagedPreview, previewProbeFailure } from './dev-task.mjs';
 
 test('expired idle connection plus synchronous work reproduces ECONNRESET; probe uses fresh connections', async (t) => {
-  const child = spawn(
-    process.execPath,
-    [
-      '--input-type=module',
-      '-e',
-      `
-    import http from 'node:http';
-    const server=http.createServer((req,res)=>{res.on('finish',()=>setTimeout(()=>req.socket.end(),25));res.end('{}');});
-    server.keepAliveTimeout=5000;
-    server.listen(0,'127.0.0.1',()=>process.send(server.address().port));
-  `,
-    ],
-    { stdio: ['ignore', 'ignore', 'inherit', 'ipc'] },
+  const closed = new Int32Array(new SharedArrayBuffer(4));
+  const worker = new Worker(
+    `const http = require('node:http');
+     const { parentPort, workerData } = require('node:worker_threads');
+     const closed = new Int32Array(workerData.closed);
+     let idleSocket;
+     const server = http.createServer((req,res) => { idleSocket=req.socket; res.end('{}'); });
+     server.keepAliveTimeout=5000;
+     parentPort.on('message', () => idleSocket.end(() => {
+       Atomics.store(closed,0,1); Atomics.notify(closed,0);
+     }));
+     server.listen(0,'127.0.0.1',()=>parentPort.postMessage(server.address().port));`,
+    { eval: true, workerData: { closed: closed.buffer } },
   );
-  t.after(async () => {
-    child.kill();
-    await once(child, 'exit');
-  });
-  const [port] = await once(child, 'message');
+  t.after(() => worker.terminate());
+  const [port] = await once(worker, 'message');
   const agent = new http.Agent({ keepAlive: true });
   t.after(() => agent.destroy());
   const old = () =>
@@ -37,16 +34,14 @@ test('expired idle connection plus synchronous work reproduces ECONNRESET; probe
     });
   assert.equal((await old()).status, 200);
   await new Promise(setImmediate);
-  assert.equal(
-    spawnSync(process.execPath, ['-e', 'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,200)']).status,
-    0,
-  );
+  // Block only the client until the server has sent FIN; no guessed scheduler delay.
+  worker.postMessage('expire');
+  assert.notEqual(Atomics.wait(closed, 0, 0, 5000), 'timed-out');
   assert.deepEqual(await old(), { code: 'ECONNRESET', reusedSocket: true });
   assert.equal((await taskPreviewControlRequest(port)).statusCode, 200);
-  assert.equal(
-    spawnSync(process.execPath, ['-e', 'Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,200)']).status,
-    0,
-  );
+  Atomics.store(closed, 0, 0);
+  worker.postMessage('expire');
+  assert.notEqual(Atomics.wait(closed, 0, 0, 5000), 'timed-out');
   assert.equal((await taskPreviewControlRequest(port)).statusCode, 200);
   assert.equal((await requestResponse(`http://127.0.0.1:${port}/`)).statusCode, 200);
 });
