@@ -170,6 +170,8 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
   if (bound.some((t) => !t.projectVerified)) problems.push('unverified-project-turn');
   if (bound.some((t) => t.finishedAt == null && t !== closing) && delivery) problems.push('unclosed-earlier-turn');
   if (delivery && !closing) problems.push('missing-closing-turn');
+  if (delivery && (state.validations ?? []).some((v) => v.finishedAt == null))
+    problems.push('unfinished-local-validation');
   if (sealed && questions.some((q) => q.answeredAt == null)) problems.push('unanswered-question-at-close');
   const partition = {
     executionRoundsMs: duration(active),
@@ -198,6 +200,13 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
     ...partition,
     approvalResponseLatencyMs: duration(response),
     ciWaitMs: duration(ci),
+    localValidationMs: duration(
+      clip((state.validations ?? []).filter((v) => v.finishedAt != null).map((v) => [v.startedAt, v.finishedAt])),
+    ),
+    localFailedAttempts: (state.validations ?? []).filter((v) => v.status === 'failed').length,
+    localPendingAttempts: (state.validations ?? []).filter((v) => v.finishedAt == null).length,
+    localRepairMs: null,
+    localRepairMeaning: 'Not explicitly recorded; a failed test does not prove a code-repair interval.',
     detailedPhaseClassification: 'separate-from-boundary-completeness',
     turnIds: bound.map((t) => ({ thread: t.thread, id: t.id })),
     issues: [...new Set(problems)],
@@ -213,5 +222,6 @@ export function assertTimingReady(state, { now = Date.now(), completion = null }
   // A current open turn is expected before final reply; older open turns cannot be silently sealed.
   const open = state.turns.filter((t) => t.finishedAt == null);
   assert.ok(open.length <= 1, 'Multiple open execution turns');
+  assert.equal(summary.localPendingAttempts, 0, 'Unfinished local validation timing');
   return summary;
 }

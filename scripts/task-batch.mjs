@@ -1,3 +1,4 @@
+import { bindBatchTiming, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import {
@@ -706,6 +707,7 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
   } else if (command === 'register') {
     only(options, ['id', 'kind', 'owner']);
     result = registerBatch(root, options);
+    bindBatchTiming(root, result);
   } else if (command === 'module') {
     only(options, ['id', 'title', 'depends-on', 'status']);
     if (options.status) {
@@ -733,6 +735,11 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
     only(options, []);
     result = closeBatch(root);
   } else throw new Error(`Unknown command ${command}`);
+  if (['module', 'checkpoint'].includes(command)) {
+    const active = readActiveBatch(root);
+    if (active && readTimeline(active.repository.commonDir, active.id))
+      refreshTimeline(active.repository.commonDir, active.id);
+  }
   console.log(JSON.stringify(result, null, 2));
   return result;
 }

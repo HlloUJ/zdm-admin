@@ -1,3 +1,4 @@
+import { observeValidationTiming } from './batch-timing-runtime.mjs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
@@ -23,10 +24,12 @@ function save(file, record) {
   renameSync(temporary, file);
 }
 
-function appendAttempt(directory, record, started = false) {
+function appendAttempt(directory, record, started = false, env = process.env) {
   mkdirSync(directory, { recursive: true });
   const file = path.join(directory, `${record.attemptId}${started ? '.started' : ''}.json`);
   writeFileSync(file, `${JSON.stringify(record, null, 2)}\n`, { flag: 'wx' });
+  // Attempts live below <worktree>/.task-verification/attempts/<key>.
+  if (record.attemptId) observeValidationTiming(path.resolve(directory, '../../..'), record, env);
 }
 
 function failureReference(attempt) {
@@ -148,8 +151,9 @@ export async function runVerificationTask(task, options = {}) {
       // Preserve pre-ledger records before replacing the latest-result index.
       if (record && !record.attemptId && record.fingerprint && record.startedAt) {
         const legacy = { ...record, attemptId: randomUUID() };
-        appendAttempt(attemptsDirectory, legacy, true);
-        if (legacy.completedAt && Number.isInteger(legacy.exitCode)) appendAttempt(attemptsDirectory, legacy);
+        appendAttempt(attemptsDirectory, legacy, true, executionEnv);
+        if (legacy.completedAt && Number.isInteger(legacy.exitCode))
+          appendAttempt(attemptsDirectory, legacy, false, executionEnv);
       }
       attempts = verificationAttempts(attemptsDirectory);
       if (record?.attemptId && !attempts.some((attempt) => attempt.attemptId === record.attemptId))
@@ -243,7 +247,7 @@ export async function runVerificationTask(task, options = {}) {
     };
     attemptRecord = record;
     try {
-      appendAttempt(attemptsDirectory, record, true);
+      appendAttempt(attemptsDirectory, record, true, executionEnv);
     } catch (error) {
       // Still run the command, but a run without durable history cannot satisfy the gate.
       historyError = `Cannot retain verification attempt: ${error.message}`;
@@ -359,7 +363,7 @@ export async function runVerificationTask(task, options = {}) {
     };
     attemptRecord = record;
     save(file, record);
-    appendAttempt(attemptsDirectory, record);
+    appendAttempt(attemptsDirectory, record, false, executionEnv);
     completionWritten = true;
     report(
       `[${finalCode === 0 ? (notApplicable ? 'not-applicable' : 'passed') : 'failed'}] ${name} ${(record.elapsedMs / 1000).toFixed(1)}s (command ${(commandMs / 1000).toFixed(1)}s, evidence ${(probeMs / 1000).toFixed(1)}s); log: ${log}${record.reason ? `; ${record.reason}` : ''}`,
@@ -381,7 +385,7 @@ export async function runVerificationTask(task, options = {}) {
     save(file, failed);
     if (attemptRecord && !completionWritten) {
       try {
-        appendAttempt(attemptsDirectory, failed);
+        appendAttempt(attemptsDirectory, failed, false, executionEnv);
       } catch {
         // The immutable start remains incomplete and blocks any same-input retry.
       }

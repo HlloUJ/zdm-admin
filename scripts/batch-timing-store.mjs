@@ -168,7 +168,7 @@ export function consumeSource(state, source) {
     }
     source.offset += last + 1;
   } catch (error) {
-    const reason = 'native-source-unavailable:' + error.message.split('\n')[0];
+    const reason = 'native-source-unavailable:' + (error.code ?? error.name ?? 'unknown');
     if (!state.issues.includes(reason)) state.issues.push(reason);
   }
 }
@@ -252,6 +252,18 @@ function startObserver(directory) {
     assert.equal(old.host, os.hostname(), 'Foreign timing observer');
     try {
       process.kill(old.pid, 0);
+      const identity = spawnSync('ps', ['-p', String(old.pid), '-o', 'command='], { encoding: 'utf8' });
+      assert.equal(identity.status, 0, 'Cannot prove timing observer process identity');
+      assert.ok(
+        identity.stdout.includes(
+          path.join(directory, 'observer-' + old.bundleDigest, 'batch-timing-observer.mjs') +
+            ' ' +
+            directory +
+            ' ' +
+            old.token,
+        ),
+        'Timing PID belongs to another process; preserve lease',
+      );
       return old;
     } catch (error) {
       assert.equal(error.code, 'ESRCH', 'Cannot prove timing observer exited');
@@ -288,3 +300,31 @@ export function readTimingSummary(common, batch) {
   return existsSync(file) ? JSON.parse(readFileSync(file)) : null;
 }
 export const observerSource = fileURLToPath(new URL('./batch-timing-observer.mjs', import.meta.url));
+
+export function recordValidationTiming(common, batch, attempt) {
+  const directory = timingDirectory(common, batch);
+  return lock(directory, () => {
+    const state = readTimeline(common, batch);
+    assert.ok(state);
+    assert.ok(
+      attempt.attemptId && Number.isFinite(Date.parse(attempt.startedAt)),
+      'Validation timing identity missing',
+    );
+    state.validations ??= [];
+    const prior = state.validations.find((v) => v.id === attempt.attemptId);
+    const next = {
+      id: attempt.attemptId,
+      startedAt: Date.parse(attempt.startedAt),
+      finishedAt: attempt.completedAt ? Date.parse(attempt.completedAt) : null,
+      status: attempt.status,
+    };
+    assert.ok(next.finishedAt == null || next.finishedAt >= next.startedAt, 'Validation clock moved backwards');
+    if (prior) {
+      assert.equal(prior.startedAt, next.startedAt);
+      if (prior.finishedAt != null) assert.deepEqual(prior, next, 'Immutable validation timing differs');
+      else Object.assign(prior, next);
+    } else state.validations.push(next);
+    atomic(path.join(directory, 'timeline.json'), state);
+    atomic(path.join(directory, 'observations.json'), { id: next.id, finishedAt: next.finishedAt });
+  });
+}

@@ -1,3 +1,4 @@
+import { bindBatchTiming } from './batch-timing-store.mjs';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, lstatSync } from 'node:fs';
 import path from 'node:path';
@@ -194,6 +195,7 @@ export function startTask(options, dependencies = {}) {
     validateActiveBatch,
     assertBatchIdAvailable,
     registerBatch,
+    bindTiming: bindBatchTiming,
     findManagedWorktrees,
     assertSafeDirectory,
     queryPreviewStatus,
@@ -309,6 +311,10 @@ export function startTask(options, dependencies = {}) {
     // Register before switching the preview so a failed startup remains recoverable in this batch.
     batch = system.registerBatch(targetWorktree, { id: options.slug, kind: options.kind });
   }
+
+  const timing = system.bindTiming(targetWorktree, batch, { resume: options.resume });
+  if (timing.status === 'not-required')
+    system.log('Batch timing: native execution identity unavailable; whole-task timing is not claimed.');
 
   if (options.kind === 'infrastructure') {
     system.log(`基建批次已就绪：${batch.id}（${branch}）`);

@@ -66,7 +66,7 @@ export function observeBatch(directory, token) {
     } catch (error) {
       writeFileSync(
         path.join(directory, 'observer-error.json'),
-        JSON.stringify({ at: Date.now(), reason: error.message }) + '\n',
+        JSON.stringify({ at: Date.now(), reason: error.code ?? error.name ?? 'unknown' }) + '\n',
         { mode: 0o600 },
       );
       stop();
@@ -76,7 +76,7 @@ export function observeBatch(directory, token) {
     if (file === 'subscriptions.json') {
       configure();
       notify();
-    } else if (file === 'observer.json') notify();
+    } else if (file === 'observer.json' || file === 'observations.json') notify();
   });
   configure();
   // No self-notification from timeline/summary writes and no periodic full-history polling.
