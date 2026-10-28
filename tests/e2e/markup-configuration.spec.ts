@@ -478,7 +478,16 @@ test('大板缺少中间级别价格时仍按门店级别顺序展示', async ({
 for (const scope of ['finished', 'accessory', 'slab'] as const) {
   test(`${scope} 价格配置新增只显示标准成功提示`, async ({ page }) => {
     await seedLogin(page, ['all'], ['SUPER_ADMIN']);
+    const unmocked: string[] = [];
+    await page.route('**/api/**', (route) => {
+      unmocked.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
+      return route.abort('blockedbyclient');
+    });
+    await installAdminApiMocks(page);
     await mockMarkupConfigurations(page);
+    await page.route('**/api/admin/accessory-guide-price-setting', (route) =>
+      route.fulfill({ json: { code: 0, data: { id: 3, priceCoefficient: 1.5 } } }),
+    );
     await page.route(new RegExp(`/api/admin/${scope}-markup-configurations(?:\\?.*)?$`), async (route) => {
       const payload = route.request().method() === 'POST' ? route.request().postDataJSON() : null;
       await route.fulfill({
@@ -507,5 +516,6 @@ for (const scope of ['finished', 'accessory', 'slab'] as const) {
     await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
     await expect(page.locator('.zdm-admin-feedback')).toHaveText('已新增“社区门店”');
     await expect(page.locator('.zdm-admin-feedback')).toHaveCount(1);
+    expect(unmocked).toEqual([]);
   });
 }

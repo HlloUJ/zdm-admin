@@ -187,7 +187,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java"
       ],
       "protectedTests": {
-        "tests/e2e/product-state-activity.spec.ts": "b012b948e88160c81032d66dfef3762858383810da891a28682a8462eb575449",
+        "tests/e2e/product-state-activity.spec.ts": "f1113b5a247e70570295c0ae102448220c495f7e45f1254cdc0dbb1f3b70648f",
         "tests/e2e/finished-stock.spec.ts": "71f18a2f430aa51df9cc0cf9773f08584502ed14177331b91335e15336f42d50",
         "tests/e2e/accessory-management.spec.ts": "572a2937b59cd5a01fb0706751f853ccee772f5022ee370a37348f9fdb641903",
         "tests/e2e/slab-collaboration.spec.ts": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
@@ -206,7 +206,7 @@
         "tests/e2e/feedback-foundation.spec.ts": "74114444a974d28f566a7c6403124365a0e515ea7a1d675bfec84b5119f052e6",
         "tests/e2e/finished-stock-permissions.spec.ts": "a9a22198ed96331cb3cb052d44729bb7a49e36fba04f23c07d5a864248fc777e",
         "tests/e2e/login.spec.ts": "95a37dab5cf03f2bbd14a2bba406aa2b3bbdaad59bb42985436ff85bd7827958",
-        "tests/e2e/markup-configuration.spec.ts": "7c4073b72f4b0ad69ce09c038cd40677f4a59cddf0b126272c4284cfc073bbe8",
+        "tests/e2e/markup-configuration.spec.ts": "5ba9ef84aef59fcec2465399ec0d6638fd006902f851e85e8f1ef141e63012f9",
         "tests/e2e/media-upload-standard.spec.ts": "fddf7c1bef1d9e4a0da25b1151866a1c12727ce6c434714a18e2bb33c6271f0d",
         "tests/e2e/permission-center.spec.ts": "3ab23b4c807f89c55420477a5adf6353d24a6ec67a4bf280c4f0a3a95198152a",
         "tests/e2e/query-responsive.spec.ts": "906a79b2ee6e3749db2a81746e8100a358ff5f7cce4937b02fa065bd49b2e699",
@@ -271,6 +271,18 @@
           "before": "7d06f638e767839a77ff86bb39d14e898895b7b07929525147f164bc628e9c01",
           "after": "71f18a2f430aa51df9cc0cf9773f08584502ed14177331b91335e15336f42d50",
           "reason": "用户确认同步修复成品现货测试：与配件共用编辑器且同样过早点击CSS禁用的加粗按钮；仅等待按钮可用，保留全部富文本断言、原超时与零重试。"
+        },
+        {
+          "file": "tests/e2e/product-state-activity.spec.ts",
+          "before": "b012b948e88160c81032d66dfef3762858383810da891a28682a8462eb575449",
+          "after": "f1113b5a247e70570295c0ae102448220c495f7e45f1254cdc0dbb1f3b70648f",
+          "reason": "正式交付CI40614012479定位配件初始化请求未Mock：仅补齐专用配件/认证/指导价夹具，新增未Mock API必须失败断言；原业务断言、超时、覆盖及零重试逐项保留。"
+        },
+        {
+          "file": "tests/e2e/markup-configuration.spec.ts",
+          "before": "7c4073b72f4b0ad69ce09c038cd40677f4a59cddf0b126272c4284cfc073bbe8",
+          "after": "5ba9ef84aef59fcec2465399ec0d6638fd006902f851e85e8f1ef141e63012f9",
+          "reason": "正式交付CI40614012479定位配件初始化请求未Mock：仅补齐专用配件/认证/指导价夹具，新增未Mock API必须失败断言；原业务断言、超时、覆盖及零重试逐项保留。"
         }
       ],
       "routes": [

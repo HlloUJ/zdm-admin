@@ -1,5 +1,16 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
+import { installAdminApiMocks as installAccessoryApiMocks } from './accessory-api-mocks';
+
+async function installStateMocks(page: Page, kind: string) {
+  const unmocked: string[] = [];
+  await page.route('**/api/**', (route) => {
+    unmocked.push(`${route.request().method()} ${new URL(route.request().url()).pathname}`);
+    return route.abort('blockedbyclient');
+  });
+  await (kind === 'accessory' ? installAccessoryApiMocks : installAdminApiMocks)(page);
+  return unmocked;
+}
 
 const surfaces = [
   { path: '/finished-stock-management', client: 'admin', kind: 'finished' },
@@ -20,7 +31,7 @@ for (const surface of surfaces) {
   test(`${surface.path} shows state activity without source tags and keeps complete-list ordering`, async ({
     page,
   }) => {
-    await installAdminApiMocks(page);
+    const unmocked = await installStateMocks(page, surface.kind);
     await page.addInitScript((surface) => {
       localStorage.setItem('zdm-admin-token', 'dev-token');
       localStorage.setItem(
@@ -103,6 +114,7 @@ for (const surface of surfaces) {
         await expect(rows.first()).not.toContainText('状态操作员');
       }
     }
+    expect(unmocked).toEqual([]);
   });
 }
 
@@ -111,7 +123,7 @@ for (const surface of surfaces) {
     test(`${surface.path} ${batch ? 'batch' : 'single'} restore immediately shows server actor and time`, async ({
       page,
     }) => {
-      await installAdminApiMocks(page);
+      const unmocked = await installStateMocks(page, surface.kind);
       await page.addInitScript((client) => {
         localStorage.setItem('zdm-admin-token', 'dev-token');
         localStorage.setItem(
@@ -221,6 +233,7 @@ for (const surface of surfaces) {
         await expect(row).not.toContainText('旧操作人');
       }
       expect(mutations).toBeGreaterThan(0);
+      expect(unmocked).toEqual([]);
     });
   }
 }
