@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import { EventEmitter, once } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { Worker } from 'node:worker_threads';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
@@ -437,4 +440,51 @@ test('offline stop and unknown-owner switch do not kickstart or mutate service s
   };
   await assert.rejects(main(['stop'], dependencies), /服务离线/);
   await assert.rejects(main(['switch', '--worktree', '/repo/task'], dependencies), /任务归属未知/);
+});
+
+test('status stays healthy after an idle control socket expires during synchronous work', async (t) => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'zdm-ctrl-'));
+  const socketFile = path.join(directory, 's.sock');
+  const closed = new Int32Array(new SharedArrayBuffer(4));
+  const worker = new Worker(
+    `const { parentPort, workerData } = require('node:worker_threads');
+     const http = require('node:http');
+     const closed = new Int32Array(workerData.closed);
+     let idleSocket;
+     const server = http.createServer((request, response) => {
+       idleSocket = request.socket;
+       response.setHeader('content-type', 'application/json');
+       response.setHeader('keep-alive', 'timeout=5');
+       response.end(JSON.stringify({
+         type: 'zdm-task-preview-service', phase: 'running', worktree: '/tmp/retained-preview'
+       }));
+     });
+     server.keepAliveTimeout = 5000;
+     parentPort.on('message', () => {
+       const notify = () => { Atomics.store(closed, 0, 1); Atomics.notify(closed, 0); };
+       if (idleSocket.destroyed) notify();
+       else idleSocket.end(notify);
+     });
+     server.listen(workerData.socketFile, () => parentPort.postMessage('ready'));`,
+    { eval: true, workerData: { socketFile, closed: closed.buffer } },
+  );
+  t.after(async () => {
+    await worker.terminate();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  await once(worker, 'message');
+  const paths = {
+    socketFile,
+    configFile: path.join(directory, 'absent-config.json'),
+    launchAgentFile: path.join(directory, 'absent-agent.plist'),
+  };
+  assert.equal((await readServiceStatus(paths)).phase, 'running');
+  // Let Node return the first socket to its pool before blocking this client only.
+  await new Promise((resolve) => setImmediate(resolve));
+  // Wait for actual server FIN while the client cannot process it.
+  worker.postMessage('expire');
+  assert.notEqual(Atomics.wait(closed, 0, 0, 5000), 'timed-out');
+  const status = await readServiceStatus(paths);
+  assert.equal(status.phase, 'running', status.lastError);
+  assert.equal(status.worktree, '/tmp/retained-preview');
 });
