@@ -405,7 +405,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-session.test.mjs": {
-      "digest": "41d89be283e6f258c14ec6c248367a70192c3eb533b5d29ff1ca63a32eb7dc3c",
+      "digest": "273b6201a5acaa23edab0efe9b7ef38b61efa7ae8375eb4faae31413b1b81f89",
       "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
       "dynamicImports": 0
     },
@@ -1026,7 +1026,7 @@
       "dynamicImports": 0
     },
     "scripts/wait-quality.mjs": {
-      "digest": "d552bcf00f5d3a71ff502f7755b8dbef3370a2216fb1d7ad49a98e5d2c862022",
+      "digest": "20e19fb46425cec0de5654a0508dcae7ab61197a8efe8ff4d01da223f0782d1e",
       "imports": [],
       "dynamicImports": 0
     },
