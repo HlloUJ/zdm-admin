@@ -992,6 +992,7 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await page.goto(productWarehouseUrl('/supply-chain/finished-stock-management'));
   await page.getByText('编辑', { exact: true }).click();
   const editor = page.locator('.form-shell');
+  await expect(editor.getByText('本次入库信息', { exact: true })).toHaveCount(0);
   await expect(page.locator('main.page--form > header.page-header')).toHaveCount(0);
   await page.setViewportSize({ width: 1280, height: 500 });
   for (const [name, selector] of [

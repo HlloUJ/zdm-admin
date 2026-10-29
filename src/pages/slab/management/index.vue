@@ -291,15 +291,6 @@
             />
           </template>
         </AdminListLayout>
-        <t-alert
-          v-if="editingRowId && tableData.find((item) => item.id === editingRowId)?.status === 'warehouse'"
-          title="本次入库信息"
-          theme="info"
-        >
-          <WarehouseEntryInformation :entry="tableData.find((item) => item.id === editingRowId)!" />
-          {{ tableData.find((item) => item.id === editingRowId)?.stateOperatorName || '历史记录未记录' }}
-          {{ formatDateTime(tableData.find((item) => item.id === editingRowId)?.stateOperatedAt) }}
-        </t-alert>
         <SlabProductFormLayout
           ref="productLayoutRef"
           v-model:visible="productDialogVisible"
@@ -682,9 +673,6 @@
       @close="closeDetailDrawer"
     >
       <t-space v-if="detailDrawerRow" direction="vertical" size="large" class="slab-detail-drawer">
-        <t-card v-if="detailDrawerRow.status === 'warehouse'" title="本次入库信息"
-          ><WarehouseEntryInformation :entry="detailDrawerRow"
-        /></t-card>
         <t-button
           v-if="detailDrawerRow.offShelfRecords.length"
           variant="text"

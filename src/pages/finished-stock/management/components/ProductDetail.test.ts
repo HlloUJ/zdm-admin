@@ -162,3 +162,13 @@ it('抽屉使用原生分区且保留资料与预览，整页编辑仍使用原�
     '基础信息',
   ]);
 });
+
+it('仓库商品不展示额外入库分区，仍保留原商品资料和预览', async () => {
+  const view = wrapper();
+  await view.setProps({ product: { ...product, status: 'warehouse' }, drawerLayout: true });
+  expect(view.findComponent({ name: 'WarehouseEntryInformation' }).exists()).toBe(false);
+  expect(view.findAllComponents(Card).map((card) => card.props('title'))).not.toContain('本次入库信息');
+  expect(view.text()).not.toContain('等待供应商确认');
+  expect(view.text()).toContain('图文介绍');
+  expect(view.find('button').exists()).toBe(true);
+});

@@ -2793,6 +2793,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "    '图文描述',\n    '基础信息',\n  ]);\n});\n",
+          "after": "    '图文描述',\n    '基础信息',\n  ]);\n});\n\nit('仓库商品不展示额外入库分区，仍保留原商品资料和预览', async () => {\n  const view = wrapper();\n  await view.setProps({ product: { ...product, status: 'warehouse' }, drawerLayout: true });\n  expect(view.findComponent({ name: 'WarehouseEntryInformation' }).exists()).toBe(false);\n  expect(view.findAllComponents(Card).map((card) => card.props('title'))).not.toContain('本次入库信息');\n  expect(view.text()).not.toContain('等待供应商确认');\n  expect(view.text()).toContain('图文介绍');\n  expect(view.find('button').exists()).toBe(true);\n});\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
+        {
           "before": "  category: '家具',\n  supplier: '供应商',\n  stock: 2,\n  publisherType: '平台发布',\n  status: 'offShelf',\n  createdByName: '测试',\n  image: '/image.png',\n  detail: '<p>图文介绍</p><img src=\"/detail.png\" onerror=\"alert(1)\"><script>alert(1)</script>',\n  offShelfReason: '价格调整',\n  offShelfDetail: '等待供应商确认',\n  attributes: [],\n  variants: [],\n};\nconst wrapper = () =>\n",
           "after": "  category: '家具',\n  supplier: '供应商',\n  stock: 2,\n  publisherType: '平台发布',\n  status: 'selling',\n  createdByName: '测试',\n  image: '/image.png',\n  detail: '<p>图文介绍</p><img src=\"/detail.png\" onerror=\"alert(1)\"><script>alert(1)</script>',\n  warehouseEntryReason: '价格调整',\n  warehouseEntryDetail: '等待供应商确认',\n  attributes: [],\n  variants: [],\n};\nconst wrapper = () =>\n",
           "stage": "before-migrations",
@@ -2816,7 +2822,8 @@
           "before": "import type { DefineComponent } from 'vue';",
           "after": "import { Card } from 'tdesign-vue-next';\nimport type { DefineComponent } from 'vue';"
         }
-      ]
+      ],
+      "approvedVisualPatches": []
     },
     "src/pages/finished-stock/management/components/ProductDetail.vue": {
       "script": "c677aa417ec183af4484919bffb9542dd3ae19cee1eb8ea6b6fe83cf0133b4c5",
@@ -2841,6 +2848,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <component :is=\"drawerLayout ? Card : AdminSectionCard\" v-if=\"product.status === 'warehouse'\" title=\"本次入库信息\">\n      <WarehouseEntryInformation :entry=\"product\" />\n      {{ product.stateOperatorName || '历史记录未记录' }} ·\n      {{ product.stateOperatedAt ? formatProductDateTime(product.stateOperatedAt) : '历史记录未记录' }}\n    </component>\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n",
+          "after": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
+        {
+          "before": "  </t-space>\n</template>\n\n<script setup lang=\"ts\">\nimport { formatProductDateTime } from '@/utils/formatProductDateTime';\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\nimport type { WarehouseEntryInformation as WarehouseEntry } from '@/services/warehouseEntry';\nimport { computed, type VNode } from 'vue';\nimport { AdminSectionCard } from '@/components/foundation';\nimport PriceSourceToggle from './PriceSourceToggle.vue';\nimport SalesLogFullscreen from './SalesLogFullscreen.vue';\n",
+          "after": "  </t-space>\n</template>\n\n<script setup lang=\"ts\">\nimport { computed, type VNode } from 'vue';\nimport { AdminSectionCard } from '@/components/foundation';\nimport PriceSourceToggle from './PriceSourceToggle.vue';\nimport SalesLogFullscreen from './SalesLogFullscreen.vue';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
+        {
+          "before": "  FinishedProductPrice,\n  FinishedProductGuidePrice,\n  FinishedSpecDimension,\n} from '@/services/finishedProducts';\ninterface DetailProduct extends WarehouseEntry {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n  id: number;\n  name: string;\n  code: string;\n  category: string;\n",
+          "after": "  FinishedProductPrice,\n  FinishedProductGuidePrice,\n  FinishedSpecDimension,\n} from '@/services/finishedProducts';\ninterface DetailProduct {\n  id: number;\n  name: string;\n  code: string;\n  category: string;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
         {
           "before": "  gap: 4px;\n}\n.product-code {\n  color: var(--td-text-color-secondary);\n  font-size: var(--td-font-size-body-small);\n}\n.product-detail__media {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));\n",
           "after": "  gap: 4px;\n}\n.product-code {\n  color: var(--td-text-color-secondary);\n  font: var(--td-font-body-small);\n}\n.product-detail__media {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));\n",
@@ -4163,6 +4188,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  warehouseEntryType: props.product.warehouseEntryType,\n  warehouseEntryReason: props.product.warehouseEntryReason,\n  warehouseEntryDetail: props.product.warehouseEntryDetail,\n  stateOperatorName: props.product.stateOperatorName,\n  stateOperatedAt: props.product.stateOperatedAt,\n  sourceUnavailable: props.product.sourceUnavailable,\n  sourceMessage: props.product.sourceMessage,\n  createdByName: '',\n  image: props.product.imageUrl || '',\n",
+          "after": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  sourceUnavailable: props.product.sourceUnavailable,\n  sourceMessage: props.product.sourceMessage,\n  createdByName: '',\n  image: props.product.imageUrl || '',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
+        {
           "before": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  offShelfByName: props.product.offShelfByName,\n  offShelfReason: props.product.offShelfReason,\n  offShelfAt: props.product.offShelfAt,\n  offShelfDetail: props.product.offShelfDetail,\n  sourceUnavailable: props.product.sourceUnavailable,\n  sourceMessage: props.product.sourceMessage,\n  createdByName: '',\n  image: props.product.imageUrl || '',\n",
           "after": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  warehouseEntryType: props.product.warehouseEntryType,\n  warehouseEntryReason: props.product.warehouseEntryReason,\n  warehouseEntryDetail: props.product.warehouseEntryDetail,\n  stateOperatorName: props.product.stateOperatorName,\n  stateOperatedAt: props.product.stateOperatedAt,\n  sourceUnavailable: props.product.sourceUnavailable,\n  sourceMessage: props.product.sourceMessage,\n  createdByName: '',\n  image: props.product.imageUrl || '',\n",
           "stage": "before-migrations",
@@ -4198,7 +4229,8 @@
           "before": "  <AdminDialog\n    :visible=\"Boolean(preview)\"\n",
           "after": "  <AdminDialog\n    confirm-function=\"close\"\n    :visible=\"Boolean(preview)\"\n"
         }
-      ]
+      ],
+      "approvedVisualPatches": []
     },
     "src/pages/finished-stock/shared/StoreFinishedStockPoolDetailAdapter.vue": {
       "script": "9b807c50d065952daf3bc95e549af8c4ecc1b3ece472680924d8f91f7dd9eeae",
@@ -6105,6 +6137,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "            </template>\n          </AdminListLayout> </template\n        ><template v-else-if=\"formPageVisible\">\n          <section ref=\"productFormRoot\" class=\"form-shell\">\n            <t-alert v-if=\"editingProduct?.status === 'warehouse'\" title=\"本次入库信息\" theme=\"info\">\n              <WarehouseEntryInformation :entry=\"editingProduct\" />\n              {{ editingProduct.stateOperatorName || '历史记录未记录' }} ·\n              {{ editingProduct.stateOperatedAt ? formatDateTime(editingProduct.stateOperatedAt) : '历史记录未记录' }}\n            </t-alert>\n            <AdminSectionCard class=\"form-heading-card\" aria-label=\"发布商品信息\">\n              <div class=\"form-title-row\">\n                <div>\n                  <h1>{{ formPageTitle }}</h1>\n",
+          "after": "            </template>\n          </AdminListLayout> </template\n        ><template v-else-if=\"formPageVisible\">\n          <section ref=\"productFormRoot\" class=\"form-shell\">\n            <AdminSectionCard class=\"form-heading-card\" aria-label=\"发布商品信息\">\n              <div class=\"form-title-row\">\n                <div>\n                  <h1>{{ formPageTitle }}</h1>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
         {
           "before": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                    :sort-icon=\"stateActivitySortIcon\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n",
           "after": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :sort=\"tableSort\"\n                    :sort-icon=\"stateActivitySortIcon\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n",
@@ -8796,6 +8834,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "              :page-size-options=\"pageSizeOptions\"\n            />\n          </template>\n        </AdminListLayout>\n        <t-alert\n          v-if=\"editingRowId && tableData.find((item) => item.id === editingRowId)?.status === 'warehouse'\"\n          title=\"本次入库信息\"\n          theme=\"info\"\n        >\n          <WarehouseEntryInformation :entry=\"tableData.find((item) => item.id === editingRowId)!\" />\n          {{ tableData.find((item) => item.id === editingRowId)?.stateOperatorName || '历史记录未记录' }}\n          {{ formatDateTime(tableData.find((item) => item.id === editingRowId)?.stateOperatedAt) }}\n        </t-alert>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n          v-model:active-section=\"productTab\"\n",
+          "after": "              :page-size-options=\"pageSizeOptions\"\n            />\n          </template>\n        </AdminListLayout>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n          v-model:active-section=\"productTab\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
+        {
+          "before": "      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >\n      <t-space v-if=\"detailDrawerRow\" direction=\"vertical\" size=\"large\" class=\"slab-detail-drawer\">\n        <t-card v-if=\"detailDrawerRow.status === 'warehouse'\" title=\"本次入库信息\"\n          ><WarehouseEntryInformation :entry=\"detailDrawerRow\"\n        /></t-card>\n        <t-button\n          v-if=\"detailDrawerRow.offShelfRecords.length\"\n          variant=\"text\"\n          :theme=\"buttonTheme('off-shelf-history')\"\n",
+          "after": "      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >\n      <t-space v-if=\"detailDrawerRow\" direction=\"vertical\" size=\"large\" class=\"slab-detail-drawer\">\n        <t-button\n          v-if=\"detailDrawerRow.offShelfRecords.length\"\n          variant=\"text\"\n          :theme=\"buttonTheme('off-shelf-history')\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
+        {
           "before": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n",
           "after": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n",
           "stage": "before-migrations",
@@ -10084,6 +10134,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "              :page-size-options=\"pageSizeOptions\"\n            />\n          </template>\n        </AdminListLayout>\n        <t-alert\n          v-if=\"editingRowId && tableData.find((item) => item.id === editingRowId)?.status === 'warehouse'\"\n          title=\"本次入库信息\"\n          theme=\"info\"\n        >\n          <WarehouseEntryInformation :entry=\"tableData.find((item) => item.id === editingRowId)!\" />\n          {{ tableData.find((item) => item.id === editingRowId)?.stateOperatorName || '历史记录未记录' }}\n          {{ formatDateTime(tableData.find((item) => item.id === editingRowId)?.stateOperatedAt) }}\n        </t-alert>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n          v-model:active-section=\"productTab\"\n",
+          "after": "              :page-size-options=\"pageSizeOptions\"\n            />\n          </template>\n        </AdminListLayout>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n          v-model:active-section=\"productTab\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
+        {
+          "before": "      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >\n      <t-space v-if=\"detailDrawerRow\" direction=\"vertical\" size=\"large\" class=\"slab-detail-drawer\">\n        <t-card v-if=\"detailDrawerRow.status === 'warehouse'\" title=\"本次入库信息\"\n          ><WarehouseEntryInformation :entry=\"detailDrawerRow\"\n        /></t-card>\n        <t-button\n          v-if=\"detailDrawerRow.offShelfRecords.length\"\n          variant=\"text\"\n          :theme=\"buttonTheme('off-shelf-history')\"\n",
+          "after": "      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >\n      <t-space v-if=\"detailDrawerRow\" direction=\"vertical\" size=\"large\" class=\"slab-detail-drawer\">\n        <t-button\n          v-if=\"detailDrawerRow.offShelfRecords.length\"\n          variant=\"text\"\n          :theme=\"buttonTheme('off-shelf-history')\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认移除额外详情与编辑入库分区及专用适配代码，保留列表、日志和既有商品资料。"
+        },
         {
           "before": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n",
           "after": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n",

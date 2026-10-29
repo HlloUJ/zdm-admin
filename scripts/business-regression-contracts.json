@@ -287,8 +287,8 @@
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "5c2d0187c83ec86ef3e6f4ece985e384f7ddcbcf067ef34fa97c2eadcd4cce2b",
-        "tests/e2e/finished-stock.spec.ts": "6391b178fd4e66ca331e460fdbec5b48f503d39e64fdc68bdfd999dbec357d65",
-        "tests/e2e/accessory-management.spec.ts": "31aa091e4b024d889428fe7b6735a8d9ad7120b2056a34d92f0d09331adc9585",
+        "tests/e2e/finished-stock.spec.ts": "38ebaf05295f4cc743ab3778346d9b1b8a8a884a449f58a692ba6dc78343950a",
+        "tests/e2e/accessory-management.spec.ts": "64af88acb197b415b7f7c26a1b261940f57b9a03d66e4fc54d8e3e260547fe95",
         "tests/e2e/slab-collaboration.spec.ts": "7c1b31d05b50270a2d7e2b1bac9ebac28a6dd877ae4faff46389d118c8698211",
         "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
         "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
@@ -310,7 +310,7 @@
         "tests/e2e/permission-center.spec.ts": "7727aa01f1b12b524b78a78145d379e2dc15dc8fbd707658a78aa8830262b606",
         "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
         "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
-        "tests/e2e/slab-publish-layout.spec.ts": "6d0f94cb54abb7bac79d7ed07d2f657bc52e9091f711e397844f71bee45a1e25",
+        "tests/e2e/slab-publish-layout.spec.ts": "1cccc4b0fd932b46bbaadbd95790c44b51b4ca0a666f30e672f0cd60ecec6927",
         "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
         "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
         "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
@@ -1368,6 +1368,42 @@
           "before": "d257830cf49e65507121b872b9f0fc67b0582b44b166c13dbb23956b1ebe5e77",
           "after": "ec07d84f2affcb69af9811fe30d13397b5b014bb4b568cfb8235411820efdd61",
           "reason": "用户授权V1.7/V1.8：补齐次级字体及入库说明合并、截断才显示气泡；精确更新完整气泡文案，补字体/行高/间距及原金额层级回归，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "31aa091e4b024d889428fe7b6735a8d9ad7120b2056a34d92f0d09331adc9585",
+          "after": "64af88acb197b415b7f7c26a1b261940f57b9a03d66e4fc54d8e3e260547fe95",
+          "reason": "用户确认移除额外详情编辑入库分区，补充不可见断言，保留原全部业务断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "572a2937b59cd5a01fb0706751f853ccee772f5022ee370a37348f9fdb641903",
+          "after": "64af88acb197b415b7f7c26a1b261940f57b9a03d66e4fc54d8e3e260547fe95",
+          "reason": "用户确认移除额外详情编辑入库分区，补充不可见断言，保留原全部业务断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "6391b178fd4e66ca331e460fdbec5b48f503d39e64fdc68bdfd999dbec357d65",
+          "after": "38ebaf05295f4cc743ab3778346d9b1b8a8a884a449f58a692ba6dc78343950a",
+          "reason": "用户确认移除额外详情编辑入库分区，补充不可见断言，保留原全部业务断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "71f18a2f430aa51df9cc0cf9773f08584502ed14177331b91335e15336f42d50",
+          "after": "38ebaf05295f4cc743ab3778346d9b1b8a8a884a449f58a692ba6dc78343950a",
+          "reason": "用户确认移除额外详情编辑入库分区，补充不可见断言，保留原全部业务断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/slab-publish-layout.spec.ts",
+          "before": "6d0f94cb54abb7bac79d7ed07d2f657bc52e9091f711e397844f71bee45a1e25",
+          "after": "1cccc4b0fd932b46bbaadbd95790c44b51b4ca0a666f30e672f0cd60ecec6927",
+          "reason": "用户确认移除额外详情编辑入库分区，补充不可见断言，保留原全部业务断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/slab-publish-layout.spec.ts",
+          "before": "336b5cf9915015361f5597143c534fe6971a83434c99a3d5f06c6151d9b2f39e",
+          "after": "1cccc4b0fd932b46bbaadbd95790c44b51b4ca0a666f30e672f0cd60ecec6927",
+          "reason": "用户确认移除额外详情编辑入库分区，补充不可见断言，保留原全部业务断言、超时和零重试。"
         }
       ],
       "routes": [

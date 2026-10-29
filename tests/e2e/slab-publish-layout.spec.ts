@@ -122,6 +122,7 @@ test('供应链编辑复用发布页三段表单并回填数据', async ({ page 
     .click();
   const dialog = page.locator('.slab-publish-page');
   await expect(dialog).toBeVisible();
+  await expect(page.getByText('本次入库信息', { exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('heading', { level: 2 })).toHaveText(['图文描述', '基础信息', '销售信息']);
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await dialog.getByRole('link', { name: '销售信息', exact: true }).click();

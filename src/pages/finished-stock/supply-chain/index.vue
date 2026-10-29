@@ -274,11 +274,6 @@
           </AdminListLayout> </template
         ><template v-else-if="formPageVisible">
           <section ref="productFormRoot" class="form-shell">
-            <t-alert v-if="editingProduct?.status === 'warehouse'" title="本次入库信息" theme="info">
-              <WarehouseEntryInformation :entry="editingProduct" />
-              {{ editingProduct.stateOperatorName || '历史记录未记录' }} ·
-              {{ editingProduct.stateOperatedAt ? formatDateTime(editingProduct.stateOperatedAt) : '历史记录未记录' }}
-            </t-alert>
             <AdminSectionCard class="form-heading-card" aria-label="发布商品信息">
               <div class="form-title-row">
                 <div>

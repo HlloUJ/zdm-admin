@@ -1,10 +1,5 @@
 <template>
   <t-space direction="vertical" size="large" class="product-detail">
-    <component :is="drawerLayout ? Card : AdminSectionCard" v-if="product.status === 'warehouse'" title="本次入库信息">
-      <WarehouseEntryInformation :entry="product" />
-      {{ product.stateOperatorName || '历史记录未记录' }} ·
-      {{ product.stateOperatedAt ? formatProductDateTime(product.stateOperatedAt) : '历史记录未记录' }}
-    </component>
     <t-alert v-if="operations && product.sourceUnavailable" theme="warning" :message="sourceMessage" />
     <component
       :is="drawerLayout ? Card : AdminSectionCard"
@@ -168,9 +163,6 @@
 </template>
 
 <script setup lang="ts">
-import { formatProductDateTime } from '@/utils/formatProductDateTime';
-import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
-import type { WarehouseEntryInformation as WarehouseEntry } from '@/services/warehouseEntry';
 import { computed, type VNode } from 'vue';
 import { AdminSectionCard } from '@/components/foundation';
 import PriceSourceToggle from './PriceSourceToggle.vue';
@@ -186,9 +178,7 @@ import type {
   FinishedProductGuidePrice,
   FinishedSpecDimension,
 } from '@/services/finishedProducts';
-interface DetailProduct extends WarehouseEntry {
-  stateOperatorName?: string;
-  stateOperatedAt?: string;
+interface DetailProduct {
   id: number;
   name: string;
   code: string;
