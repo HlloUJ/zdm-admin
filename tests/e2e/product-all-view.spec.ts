@@ -78,7 +78,13 @@ for (const surface of surfaces) {
   test(`${surface.path} defaults to All with real creation, ID tags and state-specific actions`, async ({ page }) => {
     await setup(page, surface);
     const main = page.getByRole('main');
-    await expect(main.locator('.t-tabs__nav-item').first()).toContainText('全部');
+    await expect(main.locator('.t-tabs__nav-item')).toHaveText([
+      '全部（2）',
+      '仓库中（1）',
+      '已上架（1）',
+      '已售完（1）',
+      '回收站（1）',
+    ]);
     await expect(main.locator('.t-tabs__nav-item').first()).toHaveClass(/t-is-active/);
     await expect(main.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
     await expect(main.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
@@ -166,6 +172,13 @@ for (const surface of surfaces) {
     await expect(main.locator('tbody tr').filter({ hasText: '汇总商品-selling' })).toHaveCount(0);
     await expect(main.locator('.t-tabs__nav-item').first()).toHaveClass(/t-is-active/);
     await expect(main.locator('tbody tr').filter({ hasText: '汇总商品-warehouse' })).toHaveCount(1);
+    await expect(main.locator('.t-tabs__nav-item')).toHaveText([
+      '全部（1）',
+      '仓库中（1）',
+      '已上架（0）',
+      '已售完（1）',
+      '回收站（2）',
+    ]);
     expect(writes).toBe(1);
   });
   test(`${surface.path} All without any underlying state grant cannot display products`, async ({ page }) => {

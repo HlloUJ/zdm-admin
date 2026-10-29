@@ -3359,6 +3359,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "  ),\n);\nconst tabLabel = (tab: TabConfig) => {\n  const count = countByStatus.value[tab.value];\n  return count ? `${tab.label} ${count}` : tab.label;\n};\nconst rowActions = (row: StockItem) =>\n  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));\nconst managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>\n",
+          "after": "  ),\n);\nconst tabLabel = (tab: TabConfig) => {\n  const count = countByStatus.value[tab.value];\n  return `${tab.label}（${count}）`;\n};\nconst rowActions = (row: StockItem) =>\n  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));\nconst managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.5：八个商品页面Tab数量统一为中文括号，零也显示；仅调整文案，保留统计、权限及业务逻辑。"
+        },
+        {
           "before": "                  v-if=\"showFinishedTabRail\"\n                  :value=\"activeTab\"\n                  class=\"status-tabs\"\n                  @change=\"\n                    activeTab = String($event) as StockStatus;\n                    handleTabChange();\n                  \"\n                >\n                  <t-tab-panel\n",
           "after": "                  v-if=\"showFinishedTabRail\"\n                  :value=\"activeTab\"\n                  class=\"status-tabs\"\n                  @change=\"\n                    activeTab = String($event) as StockTab;\n                    handleTabChange();\n                  \"\n                >\n                  <t-tab-panel\n",
           "stage": "before-migrations",
@@ -6033,6 +6039,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "  ),\n);\nconst tabLabel = (tab: TabConfig) => {\n  const count = countByStatus.value[tab.value];\n  return count ? `${tab.label} ${count}` : tab.label;\n};\nconst rowActions = (row: StockItem) =>\n  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));\nconst managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>\n",
+          "after": "  ),\n);\nconst tabLabel = (tab: TabConfig) => {\n  const count = countByStatus.value[tab.value];\n  return `${tab.label}（${count}）`;\n};\nconst rowActions = (row: StockItem) =>\n  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));\nconst managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.5：八个商品页面Tab数量统一为中文括号，零也显示；仅调整文案，保留统计、权限及业务逻辑。"
+        },
+        {
           "before": "                <t-form-item label=\"总库存\">\n                  <t-input-number :model-value=\"totalStock\" theme=\"normal\" :min=\"0\" disabled />\n                </t-form-item>\n                <t-form-item\n                  v-if=\"!isOperationsEdit\"\n                  label=\"上架\"\n                  v-bind=\"requiredFieldFeedback(productForm.shelfNow, '上架方式', submitAttempted, true)\"\n                  required-mark\n                >\n",
           "after": "                <t-form-item label=\"总库存\">\n                  <t-input-number :model-value=\"totalStock\" theme=\"normal\" :min=\"0\" disabled />\n                </t-form-item>\n                <t-form-item\n                  v-if=\"!isOperationsEdit && canSetShelfStatus\"\n                  label=\"上架\"\n                  v-bind=\"requiredFieldFeedback(productForm.shelfNow, '上架方式', submitAttempted, true)\"\n                  required-mark\n                >\n",
           "stage": "before-migrations",
@@ -8657,6 +8669,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "    tab.value === 'all'\n      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')\n      : item.status === tab.value,\n  ).length;\n  return count ? `${tab.label} ${count}` : tab.label;\n};\nconst rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);\nconst handleTabChange = () => {\n  selectedKeys.value = [];\n",
+          "after": "    tab.value === 'all'\n      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')\n      : item.status === tab.value,\n  ).length;\n  return `${tab.label}（${count}）`;\n};\nconst rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);\nconst handleTabChange = () => {\n  selectedKeys.value = [];\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.5：八个商品页面Tab数量统一为中文括号，零也显示；仅调整文案，保留统计、权限及业务逻辑。"
+        },
+        {
           "before": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n                  @sort-change=\"onTimeSortChange\"\n",
           "after": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n                  @sort-change=\"onTimeSortChange\"\n",
           "stage": "before-migrations",
@@ -9915,6 +9933,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "    tab.value === 'all'\n      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')\n      : item.status === tab.value,\n  ).length;\n  return count ? `${tab.label} ${count}` : tab.label;\n};\nconst rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);\nconst handleTabChange = () => {\n  selectedKeys.value = [];\n",
+          "after": "    tab.value === 'all'\n      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')\n      : item.status === tab.value,\n  ).length;\n  return `${tab.label}（${count}）`;\n};\nconst rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);\nconst handleTabChange = () => {\n  selectedKeys.value = [];\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.5：八个商品页面Tab数量统一为中文括号，零也显示；仅调整文案，保留统计、权限及业务逻辑。"
+        },
         {
           "before": "                    @change=\"clearSalesFieldError('sku')\"\n                  />\n                </t-form-item>\n              </div>\n              <t-form-item v-if=\"isProductFormPage\" label=\"上架\" required-mark>\n                <t-radio-group v-model=\"publishTargetStatus\">\n                  <t-radio value=\"selling\" :disabled=\"!canPublishToShelf\">立刻上架</t-radio>\n                  <t-radio value=\"warehouse\" :disabled=\"productMode === 'edit' && editingSourceStatus === 'selling'\"\n                    >暂不上架</t-radio\n",
           "after": "                    @change=\"clearSalesFieldError('sku')\"\n                  />\n                </t-form-item>\n              </div>\n              <t-form-item v-if=\"isProductFormPage && canSetShelfStatus\" label=\"上架\" required-mark>\n                <t-radio-group v-model=\"publishTargetStatus\">\n                  <t-radio value=\"selling\" :disabled=\"!canPublishToShelf\">立刻上架</t-radio>\n                  <t-radio value=\"warehouse\" :disabled=\"productMode === 'edit' && editingSourceStatus === 'selling'\"\n                    >暂不上架</t-radio\n",

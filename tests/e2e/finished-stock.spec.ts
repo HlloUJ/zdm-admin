@@ -146,8 +146,8 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
 
   await page.goto(productWarehouseUrl('/supply-chain/finished-stock-management'));
 
-  await expect(page.getByText('仓库中 1', { exact: true })).toBeVisible();
-  await expect(page.getByText('已上架', { exact: true })).toBeVisible();
+  await expect(page.getByText('仓库中（1）', { exact: true })).toBeVisible();
+  await expect(page.getByText('已上架（0）', { exact: true })).toBeVisible();
   await expect(page.getByText('已上架 0', { exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: '发布商品', exact: true }).click();

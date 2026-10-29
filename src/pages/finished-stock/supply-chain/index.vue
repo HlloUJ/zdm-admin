@@ -2061,7 +2061,7 @@ const batchFillMatchedRows = computed(() =>
 );
 const tabLabel = (tab: TabConfig) => {
   const count = countByStatus.value[tab.value];
-  return count ? `${tab.label} ${count}` : tab.label;
+  return `${tab.label}（${count}）`;
 };
 const rowActions = (row: StockItem) =>
   finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));

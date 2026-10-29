@@ -164,19 +164,19 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   const supplierControl = (await page.locator('.supplier-filter .t-input').boundingBox())!;
   expect(searchBox.x).toBeGreaterThan(supplierControl.x + supplierControl.width);
 
-  for (const tabLabel of ['仓库中 1', '已上架', '已售完', '回收站 2']) {
+  for (const tabLabel of ['仓库中（1）', '已上架（0）', '已售完（0）', '回收站（2）']) {
     await page.getByText(tabLabel, { exact: true }).click();
     await expect(keywordInput).toBeVisible();
   }
 
-  await page.getByText('仓库中 1', { exact: true }).click();
+  await page.getByText('仓库中（1）', { exact: true }).click();
   for (const keyword of ['雪花白大板', '6', 'SLAB-E2E-006']) {
     await keywordInput.fill(keyword);
     await page.getByRole('button', { name: '查询', exact: true }).click();
     await expect(page.getByRole('row', { name: /雪花白大板 06/ })).toBeVisible();
   }
 
-  await page.getByText('回收站 2', { exact: true }).click();
+  await page.getByText('回收站（2）', { exact: true }).click();
   await keywordInput.fill('SLAB-E2E-008');
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await expect(page.getByRole('row', { name: /回收站大板 08/ })).toBeVisible();
@@ -198,7 +198,7 @@ for (const client of ['admin', 'supply-chain'] as const) {
       for (const tab of ['仓库中', '已上架']) {
         await page
           .locator('.status-tabs')
-          .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))
+          .getByText(new RegExp(`^${tab}（[0-9]+）$`))
           .click();
         const fields = page.locator('.filter-fields');
         const items = fields.locator('.t-form__item');
@@ -581,7 +581,7 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
   for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
     await page
       .locator('.status-tabs')
-      .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))
+      .getByText(new RegExp(`^${tab}（[0-9]+）$`))
       .click();
     const fields = page.locator('.filter-fields');
     const overflow = await fields.evaluate((host) => {
@@ -647,7 +647,7 @@ test('shows warehouse actor and retained down-shelf reason instead of creator me
   await page.goto(productWarehouseUrl('/finished-stock-management'));
   await page
     .locator('.status-tabs')
-    .getByText(/^仓库中(?: [0-9]+)?$/)
+    .getByText(/^仓库中（[0-9]+）$/)
     .click();
   const headers = await page.locator('thead th').allTextContents();
   expect(headers.join('|')).toContain('入库类型 / 详细说明|入库人|入库时间');
@@ -664,7 +664,7 @@ test('does not add empty-cell padding to the finished stock horizontal scroll wi
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [] } }));
   await page.goto(productWarehouseUrl('/finished-stock-management'));
   for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
-    await page.locator('.status-tabs').getByText(tab, { exact: true }).click();
+    await page.locator('.status-tabs').getByText(`${tab}（0）`, { exact: true }).click();
     const table = page.locator('.finished-stock-table');
     await expect(table.getByText('暂无数据')).toBeVisible();
     const sizes = await table.evaluate((root) => {

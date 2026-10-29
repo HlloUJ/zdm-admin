@@ -414,7 +414,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toHaveCount(0);
   await expect(page.getByText('已删除“外部系统大板 09”', { exact: true })).toBeVisible();
   await expect(row).toHaveCount(0);
-  await page.getByText('回收站 1', { exact: true }).click();
+  await page.getByText('回收站（1）', { exact: true }).click();
   await expect(row).toBeVisible();
   await expect(row).toContainText('韩健');
   await expect(row).toContainText('2026/08/23 10:00');
@@ -501,7 +501,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
 
 test('permanently deletes one or multiple slabs from the recycle tab after confirmation', async ({ page }) => {
   await page.goto(productWarehouseUrl('/slab-management'));
-  await page.getByText('回收站 2', { exact: true }).click();
+  await page.getByText('回收站（2）', { exact: true }).click();
 
   const singleRow = page.getByRole('row', { name: /回收站大板 07/ });
   await singleRow.getByText('彻底删除', { exact: true }).click();
@@ -543,7 +543,7 @@ test('shows recycled slab prices without allowing edits', async ({ page }) => {
     });
   });
   await page.goto(productWarehouseUrl('/slab-management'));
-  await page.getByText('回收站 2', { exact: true }).click();
+  await page.getByText('回收站（2）', { exact: true }).click();
 
   const recycleRow = page.getByRole('row', { name: /回收站大板 07/ });
   await recycleRow.getByText('详情', { exact: true }).click();
@@ -664,7 +664,7 @@ test('shows only assigned slab tabs and operations', async ({ page }) => {
 
 test('places clear recycle after batch purge and permanently deletes every recycled slab', async ({ page }) => {
   await page.goto(productWarehouseUrl('/slab-management'));
-  await page.getByText('回收站 2', { exact: true }).click();
+  await page.getByText('回收站（2）', { exact: true }).click();
 
   expect((await page.locator('.toolbar-buttons button').allTextContents()).map((text) => text.trim())).toEqual([
     '批量放回到仓库',
@@ -820,7 +820,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   });
 
   await page.goto(productWarehouseUrl('/slab-management'));
-  await page.getByText('已上架 1', { exact: true }).click();
+  await page.getByText('已上架（1）', { exact: true }).click();
   const row = page.getByRole('row', { name: /批量下架大板 61/ });
   await row.locator('.t-checkbox').click();
   await page.getByRole('button', { name: '批量下架', exact: true }).click();
@@ -860,7 +860,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(dialog).toBeHidden();
   await expect(page.getByText('已批量下架“1 个大板”', { exact: true })).toBeVisible();
 
-  await page.getByText('仓库中 2', { exact: true }).click();
+  await page.getByText('仓库中（2）', { exact: true }).click();
   const filterCard = page.locator('.list-controls');
   await expect(filterCard.getByText('入库类型', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('入库人', { exact: true })).toBeVisible();
@@ -1012,8 +1012,8 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
 });
 
 for (const scenario of [
-  { tab: '仓库中 1', expectedStatus: 'warehouse', expectedTab: /仓库中/ },
-  { tab: '已上架', expectedStatus: 'selling', expectedTab: /已上架/ },
+  { tab: '仓库中（1）', expectedStatus: 'warehouse', expectedTab: /仓库中/ },
+  { tab: '已上架（0）', expectedStatus: 'selling', expectedTab: /已上架/ },
 ] as const) {
   test(`publishes a slab into ${scenario.expectedStatus} from its current tab`, async ({ page }) => {
     await page.route('**/api/admin/slabs/form-options', async (route) => {

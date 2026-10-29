@@ -1630,7 +1630,7 @@ const tabLabel = (tab: { label: string; value: SlabTab }) => {
       ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')
       : item.status === tab.value,
   ).length;
-  return count ? `${tab.label} ${count}` : tab.label;
+  return `${tab.label}（${count}）`;
 };
 const rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);
 const handleTabChange = () => {
