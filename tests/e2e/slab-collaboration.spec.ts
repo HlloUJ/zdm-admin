@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -58,7 +59,7 @@ async function setup(page: Page, status: string, sourceStatus = 'selling', detai
     }),
   );
   await page.route('**/api/admin/slabs/action-check', (route) => route.fulfill({ json: { code: 0, data: true } }));
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   await expect(page.getByRole('main').getByText('协同大板', { exact: true })).toBeVisible();
 }
 for (const status of ['soldOut', 'recycle']) {
@@ -120,15 +121,17 @@ test('运营角色候选目录五个状态均显示详情且默认不勾选', as
       },
     }),
   );
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   await page.locator('tbody tr').filter({ hasText: '大板运营角色' }).getByText('权限', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
   await dialog.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
   const rows = dialog.locator('.permission-matrix tbody tr');
   const first = rows.filter({ hasText: '大板管理页' }).first();
   const index = await first.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+  await expect(rows.nth(index + 1).locator('.permission-tab-text')).toHaveText('全部');
+  await expect(rows.nth(index + 1).getByRole('checkbox', { name: '查看', exact: true })).not.toBeChecked();
   for (const [offset, label] of ['仓库中', '已上架', '已售完', '回收站'].entries()) {
-    const row = rows.nth(index + offset + 1);
+    const row = rows.nth(index + offset + 2);
     await expect(row.locator('.permission-tab-text')).toHaveText(label);
     await expect(row.getByRole('checkbox', { name: offset < 2 ? '编辑' : '详情', exact: true })).not.toBeChecked();
   }

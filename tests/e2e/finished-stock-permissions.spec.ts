@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -30,7 +31,7 @@ async function setup(page: Page, permissions: string[], clientCode = 'admin') {
 const prefix = 'admin.finished-stock-management.';
 test('hides finished stock menu without its permissions', async ({ page }) => {
   await setup(page, ['admin.slab-management.warehouse.view']);
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   await expect(page.locator('.admin-side-menu').getByText('成品现货管理', { exact: true })).toHaveCount(0);
 });
 test('one tab hides rail and only grants requested row operation', async ({ page }) => {
@@ -39,7 +40,7 @@ test('one tab hides rail and only grants requested row operation', async ({ page
     ['supply-chain.finished-stock-management.warehouse.view', 'supply-chain.finished-stock-management.warehouse.edit'],
     'supply-chain',
   );
-  await page.goto('/supply-chain/finished-stock-management');
+  await page.goto(productWarehouseUrl('/supply-chain/finished-stock-management'));
   const main = page.getByRole('main');
   await expect(main.getByText('意式轻奢岩板餐桌', { exact: true })).toBeVisible();
   await expect(main.locator('.status-tabs')).toHaveCount(0);
@@ -78,7 +79,7 @@ for (const canViewPrice of [true, false]) {
     await page.route('**/api/admin/finished-products', (route) =>
       route.fulfill({ json: { code: 0, data: [product] } }),
     );
-    await page.goto('/supply-chain/finished-stock-management');
+    await page.goto(productWarehouseUrl('/supply-chain/finished-stock-management'));
     const main = page.getByRole('main');
     await expect(main.locator('.table-actions .t-link')).toHaveText(['上架', '编辑', '删除']);
     await expect(main.locator('.table-actions').getByText('价格', { exact: true })).toHaveCount(0);
@@ -89,7 +90,7 @@ test('multiple tabs exclude unauthorized default and fall back to selling', asyn
   const formOptionsLoaded = page.waitForResponse(
     (response) => new URL(response.url()).pathname === '/api/admin/finished-products/form-options' && response.ok(),
   );
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   // The tab rail renders before its option request finishes; keep the mocked route alive until it settles.
   await (await formOptionsLoaded).finished();
   const main = page.getByRole('main');
@@ -104,7 +105,7 @@ test('log-only access does not expose unauthorized warehouse content', async ({ 
   page.on('request', (request) => {
     if (new URL(request.url()).pathname === '/api/admin/finished-products') listRequested = true;
   });
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   const main = page.getByRole('main');
   await expect(main.getByText('操作日志', { exact: true })).toBeVisible();
   await expect(main.locator('.status-tabs')).toHaveCount(0);
@@ -164,7 +165,7 @@ for (const [status, scope] of [
       if (route.request().method() !== 'GET') writes++;
       return route.fulfill({ json: { code: 0, message: 'ok', data: product } });
     });
-    await page.goto('/finished-stock-management');
+    await page.goto(productWarehouseUrl('/finished-stock-management'));
     const main = page.getByRole('main');
     if (status === 'selling') {
       const overlay = main.locator('.source-unavailable-overlay');
@@ -255,7 +256,7 @@ test('operations role catalog exposes detail permission for all five finished st
       },
     }),
   );
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   const row = page.locator('tbody tr').filter({ hasText: '运营管理平台角色' }).first();
   await row.getByText('权限', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
@@ -263,13 +264,15 @@ test('operations role catalog exposes detail permission for all five finished st
   const rows = dialog.locator('.permission-matrix tbody tr');
   const first = rows.filter({ hasText: '成品现货管理页' }).first();
   const firstIndex = await first.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
+  await expect(rows.nth(firstIndex + 1).locator('.permission-tab-text')).toHaveText('全部');
+  await expect(rows.nth(firstIndex + 1).getByRole('checkbox', { name: '查看', exact: true })).not.toBeChecked();
   const statusNames = ['仓库中', '已上架', '已售完', '回收站'];
   for (const [index, label] of statusNames.entries()) {
-    const statusRow = rows.nth(firstIndex + index + 1);
+    const statusRow = rows.nth(firstIndex + index + 2);
     await expect(statusRow.locator('.permission-tab-text')).toHaveText(label);
     await expect(statusRow.getByText(index < 2 ? '编辑' : '详情', { exact: true })).toBeVisible();
   }
-  const listed = rows.nth(firstIndex + 2);
+  const listed = rows.nth(firstIndex + 3);
   await expect(listed.getByRole('checkbox', { name: '查看', exact: true })).toBeChecked();
   await expect(listed.getByRole('checkbox', { name: '编辑', exact: true })).not.toBeChecked();
   await dialog.getByRole('button', { name: '取消', exact: true }).click();
@@ -305,7 +308,7 @@ for (const sourceStatus of ['offShelf', 'recycle', 'warehouse', 'purged']) {
     await page.route('**/api/admin/finished-products/72', (route) =>
       route.fulfill({ json: { code: 0, message: 'ok', data: product } }),
     );
-    await page.goto('/finished-stock-management');
+    await page.goto(productWarehouseUrl('/finished-stock-management'));
     const overlay = page.getByRole('main').locator('.source-unavailable-overlay');
     await expect(overlay).toContainText(product.sourceMessage);
     await expect(overlay.getByRole('button')).toHaveText(['详情', '彻底删除']);
@@ -350,7 +353,7 @@ test('operations purge logs display actual previous state to permanently deleted
     const id = Number(route.request().url().split('/').pop());
     return route.fulfill({ json: { code: 0, data: records.find((record) => record.id === id) } });
   });
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   await page.getByRole('main').getByText('操作日志', { exact: true }).click();
   for (const [index, record] of records.entries()) {
     await page.getByRole('row').filter({ hasText: record.productName }).getByText('详情', { exact: true }).click();
@@ -410,7 +413,11 @@ for (const [client, retryFailure] of [
       else product.status = 'selling';
       await route.fulfill({ json: { code: 0, data: product } });
     });
-    await page.goto(client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management');
+    await page.goto(
+      productWarehouseUrl(
+        client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management',
+      ),
+    );
     const main = page.getByRole('main');
     await expect(main.getByText('批量上架验收83', { exact: true })).toBeVisible();
     await main.locator('thead .t-checkbox__input').click();
@@ -456,7 +463,7 @@ test('operations incomplete shelf warns before confirmation without updating pro
   await page.route('**/api/admin/finished-products/991/shelf-check', (route) =>
     route.fulfill({ status: 400, json: { code: 400, message: '请完善全部成品现货价格后再上架' } }),
   );
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   await page.locator('tbody tr').filter({ hasText: product.name }).getByText('上架', { exact: true }).click();
   await expect(page.getByText('请完善全部成品现货价格后再上架', { exact: true })).toBeVisible();
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
@@ -485,7 +492,7 @@ test('operations batch shelf continues after failure and retains the failed row 
     product.status = 'selling';
     return route.fulfill({ json: { code: 0, data: product } });
   });
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   await expect(page.locator('tbody tr')).toHaveCount(3);
   await page.locator('thead .t-checkbox').click();
   await page.getByRole('button', { name: '批量上架', exact: true }).click();
@@ -515,7 +522,11 @@ for (const client of ['supply-chain', 'admin']) {
       await page.route('**/api/admin/finished-products/operation-logs?**', (route) =>
         route.fulfill({ json: { code: 0, message: 'ok', data: { records: [], total: 0 } } }),
       );
-      await page.goto(client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management');
+      await page.goto(
+        productWarehouseUrl(
+          client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management',
+        ),
+      );
       const main = page.getByRole('main');
       await expect(main.locator('.page-header')).toHaveCount(0);
       const log = main.getByRole('button', { name: '操作日志', exact: true });
@@ -559,7 +570,7 @@ for (const client of ['supply-chain', 'admin']) {
 test('supply-chain publish alone does not display selected count', async ({ page }) => {
   const prefix = 'supply-chain.finished-stock-management.';
   await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.publish'], 'supply-chain');
-  await page.goto('/supply-chain/finished-stock-management');
+  await page.goto(productWarehouseUrl('/supply-chain/finished-stock-management'));
   const main = page.getByRole('main');
   await expect(main.getByRole('button', { name: '发布商品', exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '批量上架', exact: true })).toHaveCount(0);
@@ -589,7 +600,11 @@ for (const client of ['admin', 'supply-chain']) {
       if (route.request().method() !== 'GET') writes++;
       return route.fulfill({ json: { code: 0, data: product } });
     });
-    await page.goto(client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management');
+    await page.goto(
+      productWarehouseUrl(
+        client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management',
+      ),
+    );
     await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
     await page.getByRole('row').filter({ hasText: '下架校验商品' }).getByText('下架', { exact: true }).click();
     const dialog = page.locator('.t-dialog:visible');

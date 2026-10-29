@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { checkDecimalEditing } from './decimal-editing';
 import { expect, test, type Page } from '@playwright/test';
 import type { SlabPayload, SlabPrice, SlabRecord } from '../../src/services/slabs';
@@ -78,7 +79,7 @@ async function setup(
     state.saves.push(payload);
     return route.fulfill({ json: { code: 0, data: { ...state.product, ...payload } } });
   });
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   await expect(page.getByRole('main').getByText('四级价格大板', { exact: true })).toBeVisible();
   return state;
 }
@@ -146,7 +147,7 @@ for (const canViewPrice of [true, false]) {
         },
       }),
     );
-    await page.goto('/supply-chain/slab-management');
+    await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
     const main = page.getByRole('main');
     await expect(main.locator('.table-actions .t-link')).toHaveText(['上架', '编辑', '删除']);
     await expect(main.locator('.table-actions').getByText('价格', { exact: true })).toHaveCount(0);

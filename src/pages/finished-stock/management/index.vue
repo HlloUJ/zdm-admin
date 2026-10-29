@@ -44,7 +44,7 @@
                   :value="activeTab"
                   class="status-tabs"
                   @change="
-                    activeTab = String($event) as StockStatus;
+                    activeTab = String($event) as StockTab;
                     handleTabChange();
                   "
                 >
@@ -168,7 +168,8 @@
                     row-key="id"
                     :data="pageData"
                     :columns="columns"
-                    :sort="tableSort"
+                    :sort="activeTab === 'all' ? undefined : tableSort"
+                    :sort-icon="stateActivitySortIcon"
                     :loading="loading"
                     hover
                     table-layout="fixed"
@@ -201,7 +202,9 @@
                     <template #product="{ row }">
                       <div class="product-meta">
                         <div class="product-name">{{ row.name }}</div>
-                        <div class="product-code">ID：{{ row.id }}</div>
+                        <div class="product-code">
+                          ID：{{ row.id }} <ProductListStatusTag v-if="activeTab === 'all'" :status="row.status" />
+                        </div>
                       </div>
                     </template>
                     <template #supplier="{ row }">
@@ -212,7 +215,9 @@
                       </div>
                     </template>
                     <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-                    <template #warehouseEntry="{ row }"><WarehouseEntryInformation :entry="row" /></template>
+                    <template #warehouseEntry="{ row }"
+                      ><WarehouseEntryInformation v-if="row.status === 'warehouse'" :entry="row"
+                    /></template>
                     <template #stateOperatorName="{ row }"
                       ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
                     >
@@ -222,7 +227,7 @@
                     <template #operation="{ row }">
                       <div class="table-actions">
                         <t-link
-                          v-for="action in managementRowButtons"
+                          v-for="action in managementRowButtons(row)"
                           :key="action.id"
                           :theme="buttonTheme(buttonFunctionFor('stock', action.id))"
                           hover="color"
@@ -243,7 +248,9 @@
                   </t-space>
                   <t-space size="small">
                     <t-button
-                      v-if="hasFinishedAction(['warehouse', 'selling'].includes(activeTab) ? 'edit' : 'detail')"
+                      v-if="
+                        hasFinishedAction(['warehouse', 'selling'].includes(row.status) ? 'edit' : 'detail', row.status)
+                      "
                       size="small"
                       :theme="buttonTheme('view')"
                       @click="handleRowAction('detail', row)"
@@ -1158,6 +1165,8 @@
 </template>
 
 <script setup lang="ts">
+import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
+import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
 import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { useCommodityModule } from '@/composables/useCommodityModule';
@@ -1170,7 +1179,7 @@ import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
-import { stateActivityColumns } from '@/services/productStateActivity';
+import { stateActivitySortIcon, stateActivityColumns } from '@/services/productStateActivity';
 import { filterFinishedStockItems } from '../shared/finishedStockListFilter';
 import { finishedStockFormIssues, isValidSpecQuantity } from '../shared/finishedStockFormValidation';
 import { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';
@@ -1182,6 +1191,7 @@ import type {
   FinishedStockToolbarAction,
   FinishedStockRowAction,
   StockStatus,
+  StockTab,
   PublisherType,
   RowAction,
   BatchAction,
@@ -1260,6 +1270,7 @@ import { AdminListLayout, AdminPagination } from '@/components/foundation';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 const tabs: TabConfig[] = [
+  { value: 'all', label: '全部' },
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '已上架' },
   { value: 'soldOut', label: '已售完' },
@@ -1269,11 +1280,12 @@ const pageSizeOptions = [10, 20, 50];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
 const productPermissionPrefix = computed(() => `${'admin'}.${commodity.moduleKey}`);
 const sourceBlocked = (row: StockItem) => Boolean(row.sourceUnavailable);
-const activeTab = ref<StockStatus>('warehouse');
+const activeTab = ref<StockTab>(initialProductListTab(useRoute().query.tab));
 const { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {
   currentPagination.value.current = 1;
 });
-const finishedScope: Record<StockStatus, string> = {
+const finishedScope: Record<StockTab, string> = {
+  all: 'all',
   warehouse: 'warehouse',
   selling: 'selling',
   soldOut: 'sold-out',
@@ -1284,7 +1296,9 @@ const hasFinishedAction = (action: string, status = activeTab.value) =>
 const { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermissionTabs({
   tabs,
   activeTab,
-  canAccess: (tab) => hasFinishedAction('view', tab.value),
+  canAccess: (tab) =>
+    hasFinishedAction('view', tab.value) &&
+    (tab.value !== 'all' || hasFinishedAction('view', 'warehouse') || hasFinishedAction('view', 'selling')),
 });
 const finishedActionCodes: Record<string, string> = {
   publish: 'publish',
@@ -1563,19 +1577,22 @@ const defaultFilter = (): FilterState => ({
   category: '',
   supplier: '',
 });
-const filters = reactive<Record<StockStatus, FilterState>>({
+const filters = reactive<Record<StockTab, FilterState>>({
+  all: defaultFilter(),
   warehouse: defaultFilter(),
   selling: defaultFilter(),
   soldOut: defaultFilter(),
   recycle: defaultFilter(),
 });
-const appliedFilters = reactive<Record<StockStatus, FilterState>>({
+const appliedFilters = reactive<Record<StockTab, FilterState>>({
+  all: defaultFilter(),
   warehouse: defaultFilter(),
   selling: defaultFilter(),
   soldOut: defaultFilter(),
   recycle: defaultFilter(),
 });
-const paginations = reactive<Record<StockStatus, PaginationState>>({
+const paginations = reactive<Record<StockTab, PaginationState>>({
+  all: { current: 1, pageSize: 10 },
   warehouse: { current: 1, pageSize: 10 },
   selling: { current: 1, pageSize: 10 },
   soldOut: { current: 1, pageSize: 10 },
@@ -1728,7 +1745,9 @@ const supplierOptions = computed(() => {
     .filter((supplier) => supplier.status !== 'disabled' && supplier.supplyTypes.some(isFinishedSupplyType))
     .map((supplier) => supplier.name);
 });
-const countByStatus = computed<Record<StockStatus, number>>(() => ({
+const countByStatus = computed<Record<StockTab, number>>(() => ({
+  all: dataItems.value.filter((item) => isAllProductStatus(item.status) && hasFinishedAction('view', item.status))
+    .length,
   warehouse: dataItems.value.filter((item) => item.status === 'warehouse').length,
   selling: dataItems.value.filter((item) => item.status === 'selling').length,
   soldOut: dataItems.value.filter((item) => item.status === 'soldOut').length,
@@ -1903,12 +1922,26 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);
 });
 const filteredData = computed(() =>
-  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value, descending.value),
+  filterFinishedStockItems(
+    activeTab.value === 'all'
+      ? dataItems.value.filter((row) => hasFinishedAction('view', row.status))
+      : dataItems.value,
+    activeTab.value,
+    currentAppliedFilter.value,
+    descending.value,
+  ),
 );
 const paginationTotal = computed(() => filteredData.value.length);
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
   return filteredData.value.slice(start, start + currentPagination.value.pageSize);
+});
+watch(paginationTotal, (total) => {
+  if (activeTab.value === 'all')
+    currentPagination.value.current = Math.min(
+      currentPagination.value.current,
+      Math.max(1, Math.ceil(total / currentPagination.value.pageSize)),
+    );
 });
 const pageAllSelected = computed(
   () => pageData.value.length > 0 && pageData.value.every((item) => selectedKeySet.value.has(item.id)),
@@ -1917,6 +1950,7 @@ const pagePartiallySelected = computed(
   () => pageData.value.some((item) => selectedKeySet.value.has(item.id)) && !pageAllSelected.value,
 );
 const batchButtons = computed(() => {
+  if (activeTab.value === 'all') return [];
   const map: Record<
     StockStatus,
     {
@@ -1959,6 +1993,7 @@ const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
 );
 // Fixed pixel widths; update only when the tab action buttons change.
 const operationWidths = {
+  all: 208,
   warehouse: 190,
   selling: 208,
   soldOut: 104,
@@ -1969,13 +2004,17 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'product', title: '商品名称/ID', minWidth: 220 },
     { colKey: 'supplier', title: '供应商', width: 180 },
-    ...stateActivityColumns(activeTab.value, toggleTimeSort),
+    ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),
   ];
-  if (activeTab.value !== 'soldOut') {
+  if (!['all', 'soldOut'].includes(activeTab.value)) {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
-  if (activeTab.value === 'warehouse') {
-    base.splice(4, 0, { colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });
+  if (activeTab.value === 'warehouse' || activeTab.value === 'all') {
+    base.splice(activeTab.value === 'all' ? 3 : 4, 0, {
+      colKey: 'warehouseEntry',
+      title: '入库类型 / 详细说明',
+      minWidth: 240,
+    });
   }
   base.push({
     colKey: 'operation',
@@ -2076,13 +2115,10 @@ const tabLabel = (tab: TabConfig) => {
   const count = countByStatus.value[tab.value];
   return count ? `${tab.label} ${count}` : tab.label;
 };
-const rowActions = () => finishedStockActions[activeTab.value].filter((action) => hasFinishedAction(action.permission));
-const managementRowButtons = computed<FinishedStockRowAction[]>(() => [
-  ...rowActions().map((action) => ({
-    id: action.id,
-    label: action.label,
-  })),
-]);
+const rowActions = (row: StockItem) =>
+  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));
+const managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>
+  rowActions(row).map((action) => ({ id: action.id, label: action.label }));
 const handleManagementRowButton = (action: string, row: StockItem) => {
   handleRowAction(action as RowAction, row);
 };

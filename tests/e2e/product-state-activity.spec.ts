@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 import { installAdminApiMocks as installAccessoryApiMocks } from './accessory-api-mocks';
@@ -99,11 +100,61 @@ for (const surface of surfaces) {
     await page.route(`**/api/admin/${endpoint}/attribute-template-options`, (route) =>
       route.fulfill({ json: { code: 0, data: [] } }),
     );
-    await page.goto(surface.path);
+    await page.goto(productWarehouseUrl(surface.path));
     const main = page.getByRole('main');
     for (let index = 0; index < states.length; index++) {
       await main.locator('.t-tabs__nav-item').filter({ hasText: titles[index] }).click();
       await expect(main.getByRole('columnheader', { name: timeTitles[index], exact: true })).toBeVisible();
+      if (states[index] === 'warehouse') {
+        const columnKeys = await main
+          .locator('thead th')
+          .evaluateAll((headers) => headers.map((header) => header.getAttribute('data-colkey')));
+        const entryIndex = columnKeys.indexOf('warehouseEntry');
+        expect(entryIndex).toBeGreaterThanOrEqual(0);
+        expect(columnKeys.slice(entryIndex, entryIndex + 3)).toEqual([
+          'warehouseEntry',
+          'stateOperatorName',
+          'stateOperatedAt',
+        ]);
+      }
+      const timeHeader = main.getByRole('columnheader', { name: timeTitles[index], exact: true });
+      const sortIcons = timeHeader.locator('.t-table__sort-icon');
+      await expect(sortIcons.locator('svg.t-icon-caret-down-small.t-size-s')).toHaveCount(2);
+      const headerLayout = await timeHeader.evaluate((header) => {
+        const title = header.querySelector<HTMLButtonElement>('.product-state-time-title')!;
+        const icons = header.querySelector<HTMLElement>('.t-table__double-icons')!;
+        const typography = (element: Element) => {
+          const style = getComputedStyle(element);
+          return {
+            family: style.fontFamily,
+            size: style.fontSize,
+            weight: style.fontWeight,
+            line: style.lineHeight,
+            color: style.color,
+          };
+        };
+        const textBox = title.getBoundingClientRect();
+        const iconBox = icons.getBoundingClientRect();
+        return {
+          title: typography(title),
+          header: typography(header),
+          gap: iconBox.left - textBox.right,
+          centerDifference: Math.abs(iconBox.y + iconBox.height / 2 - textBox.y - textBox.height / 2),
+          iconHeight: iconBox.height,
+          textSize: parseFloat(getComputedStyle(title).fontSize),
+        };
+      });
+      expect(headerLayout.title).toEqual(headerLayout.header);
+      expect(headerLayout.gap).toBeGreaterThanOrEqual(0);
+      expect(headerLayout.gap).toBeLessThanOrEqual(6);
+      expect(headerLayout.centerDifference).toBeLessThanOrEqual(1);
+      expect(headerLayout.iconHeight).toBeLessThanOrEqual(headerLayout.textSize);
+
+      await expect(sortIcons.last()).toHaveClass(/t-table__sort-icon--active/);
+      await sortIcons.first().click();
+      await expect(sortIcons.first()).toHaveClass(/t-table__sort-icon--active/);
+      await sortIcons.last().click();
+      await expect(sortIcons.last()).toHaveClass(/t-table__sort-icon--active/);
       await expect(main.getByRole('columnheader', { name: '创建人', exact: true })).toHaveCount(0);
       await expect(main.getByRole('columnheader', { name: '创建时间', exact: true })).toHaveCount(0);
       const rows = main.locator('tbody tr');
@@ -217,7 +268,7 @@ for (const surface of surfaces) {
           return route.fulfill({ json: { code: 0, data: [] } });
         return route.fallback();
       });
-      await page.goto(surface.path);
+      await page.goto(productWarehouseUrl(surface.path));
       const main = page.getByRole('main');
       await main.locator('.t-tabs__nav-item').filter({ hasText: '回收站' }).click();
       if (batch) {
@@ -317,7 +368,7 @@ for (const surface of surfaces) {
         return route.fulfill({ json: { code: 0, data: [] } });
       return route.fallback();
     });
-    await page.goto(surface.path);
+    await page.goto(productWarehouseUrl(surface.path));
     const main = page.getByRole('main');
     await expect(main.locator('.t-tabs__nav-item').filter({ hasText: '已下架' })).toHaveCount(0);
     await main.locator('.t-tabs__nav-item').filter({ hasText: '已上架' }).click();
@@ -398,7 +449,7 @@ for (const surface of surfaces) {
     await page.route(`**/api/admin/${endpoint}/attribute-template-options`, (route) =>
       route.fulfill({ json: { code: 0, data: [] } }),
     );
-    await page.goto(surface.path);
+    await page.goto(productWarehouseUrl(surface.path));
     const main = page.getByRole('main');
     const rows = main.locator('tbody tr');
     await expect(rows.first()).toContainText('入库验证商品-14');

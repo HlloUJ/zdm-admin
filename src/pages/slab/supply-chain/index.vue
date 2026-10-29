@@ -161,7 +161,8 @@
                   row-key="id"
                   :data="pageData"
                   :columns="columns"
-                  :sort="tableSort"
+                  :sort="activeTab === 'all' ? undefined : tableSort"
+                  :sort-icon="stateActivitySortIcon"
                   :loading="loading"
                   hover
                   table-layout="fixed"
@@ -198,7 +199,9 @@
                   <template #slab="{ row }">
                     <div class="slab-meta">
                       <div class="slab-name">{{ row.name }}</div>
-                      <div class="slab-code">ID：{{ row.id }}</div>
+                      <div class="slab-code">
+                        ID：{{ row.id }} <ProductListStatusTag v-if="activeTab === 'all'" :status="row.status" />
+                      </div>
                       <div class="slab-code">大板编号：{{ row.code }}</div>
                     </div>
                   </template>
@@ -209,10 +212,16 @@
                     </div>
                   </template>
                   <template #warehouseEntry="{ row }"
-                    ><WarehouseEntryInformation class="off-shelf-reason-cell" :entry="row">
+                    ><WarehouseEntryInformation
+                      class="off-shelf-reason-cell"
+                      :entry="row"
+                      :tooltip-disabled="offShelfHistoryVisible"
+                    >
                       <t-tooltip
                         v-if="row.warehouseEntryType === 'offShelf' && row.offShelfRecords.length"
+                        v-model:visible="offShelfHistoryTooltips[row.id]"
                         content="查看历史下架原因"
+                        :disabled="offShelfHistoryVisible"
                       >
                         <t-button
                           :theme="buttonTheme('off-shelf-history')"
@@ -226,6 +235,7 @@
                         ></t-button>
                       </t-tooltip> </WarehouseEntryInformation
                   ></template>
+                  <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
                   <template #stateOperatorName="{ row }"
                     ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
                   >
@@ -235,7 +245,7 @@
                   <template #operation="{ row }">
                     <div class="table-actions">
                       <t-link
-                        v-for="action in rowActions()"
+                        v-for="action in rowActions(row)"
                         :key="action.action"
                         :theme="buttonTheme(buttonFunctionFor('stock', action.action))"
                         hover="color"
@@ -254,7 +264,7 @@
                 </t-space>
                 <t-space size="small">
                   <t-button
-                    v-if="hasSlabAction(activeTab, ['warehouse', 'selling'].includes(activeTab) ? 'edit' : 'detail')"
+                    v-if="hasSlabAction(row.status, ['warehouse', 'selling'].includes(row.status) ? 'edit' : 'detail')"
                     size="small"
                     :theme="buttonTheme('view')"
                     @click="handleRowAction('detail', row)"
@@ -966,6 +976,9 @@
 </template>
 
 <script setup lang="ts">
+import { useRoute } from 'vue-router';
+import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
+import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
 import { warehouseEntryTypes } from '@/services/warehouseEntry';
 import { useStateActivitySort } from '@/composables/useStateActivitySort';
@@ -976,7 +989,7 @@ import { preventZeroQuantity } from '@/utils/quantityInput';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
-import { stateActivityColumns } from '@/services/productStateActivity';
+import { stateActivitySortIcon, stateActivityColumns } from '@/services/productStateActivity';
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';
 import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
@@ -1055,7 +1068,7 @@ import {
 } from '@/services/slabs';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 type PublisherType = SlabPublisherType;
-type SlabTab = SlabStatus;
+type SlabTab = SlabStatus | 'all';
 type ProductMode = 'create' | 'edit' | 'view';
 type RowAction = SlabRowAction;
 type BatchAction = SlabBatchAction;
@@ -1073,7 +1086,7 @@ type UploadItemKey = 'main' | 'scan' | 'design' | 'video';
 type SalesNumberChangeContext = {
   type?: string;
 };
-const activeTab = ref<SlabTab>('warehouse');
+const activeTab = ref<SlabTab>(initialProductListTab(useRoute().query.tab));
 const { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {
   currentPagination.value.current = 1;
 });
@@ -1081,6 +1094,7 @@ const loginUser = computed(() => getLoginUser());
 const productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);
 const sourceBlocked: (row: SlabItem) => boolean = () => false;
 const slabPermissionScope: Record<SlabTab, string> = {
+  all: 'all',
   warehouse: 'warehouse',
   selling: 'selling',
   soldOut: 'sold-out',
@@ -1096,7 +1110,9 @@ const canViewOperationLogs = computed(() =>
 const { visibleTabs: slabTabs, showTabRail: showSlabTabRail } = usePermissionTabs({
   tabs,
   activeTab,
-  canAccess: (tab) => hasSlabAction(tab.value, 'view'),
+  canAccess: (tab) =>
+    hasSlabAction(tab.value, 'view') &&
+    (tab.value !== 'all' || hasSlabAction('warehouse', 'view') || hasSlabAction('selling', 'view')),
 });
 const loading = ref(false);
 const saving = ref(false);
@@ -1160,6 +1176,7 @@ const detailMediaItems = computed<DetailMediaItem[]>(() => {
 const confirmDialogVisible = ref(false);
 const reasonDialogVisible = ref(false);
 const offShelfHistoryVisible = ref(false);
+const offShelfHistoryTooltips = reactive<Record<number, boolean>>({});
 const offShelfHistoryRow = ref<SlabItem | null>(null);
 const offShelfHistoryRecords = computed(() =>
   [...(offShelfHistoryRow.value?.offShelfRecords ?? [])].sort((left, right) => {
@@ -1280,12 +1297,14 @@ const supplierFilterOptions = computed(() =>
   publishOptions.suppliers.map((item) => ({ id: item.id, name: item.label })),
 );
 const filters = reactive<Record<SlabTab, FilterState>>({
+  all: makeFilterState(),
   warehouse: makeFilterState(),
   selling: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
 });
 const appliedFilters = reactive<Record<SlabTab, FilterState>>({
+  all: makeFilterState(),
   warehouse: makeFilterState(),
   selling: makeFilterState(),
   soldOut: makeFilterState(),
@@ -1300,6 +1319,7 @@ const paginations = reactive<
     }
   >
 >({
+  all: { current: 1, pageSize: 10 },
   warehouse: { current: 1, pageSize: 10 },
   selling: { current: 1, pageSize: 10 },
   soldOut: { current: 1, pageSize: 10 },
@@ -1529,6 +1549,7 @@ const { isValidMeasurement, isValidSalesNumber, salesRules, stockInputProps, pro
 );
 // Fixed pixel widths; update only when the tab action buttons change.
 const operationWidths = {
+  all: 208,
   warehouse: 184,
   selling: 208,
   soldOut: 104,
@@ -1546,10 +1567,12 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'grade', title: '等级', width: 160, align: 'center' },
     { colKey: 'size', title: '尺寸', width: 170 },
     { colKey: 'tenant', title: '供应商', width: 180 },
-    ...stateActivityColumns(activeTab.value, toggleTimeSort),
   ];
-  if (activeTab.value === 'warehouse')
+  if (activeTab.value === 'warehouse' || activeTab.value === 'all')
     baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });
+  baseColumns.push(
+    ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),
+  );
   baseColumns.push({
     colKey: 'operation',
     title: '操作',
@@ -1557,7 +1580,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     align: 'left',
     fixed: 'right',
   });
-  return baseColumns;
+  return activeTab.value === 'all' ? baseColumns.filter((col) => col.colKey !== 'select') : baseColumns;
 });
 const currentFilter = computed(() => filters[activeTab.value]);
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
@@ -1582,7 +1605,12 @@ const productDialogTitle = computed(() => {
   return '查看商品';
 });
 const filteredData = computed(() =>
-  filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value, descending.value),
+  filterSlabItems(
+    activeTab.value === 'all' ? tableData.value.filter((row) => hasSlabAction(row.status, 'view')) : tableData.value,
+    activeTab.value,
+    currentAppliedFilter.value,
+    descending.value,
+  ),
 );
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
@@ -1591,12 +1619,22 @@ const pageData = computed(() => {
 const shelfErrors = reactive<Record<number, string>>({});
 const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
-const batchButtons = computed(() => slabBatchButtons(activeTab.value, hasSlabAction));
+const batchButtons = computed(() =>
+  activeTab.value === 'all'
+    ? hasSlabAction('warehouse', 'publish') || hasSlabAction('selling', 'publish')
+      ? [{ label: '发布商品', action: 'publish' as const, icon: 'add' }]
+      : []
+    : slabBatchButtons(activeTab.value, hasSlabAction),
+);
 const tabLabel = (tab: { label: string; value: SlabTab }) => {
-  const count = tableData.value.filter((item) => item.status === tab.value).length;
+  const count = tableData.value.filter((item) =>
+    tab.value === 'all'
+      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')
+      : item.status === tab.value,
+  ).length;
   return count ? `${tab.label} ${count}` : tab.label;
 };
-const rowActions = () => slabRowButtons(activeTab.value, hasSlabAction);
+const rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);
 const handleTabChange = () => {
   selectedKeys.value = [];
   ensureCurrentPage();
@@ -1753,7 +1791,9 @@ const openProductDialog = (mode: ProductMode, row?: SlabItem) => {
   }
   productMode.value = mode;
   publishTargetStatus.value =
-    mode === 'create' ? 'warehouse' : resolveSlabPublishTargetStatus(row?.status || activeTab.value);
+    mode === 'create'
+      ? 'warehouse'
+      : resolveSlabPublishTargetStatus(row?.status || (activeTab.value === 'all' ? 'warehouse' : activeTab.value));
   productTab.value = mode === 'view' ? 'sales' : 'images';
   editingRowId.value = row?.id ?? null;
   resetProductForm();
@@ -1974,7 +2014,7 @@ const handleProductSubmit = async () => {
       upsertSlabItem(await updateSlab(editingItem.id, payload));
     } else {
       upsertSlabItem(await createSlab(payload));
-      activeTab.value = publishTargetStatus.value;
+      if (activeTab.value !== 'all') activeTab.value = publishTargetStatus.value;
       paginations[publishTargetStatus.value].current = 1;
     }
     pendingUploadedMediaIds.clear();
@@ -2311,6 +2351,7 @@ const closeReasonDialog = () => {
   reasonFormRef.value?.clearValidate();
 };
 const openOffShelfHistory = (row: SlabItem) => {
+  offShelfHistoryTooltips[row.id] = false;
   offShelfHistoryRow.value = row;
   offShelfHistoryVisible.value = true;
 };

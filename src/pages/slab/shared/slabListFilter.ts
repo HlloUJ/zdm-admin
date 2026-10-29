@@ -1,3 +1,4 @@
+import { isAllProductStatus, sortProductsByCreation } from '@/services/productAllView';
 import { sortByStateActivity } from '@/services/productStateActivity';
 import type { SlabOffShelfRecord, SlabStatus } from '@/services/slabs';
 import type { FilterState, SlabItem } from './slabPageModel';
@@ -15,9 +16,14 @@ export const latestOffShelfRecord = (row: SlabItem) =>
     return timeDifference > 0 || (timeDifference === 0 && current.id > latest.id) ? current : latest;
   }, undefined);
 
-export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter: FilterState, descending = true) => {
+export const filterSlabItems = (
+  items: SlabItem[],
+  activeTab: SlabStatus | 'all',
+  filter: FilterState,
+  descending = true,
+) => {
   const matchedItems = items.filter((item) => {
-    const statusMatched = item.status === activeTab;
+    const statusMatched = activeTab === 'all' ? isAllProductStatus(item.status) : item.status === activeTab;
     const keyword = filter.keyword.trim().toLowerCase();
     const keywordMatched =
       !keyword ||
@@ -49,5 +55,5 @@ export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter
       entryByMatched
     );
   });
-  return sortByStateActivity(matchedItems, descending);
+  return activeTab === 'all' ? sortProductsByCreation(matchedItems) : sortByStateActivity(matchedItems, descending);
 };

@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { checkDecimalEditing } from './decimal-editing';
 import { expect, test } from '@playwright/test';
@@ -19,7 +20,7 @@ test.beforeEach(async ({ page }) => {
       }),
     );
   });
-  await page.goto('/supply-chain/slab-management');
+  await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
 });
 
 test('发布直接进入三段整页表单，导航固定且返回保留列表状态', async ({ page }) => {

@@ -1,0 +1,38 @@
+/* User-approved compact layout, limited to product state-time columns. */
+.product-state-time-column .product-state-time-title {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.t-table th.product-state-time-column .t-table__cell--title {
+  align-items: center;
+  gap: var(--td-comp-margin-xxs);
+}
+
+.product-state-time-column .t-table__filter-icon-wrap {
+  width: auto;
+  height: auto;
+  margin-left: 0;
+}
+
+.product-state-time-column .t-table__double-icons {
+  height: var(--td-font-size-body-medium);
+}
+
+.product-state-time-column .t-table__double-icons .t-table__sort-icon {
+  height: calc(var(--td-font-size-body-medium) / 2);
+  top: auto;
+  bottom: auto;
+}
+
+/* Let each native half-height sort control receive clicks, not the overlapping SVG canvas. */
+.product-state-time-column .t-table__sort-icon > svg {
+  pointer-events: none;
+}

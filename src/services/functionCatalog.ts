@@ -1,3 +1,4 @@
+import { productAllViewPages } from './productAllView';
 import { storeOrderPrototype } from '@/pages/order/prototype/resources';
 import { isFunctionAllowedForAudience } from './functionAudience';
 import { verifiedFunctionCatalog } from './functionCatalogAdminData';
@@ -87,6 +88,21 @@ const withDefaultViewAction = (scope: string, actions: FunctionAction[]) => [
   ...actions.filter((action) => !isViewPermission(action.value) && !isLegacyReadAction(action)),
 ];
 
+// Explicitly registered existing product pages; action references retain their original state grants.
+
+const productTabsWithAll = (page: FunctionPage): FunctionTab[] => {
+  if (!productAllViewPages.has(page.value)) return page.tabs;
+  const original = page.tabs.filter((tab) => tab.value !== `${page.value}.all`);
+  const referencedActions = original
+    .filter((tab) => /\.(warehouse|selling)$/.test(tab.value))
+    .flatMap((tab) =>
+      tab.actions
+        .filter((action) => /\.(publish|select|shelf|off-shelf|edit|delete)$/.test(action.value))
+        .map((action) => ({ ...action, label: `${tab.label} · ${action.label}` })),
+    );
+  return [{ label: '全部', value: `${page.value}.all`, actions: referencedActions }, ...original];
+};
+
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>
   modules.map((module) => ({
     ...module,
@@ -97,7 +113,7 @@ export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionM
         actions: page.tabs.length
           ? page.actions.filter((action) => !isLegacyReadAction(action))
           : withDefaultViewAction(page.value, page.actions),
-        tabs: page.tabs.map((tab) => ({
+        tabs: productTabsWithAll(page).map((tab) => ({
           ...tab,
           actions: withDefaultViewAction(tab.value, tab.actions),
         })),
@@ -323,19 +339,21 @@ const withAdministrationTabs = (modules: FunctionModule[]): FunctionModule[] =>
     })),
   }));
 
-export const fullFunctionCatalog = applyConfirmedNavigationStructure(
-  orderModulesByNavigation(
-    withDefaultViewPermissions(
-      withAdministrationTabs([
-        storeLevelModule,
-        storeProducts,
-        storeCustomerManagement,
-        storeOrderPrototype,
-        storePriceConfiguration,
-        ...verifiedFunctionCatalog,
-        supplyChainProducts,
-        supplyTypeModule,
-      ]),
+export const fullFunctionCatalog = withDefaultViewPermissions(
+  applyConfirmedNavigationStructure(
+    orderModulesByNavigation(
+      withDefaultViewPermissions(
+        withAdministrationTabs([
+          storeLevelModule,
+          storeProducts,
+          storeCustomerManagement,
+          storeOrderPrototype,
+          storePriceConfiguration,
+          ...verifiedFunctionCatalog,
+          supplyChainProducts,
+          supplyTypeModule,
+        ]),
+      ),
     ),
   ),
 );
@@ -396,7 +414,16 @@ export const getFunctionModulePermissionValues = (module?: FunctionModule) =>
       module?.menus.flatMap((menu) =>
         menu.pages.flatMap((page) => [
           ...page.actions.map((action) => action.value),
-          ...page.tabs.flatMap((tab) => tab.actions.map((action) => action.value)),
+          ...page.tabs.flatMap((tab) =>
+            tab.actions
+              .filter(
+                (action) =>
+                  !productAllViewPages.has(page.value) ||
+                  tab.value !== `${page.value}.all` ||
+                  action.value.startsWith(`${tab.value}.`),
+              )
+              .map((action) => action.value),
+          ),
         ]),
       ) ?? [],
     ),
@@ -497,6 +524,7 @@ export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], p
     const viewPermission = getRowViewPermissionValue(row);
     if (
       viewPermission &&
+      !(viewPermission.endsWith('.all.view') && productAllViewPages.has(viewPermission.slice(0, -9))) &&
       row.actions.some((action) => !isViewPermission(action.value) && selectedValues.has(action.value))
     ) {
       selectedValues.add(viewPermission);

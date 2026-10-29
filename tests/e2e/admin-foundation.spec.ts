@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks, setMockBusinessClient } from './admin-api-mocks';
@@ -22,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('keeps foundation pagination spacing consistent inside list layouts', async ({ page }) => {
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
 
   const styles = await page.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
     const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination');
@@ -66,7 +67,7 @@ test('uses the official TDesign pagination controls on routed list pages', async
 
   for (const route of routes) {
     await setMockBusinessClient(page, route === '/supplier-management' ? 'supply-chain' : 'admin');
-    await page.goto(route);
+    await page.goto(productWarehouseUrl(route));
     const pagination = page.locator('.zdm-admin-pagination:visible .t-pagination');
     await expect(pagination).toBeVisible();
     await expect(page.locator('.custom-pagination')).toHaveCount(0);
@@ -81,12 +82,12 @@ test('uses the official TDesign pagination controls on routed list pages', async
 test('matches the independent official filter grid and native pagination padding', async ({ page, context }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supplier-management');
+  await page.goto(productWarehouseUrl('/supplier-management'));
   const form = page.locator('.zdm-admin-filter-form');
   await expect(form).toBeVisible();
   const formWidth = (await form.boundingBox())!.width;
   const reference = await context.newPage();
-  await reference.goto('/tests/fixtures/official-ui/reference.html');
+  await reference.goto(productWarehouseUrl('/tests/fixtures/official-ui/reference.html'));
   await reference.locator('.list-common-table').evaluate((host, width) => {
     (host as HTMLElement).style.width = `${width + 64}px`;
     (host as HTMLElement).style.boxSizing = 'border-box';
@@ -128,7 +129,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
       body: JSON.stringify({ code: 0, message: 'ok', data: [] }),
     });
   });
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('请输入大板名称/ID/编号', { exact: true });
   expect((await page.locator('.slab-keyword-filter').boundingBox())!.width).toBeGreaterThan(200);
   await expect(page.locator('.filter-fields .t-form__label')).toHaveText([
@@ -185,7 +186,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
 for (const client of ['admin', 'supply-chain'] as const) {
   test(`${client} slab filters follow their configured grid and right-hand actions`, async ({ page }) => {
     await setMockBusinessClient(page, client);
-    await page.goto(client === 'admin' ? '/slab-management' : '/supply-chain/slab-management');
+    await page.goto(productWarehouseUrl(client === 'admin' ? '/slab-management' : '/supply-chain/slab-management'));
     const sizes = [
       [1920, 4],
       [1689, 4],
@@ -351,13 +352,13 @@ test('orders the requested management lists by creation time descending', async 
       }),
     );
 
-    await page.goto(item.path);
+    await page.goto(productWarehouseUrl(item.path));
     await expect(page.getByRole('main').locator('tbody tr').first()).toContainText(item.newerName);
   }
 });
 
 test('opens tenant create, business and edit dialogs', async ({ page }) => {
-  await page.goto('/tenant-management');
+  await page.goto(productWarehouseUrl('/tenant-management'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.page-header')).toHaveCount(0);
@@ -392,7 +393,7 @@ test('opens tenant create, business and edit dialogs', async ({ page }) => {
 });
 
 test('gates tenant actions by status and requires the exact name before permanent deletion', async ({ page }) => {
-  await page.goto('/tenant-management');
+  await page.goto(productWarehouseUrl('/tenant-management'));
 
   const enabledRow = page.locator('tbody tr').filter({ hasText: '装点猫直营租户' });
   await expect(enabledRow.getByText('业务开通', { exact: true })).toBeVisible();
@@ -424,7 +425,7 @@ test('gates tenant actions by status and requires the exact name before permanen
 });
 
 test('opens store create, level and edit dialogs', async ({ page }) => {
-  await page.goto('/tenant-store-management');
+  await page.goto(productWarehouseUrl('/tenant-store-management'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.page-header')).toHaveCount(0);
@@ -463,7 +464,7 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
 
 test('opens supplier create and edit dialogs', async ({ page }) => {
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supplier-management');
+  await page.goto(productWarehouseUrl('/supplier-management'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.page-header')).toHaveCount(0);
@@ -511,7 +512,7 @@ for (const route of [
   test(`uses consistent label and condition spacing across list filters: ${route}`, async ({ page }) => {
     await page.setViewportSize({ width: 1393, height: 868 });
     await setMockBusinessClient(page, route === '/supplier-management' ? 'supply-chain' : 'admin');
-    await page.goto(route);
+    await page.goto(productWarehouseUrl(route));
     const fields = page
       .locator('.zdm-admin-filter-form .filter-fields, .zdm-admin-filter-form .supply-type-filter-fields')
       .first();
@@ -547,7 +548,7 @@ test('resets category browsing and keeps the four-level filter popup stable', as
     route.fulfill({ json: { code: 0, data: [] } }),
   );
   await page.setViewportSize({ width: 1393, height: 868 });
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   const category = page.locator('.filter-fields .t-form__item').nth(1);
   await category.locator('.t-input').click();
   const panel = page.locator('.t-cascader__panel:visible');
@@ -576,7 +577,7 @@ test('resets category browsing and keeps the four-level filter popup stable', as
 
 test('keeps slab filters inside the card across status tabs', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
     await page
       .locator('.status-tabs')
@@ -643,7 +644,7 @@ test('shows warehouse actor and retained down-shelf reason instead of creator me
       },
     }),
   );
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   await page
     .locator('.status-tabs')
     .getByText(/^仓库中(?: [0-9]+)?$/)
@@ -661,7 +662,7 @@ test('shows warehouse actor and retained down-shelf reason instead of creator me
 test('does not add empty-cell padding to the finished stock horizontal scroll width', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [] } }));
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
     await page.locator('.status-tabs').getByText(tab, { exact: true }).click();
     const table = page.locator('.finished-stock-table');

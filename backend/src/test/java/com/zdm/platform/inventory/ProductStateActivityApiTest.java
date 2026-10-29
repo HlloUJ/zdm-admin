@@ -58,6 +58,25 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
         Stream.of("admin", "supply-chain").flatMap(client ->
             Stream.of("warehouse", "selling").map(state -> Arguments.of(kind, client, state))));
   }
+  static Stream<Arguments> allViewSurfaces() {
+    return Stream.of("finished", "accessory", "slab").flatMap(kind ->
+        Stream.of("admin", "supply-chain").map(client -> Arguments.of(kind, client)));
+  }
+  @ParameterizedTest @MethodSource("allViewSurfaces")
+  void allViewGrantNeverReplacesTheRealStateViewGrant(String kind, String client) throws Exception {
+    product(kind, "warehouse");
+    String prefix = client + "." + ("slab".equals(kind) ? "slab-management" : "finished".equals(kind) ? "finished-stock-management" : "accessory-management");
+    for (String stateGrant : List.of("none", "selling", "warehouse")) {
+      var permissions = new java.util.ArrayList<>(List.of(prefix + ".all.view"));
+      if (!"none".equals(stateGrant)) { permissions.add(prefix + "." + stateGrant + ".view"); }
+      var actor = new CurrentIdentity(1L, 1L, 1L, 1L, client, null, null, "受限汇总用户", "all", List.of("OPERATOR"), permissions);
+      SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(actor, null, List.of()));
+      JsonNode body = json.readTree(mvc.perform(get("/api/admin/" + endpoint(kind))).andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+      assertThat(body.path("code").asInt()).isZero();
+      boolean visible = body.path("data").findValues("id").stream().anyMatch(id -> id.asLong() == 99880L);
+      assertThat(visible).isEqualTo("warehouse".equals(stateGrant));
+    }
+  }
   private void identity(String client) {
     var actor = new CurrentIdentity(1L, 1L, 1L, 1L, client, null, null, "真实触发人", "all", List.of("OPERATOR"), List.of("all"));
     SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(actor, null, List.of()));

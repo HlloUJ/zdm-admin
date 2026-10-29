@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
 import { checkDecimalEditing } from './decimal-editing';
 import { expect, test, type Page } from '@playwright/test';
@@ -168,7 +169,7 @@ for (const displayMode of ['single', 'layered'] as const) {
       }
       return route.fulfill({ json: ok([]) });
     });
-    await page.goto('/store/accessory-management');
+    await page.goto(productWarehouseUrl('/store/accessory-management'));
     await page.getByRole('button', { name: '商品中心' }).click();
     const dialog = page.locator('.t-dialog:visible');
     await expect(dialog.getByText('商品中心', { exact: true })).toBeVisible();
@@ -330,7 +331,7 @@ test('store uses a direct menu, selects an operations product, and edits only it
     return route.fulfill({ json: ok(records[0]) });
   });
 
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const menu = page.getByRole('complementary');
   await expect(menu.getByText('配件管理', { exact: true })).toBeVisible();
   await expect(menu.getByText('价格配置', { exact: true })).toBeVisible();
@@ -429,7 +430,7 @@ test('upstream unavailable row is masked, with detail and purge only', async ({ 
   });
   await page.route('**/api/admin/store-accessory-products', (route) => route.fulfill({ json: ok([blocked]) }));
   await page.route('**/api/admin/store-accessory-products/41', (route) => route.fulfill({ json: ok(blocked) }));
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   await page.getByText(/已上架（1）/).click();
   const overlay = page.locator('.source-unavailable-overlay');
   await expect(overlay).toContainText('供应链下架');
@@ -474,7 +475,7 @@ for (const source of ['供应链', '运营端']) {
         if (path.endsWith('/41')) return route.fulfill({ json: ok(latest()) });
         return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : [latest()]) });
       });
-      await page.goto('/store/accessory-management');
+      await page.goto(productWarehouseUrl('/store/accessory-management'));
       const main = page.getByRole('main');
       const overlay = main.locator('.source-unavailable-overlay');
       await expect(main.getByText('门店测试商品', { exact: true })).toBeVisible();
@@ -549,7 +550,7 @@ for (const entry of ['门店详情', '商品中心详情']) {
         ),
       });
     });
-    await page.goto('/store/accessory-management');
+    await page.goto(productWarehouseUrl('/store/accessory-management'));
     if (entry === '门店详情')
       await page.locator('.source-unavailable-overlay').getByRole('button', { name: '详情', exact: true }).click();
     else {
@@ -591,7 +592,7 @@ test('store submission race refreshes upstream overlay instead of an ordinary er
     }
     return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : [latest()]) });
   });
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const main = page.getByRole('main');
   await main.getByText('上架', { exact: true }).click();
   await page.locator('.t-dialog:visible').getByRole('button', { name: '确认上架', exact: true }).click();
@@ -628,7 +629,7 @@ test('store price configuration separates category prices from role discounts', 
       ]),
     }),
   );
-  await page.goto('/store/price-configuration');
+  await page.goto(productWarehouseUrl('/store/price-configuration'));
   const main = page.getByRole('main');
   await expect(main.locator('.t-tabs')).toHaveCount(0);
   await main.locator('.price-menu .t-menu__item').filter({ hasText: '配件' }).last().click();
@@ -662,7 +663,7 @@ test('store operation logs show the same filter, pagination, and detail structur
   await page.route('**/api/admin/store-accessory-products/operation-logs/1', (route) =>
     route.fulfill({ json: ok(log) }),
   );
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   await page.getByRole('main').getByText('操作日志').click();
   const drawer = page.locator('.t-drawer--open').filter({ has: page.locator('.operation-log-filters') });
   await expect(drawer.locator('.operation-log-keyword-filter input')).toHaveAttribute(
@@ -721,7 +722,7 @@ for (const operationType of ['SOURCE_OFF_SHELF', 'OPERATIONS_OFF_SHELF']) {
         json: ok(path.endsWith('/categories') ? [] : [product({ status: 'selling', effectiveStatus: 'selling' })]),
       });
     });
-    await page.goto('/store/accessory-management');
+    await page.goto(productWarehouseUrl('/store/accessory-management'));
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
     const expectedSummary = source ? '该商品已被供应链下架' : '该商品已被运营管理平台下架';
     await expect(page.locator('.t-drawer--open').getByText(expectedSummary, { exact: true })).toBeVisible();
@@ -766,7 +767,7 @@ for (const operationType of ['SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE
       if (path.endsWith('/operation-logs')) return route.fulfill({ json: ok({ records: [log], total: 1 }) });
       return route.fulfill({ json: ok([]) });
     });
-    await page.goto('/store/accessory-management');
+    await page.goto(productWarehouseUrl('/store/accessory-management'));
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
     await page.locator('.t-drawer--open').getByText('详情', { exact: true }).click();
     const detail = page.locator('.t-dialog:visible');
@@ -804,7 +805,7 @@ test('store list applies keyword and operations category only after query', asyn
       ]),
     }),
   );
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const main = page.getByRole('main');
   const keyword = main.getByPlaceholder('请输入商品名称/ID/编号');
   const query = main.getByRole('button', { name: '查询', exact: true });
@@ -851,7 +852,7 @@ test('store batch shelf matches shared confirmation and partial failure feedback
     item.effectiveStatus = 'selling';
     return route.fulfill({ json: ok([item]) });
   });
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const main = page.getByRole('main');
   const button = main.getByRole('button', { name: '批量上架', exact: true });
   await expect(button).toBeDisabled();
@@ -934,7 +935,7 @@ for (const scenario of [
       }
       return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : records) });
     });
-    await page.goto('/store/accessory-management');
+    await page.goto(productWarehouseUrl('/store/accessory-management'));
     const main = page.getByRole('main');
     await main.getByText(`${scenario.tab}（1）`, { exact: true }).click();
     const button = main.getByRole('button', { name: scenario.button, exact: true });
@@ -991,7 +992,7 @@ test('store batch off shelf uses operations reason dialog and failure feedback',
     }
     return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : records) });
   });
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const main = page.getByRole('main');
   await main.getByText('已上架（1）', { exact: true }).click();
   const button = main.getByRole('button', { name: '批量下架', exact: true });
@@ -1052,7 +1053,7 @@ test('store list header checkbox selects and clears only the current page', asyn
     product({ id: index + 1, productId: index + 101, name: `门店分页商品${index + 1}` }),
   );
   await page.route('**/api/admin/store-accessory-products', (route) => route.fulfill({ json: ok(records) }));
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const main = page.getByRole('main');
   const header = main.locator('thead .t-checkbox');
   const rows = main.locator('tbody .t-checkbox');
@@ -1090,7 +1091,7 @@ test('product center paginates and header checkbox selects only the current page
     if (path.endsWith('/select')) selectedIds = route.request().postDataJSON().productIds;
     return route.fulfill({ json: ok([]) });
   });
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   await page.getByRole('button', { name: '商品中心' }).click();
   const dialog = page.locator('.t-dialog:visible');
   const header = dialog.locator('thead .t-checkbox');
@@ -1160,7 +1161,7 @@ test('selection log displays historical product, store prices and media without 
     if (path.endsWith('/operation-logs')) return route.fulfill({ json: ok({ records: [log], total: 1 }) });
     return route.fulfill({ json: ok([]) });
   });
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   await page.getByRole('main').getByText('操作日志').click();
   await page.locator('.t-drawer:visible').getByText('详情', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
@@ -1194,7 +1195,7 @@ test('invalid warehouse overlay excludes selection and shows only the source rea
     const path = new URL(route.request().url()).pathname;
     return route.fulfill({ json: ok(path.endsWith('/categories') ? [] : path.endsWith('/41') ? blocked : [blocked]) });
   });
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const main = page.getByRole('main');
   const overlay = main.locator('.source-unavailable-overlay');
   await expect(overlay).toContainText('该商品已被运营管理平台下架');
@@ -1232,7 +1233,7 @@ test('store editor requires category, leaves missing prices empty, and follows o
       ]),
     }),
   );
-  await page.goto('/store/accessory-management/41/edit');
+  await page.goto(productWarehouseUrl('/store/accessory-management/41/edit'));
   const main = page.getByRole('main');
   const input = main.locator('.store-sale-price-input input');
   await expect(input).toHaveValue('');
@@ -1306,7 +1307,7 @@ test('store editor keeps wide sales specifications inside the content area', asy
   await page.route('**/api/admin/store-accessory-products/41/edit-categories', (route) =>
     route.fulfill({ json: ok([{ id: 7, parentId: null, name: '门店餐桌', status: 'enabled', coefficient: 1.5 }]) }),
   );
-  await page.goto('/store/accessory-management/41/edit');
+  await page.goto(productWarehouseUrl('/store/accessory-management/41/edit'));
   const main = page.getByRole('main');
   await expect(main.getByRole('heading', { name: '编辑商品', exact: true })).toBeVisible();
   const noPageOverflow = () =>
@@ -1332,7 +1333,7 @@ test('supply price attention stays on its product row, can be dismissed and retu
       json: ok([product({ salePriceAttention: true }), product({ id: 42, productId: 92, name: '正常价格商品' })]),
     }),
   );
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const main = page.locator('main.page');
   const warning = main.locator('.finished-row-warning');
   await expect(warning).toHaveCount(1);
@@ -1373,7 +1374,7 @@ for (const [status, tab] of [['recycle', '回收站']] as const) {
     };
     await page.route('**/api/admin/store-accessory-products', (route) => route.fulfill({ json: ok([old]) }));
     await page.route('**/api/admin/store-accessory-products/41', (route) => route.fulfill({ json: ok(latest) }));
-    await page.goto('/store/accessory-management');
+    await page.goto(productWarehouseUrl('/store/accessory-management'));
     const main = page.locator('main.page');
     await main.getByText(`${tab}（1）`, { exact: true }).click();
     await expect(main.getByText('编辑', { exact: true })).toHaveCount(0);
@@ -1395,7 +1396,7 @@ test('store log-only permission keeps its native toolbar entry without exposing 
   await page.route('**/api/admin/store-accessory-products/operation-logs?**', (route) =>
     route.fulfill({ json: ok({ records: [], total: 0 }) }),
   );
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   const main = page.getByRole('main');
   const log = main.locator('.zdm-admin-list-toolbar__auxiliary').getByRole('button', { name: '操作日志', exact: true });
   await expect(log).toBeVisible();
@@ -1423,7 +1424,7 @@ test('single off shelf marks the existing required reason and keeps details opti
     if (path.endsWith('/categories')) return route.fulfill({ json: ok([]) });
     return route.fulfill({ json: ok([record]) });
   });
-  await page.goto('/store/accessory-management');
+  await page.goto(productWarehouseUrl('/store/accessory-management'));
   await page.getByRole('main').getByText('已上架（1）', { exact: true }).click();
   await page.locator('tr').filter({ hasText: '门店测试商品' }).getByText('下架', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');

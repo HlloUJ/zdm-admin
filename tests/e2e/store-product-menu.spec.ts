@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -27,7 +28,7 @@ for (const scopes of [
         }),
       );
     }, scopes);
-    await page.goto(scopes.length ? `/store/${scopes[0]}` : '/dashboard');
+    await page.goto(productWarehouseUrl(scopes.length ? `/store/${scopes[0]}` : '/dashboard'));
     const sidebar = page.locator('.side-nav');
     const group = sidebar.locator('.menu-level-one').filter({ hasText: '商品管理' });
     await expect(group).toHaveCount(scopes.length ? 1 : 0);

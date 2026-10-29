@@ -1,5 +1,10 @@
-import { Button } from 'tdesign-vue-next';
+import { h } from 'vue';
+import { CaretDownSmallIcon } from 'tdesign-icons-vue-next';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
+import './productStateActivity.css';
+
+/** Keep native table sorting and active colors; only replace the default chevrons. */
+export const stateActivitySortIcon = () => h(CaretDownSmallIcon, { size: 'small' });
 
 const labels: Record<string, [string, string]> = {
   warehouse: ['入库人', '入库时间'],
@@ -13,8 +18,9 @@ export function stateActivityColumns(status: string, toggleTimeSort?: () => void
     ...(actor ? [{ colKey: 'stateOperatorName', title: actor, width: 120, align: 'center' as const }] : []),
     {
       colKey: 'stateOperatedAt',
+      className: 'product-state-time-column',
       title: toggleTimeSort
-        ? (h) => h(Button, { variant: 'text', theme: 'default', size: 'small', onClick: toggleTimeSort }, () => time)
+        ? (h) => h('button', { type: 'button', class: 'product-state-time-title', onClick: toggleTimeSort }, time)
         : time,
       width: 180,
       align: 'center',

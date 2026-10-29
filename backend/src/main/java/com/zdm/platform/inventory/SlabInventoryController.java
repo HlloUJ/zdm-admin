@@ -79,7 +79,10 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @GetMapping
   public ApiResponse<List<SlabInventory>> list() {
     permissionGuard.requireView(prefix());
-    return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()).stream().map(this::visiblePrices).toList());
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()).stream()
+        .filter(item -> permissionGuard.hasPermission(prefix() + ".view")
+            || permissionGuard.hasPermission(permission(statusScope(isSupplyChain() ? item.getSourceStatus() : item.getStatus()), "view")))
+        .map(this::visiblePrices).toList());
   }
 
   @GetMapping("/{id}")

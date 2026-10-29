@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -55,7 +56,7 @@ for (const width of [1366, 768, 390]) {
         },
       }),
     );
-    await page.goto('/role-management');
+    await page.goto(productWarehouseUrl('/role-management'));
     const pager = page.locator('main .t-pagination');
     await expect(pager).toBeVisible();
     await expect(page.locator('.zdm-admin-list-layout__pagination')).toHaveCSS('padding', '16px');
@@ -76,7 +77,7 @@ for (const width of [1366, 768, 390]) {
   test(`order tables keep independent page sizes and correct totals at ${width}px`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });
     await setup(page, true);
-    await page.goto('/store/order-management/sales');
+    await page.goto(productWarehouseUrl('/store/order-management/sales'));
     await expect(page.getByText(/^XS\d{13}$/).first()).toBeVisible();
     await page.evaluate(() => {
       const key = Object.keys(localStorage).find((key) => key.startsWith('zdm-order-prototype-v1:'))!;
@@ -118,7 +119,7 @@ for (const width of [1366, 768, 390]) {
       ['fulfillment', 30],
       ['settings', 45],
     ] as const) {
-      await page.goto(`/store/order-management/${route}`);
+      await page.goto(productWarehouseUrl(`/store/order-management/${route}`));
       const pager = page.locator('main .t-pagination');
       const table = page.locator('main .t-table:has(.t-pagination)');
       await expect(pager.locator('.t-pagination__total')).toHaveText(`共 ${total} 条数据`);
@@ -129,7 +130,7 @@ for (const width of [1366, 768, 390]) {
       await chooseTwenty(page);
       await expect(table.locator('tbody > tr')).toHaveCount(20);
     }
-    await page.goto('/store/order-management/sales');
+    await page.goto(productWarehouseUrl('/store/order-management/sales'));
     await page.getByRole('button', { name: '详情', exact: true }).first().click();
     await expect(page.getByRole('main').getByText('金额计算过程', { exact: true })).toBeVisible();
     const pager = page.locator('main .t-pagination');

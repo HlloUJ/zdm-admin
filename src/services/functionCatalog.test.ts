@@ -130,8 +130,8 @@ describe('full function catalog', () => {
         .flatMap((m) => m.menus)
         .flatMap((m) => m.pages)
         .find((p) => p.value === `supply-chain.${module}`)!;
-      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已售完', '回收站']);
-      expect(sourcePage.tabs.map((tab) => tab.actions.map((action) => action.label))).toEqual([
+      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);
+      expect(sourcePage.tabs.slice(1).map((tab) => tab.actions.map((action) => action.label))).toEqual([
         ['查看', '发布商品', '批量上架', '上架', '编辑', '删除'],
         ['查看', '发布商品', '批量下架', '下架', '编辑', '删除'],
         ['查看', '详情'],
@@ -169,8 +169,8 @@ describe('full function catalog', () => {
       true,
     );
     expect(collectFunctionCatalogRows(products).map((row) => row.menuLabel)).toEqual([
-      ...Array(5).fill('成品现货管理'),
-      ...Array(5).fill('配件管理'),
+      ...Array(6).fill('成品现货管理'),
+      ...Array(6).fill('配件管理'),
     ]);
     for (const scope of ['finished-stock-management', 'accessory-management']) {
       const assigned = [`store.${scope}.warehouse.view`, `store.${scope}.warehouse.edit`];
@@ -191,10 +191,16 @@ describe('full function catalog', () => {
       ['配件管理', 'store.accessory-management.menu', false],
     ]);
     expect(stock.menus[0].direct).toBe(false);
-    expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已售完', '回收站']);
+    expect(stock.menus[0].pages[0].tabs.map((tab) => tab.label)).toEqual([
+      '全部',
+      '仓库中',
+      '已上架',
+      '已售完',
+      '回收站',
+    ]);
     const storeValues = getFunctionCatalogPermissionValues(terminalFunctionTrees.store);
     expect(storeValues).toContain('store.finished-stock-management.warehouse.select');
-    expect(stock.menus[0].pages[0].tabs.slice(0, 2).map((tab) => tab.actions.map((action) => action.label))).toEqual([
+    expect(stock.menus[0].pages[0].tabs.slice(1, 3).map((tab) => tab.actions.map((action) => action.label))).toEqual([
       ['查看', '商品中心', '批量上架', '上架', '编辑', '删除'],
       ['查看', '批量下架', '下架', '编辑', '删除'],
     ]);
@@ -461,7 +467,9 @@ describe('finished stock catalog contract', () => {
       .flatMap((m) => m.menus)
       .find((m) => m.value === 'admin.finished-stock-management.menu')!.pages[0];
     expect(
-      page.tabs.map((tab) => [tab.label, tab.value, tab.actions.map((action) => [action.label, action.value])]),
+      page.tabs
+        .slice(1)
+        .map((tab) => [tab.label, tab.value, tab.actions.map((action) => [action.label, action.value])]),
     ).toEqual([
       [
         '仓库中',
@@ -507,13 +515,13 @@ describe('finished stock catalog contract', () => {
         ],
       ],
     ]);
-    expect(page.tabs.flatMap((tab) => tab.actions)).toHaveLength(19);
+    expect(page.tabs.slice(1).flatMap((tab) => tab.actions)).toHaveLength(19);
     expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);
     const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>
       value.startsWith('admin.finished-stock-management.'),
     );
-    expect(values).toHaveLength(20);
-    expect(new Set(values).size).toBe(20);
+    expect(values).toHaveLength(21);
+    expect(new Set(values).size).toBe(21);
     expect(page.tabs.flatMap((tab) => tab.actions).some((action) => ['查询', '重置'].includes(action.label))).toBe(
       false,
     );
@@ -577,12 +585,12 @@ describe('slab operations details', () => {
       .flatMap((module) => module.menus)
       .flatMap((menu) => menu.pages)
       .find((item) => item.value === 'admin.slab-management')!;
-    expect(page.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已售完', '回收站']);
-    expect(page.tabs.slice(0, 2).map((tab) => tab.actions.map((action) => action.label))).toEqual([
+    expect(page.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);
+    expect(page.tabs.slice(1, 3).map((tab) => tab.actions.map((action) => action.label))).toEqual([
       ['查看', '批量上架', '上架', '编辑', '删除'],
       ['查看', '批量下架', '下架', '编辑', '删除'],
     ]);
-    for (const tab of page.tabs) {
+    for (const tab of page.tabs.filter((tab) => !tab.value.endsWith('.all'))) {
       const active = tab.value.endsWith('.warehouse') || tab.value.endsWith('.selling');
       expect(tab.actions.filter((action) => action.value.endsWith(active ? '.edit' : '.detail'))).toEqual([
         { label: active ? '编辑' : '详情', value: `${tab.value}.${active ? 'edit' : 'detail'}` },

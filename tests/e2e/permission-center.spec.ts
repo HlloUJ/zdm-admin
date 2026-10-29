@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
@@ -65,7 +66,7 @@ test('allows account 15900000001 to operate the granted attribute tab', async ({
     );
   });
 
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
   const main = page.getByRole('main');
   const row = main.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
   const actions = row.locator('.table-actions');
@@ -127,7 +128,7 @@ test('allows account 15900000001 to operate the granted attribute-value tab', as
     );
   });
 
-  await page.goto('/product-attribute-value');
+  await page.goto(productWarehouseUrl('/product-attribute-value'));
   const main = page.getByRole('main');
   const row = main.locator('tbody tr').filter({ hasText: 'E2E 共享属性值' });
   const actions = row.locator('.table-actions');
@@ -167,7 +168,7 @@ test('shows only granted craft operation buttons for a restricted account', asyn
     );
   });
 
-  await page.goto('/finished-stock-craft');
+  await page.goto(productWarehouseUrl('/finished-stock-craft'));
   const main = page.getByRole('main');
   const craftRow = main.locator('tbody tr').filter({ hasText: 'E2E 边工艺' });
   const craftActions = craftRow.locator('.table-actions');
@@ -202,7 +203,7 @@ test('shows only granted category operation buttons for a restricted account', a
     );
   });
 
-  await page.goto('/product-category');
+  await page.goto(productWarehouseUrl('/product-category'));
   const main = page.getByRole('main');
   const categoryRow = main.locator('tbody tr').filter({ hasText: '成品现货' });
   const categoryActions = categoryRow.locator('.table-actions');
@@ -241,7 +242,7 @@ test('shows the finished category buttons granted to account 15900000001', async
     );
   });
 
-  await page.goto('/product-category');
+  await page.goto(productWarehouseUrl('/product-category'));
   const main = page.getByRole('main');
   const rootRow = main.locator('tbody tr').filter({ hasText: '成品现货' });
   const rootActions = rootRow.locator('.table-actions');
@@ -275,7 +276,7 @@ test('shows only the granted product category tab', async ({ page }) => {
     );
   });
 
-  await page.goto('/product-category');
+  await page.goto(productWarehouseUrl('/product-category'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.scope-tabs')).toHaveCount(0);
@@ -310,7 +311,7 @@ test('falls back to the only granted product category tab', async ({ page }) => 
       },
     }),
   );
-  await page.goto('/product-category');
+  await page.goto(productWarehouseUrl('/product-category'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.scope-tabs')).toHaveCount(0);
@@ -335,7 +336,7 @@ test('shows slab variety edit without status operation for an edit-only account'
     );
   });
 
-  await page.goto('/slab-variety');
+  await page.goto(productWarehouseUrl('/slab-variety'));
   const main = page.getByRole('main');
   const varietyRow = main.locator('tbody tr').filter({ hasText: '潘多拉' });
   const varietyActions = varietyRow.locator('.table-actions');
@@ -367,7 +368,7 @@ test('shows slab variety status without edit operation for a status-only account
     );
   });
 
-  await page.goto('/slab-variety');
+  await page.goto(productWarehouseUrl('/slab-variety'));
   const main = page.getByRole('main');
   const varietyRow = main.locator('tbody tr').filter({ hasText: '潘多拉' });
   const varietyActions = varietyRow.locator('.table-actions');
@@ -396,7 +397,7 @@ test('shows supplier status without unrelated operations for a status-only accou
     );
   });
 
-  await page.goto('/supplier-management');
+  await page.goto(productWarehouseUrl('/supplier-management'));
   const main = page.getByRole('main');
   const supplierRow = main.locator('tbody tr').filter({ hasText: '装点猫大板供应商' }).first();
   const supplierActions = supplierRow.locator('.table-actions');
@@ -425,7 +426,7 @@ test('allows account 15900000002 with all data scope to view all suppliers', asy
     );
   });
 
-  await page.goto('/supplier-management');
+  await page.goto(productWarehouseUrl('/supplier-management'));
   const main = page.getByRole('main');
 
   await expect(main.getByText('装点猫大板供应商', { exact: true })).toBeVisible();
@@ -435,7 +436,7 @@ test('allows account 15900000002 with all data scope to view all suppliers', asy
 });
 
 test('opens employee invitation and edit dialogs', async ({ page }) => {
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.page-header')).toHaveCount(0);
@@ -506,7 +507,7 @@ test('employee invitation follows the selected system tab', async ({ page }) => 
   await page.route(/\/api\/admin\/employees\?clientCode=supply-chain$/, (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, data: [] }) }),
   );
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   for (const [label, client] of [
     ['运营管理平台', 'admin'],
     ['供应链协同系统', 'supply-chain'],
@@ -533,7 +534,7 @@ test('supply chain invitation displays its server-bound system', async ({ page }
       }),
     }),
   );
-  await page.goto('/employee-invite?token=e2e-invite-token&clientCode=admin');
+  await page.goto(productWarehouseUrl('/employee-invite?token=e2e-invite-token&clientCode=admin'));
   await expect(page.getByRole('heading', { name: '供应链协同系统员工注册' })).toBeVisible();
 });
 
@@ -568,7 +569,7 @@ test('platform supply-chain invitation keeps registration steps and enables admi
       }),
     }),
   );
-  await page.goto('/employee-invite?token=e2e-invite-token');
+  await page.goto(productWarehouseUrl('/employee-invite?token=e2e-invite-token'));
   await expect(page.getByRole('heading', { name: '供应链协同系统员工注册' })).toBeVisible();
   await page.getByPlaceholder('请输入手机号').fill('15926627771');
   await page.getByRole('button', { name: '获取验证码' }).click();
@@ -583,7 +584,7 @@ test('platform supply-chain invitation keeps registration steps and enables admi
 });
 
 test('registers from employee invite link', async ({ page }) => {
-  await page.goto('/employee-invite?token=e2e-invite-token');
+  await page.goto(productWarehouseUrl('/employee-invite?token=e2e-invite-token'));
 
   await expect(page.getByRole('heading', { name: '运营管理平台员工注册' })).toBeVisible();
   await page.getByPlaceholder('请输入手机号').fill('15926629999');
@@ -632,7 +633,7 @@ for (const { canLogin, existingEmployee } of [
     page.on('request', (request) => {
       if (request.url().endsWith('/register')) registerCalls += 1;
     });
-    await page.goto('/employee-invite?token=e2e-invite-token');
+    await page.goto(productWarehouseUrl('/employee-invite?token=e2e-invite-token'));
     await page.getByPlaceholder('请输入手机号').fill('15926626945');
     await page.getByRole('button', { name: '获取验证码' }).click();
     await expect(page.getByText('验证码已发送')).toBeVisible();
@@ -661,7 +662,7 @@ for (const message of ['邀请链接已使用', '邀请链接已过期']) {
         body: JSON.stringify({ code: 400, message, data: null }),
       }),
     );
-    await page.goto('/employee-invite?token=e2e-invite-token');
+    await page.goto(productWarehouseUrl('/employee-invite?token=e2e-invite-token'));
     await expect(page.getByRole('heading', { name: '邀请链接不可用' })).toBeVisible();
     await expect(page.getByText(message)).toBeVisible();
     await expect(page.getByRole('button', { name: '下一步' })).toHaveCount(0);
@@ -669,7 +670,7 @@ for (const message of ['邀请链接已使用', '邀请链接已过期']) {
 }
 
 test('employee permission dialog validates only after submit and clears errors on reopen', async ({ page }) => {
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   const row = page.locator('tbody tr').filter({ hasText: '15926628888' }).first();
   await row.getByText('角色', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '配置权限' });
@@ -690,7 +691,7 @@ test('employee permission dialog validates only after submit and clears errors o
 });
 
 test('validates role and data permission before enabling employee', async ({ page }) => {
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
 
   const pendingEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926628888' }).first();
   await expect(pendingEmployeeRow).toBeVisible();
@@ -702,7 +703,7 @@ test('validates role and data permission before enabling employee', async ({ pag
 });
 
 test('opens enable confirmation after employee permissions are configured', async ({ page }) => {
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
 
   const pendingEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926628888' }).first();
   await expect(pendingEmployeeRow).toBeVisible();
@@ -754,7 +755,7 @@ test('filters menu and employee actions by logged-in permissions', async ({ page
     );
   });
 
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   const sideNav = page.locator('.side-nav');
   const firstEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926626945' }).first();
   const firstEmployeeActions = firstEmployeeRow.locator('.table-actions');
@@ -798,7 +799,7 @@ test('shows employee permission action without edit action for permission-only u
     );
   });
 
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   const permissionOnlyEmployeeRow = page.locator('tbody tr').filter({ hasText: '15926628888' }).first();
   const permissionOnlyEmployeeActions = permissionOnlyEmployeeRow.locator('.table-actions');
   await expect(permissionOnlyEmployeeActions.getByText('编辑', { exact: true })).toHaveCount(0);
@@ -832,7 +833,7 @@ test('allows granted employee operations for records created by another account'
     );
   });
 
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   const row = page.locator('tbody tr').filter({ hasText: '15926627777' }).first();
   const actions = row.locator('.table-actions');
 
@@ -882,7 +883,7 @@ test('hides all operations for the current employee', async ({ page }) => {
     );
   });
 
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   const row = page.locator('tbody tr').filter({ hasText: '15926627777' }).first();
 
   const actions = row.locator('.table-actions');
@@ -912,7 +913,7 @@ test('shows current account info and logout on tenant management page', async ({
     );
   });
 
-  await page.goto('/tenant-management');
+  await page.goto(productWarehouseUrl('/tenant-management'));
 
   await expect(page.locator('.top-nav .user-name')).toHaveText('租户管理员');
   await expect(page.locator('.top-nav .user-role')).toHaveText('租户管理员');
@@ -938,7 +939,7 @@ test('shows only granted store management operations for a restricted account', 
     );
   });
 
-  await page.goto('/tenant-store-management');
+  await page.goto(productWarehouseUrl('/tenant-store-management'));
   const main = page.getByRole('main');
   const row = main.locator('tbody tr').filter({ hasText: '杭州体验门店' });
 
@@ -975,7 +976,7 @@ test('filters role actions by logged-in permissions', async ({ page }) => {
     );
   });
 
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   const main = page.getByRole('main');
   const sideNav = page.locator('.side-nav');
 
@@ -1014,7 +1015,7 @@ test('allows granted role operations for records created by another account', as
     );
   });
 
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   const row = page.locator('tbody tr').filter({ hasText: '运营管理平台角色' }).first();
   const actions = row.locator('.table-actions');
 
@@ -1035,7 +1036,7 @@ test('allows granted role operations for records created by another account', as
 });
 
 test('opens role permission configuration dialog', async ({ page }) => {
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   const main = page.getByRole('main');
   await expect(main.locator('.page-header')).toHaveCount(0);
   await expect(main.locator('.role-tabs')).toHaveCount(0);
@@ -1115,11 +1116,12 @@ test('opens role permission configuration dialog', async ({ page }) => {
     '删除',
   ]);
   await roleModuleList.getByText('商品管理', { exact: true }).click();
-  await expect(roleMatrix.locator('tbody tr')).toHaveCount(34);
+  await expect(roleMatrix.locator('tbody tr')).toHaveCount(37);
   const finishedRows = roleMatrix.locator('tbody tr');
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
+    ['查看', '仓库中 · 上架', '仓库中 · 编辑', '仓库中 · 删除', '已上架 · 下架', '已上架 · 编辑', '已上架 · 删除'],
     ['查看', '批量上架', '上架', '编辑', '删除'],
     ['查看', '批量下架', '下架', '编辑', '删除'],
     ['查看', '详情'],
@@ -1128,9 +1130,9 @@ test('opens role permission configuration dialog', async ({ page }) => {
   for (const [index, labels] of expectedFinishedActions.entries()) {
     await expect(finishedRows.nth(index).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
   }
-  await expect(finishedRows.nth(5)).toContainText('配件管理页');
+  await expect(finishedRows.nth(6)).toContainText('配件管理页');
   for (const [index, labels] of expectedFinishedActions.entries()) {
-    await expect(finishedRows.nth(index + 5).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
+    await expect(finishedRows.nth(index + 6).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
   }
   await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(adminProductSecondMenuLabels);
   await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
@@ -1309,7 +1311,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
 });
 
 test('filters terminal allocation to shared and terminal-only modules and persists selection', async ({ page }) => {
-  await page.goto('/terminal-function-allocation');
+  await page.goto(productWarehouseUrl('/terminal-function-allocation'));
   const main = page.getByRole('main');
   const moduleList = main.locator('.permission-module-list');
   const matrix = main.locator('.permission-matrix');
@@ -1404,7 +1406,7 @@ test('filters terminal allocation to shared and terminal-only modules and persis
 test('assigns supply-chain selling delete rights separately for finished stock, accessories and slabs', async ({
   page,
 }) => {
-  await page.goto('/terminal-function-allocation');
+  await page.goto(productWarehouseUrl('/terminal-function-allocation'));
   const main = page.getByRole('main');
   await main.locator('.terminal-tabs').getByText('供应链协同系统', { exact: true }).click();
   await main.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
@@ -1449,7 +1451,7 @@ for (const storeType of ['cityPartner', 'slabSupplier']) {
         }),
       );
     }, storeType);
-    await page.goto('/store-category-management');
+    await page.goto(productWarehouseUrl('/store-category-management'));
     await expect(page).toHaveURL(/store-category-management$/);
     const menu = page.locator('.side-nav');
     await expect(menu.getByText('门店分类管理', { exact: true })).toBeVisible();
@@ -1458,9 +1460,9 @@ for (const storeType of ['cityPartner', 'slabSupplier']) {
     await expect(menu.locator('[data-menu-path="/accessory-management"]')).toHaveCount(0);
     await expect(menu.getByText('租户与门店', { exact: true })).toHaveCount(0);
     await expect(menu.getByText('终端功能分配', { exact: true })).toHaveCount(0);
-    await page.goto('/terminal-function-allocation');
+    await page.goto(productWarehouseUrl('/terminal-function-allocation'));
     await expect(page).not.toHaveURL(/terminal-function-allocation$/);
-    await page.goto('/product-category');
+    await page.goto(productWarehouseUrl('/product-category'));
     await expect(page).not.toHaveURL(/product-category$/);
   });
 }
@@ -1479,13 +1481,13 @@ test('rejects platform allocation access with legacy view permission', async ({ 
       }),
     );
   });
-  await page.goto('/terminal-function-allocation');
+  await page.goto(productWarehouseUrl('/terminal-function-allocation'));
   await expect(page).not.toHaveURL(/terminal-function-allocation$/);
   await expect(page.locator('.side-nav').getByText('终端功能分配', { exact: true })).toHaveCount(0);
 });
 
 test('allocates supply chain employee and role management and persists selection', async ({ page }) => {
-  await page.goto('/terminal-function-allocation');
+  await page.goto(productWarehouseUrl('/terminal-function-allocation'));
   const main = page.getByRole('main');
   await main.locator('.terminal-tabs').getByText('供应链协同系统', { exact: true }).click();
   await main.locator('.permission-module-list').getByText('权限管理', { exact: true }).click();
@@ -1544,7 +1546,7 @@ test('supply chain view-only staff pages use own system and hide actions and pla
     ['role-management', 'roles'],
   ]) {
     const request = page.waitForRequest((r) => r.url().includes(`/api/admin/${api}?`));
-    await page.goto('/' + path);
+    await page.goto(productWarehouseUrl('/' + path));
     expect(new URL((await request).url()).searchParams.get('clientCode')).toBe('supply-chain');
     await expect(page.getByRole('main').locator('.t-tabs__nav')).toHaveCount(0);
     await expect(page.getByRole('main').getByRole('button', { name: /邀请员工|新增/ })).toHaveCount(0);
@@ -1581,7 +1583,7 @@ test('supply chain manages its own roles independently of creation source', asyn
       }),
     }),
   );
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   for (const name of ['平台创建角色', '历史来源未确认']) {
     const row = page.locator('tbody tr').filter({ hasText: name });
     await expect(row).toBeVisible();
@@ -1599,7 +1601,7 @@ test('platform roles stay on its own client and supply-chain administrators have
   page.on('request', (r) => {
     if (r.url().includes('/api/admin/roles?')) roleRequests.push(r.url());
   });
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   await expect(page.getByRole('main').locator('.t-tabs__nav')).toHaveCount(0);
   expect(roleRequests.every((url) => new URL(url).searchParams.get('clientCode') === 'admin')).toBe(true);
   await page.route(/\/api\/admin\/employees\?clientCode=supply-chain$/, (route) =>
@@ -1619,7 +1621,7 @@ test('platform roles stay on its own client and supply-chain administrators have
       }),
     }),
   );
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   await page.getByRole('main').locator('.t-tabs__nav-item').filter({ hasText: '供应链协同系统' }).click();
   const row = page.locator('tbody tr').filter({ hasText: '初始管理员' });
   await expect(row).toBeVisible();
@@ -1657,7 +1659,7 @@ test('platform edits, disables, enables and deletes only the selected supply-cha
     administrator = { ...administrator, ...route.request().postDataJSON() };
     return route.fulfill({ contentType: 'application/json', body: JSON.stringify({ code: 0, data: administrator }) });
   });
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   await page.getByRole('main').locator('.t-tabs__nav-item').filter({ hasText: '供应链协同系统' }).click();
   const row = page.locator('tbody tr').filter({ hasText: '15926627771' });
   await expect(row.locator('.table-actions .t-link')).toHaveText(['编辑', '停用', '删除']);
@@ -1715,7 +1717,7 @@ test('shows only granted attribute tabs and falls back to the first accessible t
     );
   });
 
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属属性', '配件专属属性']);
@@ -1742,7 +1744,7 @@ test('shows only granted attribute-value tabs and falls back to the first access
     );
   });
 
-  await page.goto('/product-attribute-value');
+  await page.goto(productWarehouseUrl('/product-attribute-value'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.scope-controls .t-tabs__nav-item')).toHaveText(['成品现货专属值', '配件专属值']);
@@ -1771,7 +1773,7 @@ for (const identity of [
         }),
       );
     }, identity);
-    await page.goto('/terminal-function-allocation');
+    await page.goto(productWarehouseUrl('/terminal-function-allocation'));
     await expect(page).not.toHaveURL(/terminal-function-allocation$/);
     await expect(page.locator('.side-nav').getByText('终端功能分配', { exact: true })).toHaveCount(0);
   });
@@ -1826,7 +1828,7 @@ test('builtin store manager exposes permissions only while ordinary roles keep e
       },
     });
   });
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   const manager = page.locator('tbody tr').filter({ hasText: '店长' });
   await expect(manager.locator('.table-actions .t-link')).toHaveText(['权限']);
   const ordinary = page.locator('tbody tr').filter({ hasText: '普通导购' });
@@ -1871,7 +1873,7 @@ test('store role customer matrix retains bulk assignment and removes retired sta
     }
     return route.fulfill({ json: { code: 0, data: [role] } });
   });
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   await page.locator('tbody tr').filter({ hasText: '普通导购' }).getByText('权限', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
   await dialog.locator('.permission-module-list').getByText('客户管理', { exact: true }).click();

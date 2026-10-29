@@ -1,3 +1,4 @@
+import { productAllViewPages } from './productAllView';
 import { canPreviewStoreOrders } from './orderPrototypePreview';
 import { getUserFunctionAudience, isFunctionAllowedForAudience } from './functionAudience';
 import type { LoginUser } from './auth';
@@ -282,7 +283,10 @@ export function hasMenuPermission(user: LoginUser, prefix?: string) {
   }
   return user.permissions.some(
     (permission) =>
-      permission === `${prefix}.view` || (permission.startsWith(`${prefix}.`) && permission.endsWith('.view')),
+      permission === `${prefix}.view` ||
+      (permission.startsWith(`${prefix}.`) &&
+        permission.endsWith('.view') &&
+        !(productAllViewPages.has(prefix) && permission === `${prefix}.all.view`)),
   );
 }
 

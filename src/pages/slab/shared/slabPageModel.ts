@@ -169,9 +169,10 @@ export type CornerFieldKey =
   | 'corner4Width';
 export type MeasurementField = 'length' | 'width' | 'height' | 'tolerance' | CornerFieldKey;
 export const tabs: {
-  value: SlabStatus;
+  value: SlabStatus | 'all';
   label: string;
 }[] = [
+  { value: 'all', label: '全部' },
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '已上架' },
   { value: 'soldOut', label: '已售完' },

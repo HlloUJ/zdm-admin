@@ -14,7 +14,12 @@
     </t-tag>
     <template v-if="entry.warehouseEntryType === 'offShelf'">
       <span v-if="entry.warehouseEntryReason">{{ entry.warehouseEntryReason }}</span>
-      <t-tooltip :content="entry.warehouseEntryDetail || '未填写详细说明'" placement="bottom-left">
+      <t-tooltip
+        v-model:visible="detailTooltipVisible"
+        :disabled="tooltipDisabled"
+        :content="entry.warehouseEntryDetail || '未填写详细说明'"
+        placement="bottom-left"
+      >
         <span data-entry-detail>{{ entry.warehouseEntryDetail || '未填写详细说明' }}</span>
       </t-tooltip>
     </template>
@@ -26,6 +31,14 @@
   </t-space>
 </template>
 <script setup lang="ts">
+import { ref, watch } from 'vue';
 import { warehouseEntryLabel, type WarehouseEntryInformation } from '@/services/warehouseEntry';
-defineProps<{ entry: WarehouseEntryInformation }>();
+const props = defineProps<{ entry: WarehouseEntryInformation; tooltipDisabled?: boolean }>();
+const detailTooltipVisible = ref(false);
+watch(
+  () => props.tooltipDisabled,
+  (disabled) => {
+    if (disabled) detailTooltipVisible.value = false;
+  },
+);
 </script>

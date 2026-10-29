@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { test, expect, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 async function setup(page: Page, audience = 'store', permissions = ['all']) {
@@ -34,7 +35,7 @@ test('store order prototype has five status views and drill-down without busines
   });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
-  await page.goto('/store/order-management/sales');
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
   await expect(page.getByText('订单管理', { exact: true })).toBeVisible();
   for (const label of ['待确认', '已确认', '已发货', '已完成', '已取消'])
     await expect(page.locator('.t-tabs__nav-item').filter({ hasText: new RegExp(`^${label}（1）$`) })).toBeVisible();
@@ -63,7 +64,7 @@ test('store order prototype has five status views and drill-down without busines
 });
 test('creates a local pending order using the real form and persists its snapshot', async ({ page }) => {
   await setup(page);
-  await page.goto('/store/order-management/sales');
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
   await page.getByRole('button', { name: '新增订单', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '新增订单' });
   await dialog.getByPlaceholder('请输入联系电话', { exact: true }).fill('13800000088');
@@ -87,7 +88,7 @@ test('creates a local pending order using the real form and persists its snapsho
 });
 test('single granted status hides tabs and all ungranted mutations', async ({ page }) => {
   await setup(page, 'store', ['store.order-management.sales.completed.view']);
-  await page.goto('/store/order-management/sales');
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
   await expect(page.getByText(/^XS\d{13}$/)).toBeVisible();
   await expect(page.locator('.t-tabs__nav-item')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '新增订单', exact: true })).toHaveCount(0);
@@ -96,14 +97,14 @@ test('single granted status hides tabs and all ungranted mutations', async ({ pa
 for (const audience of ['admin', 'supplier', 'supply-chain'])
   test(`${audience} cannot enter the store order prototype`, async ({ page }) => {
     await setup(page, audience);
-    await page.goto('/store/order-management/sales');
+    await page.goto(productWarehouseUrl('/store/order-management/sales'));
     await expect(page).not.toHaveURL(/order-management/);
     await expect(page.getByText('订单管理', { exact: true })).toHaveCount(0);
   });
 
 test('payment configuration starts empty and supports CRUD without rewriting historical receipts', async ({ page }) => {
   await setup(page);
-  await page.goto('/store/order-management/settings');
+  await page.goto(productWarehouseUrl('/store/order-management/settings'));
   await page.getByText('订单管理', { exact: true }).click();
   await expect(page.getByText('款项配置', { exact: true })).toBeVisible();
   await expect(page.getByText('订单管理前端原型', { exact: true })).toHaveCount(0);
@@ -159,7 +160,7 @@ test('payment configuration starts empty and supports CRUD without rewriting his
   await page.reload();
   await expect(page.getByRole('cell', { name: '首付款', exact: true })).toHaveCount(0);
   await expect(page.getByRole('cell', { name: '预付款', exact: true })).toBeVisible();
-  await page.goto('/store/order-management/sales');
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
   await page.getByRole('button', { name: '详情', exact: true }).click();
   await page.getByRole('button', { name: '登记收款', exact: true }).click();
   dialog = page.locator('.t-dialog:visible');
@@ -170,7 +171,7 @@ test('payment configuration starts empty and supports CRUD without rewriting his
 
 test('partitioned order cards retain summaries and independently toggle product details', async ({ page }) => {
   await setup(page);
-  await page.goto('/store/order-management/sales');
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
   const firstId = await page.getByText(/^XS\d{13}$/).innerText();
   const secondId = 'XS1234567890123';
   await page.evaluate((secondId) => {
@@ -245,7 +246,7 @@ test('status totals respect order scope, creation dates filter pending orders, a
 }) => {
   await page.clock.setFixedTime(new Date('2026-10-21T02:00:00Z'));
   await setup(page);
-  await page.goto('/store/order-management/sales');
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
   await expect(page.locator('.order-card')).toHaveCount(1);
   await page.evaluate(() => {
     const key = 'zdm-order-prototype-v1:1:2:7:7';
@@ -294,7 +295,7 @@ test('status tabs keep native scale and alignment while order amounts follow col
   page,
 }) => {
   await setup(page);
-  await page.goto('/store/order-management/sales');
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
   const tabs = page.locator('.sales-order-filter-card .t-tabs__nav-item');
   await expect(tabs).toHaveCount(5);
   const amount = page.locator('.order-metric__amount').first();
@@ -325,7 +326,7 @@ test('status tabs keep native scale and alignment while order amounts follow col
 
 test('unchanged pagination events preserve expanded goods while real page changes still work', async ({ page }) => {
   await setup(page);
-  await page.goto('/store/order-management/sales');
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
   await page.locator('.order-toggle').click();
   const previous = page.locator('.sales-order-list > .zdm-admin-pagination .t-pagination__btn-prev');
   const next = page.locator('.sales-order-list > .zdm-admin-pagination .t-pagination__btn-next');

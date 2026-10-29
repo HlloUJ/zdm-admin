@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { expect, test } from '@playwright/test';
 import { installAdminApiMocks, setMockBusinessClient } from './admin-api-mocks';
@@ -43,7 +44,7 @@ for (const client of ['supply-chain'] as const) {
         },
       }),
     );
-    await page.goto('/supply-chain/slab-management');
+    await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
     await page.getByRole('button', { name: '发布商品', exact: true }).click();
     const form = page.locator('.slab-publish-page');
     const cards = form.locator('.admin-media-upload.t-upload');
@@ -79,7 +80,7 @@ test('craft image retains required validation, preview and cancellation release 
       },
     }),
   );
-  await page.goto('/finished-stock-craft');
+  await page.goto(productWarehouseUrl('/finished-stock-craft'));
   await page.getByRole('button', { name: '新增', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   const upload = dialog.locator('.admin-media-upload.t-upload');
@@ -138,7 +139,7 @@ test('operations slab retains read-only image/video cards and the stored video c
   };
   await page.route('**/api/admin/slabs', (route) => route.fulfill({ json: { code: 0, data: [slab] } }));
   await page.route('**/api/admin/slabs/6', (route) => route.fulfill({ json: { code: 0, data: slab } }));
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   await expect(page.getByRole('button', { name: '发布商品', exact: true })).toHaveCount(0);
   await page.getByRole('main').locator('.table-actions').getByText('编辑', { exact: true }).click();
   const form = page.locator('.slab-publish-page');
