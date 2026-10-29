@@ -9,7 +9,8 @@ export const filterFinishedStockItems = (
   descending = true,
 ) => {
   const keyword = filter.keyword.trim().toLocaleLowerCase();
-  const sorted = activeTab === 'all' ? sortProductsByCreation(items) : sortByStateActivity(items, descending);
+  const sorted =
+    activeTab === 'all' ? sortProductsByCreation(items, descending) : sortByStateActivity(items, descending);
   return sorted.filter((item) => {
     if (activeTab === 'all' ? !isAllProductStatus(item.status) : item.status !== activeTab) return false;
     if (

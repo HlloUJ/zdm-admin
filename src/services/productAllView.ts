@@ -1,13 +1,23 @@
+import { h } from 'vue';
+import './productStateActivity.css';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 
 export type ProductListTab<Status extends string> = Status | 'all';
 export const isAllProductStatus = (status: string) => status === 'warehouse' || status === 'selling';
-export const productCreationColumns: PrimaryTableCol<TableRowData>[] = [
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
+export const productCreationColumns = (toggleTimeSort?: () => void): PrimaryTableCol<TableRowData>[] => [
+  { colKey: 'createdByName', title: '创建人', width: 120 },
+  {
+    colKey: 'createdAt',
+    title: toggleTimeSort
+      ? () => h('button', { type: 'button', class: 'product-state-time-title', onClick: toggleTimeSort }, '创建时间')
+      : '创建时间',
+    width: 180,
+    className: 'product-state-time-column',
+    sorter: true,
+  },
 ];
-/** Stable equal times retain the incoming order; no ID or state-time fallback. */
-export function sortProductsByCreation<T extends { createdAt?: string }>(items: T[]): T[] {
+/** Sort either direction; equal times retain incoming order and missing times stay last. */
+export function sortProductsByCreation<T extends { createdAt?: string }>(items: T[], descending = true): T[] {
   const time = (value?: string) => {
     const parsed = value ? Date.parse(value) : Number.NaN;
     return Number.isFinite(parsed) ? parsed : null;
@@ -16,7 +26,7 @@ export function sortProductsByCreation<T extends { createdAt?: string }>(items: 
     const left = time(a.createdAt),
       right = time(b.createdAt);
     if (left === null || right === null) return left === right ? 0 : left === null ? 1 : -1;
-    return right - left;
+    return (descending ? -1 : 1) * (left - right);
   });
 }
 

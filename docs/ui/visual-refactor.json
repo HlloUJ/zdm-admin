@@ -1280,6 +1280,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "const canDeleteCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.delete`));\n\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 72, align: 'left' },\n  { colKey: 'image', title: '工艺图片', width: 112, align: 'center' },\n  { colKey: 'name', title: '工艺名称', minWidth: 160 },\n  { colKey: 'type', title: '工艺类型', width: 120 },\n  { colKey: 'width', title: '工艺宽度（mm）', width: 150, ellipsisTitle: true },\n  { colKey: 'status', title: '状态', width: 100, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "after": "const canDeleteCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.delete`));\n\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 72, align: 'left' },\n  { colKey: 'image', title: '工艺图片', width: 112 },\n  { colKey: 'name', title: '工艺名称', minWidth: 160 },\n  { colKey: 'type', title: '工艺类型', width: 120 },\n  { colKey: 'width', title: '工艺宽度（mm）', width: 150, ellipsisTitle: true },\n  { colKey: 'status', title: '状态', width: 100 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
           "before": "          />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
@@ -3359,6 +3365,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                    :sort-icon=\"stateActivitySortIcon\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n",
+          "after": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :sort=\"tableSort\"\n                    :sort-icon=\"stateActivitySortIcon\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
+          "before": "  const base: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n    { colKey: 'supplier', title: '供应商', width: 180 },\n    ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  ];\n  if (!['all', 'soldOut'].includes(activeTab.value)) {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n",
+          "after": "  const base: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n    { colKey: 'supplier', title: '供应商', width: 180 },\n    ...(activeTab.value === 'all'\n      ? productCreationColumns(toggleTimeSort)\n      : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  ];\n  if (!['all', 'soldOut'].includes(activeTab.value)) {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "before": "  ),\n);\nconst tabLabel = (tab: TabConfig) => {\n  const count = countByStatus.value[tab.value];\n  return count ? `${tab.label} ${count}` : tab.label;\n};\nconst rowActions = (row: StockItem) =>\n  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));\nconst managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>\n",
           "after": "  ),\n);\nconst tabLabel = (tab: TabConfig) => {\n  const count = countByStatus.value[tab.value];\n  return `${tab.label}（${count}）`;\n};\nconst rowActions = (row: StockItem) =>\n  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));\nconst managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>\n",
           "stage": "before-migrations",
@@ -4302,6 +4320,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  filter: FilterState,\n  descending = true,\n) => {\n  const keyword = filter.keyword.trim().toLocaleLowerCase();\n  const sorted = activeTab === 'all' ? sortProductsByCreation(items) : sortByStateActivity(items, descending);\n  return sorted.filter((item) => {\n    if (activeTab === 'all' ? !isAllProductStatus(item.status) : item.status !== activeTab) return false;\n    if (\n      keyword &&\n",
+          "after": "  filter: FilterState,\n  descending = true,\n) => {\n  const keyword = filter.keyword.trim().toLocaleLowerCase();\n  const sorted =\n    activeTab === 'all' ? sortProductsByCreation(items, descending) : sortByStateActivity(items, descending);\n  return sorted.filter((item) => {\n    if (activeTab === 'all' ? !isAllProductStatus(item.status) : item.status !== activeTab) return false;\n    if (\n      keyword &&\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "before": "import { sortByStateActivity } from '@/services/productStateActivity';\nimport type { FilterState, StockItem, StockStatus } from './finishedStockPageModel';\n\nexport const filterFinishedStockItems = (\n  items: StockItem[],\n  activeTab: StockStatus,\n  filter: FilterState,\n  descending = true,\n) => {\n  const keyword = filter.keyword.trim().toLocaleLowerCase();\n  const sorted = sortByStateActivity(items, descending);\n  return sorted.filter((item) => {\n    if (item.status !== activeTab) return false;\n    if (\n      keyword &&\n      ![item.name, String(item.id), item.code].some((value) => value.toLocaleLowerCase().includes(keyword))\n    )\n",
           "after": "import { isAllProductStatus, sortProductsByCreation } from '@/services/productAllView';\nimport { sortByStateActivity } from '@/services/productStateActivity';\nimport type { FilterState, StockItem, StockTab } from './finishedStockPageModel';\n\nexport const filterFinishedStockItems = (\n  items: StockItem[],\n  activeTab: StockTab,\n  filter: FilterState,\n  descending = true,\n) => {\n  const keyword = filter.keyword.trim().toLocaleLowerCase();\n  const sorted = activeTab === 'all' ? sortProductsByCreation(items) : sortByStateActivity(items, descending);\n  return sorted.filter((item) => {\n    if (activeTab === 'all' ? !isAllProductStatus(item.status) : item.status !== activeTab) return false;\n    if (\n      keyword &&\n      ![item.name, String(item.id), item.code].some((value) => value.toLocaleLowerCase().includes(keyword))\n    )\n",
           "stage": "before-migrations",
@@ -4744,6 +4768,24 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                  class=\"finished-stock-table\"\n                  row-key=\"id\"\n                  :data=\"pageRows\"\n                  :columns=\"columns\"\n                  :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  :row-attributes=\"\n                    ({ row }: { row: StoreFinishedProduct }) =>\n",
+          "after": "                  class=\"finished-stock-table\"\n                  row-key=\"id\"\n                  :data=\"pageRows\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  :row-attributes=\"\n                    ({ row }: { row: StoreFinishedProduct }) =>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
+          "before": "};\nconst submittingOffShelf = ref(false);\nconst filteredRows = computed(() =>\n  (activeTab.value === 'all'\n    ? sortProductsByCreation(rows.value)\n    : sortByStateActivity(rows.value, descending.value)\n  ).filter(\n    (row) =>\n      (activeTab.value === 'all'\n",
+          "after": "};\nconst submittingOffShelf = ref(false);\nconst filteredRows = computed(() =>\n  (activeTab.value === 'all'\n    ? sortProductsByCreation(rows.value, descending.value)\n    : sortByStateActivity(rows.value, descending.value)\n  ).filter(\n    (row) =>\n      (activeTab.value === 'all'\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
+          "before": "  ...baseColumns.filter((column) => activeTab.value !== 'all' || column.colKey !== 'select'),\n  ...(['all', 'warehouse'].includes(activeTab.value)\n    ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]\n    : []),\n  ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },\n]);\nconst poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'select', title: 'poolSelectTitle', width: 48 },\n",
+          "after": "  ...baseColumns.filter((column) => activeTab.value !== 'all' || column.colKey !== 'select'),\n  ...(['all', 'warehouse'].includes(activeTab.value)\n    ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]\n    : []),\n  ...(activeTab.value === 'all'\n    ? productCreationColumns(toggleTimeSort)\n    : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },\n]);\nconst poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'select', title: 'poolSelectTitle', width: 48 },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "before": "  const action = batchActions[activeTab.value];\n  return action && can(activeScope.value, action.permission) ? action : null;\n});\nconst storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [\n  ...(['all', 'warehouse'].includes(activeTab.value) && can('warehouse', 'select')\n    ? [{ id: 'select', label: '商品中心', icon: 'add' }]\n    : []),\n  ...(batchAction.value\n    ? [\n",
           "after": "  const action = batchActions[activeTab.value];\n  return action && can(activeScope.value, action.permission) ? action : null;\n});\nconst storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [\n  ...(['all', 'warehouse'].includes(activeTab.value) && canGlobal('select')\n    ? [{ id: 'select', label: '商品中心', icon: 'add' }]\n    : []),\n  ...(batchAction.value\n    ? [\n",
@@ -6038,6 +6080,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                    :sort-icon=\"stateActivitySortIcon\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n",
+          "after": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :sort=\"tableSort\"\n                    :sort-icon=\"stateActivitySortIcon\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
+          "before": "  const base: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n    { colKey: 'supplier', title: '供应商', width: 180 },\n    ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  ];\n  if (!['all', 'soldOut'].includes(activeTab.value)) {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n",
+          "after": "  const base: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n    { colKey: 'supplier', title: '供应商', width: 180 },\n    ...(activeTab.value === 'all'\n      ? productCreationColumns(toggleTimeSort)\n      : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  ];\n  if (!['all', 'soldOut'].includes(activeTab.value)) {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "before": "  ),\n);\nconst tabLabel = (tab: TabConfig) => {\n  const count = countByStatus.value[tab.value];\n  return count ? `${tab.label} ${count}` : tab.label;\n};\nconst rowActions = (row: StockItem) =>\n  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));\nconst managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>\n",
           "after": "  ),\n);\nconst tabLabel = (tab: TabConfig) => {\n  const count = countByStatus.value[tab.value];\n  return `${tab.label}（${count}）`;\n};\nconst rowActions = (row: StockItem) =>\n  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));\nconst managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>\n",
@@ -7448,6 +7502,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSortCategory.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28 }] : []),\n  { colKey: 'name', title: '分类名称', minWidth: 240, align: 'left' },\n  { colKey: 'level', title: '分类级别', width: 120, align: 'left' },\n  { colKey: 'productCount', title: '关联商品', width: 120, align: 'center' },\n  { colKey: 'status', title: '状态', width: 100, align: 'center' },\n  { colKey: 'sort', title: '排序', width: 100, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 200, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 200,\n",
+          "after": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSortCategory.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28 }] : []),\n  { colKey: 'name', title: '分类名称', minWidth: 240, align: 'left' },\n  { colKey: 'level', title: '分类级别', width: 120, align: 'left' },\n  { colKey: 'productCount', title: '关联商品', width: 120 },\n  { colKey: 'status', title: '状态', width: 100 },\n  { colKey: 'sort', title: '排序', width: 100 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 200 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 200,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
           "before": "                <div class=\"table-actions\">\n                  <t-link\n                    v-if=\"canCreateChildCategory && row.level < maxCategoryLevel\"\n                    :theme=\"buttonTheme('create')\"\n                    @click=\"openCreateDialog(row)\"\n                    >新增下级</t-link\n                  >\n                  <t-link v-if=\"canEditCategory\" :theme=\"buttonTheme('edit')\" @click=\"openEditDialog(row)\">编辑</t-link>\n                  <t-link\n                    v-if=\"canToggleCategoryStatus\"\n                    :theme=\"buttonTheme(row.status === 'enabled' ? 'disable' : 'enable')\"\n                    @click=\"openStatusConfirm(row.node)\"\n                    >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link\n                  >\n                  <t-link v-if=\"canDeleteCategory\" :theme=\"buttonTheme('delete')\" @click=\"openDeleteDialog(row.node)\"\n                    >删除</t-link\n                  >\n                  <span v-if=\"!hasVisibleRowAction(row)\">-</span>\n",
@@ -7853,6 +7913,12 @@
       "script": "c6fa58a7218a606353f86b4986997e836fb888e3a23a2fcf70a482e548935fe0",
       "template": "5e3c0a78337d9dfc5455d79cd1734fbfacea060c58f3b27362c9647869b2bf52",
       "approvedBusinessPatches": [
+        {
+          "before": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'name', title: '门店级别', minWidth: 200, align: 'left' },\n  { colKey: 'priceCoefficient', title: '价格系数', width: 130, align: 'right' },\n  { colKey: 'status', title: '状态', width: 100, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "after": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'name', title: '门店级别', minWidth: 200, align: 'left' },\n  { colKey: 'priceCoefficient', title: '价格系数', width: 130 },\n  { colKey: 'status', title: '状态', width: 100 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "reason": "2026-10-27 用户确认移除价格同步影响数量统计与额外提示，保留标准话术、实际价格同步及引用保护。",
           "stage": "before-migrations",
@@ -8294,6 +8360,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '色系名称', minWidth: 180, align: 'left' },\n  { colKey: 'categoryName', title: '色系分类', minWidth: 160, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "after": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '色系名称', minWidth: 180, align: 'left' },\n  { colKey: 'categoryName', title: '色系分类', minWidth: 160, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
+          "before": "  },\n]);\nconst categoryColumns: PrimaryTableCol<TableRowData>[] = [\n  { colKey: 'name', title: '分类名称', minWidth: 180 },\n  { colKey: 'createdByName', title: '创建人', width: 140, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  { colKey: 'remark', title: '备注', minWidth: 220, ellipsis: true },\n  { colKey: 'operation', title: '操作', width: 116, fixed: 'right' },\n];\n\n",
+          "after": "  },\n]);\nconst categoryColumns: PrimaryTableCol<TableRowData>[] = [\n  { colKey: 'name', title: '分类名称', minWidth: 180 },\n  { colKey: 'createdByName', title: '创建人', width: 140 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  { colKey: 'remark', title: '备注', minWidth: 220, ellipsis: true },\n  { colKey: 'operation', title: '操作', width: 116, fixed: 'right' },\n];\n\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-22 user approved repairing the ten audited narrow list overflows via shared opt-in containment; classes only, preserve desktop geometry, fields, permissions and business handlers.",
           "before": "header=\"色系分类管理\"",
@@ -8469,6 +8547,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'code', title: '等级', minWidth: 150, align: 'left' },\n  { colKey: 'name', title: '等级名称', minWidth: 220, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "after": "  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'code', title: '等级', minWidth: 150, align: 'left' },\n  { colKey: 'name', title: '等级名称', minWidth: 220, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
@@ -8668,6 +8752,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n",
+          "after": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
+          "before": "};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const baseColumns: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n    { colKey: 'image', title: '商品主图', width: 96, align: 'center' },\n    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n    { colKey: 'variety', title: '品种', width: 140 },\n    { colKey: 'origin', title: '产地', width: 110 },\n    { colKey: 'texture', title: '纹理', width: 110 },\n    { colKey: 'color', title: '色系', width: 110 },\n    { colKey: 'grade', title: '等级', width: 160, align: 'center' },\n    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n  ];\n  if (activeTab.value === 'warehouse' || activeTab.value === 'all')\n    baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });\n  baseColumns.push(\n    ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  );\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n",
+          "after": "};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const baseColumns: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n    { colKey: 'variety', title: '品种', width: 140 },\n    { colKey: 'origin', title: '产地', width: 110 },\n    { colKey: 'texture', title: '纹理', width: 110 },\n    { colKey: 'color', title: '色系', width: 110 },\n    { colKey: 'grade', title: '等级', width: 160 },\n    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n  ];\n  if (activeTab.value === 'warehouse' || activeTab.value === 'all')\n    baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });\n  baseColumns.push(\n    ...(activeTab.value === 'all'\n      ? productCreationColumns(toggleTimeSort)\n      : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  );\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "before": "    tab.value === 'all'\n      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')\n      : item.status === tab.value,\n  ).length;\n  return count ? `${tab.label} ${count}` : tab.label;\n};\nconst rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);\nconst handleTabChange = () => {\n  selectedKeys.value = [];\n",
           "after": "    tab.value === 'all'\n      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')\n      : item.status === tab.value,\n  ).length;\n  return `${tab.label}（${count}）`;\n};\nconst rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);\nconst handleTabChange = () => {\n  selectedKeys.value = [];\n",
@@ -9565,6 +9661,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '产地名称', minWidth: 220, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "after": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '产地名称', minWidth: 220, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
           "before": "          <t-input v-model=\"formData.name\" clearable placeholder=\"请输入产地\" />\n        </t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\">\n          <t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n          />\n        </t-form-item>\n      </t-form>\n    </t-dialog>\n",
@@ -9717,6 +9819,12 @@
     "src/pages/slab/shared/slabListFilter.ts": {
       "content": "0dd9d8474550747540a59b8d6ca025fb1df41d55c45cf4de371330fe65141330",
       "approvedBusinessPatches": [
+        {
+          "before": "      entryTypeMatched &&\n      entryByMatched\n    );\n  });\n  return activeTab === 'all' ? sortProductsByCreation(matchedItems) : sortByStateActivity(matchedItems, descending);\n};\n",
+          "after": "      entryTypeMatched &&\n      entryByMatched\n    );\n  });\n  return activeTab === 'all'\n    ? sortProductsByCreation(matchedItems, descending)\n    : sortByStateActivity(matchedItems, descending);\n};\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "before": "import { sortByStateActivity } from '@/services/productStateActivity';\nimport type { SlabOffShelfRecord, SlabStatus } from '@/services/slabs';\nimport type { FilterState, SlabItem } from './slabPageModel';\n\n",
           "after": "import { isAllProductStatus, sortProductsByCreation } from '@/services/productAllView';\nimport { sortByStateActivity } from '@/services/productStateActivity';\nimport type { SlabOffShelfRecord, SlabStatus } from '@/services/slabs';\nimport type { FilterState, SlabItem } from './slabPageModel';\n\n",
@@ -9933,6 +10041,18 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n",
+          "after": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
+          "before": "};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const baseColumns: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n    { colKey: 'image', title: '商品主图', width: 96, align: 'center' },\n    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n    { colKey: 'variety', title: '品种', width: 140 },\n    { colKey: 'origin', title: '产地', width: 110 },\n    { colKey: 'texture', title: '纹理', width: 110 },\n    { colKey: 'color', title: '色系', width: 110 },\n    { colKey: 'grade', title: '等级', width: 160, align: 'center' },\n    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n  ];\n  if (activeTab.value === 'warehouse' || activeTab.value === 'all')\n    baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });\n  baseColumns.push(\n    ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  );\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n",
+          "after": "};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const baseColumns: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },\n    { colKey: 'variety', title: '品种', width: 140 },\n    { colKey: 'origin', title: '产地', width: 110 },\n    { colKey: 'texture', title: '纹理', width: 110 },\n    { colKey: 'color', title: '色系', width: 110 },\n    { colKey: 'grade', title: '等级', width: 160 },\n    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n  ];\n  if (activeTab.value === 'warehouse' || activeTab.value === 'all')\n    baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });\n  baseColumns.push(\n    ...(activeTab.value === 'all'\n      ? productCreationColumns(toggleTimeSort)\n      : stateActivityColumns(activeTab.value, toggleTimeSort)),\n  );\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "before": "    tab.value === 'all'\n      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')\n      : item.status === tab.value,\n  ).length;\n  return count ? `${tab.label} ${count}` : tab.label;\n};\nconst rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);\nconst handleTabChange = () => {\n  selectedKeys.value = [];\n",
           "after": "    tab.value === 'all'\n      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')\n      : item.status === tab.value,\n  ).length;\n  return `${tab.label}（${count}）`;\n};\nconst rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);\nconst handleTabChange = () => {\n  selectedKeys.value = [];\n",
@@ -10768,6 +10888,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "const pagination = reactive({ current: 1, pageSize: 10 });\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '标准纹理', minWidth: 200, align: 'left' },\n  { colKey: 'aliasCount', title: '别名数量', width: 120, align: 'center' },\n  { colKey: 'status', title: '状态', width: 120, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 196,\n",
+          "after": "const pagination = reactive({ current: 1, pageSize: 10 });\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '标准纹理', minWidth: 200, align: 'left' },\n  { colKey: 'aliasCount', title: '别名数量', width: 120 },\n  { colKey: 'status', title: '状态', width: 120 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 196,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
           "before": "          ><t-input v-model=\"formData.name\" clearable placeholder=\"请输入标准纹理\"\n        /></t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\"\n          ><t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n        /></t-form-item>\n      </t-form>\n    </AdminDialog>\n",
@@ -10925,6 +11051,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '品种名称', minWidth: 220, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "after": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '品种名称', minWidth: 220, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "stage": "before-migrations",
           "reason": "2026-10-22 user approved reusing public pagination styles and removing legacy style hooks only; all business props and handlers retained.",
@@ -11101,6 +11233,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSortCategory.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28 }] : []),\n  { colKey: 'name', title: '分类名称', minWidth: 240, align: 'left' },\n  { colKey: 'level', title: '分类级别', width: 120, align: 'left' },\n  { colKey: 'productCount', title: '关联商品', width: 120, align: 'center' },\n  { colKey: 'status', title: '状态', width: 100, align: 'center' },\n  { colKey: 'sort', title: '排序', width: 100, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 200, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 240,\n",
+          "after": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSortCategory.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28 }] : []),\n  { colKey: 'name', title: '分类名称', minWidth: 240, align: 'left' },\n  { colKey: 'level', title: '分类级别', width: 120, align: 'left' },\n  { colKey: 'productCount', title: '关联商品', width: 120 },\n  { colKey: 'status', title: '状态', width: 100 },\n  { colKey: 'sort', title: '排序', width: 100 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 200 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 240,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user explicitly approved global native Link hover=color: hover changes color without underline. Only public hover presentation prop and formatting; preserve theme, layout, text, permissions, disabled state, handlers and existing interactions.",
           "before": "                <div class=\"table-actions\">\n                  <t-link\n                    v-if=\"canCreateChildCategory && row.level < 3\"\n                    :theme=\"buttonTheme('create')\"\n                    @click=\"openCreateDialog(row.node)\"\n                    >新增下级</t-link\n                  >\n                  <t-link v-if=\"canEditCategory\" :theme=\"buttonTheme('edit')\" @click=\"openEditDialog(row.node)\"\n                    >编辑</t-link\n                  >\n                  <t-link\n                    v-if=\"canToggleCategoryStatus\"\n                    :theme=\"buttonTheme(row.node.status === 'enabled' ? 'disable' : 'enable')\"\n                    @click=\"openStatusConfirm(row.node)\"\n                    >{{ row.node.status === 'enabled' ? '停用' : '启用' }}</t-link\n                  >\n                  <t-link v-if=\"canDeleteCategory\" :theme=\"buttonTheme('delete')\" @click=\"openDeleteDialog(row.node)\"\n                    >删除</t-link\n                  >\n                  <span v-if=\"!hasVisibleRowAction(row)\">-</span>\n",
@@ -11253,6 +11391,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '级别名称', minWidth: 220, align: 'left' },\n  { colKey: 'priceComplete', title: '价格状态', width: 130, align: 'center' },\n  { colKey: 'status', title: '状态', width: 120, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "after": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '级别名称', minWidth: 220, align: 'left' },\n  { colKey: 'priceComplete', title: '价格状态', width: 130 },\n  { colKey: 'status', title: '状态', width: 120 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
           "before": "          ><t-input v-model=\"formData.name\" clearable placeholder=\"请输入级别名称\"\n        /></t-form-item>\n        <t-form-item label=\"备注\" name=\"remark\"\n          ><t-textarea\n            v-model=\"formData.remark\"\n            placeholder=\"请输入备注\"\n            :maxlength=\"100\"\n            :autosize=\"{ minRows: 4, maxRows: 6 }\"\n        /></t-form-item>\n      </t-form>\n    </AdminDialog>\n",
@@ -11383,6 +11527,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'name', title: '供应商名称', minWidth: 220, align: 'left' },\n  { colKey: 'type', title: '供货类型', minWidth: 180, align: 'left' },\n  { colKey: 'contact', title: '联系人', width: 120, align: 'center' },\n  { colKey: 'phone', title: '联系电话', width: 150, align: 'center' },\n  { colKey: 'status', title: '状态', width: 100, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "after": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'name', title: '供应商名称', minWidth: 220, align: 'left' },\n  { colKey: 'type', title: '供货类型', minWidth: 180, align: 'left' },\n  { colKey: 'contact', title: '联系人', width: 120 },\n  { colKey: 'phone', title: '联系电话', width: 150 },\n  { colKey: 'status', title: '状态', width: 100 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
@@ -11526,6 +11676,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '供货类型', minWidth: 220, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 164,\n",
+          "after": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 88, align: 'left' },\n  { colKey: 'name', title: '供货类型', minWidth: 220, align: 'left' },\n  { colKey: 'status', title: '状态', width: 120 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 164,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-19 user approved platform-wide edit success text 修改成功; preserve create, delete, state actions and failure feedback. Register exact approved copy delta without changing frozen baseline.",
           "before": "    else await createSupplierSupplyType(payload);\n    visible.value = false;\n    if (action === '新增') adminFeedback.created(target);\n    else adminFeedback.actionSuccess({ action, target });\n    await load();\n  } catch (error) {\n    adminFeedback.actionError({ action, target, error });\n",
@@ -11668,6 +11824,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'tenantName', title: '租户姓名', minWidth: 150, align: 'left' },\n  { colKey: 'phone', title: '联系方式', width: 150, align: 'center' },\n  { colKey: 'businesses', title: '开通业务', minWidth: 260, align: 'left' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: activeTab.value === 'unarchived' ? 184 : 172,\n",
+          "after": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'tenantName', title: '租户姓名', minWidth: 150, align: 'left' },\n  { colKey: 'phone', title: '联系方式', width: 150 },\n  { colKey: 'businesses', title: '开通业务', minWidth: 260, align: 'left' },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: activeTab.value === 'unarchived' ? 184 : 172,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
@@ -11888,6 +12050,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'shopName', title: '门店名称', minWidth: 180, align: 'left' },\n  { colKey: 'shopType', title: '门店类型', width: 130, align: 'center' },\n  { colKey: 'storeLevelId', title: '门店级别', width: 140, align: 'center' },\n  { colKey: 'manager', title: '店长', width: 110, align: 'center' },\n  { colKey: 'address', title: '门店地址', minWidth: 260, align: 'left' },\n  { colKey: 'tenantName', title: '租户姓名', width: 120, align: 'center' },\n  { colKey: 'createdBy', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 170, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: activeTab.value === 'operating' ? 116 : 172,\n",
+          "after": "\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'shopName', title: '门店名称', minWidth: 180, align: 'left' },\n  { colKey: 'shopType', title: '门店类型', width: 130 },\n  { colKey: 'storeLevelId', title: '门店级别', width: 140 },\n  { colKey: 'manager', title: '店长', width: 110 },\n  { colKey: 'address', title: '门店地址', minWidth: 260, align: 'left' },\n  { colKey: 'tenantName', title: '租户姓名', width: 120 },\n  { colKey: 'createdBy', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 170 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: activeTab.value === 'operating' ? 116 : 172,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "reason": "2026-10-19 用户批准全平台可编辑多行文本使用官方空对象autosize自动增高并关闭手动拖动，不限制初始或最大行数；保留100字、框内统计、所有脚本、校验、权限、事件及保存，排除只读邀请链接。",
           "stage": "before-migrations",
@@ -12816,6 +12984,12 @@
       "content": "7342589e51af41298d3f49d9895b2160e3ae2c77a62e9cde91dfaa86a75be53e",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "};\nexport function stateActivityColumns(status: string, toggleTimeSort?: () => void): PrimaryTableCol<TableRowData>[] {\n  const [actor, time] = labels[status];\n  return [\n    ...(actor ? [{ colKey: 'stateOperatorName', title: actor, width: 120, align: 'center' as const }] : []),\n    {\n      colKey: 'stateOperatedAt',\n      className: 'product-state-time-column',\n      title: toggleTimeSort\n        ? (h) => h('button', { type: 'button', class: 'product-state-time-title', onClick: toggleTimeSort }, time)\n        : time,\n      width: 180,\n      align: 'center',\n      sorter: true,\n    },\n  ];\n}\n",
+          "after": "};\nexport function stateActivityColumns(status: string, toggleTimeSort?: () => void): PrimaryTableCol<TableRowData>[] {\n  const [actor, time] = labels[status];\n  return [\n    ...(actor ? [{ colKey: 'stateOperatorName', title: actor, width: 120 }] : []),\n    {\n      colKey: 'stateOperatedAt',\n      className: 'product-state-time-column',\n      title: toggleTimeSort\n        ? (h) => h('button', { type: 'button', class: 'product-state-time-title', onClick: toggleTimeSort }, time)\n        : time,\n      width: 180,\n      sorter: true,\n    },\n  ];\n}\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.6：恢复普通列原生默认左对齐，复选框居中保留；全部Tab创建时间升降序，其他业务保留，入库类型筛选暂缓。"
+        },
         {
           "before": "import { Button } from 'tdesign-vue-next';\nimport type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\n\nconst labels: Record<string, [string, string]> = {\n  warehouse: ['入库人', '入库时间'],\n  selling: ['上架人', '上架时间'],\n",
           "after": "import { h } from 'vue';\nimport { CaretDownSmallIcon } from 'tdesign-icons-vue-next';\nimport type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport './productStateActivity.css';\n\n/** Keep native table sorting and active colors; only replace the default chevrons. */\nexport const stateActivitySortIcon = () => h(CaretDownSmallIcon, { size: 'small' });\n\nconst labels: Record<string, [string, string]> = {\n  warehouse: ['入库人', '入库时间'],\n  selling: ['上架人', '上架时间'],\n",

@@ -161,7 +161,7 @@
                   row-key="id"
                   :data="pageData"
                   :columns="columns"
-                  :sort="activeTab === 'all' ? undefined : tableSort"
+                  :sort="tableSort"
                   :sort-icon="stateActivitySortIcon"
                   :loading="loading"
                   hover
@@ -1802,20 +1802,22 @@ const operationWidths = {
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const baseColumns: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
-    { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
+    { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },
     { colKey: 'variety', title: '品种', width: 140 },
     { colKey: 'origin', title: '产地', width: 110 },
     { colKey: 'texture', title: '纹理', width: 110 },
     { colKey: 'color', title: '色系', width: 110 },
-    { colKey: 'grade', title: '等级', width: 160, align: 'center' },
+    { colKey: 'grade', title: '等级', width: 160 },
     { colKey: 'size', title: '尺寸', width: 170 },
     { colKey: 'tenant', title: '供应商', width: 180 },
   ];
   if (activeTab.value === 'warehouse' || activeTab.value === 'all')
     baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });
   baseColumns.push(
-    ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),
+    ...(activeTab.value === 'all'
+      ? productCreationColumns(toggleTimeSort)
+      : stateActivityColumns(activeTab.value, toggleTimeSort)),
   );
   baseColumns.push({
     colKey: 'operation',

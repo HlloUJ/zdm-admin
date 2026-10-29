@@ -247,9 +247,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '色系名称', minWidth: 180, align: 'left' },
   { colKey: 'categoryName', title: '色系分类', minWidth: 160, align: 'left' },
-  { colKey: 'status', title: '状态', width: 120, align: 'center' },
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
+  { colKey: 'status', title: '状态', width: 120 },
+  { colKey: 'createdByName', title: '创建人', width: 120 },
+  { colKey: 'createdAt', title: '创建时间', width: 180 },
   {
     colKey: 'operation',
     title: '操作',
@@ -260,8 +260,8 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
 ]);
 const categoryColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'name', title: '分类名称', minWidth: 180 },
-  { colKey: 'createdByName', title: '创建人', width: 140, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 140 },
+  { colKey: 'createdAt', title: '创建时间', width: 180 },
   { colKey: 'remark', title: '备注', minWidth: 220, ellipsis: true },
   { colKey: 'operation', title: '操作', width: 116, fixed: 'right' },
 ];

@@ -15,7 +15,7 @@ const labels: Record<string, [string, string]> = {
 export function stateActivityColumns(status: string, toggleTimeSort?: () => void): PrimaryTableCol<TableRowData>[] {
   const [actor, time] = labels[status];
   return [
-    ...(actor ? [{ colKey: 'stateOperatorName', title: actor, width: 120, align: 'center' as const }] : []),
+    ...(actor ? [{ colKey: 'stateOperatorName', title: actor, width: 120 }] : []),
     {
       colKey: 'stateOperatedAt',
       className: 'product-state-time-column',
@@ -23,7 +23,6 @@ export function stateActivityColumns(status: string, toggleTimeSort?: () => void
         ? (h) => h('button', { type: 'button', class: 'product-state-time-title', onClick: toggleTimeSort }, time)
         : time,
       width: 180,
-      align: 'center',
       sorter: true,
     },
   ];

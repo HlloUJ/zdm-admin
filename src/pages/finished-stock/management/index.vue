@@ -168,7 +168,7 @@
                     row-key="id"
                     :data="pageData"
                     :columns="columns"
-                    :sort="activeTab === 'all' ? undefined : tableSort"
+                    :sort="tableSort"
                     :sort-icon="stateActivitySortIcon"
                     :loading="loading"
                     hover
@@ -2004,7 +2004,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'product', title: '商品名称/ID', minWidth: 220 },
     { colKey: 'supplier', title: '供应商', width: 180 },
-    ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),
+    ...(activeTab.value === 'all'
+      ? productCreationColumns(toggleTimeSort)
+      : stateActivityColumns(activeTab.value, toggleTimeSort)),
   ];
   if (!['all', 'soldOut'].includes(activeTab.value)) {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });

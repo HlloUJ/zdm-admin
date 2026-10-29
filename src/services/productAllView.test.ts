@@ -22,7 +22,7 @@ describe('product All view', () => {
     expect(initialProductListTab(undefined)).toBe('all');
     expect(initialProductListTab('warehouse')).toBe('warehouse');
     expect(initialProductListTab('invalid')).toBe('all');
-    expect(productCreationColumns.map((column) => column.title)).toEqual(['创建人', '创建时间']);
+    expect(productCreationColumns().map((column) => column.title)).toEqual(['创建人', '创建时间']);
   });
   it('sorts only by creation descending without IDs, state times or mutations', () => {
     const rows = [
@@ -32,6 +32,7 @@ describe('product All view', () => {
       { id: 3, stateOperatedAt: '2027-01-01' },
     ];
     expect(sortProductsByCreation(rows).map((row) => row.id)).toEqual([2, 1, 99, 3]);
+    expect(sortProductsByCreation(rows, false).map((row) => row.id)).toEqual([1, 99, 2, 3]);
     expect(rows.map((row) => row.id)).toEqual([1, 99, 2, 3]);
   });
   it('registers only the eight real pages, keeps All view-only and does not auto-grant it', () => {

@@ -288,13 +288,13 @@ const canDeleteCraft = computed(() => hasPermission(loginUser.value, `${craftPer
 
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 72, align: 'left' },
-  { colKey: 'image', title: '工艺图片', width: 112, align: 'center' },
+  { colKey: 'image', title: '工艺图片', width: 112 },
   { colKey: 'name', title: '工艺名称', minWidth: 160 },
   { colKey: 'type', title: '工艺类型', width: 120 },
   { colKey: 'width', title: '工艺宽度（mm）', width: 150, ellipsisTitle: true },
-  { colKey: 'status', title: '状态', width: 100, align: 'center' },
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
+  { colKey: 'status', title: '状态', width: 100 },
+  { colKey: 'createdByName', title: '创建人', width: 120 },
+  { colKey: 'createdAt', title: '创建时间', width: 180 },
   {
     colKey: 'operation',
     title: '操作',

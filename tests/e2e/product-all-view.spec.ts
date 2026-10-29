@@ -88,6 +88,9 @@ for (const surface of surfaces) {
     await expect(main.locator('.t-tabs__nav-item').first()).toHaveClass(/t-is-active/);
     await expect(main.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
     await expect(main.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
+    for (const header of await main.locator('thead th').all()) await expect(header).toHaveCSS('text-align', 'left');
+    for (const cell of await main.locator('tbody tr').first().locator('td').all())
+      await expect(cell).toHaveCSS('text-align', 'left');
     for (const label of ['商品状态', '状态变更时间', '入库时间', '上架时间'])
       await expect(main.getByRole('columnheader', { name: label, exact: true })).toHaveCount(0);
     await expect(main.getByRole('combobox', { name: '商品状态', exact: true })).toHaveCount(0);
@@ -244,5 +247,43 @@ for (const surface of surfaces.filter((s) => s.client === 'store')) {
     }
     await main.locator('.t-tabs__nav-item').filter({ hasText: '已上架' }).click();
     await expect(main.getByRole('button', { name: '商品中心', exact: true })).toHaveCount(0);
+  });
+}
+
+for (const surface of surfaces) {
+  test(`${surface.path} creation time title and native triangles sort the full list before pagination`, async ({
+    page,
+  }) => {
+    const records = await setup(page, surface);
+    const base = records[0];
+    records.splice(
+      0,
+      records.length,
+      ...Array.from({ length: 15 }, (_, i) => ({
+        ...base,
+        id: 950 + i,
+        productId: 950 + i,
+        name: `创建排序-${String(i).padStart(2, '0')}`,
+        createdAt: `2026-10-${String(i + 1).padStart(2, '0')}T09:00:00`,
+      })),
+    );
+    await page.reload();
+    const main = page.getByRole('main'),
+      rows = main.locator('tbody tr');
+    await expect(rows.first()).toContainText('创建排序-14');
+    await main.locator('.t-pagination__btn-next').click();
+    await expect(main.locator('.t-pagination__number.t-is-current')).toHaveText('2');
+    await main.getByRole('button', { name: '创建时间', exact: true }).click();
+    await expect(main.locator('.t-pagination__number.t-is-current')).toHaveText('1');
+    await expect(rows.first()).toContainText('创建排序-00');
+    await main.getByRole('button', { name: '创建时间', exact: true }).click();
+    await expect(rows.first()).toContainText('创建排序-14');
+    const header = main.getByRole('columnheader', { name: '创建时间', exact: true });
+    await header.locator('.t-table__sort-icon').first().click();
+    await expect(rows.first()).toContainText('创建排序-00');
+    await header.locator('.t-table__sort-icon').last().click();
+    await expect(rows.first()).toContainText('创建排序-14');
+    await main.locator('.t-tabs__nav-item').filter({ hasText: '仓库中' }).click();
+    await expect(main.getByRole('columnheader', { name: '入库时间', exact: true })).toBeVisible();
   });
 }

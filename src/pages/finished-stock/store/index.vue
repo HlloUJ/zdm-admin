@@ -119,7 +119,7 @@
                   row-key="id"
                   :data="pageRows"
                   :columns="columns"
-                  :sort="activeTab === 'all' ? undefined : tableSort"
+                  :sort="tableSort"
                   :sort-icon="stateActivitySortIcon"
                   :loading="loading"
                   :row-attributes="
@@ -646,7 +646,7 @@ const batchConfirmDescriptions: Partial<Record<ActionKind, string>> = {
 const submittingOffShelf = ref(false);
 const filteredRows = computed(() =>
   (activeTab.value === 'all'
-    ? sortProductsByCreation(rows.value)
+    ? sortProductsByCreation(rows.value, descending.value)
     : sortByStateActivity(rows.value, descending.value)
   ).filter(
     (row) =>
@@ -876,7 +876,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...(['all', 'warehouse'].includes(activeTab.value)
     ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]
     : []),
-  ...(activeTab.value === 'all' ? productCreationColumns : stateActivityColumns(activeTab.value, toggleTimeSort)),
+  ...(activeTab.value === 'all'
+    ? productCreationColumns(toggleTimeSort)
+    : stateActivityColumns(activeTab.value, toggleTimeSort)),
   { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },
 ]);
 const poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [

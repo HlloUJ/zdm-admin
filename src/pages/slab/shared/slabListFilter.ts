@@ -55,5 +55,7 @@ export const filterSlabItems = (
       entryByMatched
     );
   });
-  return activeTab === 'all' ? sortProductsByCreation(matchedItems) : sortByStateActivity(matchedItems, descending);
+  return activeTab === 'all'
+    ? sortProductsByCreation(matchedItems, descending)
+    : sortByStateActivity(matchedItems, descending);
 };

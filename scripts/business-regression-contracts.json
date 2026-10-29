@@ -329,7 +329,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "8b5fac37e17b3485552745c378e9c1283cae147658617511e64a044c57d26ff3",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "bdae1bc1aacbc411ea90139b720a4a51e104b31ea0ed98951258affd843779be",
+        "tests/e2e/product-all-view.spec.ts": "d257830cf49e65507121b872b9f0fc67b0582b44b166c13dbb23956b1ebe5e77",
         "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "6e1d79598ca04efefba7f308776f189437f7ee6aa56f2fd40042d1597a5b452b",
@@ -1314,6 +1314,12 @@
           "before": "74114444a974d28f566a7c6403124365a0e515ea7a1d675bfec84b5119f052e6",
           "after": "ca6bc903f838da881b3583b198994922b8f9cb79fd54e29b0bcc8bf971b1c3ef",
           "reason": "用户确认V1.5：仅统一商品Tab数量括号与零值文案，精确更新旧定位，八入口既有用例验证数量及删除后零值；保留其他断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "bdae1bc1aacbc411ea90139b720a4a51e104b31ea0ed98951258affd843779be",
+          "after": "d257830cf49e65507121b872b9f0fc67b0582b44b166c13dbb23956b1ebe5e77",
+          "reason": "用户确认V1.6：恢复普通列原生左对齐，八个商品入口创建时间升降序；原断言不变，增加表头/内容左对齐和完整列表分页排序验证；保留原超时及零重试。"
         }
       ],
       "routes": [
