@@ -1,0 +1,20 @@
+import { ref } from 'vue';
+import { expect, it, vi } from 'vitest';
+import { useStateActivitySort } from './useStateActivitySort';
+it('keeps each Tab direction and resets pagination on title or native icon changes', () => {
+  const tab = ref('warehouse');
+  const reset = vi.fn();
+  const sort = useStateActivitySort(tab, reset);
+  expect(sort.descending.value).toBe(true);
+  sort.toggleTimeSort();
+  expect(sort.descending.value).toBe(false);
+  tab.value = 'selling';
+  expect(sort.descending.value).toBe(true);
+  sort.onTimeSortChange({ sortBy: 'stateOperatedAt', descending: false });
+  expect(sort.descending.value).toBe(false);
+  sort.onTimeSortChange(undefined);
+  expect(sort.descending.value).toBe(true);
+  tab.value = 'warehouse';
+  expect(sort.descending.value).toBe(false);
+  expect(reset).toHaveBeenCalledTimes(3);
+});

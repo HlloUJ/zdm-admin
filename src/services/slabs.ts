@@ -1,3 +1,4 @@
+import type { WarehouseEntryInformation } from './warehouseEntry';
 import { request } from './http';
 import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
@@ -27,7 +28,7 @@ export interface SlabOffShelfRecord {
   offShelvedByAccountId?: number;
 }
 
-export interface SlabRecord {
+export interface SlabRecord extends WarehouseEntryInformation {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 

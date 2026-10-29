@@ -160,9 +160,11 @@
                     row-key="id"
                     :data="pageData"
                     :columns="columns"
+                    :sort="tableSort"
                     :loading="loading"
                     hover
                     table-layout="fixed"
+                    @sort-change="onTimeSortChange"
                   >
                     <template #selectTitle>
                       <t-checkbox
@@ -201,18 +203,8 @@
                         <span class="store-text">平台仓</span>
                       </div>
                     </template>
-                    <template #offShelfAt="{ row }">{{
-                      row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
-                    }}</template>
                     <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-                    <template #offShelfReason="{ row }">
-                      <div class="off-shelf-reason-cell">
-                        <span>{{ row.offShelfReason || '—' }}</span>
-                        <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
-                          <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
-                        </t-tooltip>
-                      </div>
-                    </template>
+                    <template #warehouseEntry="{ row }"><WarehouseEntryInformation :entry="row" /></template>
                     <template #stateOperatorName="{ row }"
                       ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
                     >
@@ -275,13 +267,10 @@
           </AdminListLayout> </template
         ><template v-else-if="formPageVisible">
           <section ref="productFormRoot" class="form-shell">
-            <t-alert
-              v-if="editingProduct?.status === 'warehouse' && editingProduct.offShelfReason"
-              theme="warning"
-              title="最近下架信息"
-            >
-              {{ editingProduct.offShelfReason }} · {{ editingProduct.offShelfDetail || '—' }}
-              {{ editingProduct.offShelfByName || '未记录' }} · {{ editingProduct.offShelfAt || '未记录' }}
+            <t-alert v-if="editingProduct?.status === 'warehouse'" title="本次入库信息" theme="info">
+              <WarehouseEntryInformation :entry="editingProduct" />
+              {{ editingProduct.stateOperatorName || '历史记录未记录' }} ·
+              {{ editingProduct.stateOperatedAt ? formatDateTime(editingProduct.stateOperatedAt) : '历史记录未记录' }}
             </t-alert>
             <AdminSectionCard class="form-heading-card" aria-label="发布商品信息">
               <div class="form-title-row">
@@ -1114,6 +1103,8 @@
 </template>
 
 <script setup lang="ts">
+import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
+import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { useCommodityModule } from '@/composables/useCommodityModule';
 const commodity = useCommodityModule();
 
@@ -1221,6 +1212,9 @@ const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应
 const productPermissionPrefix = computed(() => `${'supply-chain'}.${commodity.moduleKey}`);
 const sourceBlocked: (row: StockItem) => boolean = () => false;
 const activeTab = ref<StockStatus>('warehouse');
+const { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {
+  currentPagination.value.current = 1;
+});
 const finishedScope: Record<StockStatus, string> = {
   warehouse: 'warehouse',
   selling: 'selling',
@@ -1711,12 +1705,6 @@ const formatPriceRange = (guidePrice?: number) => {
   return value > 0 ? `￥${value.toFixed(2)}` : '-';
 };
 const toStockItem = (record: FinishedProductRecord): StockItem => {
-  record = {
-    ...record,
-    offShelfReason: record.sourceOffShelfReason,
-    offShelfDetail: record.sourceOffShelfDetail,
-    offShelfAt: record.sourceOffShelfAt,
-  };
   const status = normalizeStatus(record.sourceStatus);
   const publisherType = normalizePublisherType(record.publisherType);
   return {
@@ -1727,8 +1715,10 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     code: record.sku ?? '',
     stateOperatorName: record.stateOperatorName,
     stateOperatedAt: record.stateOperatedAt,
+    warehouseEntryType: record.warehouseEntryType,
+    warehouseEntryReason: record.warehouseEntryReason,
+    warehouseEntryDetail: record.warehouseEntryDetail,
     createdByName: record.createdByName?.trim() || '-',
-    offShelfByName: record.offShelfByName?.trim() || '未记录',
     createdAt: record.createdAt,
     image: record.mainImageUrl || '',
     name: record.name,
@@ -1753,12 +1743,12 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     specDimensions: record.specDimensions,
     priceRange: formatPriceRange(record.guidePrice),
     status,
-    offShelfReason: record.offShelfReason,
-    offShelfAt: record.offShelfAt,
-    offShelfDetail: record.offShelfDetail,
   };
 };
-const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): FinishedProductPayload => {
+const toProductPayload = (
+  item: StockItem,
+  patch: Partial<StockItem> & { offShelfReason?: string; offShelfDetail?: string } = {},
+): FinishedProductPayload => {
   const nextItem = { ...item, ...patch };
   return {
     categoryId: nextItem.categoryId,
@@ -1776,9 +1766,9 @@ const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): Fini
     attributes: nextItem.attributes,
     variants: nextItem.variants,
     specDimensions: nextItem.specDimensions,
+    offShelfReason: patch.offShelfReason,
+    offShelfDetail: patch.offShelfDetail,
     operation: nextItem.operation,
-    offShelfReason: nextItem.offShelfReason,
-    offShelfDetail: nextItem.offShelfDetail,
     status: nextItem.status,
   };
 };
@@ -1862,7 +1852,7 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);
 });
 const filteredData = computed(() =>
-  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value),
+  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value, descending.value),
 );
 const paginationTotal = computed(() => filteredData.value.length);
 const pageData = computed(() => {
@@ -1930,13 +1920,13 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'product', title: '商品名称/ID', minWidth: 220 },
     { colKey: 'supplier', title: '供应商', width: 180 },
-    ...stateActivityColumns(activeTab.value),
+    ...stateActivityColumns(activeTab.value, toggleTimeSort),
   ];
   if (activeTab.value !== 'soldOut') {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
   if (activeTab.value === 'warehouse') {
-    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });
+    base.splice(4, 0, { colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });
   }
   base.push({
     colKey: 'operation',
@@ -2552,8 +2542,6 @@ const buildProductPayloadFromForm = (): FinishedProductPayload =>
     specMode: confirmedSpecMode.value,
     specDimensions: confirmedSpecDimensions.value,
     variantLabel: specVariantLabel,
-    offShelfReason: editingProduct.value?.offShelfReason,
-    offShelfDetail: editingProduct.value?.offShelfDetail,
   });
 const buildOperationsPricePayload = (): Pick<
   FinishedProductPayload,
@@ -2566,9 +2554,8 @@ const buildOperationsPricePayload = (): Pick<
     priceLevels: productPriceLevels.value,
     variantLabel: specVariantLabel,
   });
-const upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string) => {
+const upsertStockItem = (record: FinishedProductRecord) => {
   const nextItem = toStockItem(record);
-  if (offShelfReason) nextItem.offShelfReason = offShelfReason;
   const index = dataItems.value.findIndex((item) => item.id === record.id);
   if (index >= 0) dataItems.value[index] = nextItem;
   else dataItems.value.unshift(nextItem);
@@ -2751,11 +2738,11 @@ const updateProductStatus = async (id: number, status: StockStatus | 'offShelf',
       status: status === 'offShelf' ? 'warehouse' : status,
       operation: status === 'offShelf' ? 'offShelf' : undefined,
       stock: afterStock,
-      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,
-      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,
+      offShelfReason: status === 'offShelf' ? reason : undefined,
+      offShelfDetail: status === 'offShelf' ? detail : undefined,
     }),
   );
-  upsertStockItem(updated, status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined);
+  upsertStockItem(updated);
 };
 const handleConfirm = async () => {
   const type = confirmState.type;

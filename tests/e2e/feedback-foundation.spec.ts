@@ -729,6 +729,9 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             costPrice: 6800,
             guidePrice: 9800,
             status: slabStatus,
+            warehouseEntryType: slabStatus === 'warehouse' ? 'offShelf' : null,
+            warehouseEntryReason: slabStatus === 'warehouse' ? offShelfRecords[0]!.standardReason : null,
+            warehouseEntryDetail: slabStatus === 'warehouse' ? offShelfRecords[0]!.detailReason : null,
             stateOperatorName: offShelfRecords[0]!.offShelvedByName,
             stateOperatedAt: `${offShelfRecords[0]!.offShelvedAt}Z`,
             offShelfRecords,
@@ -747,6 +750,9 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             thicknessMm: 18,
             areaSquareMeter: 4.8,
             status: 'warehouse',
+            warehouseEntryType: 'recycleRestore',
+            warehouseEntryReason: null,
+            warehouseEntryDetail: null,
             stateOperatorName: '王芳',
             stateOperatedAt: '2026-08-22T10:00:00Z',
             offShelfRecords: [
@@ -855,8 +861,8 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
 
   await page.getByText('仓库中 2', { exact: true }).click();
   const filterCard = page.locator('.list-controls');
-  await expect(filterCard.getByText('下架原因', { exact: true })).toBeVisible();
-  await expect(filterCard.getByText('下架人', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('入库类型', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('入库人', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('下架时间', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('产地', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('纹理', { exact: true })).toBeVisible();
@@ -876,7 +882,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
     '供应商',
     '入库人',
     '入库时间',
-    '下架原因/详细说明',
+    '入库类型 / 详细说明',
     '操作',
   ]);
   const offShelfRows = page.locator('.slab-list-layout tbody tr');
@@ -884,16 +890,16 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
   await expect(offShelfRows.nth(1)).toContainText('已下架大板 62');
 
-  const reasonFilter = filterCard.locator('.t-form__item').filter({ hasText: '下架原因' });
+  const reasonFilter = filterCard.locator('.t-form__item').filter({ hasText: '入库类型' });
   await reasonFilter.locator('input').click();
-  await page.locator('.t-popup__content:visible').getByText('价格调整', { exact: true }).click();
+  await page.locator('.t-popup__content:visible').getByText('下架入库', { exact: true }).click();
   await filterCard.getByRole('button', { name: '查询', exact: true }).click();
   await expect(offShelfRows).toHaveCount(1);
-  await expect(offShelfRows.nth(0)).toContainText('已下架大板 62');
+  await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
   await filterCard.getByRole('button', { name: '重置', exact: true }).click();
   await expect(offShelfRows).toHaveCount(2);
 
-  const personFilter = filterCard.locator('.t-form__item').filter({ hasText: '下架人' });
+  const personFilter = filterCard.locator('.t-form__item').filter({ hasText: '入库人' });
   await personFilter.locator('input').fill('韩健');
   await filterCard.getByRole('button', { name: '查询', exact: true }).click();
   await expect(offShelfRows).toHaveCount(1);
@@ -908,7 +914,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(offShelfRow).not.toContainText('供应商申请');
   const historyTrigger = offShelfRow.getByRole('button', { name: '查看历史下架原因', exact: true });
   await expect(historyTrigger).toHaveCSS('opacity', '0');
-  const detailText = offShelfRow.locator('.off-shelf-reason-secondary');
+  const detailText = offShelfRow.locator('[data-entry-detail]');
   await detailText.hover();
   await expect(page.locator('.t-popup__content:visible').getByText(latestDetailReason, { exact: true })).toBeVisible();
   await expect(historyTrigger).toHaveCSS('opacity', '1');

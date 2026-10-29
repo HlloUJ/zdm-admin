@@ -75,9 +75,6 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     values.put("发布类型", product.getPublisherType());
     values.put("创建人", product.getCreatedByName());
     values.put("创建时间", product.getCreatedAt());
-    values.put("下架原因", supplyChain ? product.getSourceOffShelfReason() : product.getOffShelfReason());
-    values.put("详细说明", supplyChain ? product.getSourceOffShelfDetail() : product.getOffShelfDetail());
-    values.put("下架时间", supplyChain ? product.getSourceOffShelfAt() : product.getOffShelfAt());
     values.put("规格维度", product.getSpecDimensions());
     values.put("销售规格", cleanRows(product.getVariants()));
     values.put("销售属性名称", salesAttributeNames(json.valueToTree(product.getVariants())));
@@ -220,8 +217,12 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     log.setOperationSummary(labels.get(type));
     log.setBeforeStatus(previousStatus);
     log.setAfterStatus(nextStatus);
-    log.setStandardReason("supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfReason() : product.getOffShelfReason());
-    log.setDetailReason("supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfDetail() : product.getOffShelfDetail());
+    log.setStandardReason("OFF_SHELF".equals(type) ? product.getOffShelfReason() : null);
+    log.setDetailReason("OFF_SHELF".equals(type) ? product.getOffShelfDetail() : null);
+    if ("OFF_SHELF".equals(type)) {
+      changes.put("下架原因", Map.of("before", "", "after", product.getOffShelfReason()));
+      if (product.getOffShelfDetail() != null && !product.getOffShelfDetail().isBlank()) { changes.put("详细说明", Map.of("before", "", "after", product.getOffShelfDetail())); }
+    }
     log.setOperationSource("MANUAL");
     log.setOperatorName(identity.displayName());
     log.setOperatorAccountId(identity.accountId());
@@ -230,7 +231,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品操作日志保存失败", error); }
     save(log);
-    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode());
+    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),log.getOperationType(),log.getStandardReason(),log.getDetailReason());
     if ("admin".equals(identity.clientCode()) && storeUpstreamLogs != null
         && List.of("SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE").contains(type)) {
       storeUpstreamLogs.operationsChange(product.getId(), type, previousStatus, nextStatus);
@@ -291,7 +292,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品入仓日志保存失败", error); }
     save(log);
-    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode());
+    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),log.getOperationType(),log.getStandardReason(),log.getDetailReason());
     Map<String, Long> references = new LinkedHashMap<>();
     retainMedia(snapshot, "after", references);
     history.retain("FINISHED_PRODUCT_LOG", log.getId(), references);

@@ -1,3 +1,4 @@
+import type { WarehouseEntryInformation } from '@/services/warehouseEntry';
 import type { SlabOffShelfRecord, SlabOperationType, SlabPrice, SlabPublisherType, SlabStatus } from '@/services/slabs';
 import type { OperationLogPriceTierRow } from './operationLogPriceTiers';
 
@@ -9,8 +10,8 @@ export interface FilterState {
   color: string;
   grade: string;
   supplier: string;
-  offShelfReason: string;
-  offShelvedBy: string;
+  warehouseEntryType: string;
+  warehouseEntryBy: string;
 }
 export interface OperationLogFilterState {
   keyword: string;
@@ -57,7 +58,7 @@ export interface DetailMediaItem {
   coverUrl?: string;
   type: 'image' | 'video';
 }
-export interface SlabItem {
+export interface SlabItem extends WarehouseEntryInformation {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
@@ -187,8 +188,8 @@ export const makeFilterState = (): FilterState => ({
   color: '',
   grade: '',
   supplier: '',
-  offShelfReason: '',
-  offShelvedBy: '',
+  warehouseEntryType: '',
+  warehouseEntryBy: '',
 });
 export const makeProductForm = (): ProductForm => ({
   variety: '',

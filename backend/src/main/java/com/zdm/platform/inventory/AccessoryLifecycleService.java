@@ -186,18 +186,11 @@ public class AccessoryLifecycleService {
       jdbc.update("UPDATE "+kind.table+" SET source_status=?,source_block_reason=? WHERE id=?",nextState,blockReason,id);
     }
     if("offShelf".equals(target)) {
-      if(kind==Kind.ACCESSORY) { jdbc.update("UPDATE accessory_products SET source_off_shelf_reason=?,source_off_shelf_detail=?,source_off_shelf_at=NOW() WHERE id=?",reason,detail,id); }
-      else { jdbc.update("INSERT INTO slab_off_shelf_records (slab_id,business_client_code,standard_reason,detail_reason,off_shelved_at,off_shelved_by_name,off_shelved_by_account_id) VALUES (?,'supply-chain',?,?,NOW(),?,?)",id,reason,detail,identities.require().displayName(),identities.require().accountId()); }
-    }
-    if (!"offShelf".equals(target)) {
-      if (kind == Kind.ACCESSORY) {
-        jdbc.update("UPDATE accessory_products SET source_off_shelf_reason=NULL,source_off_shelf_detail=NULL,source_off_shelf_at=NULL WHERE id=?", id);
-      }
+      if(kind==Kind.SLAB) { jdbc.update("INSERT INTO slab_off_shelf_records (slab_id,business_client_code,standard_reason,detail_reason,off_shelved_at,off_shelved_by_name,off_shelved_by_account_id) VALUES (?,'supply-chain',?,?,NOW(),?,?)",id,reason,detail,identities.require().displayName(),identities.require().accountId()); }
     }
     if(recreate) {
       jdbc.update("UPDATE "+kind.table+" SET operations_deleted=FALSE,status='warehouse' WHERE id=?",id);
-      if(kind==Kind.ACCESSORY) { jdbc.update("UPDATE accessory_products SET off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?",id); }
-      else { jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'",id); }
+      if(kind==Kind.SLAB) { jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'",id); }
       if (kind == Kind.ACCESSORY) {
         jdbc.update("UPDATE accessory_products SET selection_generation=selection_generation+1,operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
       }
@@ -287,7 +280,7 @@ public class AccessoryLifecycleService {
     if (kind == Kind.SLAB) { slabSnapshots.release(id); }
     if (row.get("operations_invalidated_at") != null && !unavailable((String) row.get("source_status"))) {
       if (kind == Kind.ACCESSORY) {
-        jdbc.update("UPDATE accessory_products SET selection_generation=selection_generation+1,operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL,off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?", id);
+        jdbc.update("UPDATE accessory_products SET selection_generation=selection_generation+1,operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
       } else {
         jdbc.update("UPDATE slab_inventory SET operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
         jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'", id);
@@ -369,7 +362,7 @@ public class AccessoryLifecycleService {
     log.put("before_status",before);log.put("after_status",after);
     log.put("operation_source",business.equals(actor.clientCode())?"MANUAL":"SUPPLY_CHAIN");log.put("operated_at",java.time.LocalDateTime.now());
     try { log.put("change_details",json.writeValueAsString(changes)); } catch(JsonProcessingException error) { throw new IllegalStateException("日志序列化失败",error); }
-    stateActivities.record(kind==Kind.ACCESSORY?"accessory":"slab",business,((Number)row.get("id")).longValue(),before,after,actor.accountId(),actor.clientCode());
+    stateActivities.record(kind==Kind.ACCESSORY?"accessory":"slab",business,((Number)row.get("id")).longValue(),before,after,actor.accountId(),actor.clientCode(),type,(String)log.get("standard_reason"),(String)log.get("detail_reason"));
     Number logId = new SimpleJdbcInsert(jdbc).withTableName(kind.logs).usingColumns(log.keySet().toArray(String[]::new)).usingGeneratedKeyColumns("id").executeAndReturnKey(log);
     if(kind==Kind.SLAB) { slabLogs.retainSnapshot(logId.longValue(), changes); }
   }

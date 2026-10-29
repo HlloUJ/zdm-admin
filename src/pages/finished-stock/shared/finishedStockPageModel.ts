@@ -1,3 +1,4 @@
+import type { WarehouseEntryInformation } from '@/services/warehouseEntry';
 import type { TableRowData } from 'tdesign-vue-next';
 import type {
   FinishedProductAttributeEntry,
@@ -55,7 +56,7 @@ export interface PaginationState {
   current: number;
   pageSize: number;
 }
-export interface StockItem {
+export interface StockItem extends WarehouseEntryInformation {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
@@ -64,7 +65,6 @@ export interface StockItem {
   sourceMessage?: string;
   id: number;
   createdByName: string;
-  offShelfByName?: string;
   createdAt?: string;
   code: string;
   image: string;
@@ -80,9 +80,6 @@ export interface StockItem {
   priceRange: string;
   status: StockStatus;
   operation?: 'offShelf';
-  offShelfReason?: string;
-  offShelfAt?: string;
-  offShelfDetail?: string;
   markupPrices?: FinishedProductPrice[];
   guidePrices?: FinishedProductGuidePrice[];
   mainImageMediaId?: number;

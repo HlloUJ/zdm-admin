@@ -372,9 +372,10 @@ test('store uses a direct menu, selects an operations product, and edits only it
   await expect(main.locator('.form-anchor-card')).toHaveCSS('position', 'fixed');
   await expect(main.locator('.form-heading-card h1')).toHaveCSS('font-size', '18px');
   await expect(main.locator('.page-header')).toHaveCount(0);
-  await expect(
-    main.locator('.readonly-product-fields .zdm-admin-section-card').nth(1).locator('.t-cascader'),
-  ).toBeVisible();
+  await expect(main.locator('.readonly-product-fields [data-product-section="base"] .t-cascader')).toBeVisible();
+  await main.getByRole('link', { name: '基础信息', exact: true }).click();
+  await expect(main.getByRole('link', { name: '基础信息', exact: true })).toHaveAttribute('aria-current', 'location');
+  await expect(main.locator('.readonly-product-fields [data-product-section="base"] .t-cascader')).toBeInViewport();
   await expect(main.locator('#store-finished-product-sales .spec-table-block')).toBeVisible();
   await expect(main.locator('.form-submit-bar')).toHaveCSS('position', 'sticky');
   await main.getByRole('link', { name: '销售信息', exact: true }).click();

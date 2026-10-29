@@ -2767,6 +2767,18 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  category: '家具',\n  supplier: '供应商',\n  stock: 2,\n  publisherType: '平台发布',\n  status: 'offShelf',\n  createdByName: '测试',\n  image: '/image.png',\n  detail: '<p>图文介绍</p><img src=\"/detail.png\" onerror=\"alert(1)\"><script>alert(1)</script>',\n  offShelfReason: '价格调整',\n  offShelfDetail: '等待供应商确认',\n  attributes: [],\n  variants: [],\n};\nconst wrapper = () =>\n",
+          "after": "  category: '家具',\n  supplier: '供应商',\n  stock: 2,\n  publisherType: '平台发布',\n  status: 'selling',\n  createdByName: '测试',\n  image: '/image.png',\n  detail: '<p>图文介绍</p><img src=\"/detail.png\" onerror=\"alert(1)\"><script>alert(1)</script>',\n  warehouseEntryReason: '价格调整',\n  warehouseEntryDetail: '等待供应商确认',\n  attributes: [],\n  variants: [],\n};\nconst wrapper = () =>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  await view.setProps({\n    operations: true,\n    product: {\n      ...product,\n      sourceStatus: 'offShelf',\n      sourceUnavailable: true,\n      variants: [{ id: 11, variantLabel: '标准规格', stock: 2, costPrice: 0 }],\n      guidePrices: [{ skuId: 11, costPrice: 99, priceCoefficient: 2, price: 198 }],\n    },\n",
+          "after": "  await view.setProps({\n    operations: true,\n    product: {\n      ...product,\n      sourceStatus: 'warehouse',\n      sourceUnavailable: true,\n      variants: [{ id: 11, variantLabel: '标准规格', stock: 2, costPrice: 0 }],\n      guidePrices: [{ skuId: 11, costPrice: 99, priceCoefficient: 2, price: 198 }],\n    },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
           "reason": "2026-10-23 用户批准抽屉原生分区调整对应回归：仅新增抽屉与整页模式隔离、数据及媒体预览验证，保留全部既有断言与原始指纹",
           "stage": "before-migrations",
           "before": "variants.map((variant) => variant.id)).toEqual([13, 12, 11]);\n  await view.setProps({ operations: false });\n  expect(vm.rows.map((row) => row.skuId)).toEqual([13, 12, 11]);\n  expect(vm.span({ rowIndex: 0, col: { colKey: 'size' } })).toEqual({});\n});\n",
@@ -2803,6 +2815,36 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <t-alert v-if=\"product.status === 'warehouse' && product.offShelfReason\" theme=\"warning\" title=\"最近下架信息\">\n      {{ product.offShelfReason }} · {{ product.offShelfDetail || '—' }} {{ product.offShelfByName || '未记录' }} ·\n      {{ product.offShelfAt || '未记录' }}\n    </t-alert>\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n      :class=\"{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }\"\n    >\n      <h3\n        v-if=\"!drawerLayout\"\n",
+          "after": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <component :is=\"drawerLayout ? Card : AdminSectionCard\" v-if=\"product.status === 'warehouse'\" title=\"本次入库信息\">\n      <WarehouseEntryInformation :entry=\"product\" />\n      {{ product.stateOperatorName || '历史记录未记录' }} ·\n      {{ product.stateOperatedAt ? formatProductDateTime(product.stateOperatedAt) : '历史记录未记录' }}\n    </component>\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n      data-product-section=\"description\"\n      :class=\"{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }\"\n    >\n      <h3\n        v-if=\"!drawerLayout\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    </component>\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '基础信息' : undefined\"\n      :class=\"{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }\"\n    >\n      <h3\n        v-if=\"!drawerLayout\"\n",
+          "after": "    </component>\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '基础信息' : undefined\"\n      data-product-section=\"base\"\n      :class=\"{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }\"\n    >\n      <h3\n        v-if=\"!drawerLayout\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  </t-space>\n</template>\n\n<script setup lang=\"ts\">\nimport { computed, type VNode } from 'vue';\nimport { AdminSectionCard } from '@/components/foundation';\nimport PriceSourceToggle from './PriceSourceToggle.vue';\nimport SalesLogFullscreen from './SalesLogFullscreen.vue';\n",
+          "after": "  </t-space>\n</template>\n\n<script setup lang=\"ts\">\nimport { formatProductDateTime } from '@/utils/formatProductDateTime';\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\nimport type { WarehouseEntryInformation as WarehouseEntry } from '@/services/warehouseEntry';\nimport { computed, type VNode } from 'vue';\nimport { AdminSectionCard } from '@/components/foundation';\nimport PriceSourceToggle from './PriceSourceToggle.vue';\nimport SalesLogFullscreen from './SalesLogFullscreen.vue';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  FinishedProductPrice,\n  FinishedProductGuidePrice,\n  FinishedSpecDimension,\n} from '@/services/finishedProducts';\ninterface DetailProduct {\n  id: number;\n  name: string;\n  code: string;\n  category: string;\n",
+          "after": "  FinishedProductPrice,\n  FinishedProductGuidePrice,\n  FinishedSpecDimension,\n} from '@/services/finishedProducts';\ninterface DetailProduct extends WarehouseEntry {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n  id: number;\n  name: string;\n  code: string;\n  category: string;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  createdByName: string;\n  createdAt?: string;\n  offShelfByName?: string;\n  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  image: string;\n  mainImageUrls?: string[];\n  videoUrl?: string;\n  detail: string;\n",
+          "after": "  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  createdByName: string;\n  createdAt?: string;\n  image: string;\n  mainImageUrls?: string[];\n  videoUrl?: string;\n  detail: string;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n",
           "after": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <t-alert v-if=\"product.status === 'warehouse' && product.offShelfReason\" theme=\"warning\" title=\"最近下架信息\">\n      {{ product.offShelfReason }} · {{ product.offShelfDetail || '—' }} {{ product.offShelfByName || '未记录' }} ·\n      {{ product.offShelfAt || '未记录' }}\n    </t-alert>\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n",
@@ -3315,6 +3357,84 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n                  >\n                    <template #selectTitle>\n                      <t-checkbox\n                        :checked=\"pageAllSelected\"\n",
+          "after": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :sort=\"tableSort\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n                    @sort-change=\"onTimeSortChange\"\n                  >\n                    <template #selectTitle>\n                      <t-checkbox\n                        :checked=\"pageAllSelected\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "                        <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->\n                        <span class=\"store-text\">平台仓</span>\n                      </div>\n                    </template>\n                    <template #offShelfAt=\"{ row }\">{{\n                      row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'\n                    }}</template>\n                    <template #createdAt=\"{ row }\">{{ formatDateTime(row.createdAt) }}</template>\n                    <template #offShelfReason=\"{ row }\">\n                      <div class=\"off-shelf-reason-cell\">\n                        <span>{{ row.offShelfReason || '—' }}</span>\n                        <t-tooltip :content=\"row.offShelfDetail || '—'\" placement=\"bottom-left\">\n                          <span class=\"off-shelf-reason-secondary\">{{ row.offShelfDetail || '—' }}</span>\n                        </t-tooltip>\n                      </div>\n                    </template>\n                    <template #stateOperatorName=\"{ row }\"\n                      ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                    >\n                    <template #stateOperatedAt=\"{ row }\">{{\n",
+          "after": "                        <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->\n                        <span class=\"store-text\">平台仓</span>\n                      </div>\n                    </template>\n                    <template #createdAt=\"{ row }\">{{ formatDateTime(row.createdAt) }}</template>\n                    <template #warehouseEntry=\"{ row }\"><WarehouseEntryInformation :entry=\"row\" /></template>\n                    <template #stateOperatorName=\"{ row }\"\n                      ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                    >\n                    <template #stateOperatedAt=\"{ row }\">{{\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { useCommodityModule } from '@/composables/useCommodityModule';\nconst commodity = useCommodityModule();\n\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\n",
+          "after": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\nimport { useStateActivitySort } from '@/composables/useStateActivitySort';\nimport { useCommodityModule } from '@/composables/useCommodityModule';\nconst commodity = useCommodityModule();\n\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];\nconst productPermissionPrefix = computed(() => `${'admin'}.${commodity.moduleKey}`);\nconst sourceBlocked = (row: StockItem) => Boolean(row.sourceUnavailable);\nconst activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  soldOut: 'sold-out',\n",
+          "after": "const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];\nconst productPermissionPrefix = computed(() => `${'admin'}.${commodity.moduleKey}`);\nconst sourceBlocked = (row: StockItem) => Boolean(row.sourceUnavailable);\nconst activeTab = ref<StockStatus>('warehouse');\nconst { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {\n  currentPagination.value.current = 1;\n});\nconst finishedScope: Record<StockStatus, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  soldOut: 'sold-out',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    sourceMessage: record.sourceMessage,\n    code: record.sku ?? '',\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    createdByName: record.createdByName?.trim() || '-',\n    offShelfByName: record.offShelfByName?.trim() || '未记录',\n    createdAt: record.createdAt,\n    image: record.mainImageUrl || '',\n    name: record.name,\n    categoryId: record.categoryId,\n",
+          "after": "    sourceMessage: record.sourceMessage,\n    code: record.sku ?? '',\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    warehouseEntryType: record.warehouseEntryType,\n    warehouseEntryReason: record.warehouseEntryReason,\n    warehouseEntryDetail: record.warehouseEntryDetail,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt,\n    image: record.mainImageUrl || '',\n    name: record.name,\n    categoryId: record.categoryId,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    variants: record.variants ?? [],\n    specDimensions: record.specDimensions,\n    priceRange: formatPriceRange(record.guidePrice),\n    status,\n    offShelfReason: record.offShelfReason,\n    offShelfAt: record.offShelfAt,\n    offShelfDetail: record.offShelfDetail,\n  };\n};\nconst toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): FinishedProductPayload => {\n  const nextItem = { ...item, ...patch };\n  return {\n    categoryId: nextItem.categoryId,\n    supplierId: nextItem.supplierId,\n",
+          "after": "    variants: record.variants ?? [],\n    specDimensions: record.specDimensions,\n    priceRange: formatPriceRange(record.guidePrice),\n    status,\n  };\n};\nconst toProductPayload = (\n  item: StockItem,\n  patch: Partial<StockItem> & { offShelfReason?: string; offShelfDetail?: string } = {},\n): FinishedProductPayload => {\n  const nextItem = { ...item, ...patch };\n  return {\n    categoryId: nextItem.categoryId,\n    supplierId: nextItem.supplierId,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    markupPrices: nextItem.markupPrices,\n    attributes: nextItem.attributes,\n    variants: nextItem.variants,\n    specDimensions: nextItem.specDimensions,\n    operation: nextItem.operation,\n    offShelfReason: nextItem.offShelfReason,\n    offShelfDetail: nextItem.offShelfDetail,\n    status: nextItem.status,\n  };\n};\nconst loadInventoryData = async () => {\n",
+          "after": "    markupPrices: nextItem.markupPrices,\n    attributes: nextItem.attributes,\n    variants: nextItem.variants,\n    specDimensions: nextItem.specDimensions,\n    offShelfReason: patch.offShelfReason,\n    offShelfDetail: patch.offShelfDetail,\n    operation: nextItem.operation,\n    status: nextItem.status,\n  };\n};\nconst loadInventoryData = async () => {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  window.removeEventListener('focus', refreshVisibleProductTemplate);\n  document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);\n});\nconst filteredData = computed(() =>\n  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value),\n);\nconst paginationTotal = computed(() => filteredData.value.length);\nconst pageData = computed(() => {\n  const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;\n",
+          "after": "  window.removeEventListener('focus', refreshVisibleProductTemplate);\n  document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);\n});\nconst filteredData = computed(() =>\n  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value, descending.value),\n);\nconst paginationTotal = computed(() => filteredData.value.length);\nconst pageData = computed(() => {\n  const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  const base: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n    { colKey: 'supplier', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value),\n  ];\n  if (activeTab.value !== 'soldOut') {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n  if (activeTab.value === 'warehouse') {\n    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  }\n  base.push({\n    colKey: 'operation',\n    title: '操作',\n",
+          "after": "  const base: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n    { colKey: 'supplier', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value, toggleTimeSort),\n  ];\n  if (activeTab.value !== 'soldOut') {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n  if (activeTab.value === 'warehouse') {\n    base.splice(4, 0, { colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });\n  }\n  base.push({\n    colKey: 'operation',\n    title: '操作',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    salesAttributeFields: salesAttributeFields.value,\n    specMode: confirmedSpecMode.value,\n    specDimensions: confirmedSpecDimensions.value,\n    variantLabel: specVariantLabel,\n    offShelfReason: editingProduct.value?.offShelfReason,\n    offShelfDetail: editingProduct.value?.offShelfDetail,\n  });\nconst buildOperationsPricePayload = (): Pick<\n  FinishedProductPayload,\n  'name' | 'status' | 'guidePrices' | 'markupPrices'\n",
+          "after": "    salesAttributeFields: salesAttributeFields.value,\n    specMode: confirmedSpecMode.value,\n    specDimensions: confirmedSpecDimensions.value,\n    variantLabel: specVariantLabel,\n  });\nconst buildOperationsPricePayload = (): Pick<\n  FinishedProductPayload,\n  'name' | 'status' | 'guidePrices' | 'markupPrices'\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    specRows: specRows.value,\n    priceLevels: productPriceLevels.value,\n    variantLabel: specVariantLabel,\n  });\nconst upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string) => {\n  const nextItem = toStockItem(record);\n  if (offShelfReason) nextItem.offShelfReason = offShelfReason;\n  const index = dataItems.value.findIndex((item) => item.id === record.id);\n  if (index >= 0) dataItems.value[index] = nextItem;\n  else dataItems.value.unshift(nextItem);\n  return nextItem;\n",
+          "after": "    specRows: specRows.value,\n    priceLevels: productPriceLevels.value,\n    variantLabel: specVariantLabel,\n  });\nconst upsertStockItem = (record: FinishedProductRecord) => {\n  const nextItem = toStockItem(record);\n  const index = dataItems.value.findIndex((item) => item.id === record.id);\n  if (index >= 0) dataItems.value[index] = nextItem;\n  else dataItems.value.unshift(nextItem);\n  return nextItem;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    if (levels) enabledPriceLevels.value = levels;\n    detailProduct.value = toStockItem(latest);\n    {\n      detailProduct.value.createdAt = formatDateTime(latest.createdAt);\n      detailProduct.value.offShelfAt = latest.offShelfAt ? formatDateTime(latest.offShelfAt) : undefined;\n    }\n    detailDialogVisible.value = true;\n  } catch {\n    adminFeedback.error('商品详情加载失败，请重试');\n",
+          "after": "    if (levels) enabledPriceLevels.value = levels;\n    detailProduct.value = toStockItem(latest);\n    {\n      detailProduct.value.createdAt = formatDateTime(latest.createdAt);\n    }\n    detailDialogVisible.value = true;\n  } catch {\n    adminFeedback.error('商品详情加载失败，请重试');\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    toProductPayload(item, {\n      status: status === 'offShelf' ? 'warehouse' : status,\n      operation: status === 'offShelf' ? 'offShelf' : undefined,\n      stock: afterStock,\n      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,\n      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,\n    }),\n  );\n  upsertStockItem(updated, status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined);\n};\nconst handleConfirm = async () => {\n  const type = confirmState.type;\n  const product = confirmState.product;\n",
+          "after": "    toProductPayload(item, {\n      status: status === 'offShelf' ? 'warehouse' : status,\n      operation: status === 'offShelf' ? 'offShelf' : undefined,\n      stock: afterStock,\n      offShelfReason: status === 'offShelf' ? reason : undefined,\n      offShelfDetail: status === 'offShelf' ? detail : undefined,\n    }),\n  );\n  upsertStockItem(updated);\n};\nconst handleConfirm = async () => {\n  const type = confirmState.type;\n  const product = confirmState.product;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "import { useRoute, useRouter } from 'vue-router';\nconst tabs: TabConfig[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'offShelf', label: '已下架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nconst pageSizeOptions = [10, 20, 50];\n",
           "after": "import { useRoute, useRouter } from 'vue-router';\nconst tabs: TabConfig[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nconst pageSizeOptions = [10, 20, 50];\n",
@@ -3885,6 +4005,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  offShelfByName: props.product.offShelfByName,\n  offShelfReason: props.product.offShelfReason,\n  offShelfAt: props.product.offShelfAt,\n  offShelfDetail: props.product.offShelfDetail,\n  sourceUnavailable: props.product.sourceUnavailable,\n  sourceMessage: props.product.sourceMessage,\n  createdByName: '',\n  image: props.product.imageUrl || '',\n",
+          "after": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  warehouseEntryType: props.product.warehouseEntryType,\n  warehouseEntryReason: props.product.warehouseEntryReason,\n  warehouseEntryDetail: props.product.warehouseEntryDetail,\n  stateOperatorName: props.product.stateOperatorName,\n  stateOperatedAt: props.product.stateOperatedAt,\n  sourceUnavailable: props.product.sourceUnavailable,\n  sourceMessage: props.product.sourceMessage,\n  createdByName: '',\n  image: props.product.imageUrl || '',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
           "before": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  offShelfReason: props.product.offShelfReason,\n  offShelfAt: props.product.offShelfAt,\n  offShelfDetail: props.product.offShelfDetail,\n  sourceUnavailable: props.product.sourceUnavailable,\n",
           "after": "  category: props.product.categoryName || '',\n  stock: props.product.totalStock,\n  publisherType: '',\n  status: props.product.effectiveStatus,\n  offShelfByName: props.product.offShelfByName,\n  offShelfReason: props.product.offShelfReason,\n  offShelfAt: props.product.offShelfAt,\n  offShelfDetail: props.product.offShelfDetail,\n  sourceUnavailable: props.product.sourceUnavailable,\n",
           "stage": "before-migrations",
@@ -4058,12 +4184,38 @@
     },
     "src/pages/finished-stock/shared/finishedStockListFilter.ts": {
       "content": "372881902779d3d5d7047cbf910bdfc12c918867d5e0ef833b0212bfb3480b98",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "import { sortByStateActivity } from '@/services/productStateActivity';\nimport type { FilterState, StockItem, StockStatus } from './finishedStockPageModel';\n\nexport const filterFinishedStockItems = (items: StockItem[], activeTab: StockStatus, filter: FilterState) => {\n  const keyword = filter.keyword.trim().toLocaleLowerCase();\n  const sorted = sortByStateActivity(items);\n  return sorted.filter((item) => {\n    if (item.status !== activeTab) return false;\n    if (\n      keyword &&\n",
+          "after": "import { sortByStateActivity } from '@/services/productStateActivity';\nimport type { FilterState, StockItem, StockStatus } from './finishedStockPageModel';\n\nexport const filterFinishedStockItems = (\n  items: StockItem[],\n  activeTab: StockStatus,\n  filter: FilterState,\n  descending = true,\n) => {\n  const keyword = filter.keyword.trim().toLocaleLowerCase();\n  const sorted = sortByStateActivity(items, descending);\n  return sorted.filter((item) => {\n    if (item.status !== activeTab) return false;\n    if (\n      keyword &&\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        }
+      ]
     },
     "src/pages/finished-stock/shared/finishedStockPageModel.ts": {
       "content": "e2d9082c5cd7a900a4334e332a69b73c7bace01b2fde276467dd8717a577b1c3",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "import type { TableRowData } from 'tdesign-vue-next';\nimport type {\n  FinishedProductAttributeEntry,\n  FinishedProductGuidePrice,\n",
+          "after": "import type { WarehouseEntryInformation } from '@/services/warehouseEntry';\nimport type { TableRowData } from 'tdesign-vue-next';\nimport type {\n  FinishedProductAttributeEntry,\n  FinishedProductGuidePrice,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "export interface PaginationState {\n  current: number;\n  pageSize: number;\n}\nexport interface StockItem {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceUnavailable?: boolean;\n  sourceStatus?: string;\n  sourceMessage?: string;\n  id: number;\n  createdByName: string;\n  offShelfByName?: string;\n  createdAt?: string;\n  code: string;\n  image: string;\n  name: string;\n",
+          "after": "export interface PaginationState {\n  current: number;\n  pageSize: number;\n}\nexport interface StockItem extends WarehouseEntryInformation {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceUnavailable?: boolean;\n  sourceStatus?: string;\n  sourceMessage?: string;\n  id: number;\n  createdByName: string;\n  createdAt?: string;\n  code: string;\n  image: string;\n  name: string;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  guidePrice?: number;\n  priceRange: string;\n  status: StockStatus;\n  operation?: 'offShelf';\n  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  markupPrices?: FinishedProductPrice[];\n  guidePrices?: FinishedProductGuidePrice[];\n  mainImageMediaId?: number;\n  mainImageMediaIds?: number[];\n",
+          "after": "  guidePrice?: number;\n  priceRange: string;\n  status: StockStatus;\n  operation?: 'offShelf';\n  markupPrices?: FinishedProductPrice[];\n  guidePrices?: FinishedProductGuidePrice[];\n  mainImageMediaId?: number;\n  mainImageMediaIds?: number[];\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "export interface FinishedStockRowAction {\n  id: string;\n  label: string;\n}\nexport type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\nexport type PublisherType = '平台发布' | '接口获取';\nexport type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';\nexport type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';\nexport type FormSectionKey = 'description' | 'base' | 'sales';\n",
           "after": "export interface FinishedStockRowAction {\n  id: string;\n  label: string;\n}\nexport type StockStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\nexport type PublisherType = '平台发布' | '接口获取';\nexport type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';\nexport type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';\nexport type FormSectionKey = 'description' | 'base' | 'sales';\n",
@@ -4098,7 +4250,21 @@
     },
     "src/pages/finished-stock/shared/finishedStockPayload.ts": {
       "content": "d471afb7a54db6a3c79af9b16f1605915b5e5227cd29acbc1c2df6280f38365b",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "  salesAttributeFields: AttributeField[];\n  specMode: SpecMode;\n  specDimensions: FinishedSpecDimension[];\n  variantLabel: (row: SpecRow) => string;\n  offShelfReason?: string;\n  offShelfDetail?: string;\n}\n\nexport const buildFinishedProductPayload = (context: ProductPayloadContext): FinishedProductPayload => {\n  const stock = context.totalStock || Number(context.form.totalStock || 0);\n",
+          "after": "  salesAttributeFields: AttributeField[];\n  specMode: SpecMode;\n  specDimensions: FinishedSpecDimension[];\n  variantLabel: (row: SpecRow) => string;\n}\n\nexport const buildFinishedProductPayload = (context: ProductPayloadContext): FinishedProductPayload => {\n  const stock = context.totalStock || Number(context.form.totalStock || 0);\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "      sizeValue: row.size || undefined,\n      costPrice: Number(row.cost),\n      stock: Number(row.quantity || 0),\n    })),\n    offShelfReason: context.offShelfReason,\n    offShelfDetail: context.offShelfDetail,\n    status,\n  };\n};\n\n",
+          "after": "      sizeValue: row.size || undefined,\n      costPrice: Number(row.cost),\n      stock: Number(row.quantity || 0),\n    })),\n    status,\n  };\n};\n\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        }
+      ]
     },
     "src/pages/finished-stock/shared/finishedStockPriceEditor.ts": {
       "content": "dce2fff3816ce73c57567d7a801090a23a6084991365f9e0766ccba7fe346f60",
@@ -4222,6 +4388,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "function scrollToFormSection(key: string) {\n  const section =\n    key === 'sales'\n      ? document.getElementById('store-finished-product-sales')\n      : readonlyFields.value?.querySelectorAll('.zdm-admin-section-card')[key === 'description' ? 0 : 1];\n  if (!section) return;\n  activeFormSection.value = key;\n  updateFormAnchorPosition();\n  const offset = Number.parseFloat(formAnchorStyle.value.top) + formAnchorHeight.value + 16;\n",
+          "after": "function scrollToFormSection(key: string) {\n  const section =\n    key === 'sales'\n      ? document.getElementById('store-finished-product-sales')\n      : readonlyFields.value?.querySelector(`[data-product-section=\"${key}\"]`);\n  if (!section) return;\n  activeFormSection.value = key;\n  updateFormAnchorPosition();\n  const offset = Number.parseFloat(formAnchorStyle.value.top) + formAnchorHeight.value + 16;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "    </div>\n    <AdminSectionCard class=\"form-submit-bar\">\n      <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"save\"\n        ><template #icon><t-icon name=\"check\" /></template>{{ formConfirmationText('edit') }}</t-button\n      >\n      <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" :disabled=\"saving\" @click=\"emit('cancel')\">取消</t-button>\n    </AdminSectionCard>\n  </section>\n</template>\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { computed, onMounted, reactive, ref, watch, h } from 'vue';\nimport type { FormInstanceFunctions, PrimaryTableCol } from 'tdesign-vue-next';\nimport { AdminSectionCard, adminFeedback, getSafeErrorMessage } from '@/components/foundation';\nimport {\n  listStoreFinishedEditCategories,\n  saveStoreFinishedEdit,\n  type StoreFinishedProduct,\n  type StoreFinishedEditCategory,\n} from '@/services/storeFinishedStock';\nimport StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';\nimport SpecPriceInput from '../management/components/SpecPriceInput.vue';\nimport PriceSourceToggle from '../management/components/PriceSourceToggle.vue';\nimport { isValidSpecPriceNumber } from '../management/priceValidation';\nimport {\n  calculateSalePrice,\n  changeDraftCategory,\n  createSalePriceDraft,\n  editDraftPrice,\n  editDraftCoefficient,\n",
           "after": "    </div>\n    <AdminSectionCard class=\"form-submit-bar\">\n      <t-button :theme=\"buttonTheme('submit')\" :loading=\"saving\" @click=\"save\"\n        ><template #icon><t-icon name=\"check\" /></template>{{ formConfirmationText('edit') }}</t-button\n      >\n      <t-button :theme=\"buttonTheme('cancel')\" variant=\"base\" :disabled=\"saving\" @click=\"emit('cancel')\">取消</t-button>\n    </AdminSectionCard>\n  </section>\n</template>\n<script setup lang=\"ts\">\nimport { useCommodityModule } from '@/composables/useCommodityModule';\nconst commodity = useCommodityModule();\n\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { computed, onMounted, reactive, ref, watch, h } from 'vue';\nimport type { FormInstanceFunctions, PrimaryTableCol } from 'tdesign-vue-next';\nimport { AdminSectionCard, adminFeedback, getSafeErrorMessage } from '@/components/foundation';\nimport { type StoreFinishedProduct, type StoreFinishedEditCategory } from '@/services/storeFinishedStock';\nconst { listStoreFinishedEditCategories, saveStoreFinishedEdit } = commodity.store;\nimport StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';\nimport SpecPriceInput from '../management/components/SpecPriceInput.vue';\nimport PriceSourceToggle from '../management/components/PriceSourceToggle.vue';\nimport { isValidSpecPriceNumber } from '../management/priceValidation';\nimport {\n  calculateSalePrice,\n  changeDraftCategory,\n  createSalePriceDraft,\n  editDraftPrice,\n  editDraftCoefficient,\n",
@@ -4439,6 +4611,48 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                  class=\"finished-stock-table\"\n                  row-key=\"id\"\n                  :data=\"pageRows\"\n                  :columns=\"columns\"\n                  :loading=\"loading\"\n                  :row-attributes=\"\n                    ({ row }: { row: StoreFinishedProduct }) =>\n                      row.sourceUnavailable\n",
+          "after": "                  class=\"finished-stock-table\"\n                  row-key=\"id\"\n                  :data=\"pageRows\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :loading=\"loading\"\n                  :row-attributes=\"\n                    ({ row }: { row: StoreFinishedProduct }) =>\n                      row.sourceUnavailable\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "                          : {}\n                  \"\n                  hover\n                  table-layout=\"fixed\"\n                >\n                  <template #selectTitle\n                    ><t-checkbox :checked=\"pageAllSelected\" :indeterminate=\"pagePartlySelected\" @change=\"togglePage\"\n                  /></template>\n",
+          "after": "                          : {}\n                  \"\n                  hover\n                  table-layout=\"fixed\"\n                  @sort-change=\"onTimeSortChange\"\n                >\n                  <template #selectTitle\n                    ><t-checkbox :checked=\"pageAllSelected\" :indeterminate=\"pagePartlySelected\" @change=\"togglePage\"\n                  /></template>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n                  <template #offShelfReason=\"{ row }\">\n                    <t-tooltip :content=\"row.offShelfDetail || '—'\">{{ row.offShelfReason || '—' }}</t-tooltip>\n                  </template>\n                  <template #offShelfAt=\"{ row }\">{{ time(row.offShelfAt) }}</template>\n                  <template #operation=\"{ row }\">\n                    <div class=\"table-actions\">\n                      <t-link\n                        v-for=\"action in storeRowButtons\"\n",
+          "after": "                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n                  <template #warehouseEntry=\"{ row }\"><WarehouseEntryInformation :entry=\"row\" /></template>\n                  <template #operation=\"{ row }\">\n                    <div class=\"table-actions\">\n                      <t-link\n                        v-for=\"action in storeRowButtons\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { useCommodityModule } from '@/composables/useCommodityModule';\nconst commodity = useCommodityModule();\n\nimport { operationConfirmation } from '@/components/foundation/actions/confirmation';\n",
+          "after": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\nimport { useStateActivitySort } from '@/composables/useStateActivitySort';\nimport { useCommodityModule } from '@/composables/useCommodityModule';\nconst commodity = useCommodityModule();\n\nimport { operationConfirmation } from '@/components/foundation/actions/confirmation';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "      label: `${statusLabels[value]}（${rows.value.filter((item) => item.effectiveStatus === value).length}）`,\n    })),\n);\nconst activeTab = ref<StoreFinishedStatus>('warehouse');\nconst activeScope = computed(() => (activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value));\nconst rows = ref<StoreFinishedProduct[]>([]);\nconst loading = ref(false);\nconst page = ref(1);\n",
+          "after": "      label: `${statusLabels[value]}（${rows.value.filter((item) => item.effectiveStatus === value).length}）`,\n    })),\n);\nconst activeTab = ref<StoreFinishedStatus>('warehouse');\nconst { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {\n  page.value = 1;\n});\nconst activeScope = computed(() => (activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value));\nconst rows = ref<StoreFinishedProduct[]>([]);\nconst loading = ref(false);\nconst page = ref(1);\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  clear: '是否清空回收站？',\n};\nconst submittingOffShelf = ref(false);\nconst filteredRows = computed(() =>\n  sortByStateActivity(rows.value).filter(\n    (row) =>\n      row.effectiveStatus === activeTab.value &&\n      (!appliedFilter.keyword || `${row.name} ${row.productId}`.includes(appliedFilter.keyword)) &&\n      matchesListCategory(row.categoryId),\n",
+          "after": "  clear: '是否清空回收站？',\n};\nconst submittingOffShelf = ref(false);\nconst filteredRows = computed(() =>\n  sortByStateActivity(rows.value, descending.value).filter(\n    (row) =>\n      row.effectiveStatus === activeTab.value &&\n      (!appliedFilter.keyword || `${row.name} ${row.productId}`.includes(appliedFilter.keyword)) &&\n      matchesListCategory(row.categoryId),\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  recycle: 208,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...baseColumns,\n  ...stateActivityColumns(activeTab.value),\n  ...(activeTab.value === 'warehouse' ? [{ colKey: 'offShelfReason', title: '下架原因', minWidth: 140 }] : []),\n  { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },\n]);\nconst poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'select', title: 'poolSelectTitle', width: 48 },\n",
+          "after": "  recycle: 208,\n};\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...baseColumns,\n  ...stateActivityColumns(activeTab.value, toggleTimeSort),\n  ...(activeTab.value === 'warehouse'\n    ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]\n    : []),\n  { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },\n]);\nconst poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'select', title: 'poolSelectTitle', width: 48 },\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`);\nconst statusLabels: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  offShelf: '已下架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\nconst tabOrder: StoreFinishedStatus[] = ['warehouse', 'selling', 'offShelf', 'soldOut', 'recycle'];\nconst tabs = computed(() =>\n  tabOrder\n    .filter((tab) => can(tab === 'offShelf' ? 'off-shelf' : tab === 'soldOut' ? 'sold-out' : tab, 'view'))\n    .map((value) => ({\n      value,\n      label: `${statusLabels[value]}（${rows.value.filter((item) => item.effectiveStatus === value).length}）`,\n    })),\n);\nconst activeTab = ref<StoreFinishedStatus>('warehouse');\nconst activeScope = computed(() =>\n  activeTab.value === 'offShelf' ? 'off-shelf' : activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value,\n);\nconst rows = ref<StoreFinishedProduct[]>([]);\nconst loading = ref(false);\nconst page = ref(1);\nconst pageSize = ref(10);\n",
           "after": "const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`);\nconst statusLabels: Record<string, string> = {\n  warehouse: '仓库中',\n  selling: '已上架',\n  soldOut: '已售完',\n  recycle: '回收站',\n  purged: '已彻底删除',\n};\nconst tabOrder: StoreFinishedStatus[] = ['warehouse', 'selling', 'soldOut', 'recycle'];\nconst tabs = computed(() =>\n  tabOrder\n    .filter((tab) => can(tab === 'soldOut' ? 'sold-out' : tab, 'view'))\n    .map((value) => ({\n      value,\n      label: `${statusLabels[value]}（${rows.value.filter((item) => item.effectiveStatus === value).length}）`,\n    })),\n);\nconst activeTab = ref<StoreFinishedStatus>('warehouse');\nconst activeScope = computed(() => (activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value));\nconst rows = ref<StoreFinishedProduct[]>([]);\nconst loading = ref(false);\nconst page = ref(1);\nconst pageSize = ref(10);\n",
@@ -5619,6 +5833,90 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n                  >\n                    <template #selectTitle>\n                      <t-checkbox\n                        :checked=\"pageAllSelected\"\n",
+          "after": "                    \"\n                    row-key=\"id\"\n                    :data=\"pageData\"\n                    :columns=\"columns\"\n                    :sort=\"tableSort\"\n                    :loading=\"loading\"\n                    hover\n                    table-layout=\"fixed\"\n                    @sort-change=\"onTimeSortChange\"\n                  >\n                    <template #selectTitle>\n                      <t-checkbox\n                        :checked=\"pageAllSelected\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "                        <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->\n                        <span class=\"store-text\">平台仓</span>\n                      </div>\n                    </template>\n                    <template #offShelfAt=\"{ row }\">{{\n                      row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'\n                    }}</template>\n                    <template #createdAt=\"{ row }\">{{ formatDateTime(row.createdAt) }}</template>\n                    <template #offShelfReason=\"{ row }\">\n                      <div class=\"off-shelf-reason-cell\">\n                        <span>{{ row.offShelfReason || '—' }}</span>\n                        <t-tooltip :content=\"row.offShelfDetail || '—'\" placement=\"bottom-left\">\n                          <span class=\"off-shelf-reason-secondary\">{{ row.offShelfDetail || '—' }}</span>\n                        </t-tooltip>\n                      </div>\n                    </template>\n                    <template #stateOperatorName=\"{ row }\"\n                      ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                    >\n                    <template #stateOperatedAt=\"{ row }\">{{\n",
+          "after": "                        <!-- TODO(warehouse-management): 仓库模块补全后改为展示商品关联的真实仓库，当前临时显示平台仓。 -->\n                        <span class=\"store-text\">平台仓</span>\n                      </div>\n                    </template>\n                    <template #createdAt=\"{ row }\">{{ formatDateTime(row.createdAt) }}</template>\n                    <template #warehouseEntry=\"{ row }\"><WarehouseEntryInformation :entry=\"row\" /></template>\n                    <template #stateOperatorName=\"{ row }\"\n                      ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                    >\n                    <template #stateOperatedAt=\"{ row }\">{{\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "            </template>\n          </AdminListLayout> </template\n        ><template v-else-if=\"formPageVisible\">\n          <section ref=\"productFormRoot\" class=\"form-shell\">\n            <t-alert\n              v-if=\"editingProduct?.status === 'warehouse' && editingProduct.offShelfReason\"\n              theme=\"warning\"\n              title=\"最近下架信息\"\n            >\n              {{ editingProduct.offShelfReason }} · {{ editingProduct.offShelfDetail || '—' }}\n              {{ editingProduct.offShelfByName || '未记录' }} · {{ editingProduct.offShelfAt || '未记录' }}\n            </t-alert>\n            <AdminSectionCard class=\"form-heading-card\" aria-label=\"发布商品信息\">\n              <div class=\"form-title-row\">\n                <div>\n",
+          "after": "            </template>\n          </AdminListLayout> </template\n        ><template v-else-if=\"formPageVisible\">\n          <section ref=\"productFormRoot\" class=\"form-shell\">\n            <t-alert v-if=\"editingProduct?.status === 'warehouse'\" title=\"本次入库信息\" theme=\"info\">\n              <WarehouseEntryInformation :entry=\"editingProduct\" />\n              {{ editingProduct.stateOperatorName || '历史记录未记录' }} ·\n              {{ editingProduct.stateOperatedAt ? formatDateTime(editingProduct.stateOperatedAt) : '历史记录未记录' }}\n            </t-alert>\n            <AdminSectionCard class=\"form-heading-card\" aria-label=\"发布商品信息\">\n              <div class=\"form-title-row\">\n                <div>\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { useCommodityModule } from '@/composables/useCommodityModule';\nconst commodity = useCommodityModule();\n\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\n",
+          "after": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\nimport { useStateActivitySort } from '@/composables/useStateActivitySort';\nimport { useCommodityModule } from '@/composables/useCommodityModule';\nconst commodity = useCommodityModule();\n\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.${commodity.moduleKey}`);\nconst sourceBlocked: (row: StockItem) => boolean = () => false;\nconst activeTab = ref<StockStatus>('warehouse');\nconst finishedScope: Record<StockStatus, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  soldOut: 'sold-out',\n",
+          "after": "const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.${commodity.moduleKey}`);\nconst sourceBlocked: (row: StockItem) => boolean = () => false;\nconst activeTab = ref<StockStatus>('warehouse');\nconst { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {\n  currentPagination.value.current = 1;\n});\nconst finishedScope: Record<StockStatus, string> = {\n  warehouse: 'warehouse',\n  selling: 'selling',\n  soldOut: 'sold-out',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  const value = Number(guidePrice ?? 0);\n  return value > 0 ? `￥${value.toFixed(2)}` : '-';\n};\nconst toStockItem = (record: FinishedProductRecord): StockItem => {\n  record = {\n    ...record,\n    offShelfReason: record.sourceOffShelfReason,\n    offShelfDetail: record.sourceOffShelfDetail,\n    offShelfAt: record.sourceOffShelfAt,\n  };\n  const status = normalizeStatus(record.sourceStatus);\n  const publisherType = normalizePublisherType(record.publisherType);\n  return {\n    id: record.id,\n",
+          "after": "  const value = Number(guidePrice ?? 0);\n  return value > 0 ? `￥${value.toFixed(2)}` : '-';\n};\nconst toStockItem = (record: FinishedProductRecord): StockItem => {\n  const status = normalizeStatus(record.sourceStatus);\n  const publisherType = normalizePublisherType(record.publisherType);\n  return {\n    id: record.id,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    sourceMessage: record.sourceMessage,\n    code: record.sku ?? '',\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    createdByName: record.createdByName?.trim() || '-',\n    offShelfByName: record.offShelfByName?.trim() || '未记录',\n    createdAt: record.createdAt,\n    image: record.mainImageUrl || '',\n    name: record.name,\n    categoryId: record.categoryId,\n",
+          "after": "    sourceMessage: record.sourceMessage,\n    code: record.sku ?? '',\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    warehouseEntryType: record.warehouseEntryType,\n    warehouseEntryReason: record.warehouseEntryReason,\n    warehouseEntryDetail: record.warehouseEntryDetail,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt,\n    image: record.mainImageUrl || '',\n    name: record.name,\n    categoryId: record.categoryId,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    variants: record.variants ?? [],\n    specDimensions: record.specDimensions,\n    priceRange: formatPriceRange(record.guidePrice),\n    status,\n    offShelfReason: record.offShelfReason,\n    offShelfAt: record.offShelfAt,\n    offShelfDetail: record.offShelfDetail,\n  };\n};\nconst toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): FinishedProductPayload => {\n  const nextItem = { ...item, ...patch };\n  return {\n    categoryId: nextItem.categoryId,\n    supplierId: nextItem.supplierId,\n",
+          "after": "    variants: record.variants ?? [],\n    specDimensions: record.specDimensions,\n    priceRange: formatPriceRange(record.guidePrice),\n    status,\n  };\n};\nconst toProductPayload = (\n  item: StockItem,\n  patch: Partial<StockItem> & { offShelfReason?: string; offShelfDetail?: string } = {},\n): FinishedProductPayload => {\n  const nextItem = { ...item, ...patch };\n  return {\n    categoryId: nextItem.categoryId,\n    supplierId: nextItem.supplierId,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    markupPrices: nextItem.markupPrices,\n    attributes: nextItem.attributes,\n    variants: nextItem.variants,\n    specDimensions: nextItem.specDimensions,\n    operation: nextItem.operation,\n    offShelfReason: nextItem.offShelfReason,\n    offShelfDetail: nextItem.offShelfDetail,\n    status: nextItem.status,\n  };\n};\nconst loadInventoryData = async () => {\n",
+          "after": "    markupPrices: nextItem.markupPrices,\n    attributes: nextItem.attributes,\n    variants: nextItem.variants,\n    specDimensions: nextItem.specDimensions,\n    offShelfReason: patch.offShelfReason,\n    offShelfDetail: patch.offShelfDetail,\n    operation: nextItem.operation,\n    status: nextItem.status,\n  };\n};\nconst loadInventoryData = async () => {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  window.removeEventListener('focus', refreshVisibleProductTemplate);\n  document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);\n});\nconst filteredData = computed(() =>\n  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value),\n);\nconst paginationTotal = computed(() => filteredData.value.length);\nconst pageData = computed(() => {\n  const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;\n",
+          "after": "  window.removeEventListener('focus', refreshVisibleProductTemplate);\n  document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);\n});\nconst filteredData = computed(() =>\n  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value, descending.value),\n);\nconst paginationTotal = computed(() => filteredData.value.length);\nconst pageData = computed(() => {\n  const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  const base: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n    { colKey: 'supplier', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value),\n  ];\n  if (activeTab.value !== 'soldOut') {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n  if (activeTab.value === 'warehouse') {\n    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  }\n  base.push({\n    colKey: 'operation',\n    title: '操作',\n",
+          "after": "  const base: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'image', title: '商品主图', width: 96 },\n    { colKey: 'product', title: '商品名称/ID', minWidth: 220 },\n    { colKey: 'supplier', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value, toggleTimeSort),\n  ];\n  if (activeTab.value !== 'soldOut') {\n    base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });\n  }\n  if (activeTab.value === 'warehouse') {\n    base.splice(4, 0, { colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });\n  }\n  base.push({\n    colKey: 'operation',\n    title: '操作',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    salesAttributeFields: salesAttributeFields.value,\n    specMode: confirmedSpecMode.value,\n    specDimensions: confirmedSpecDimensions.value,\n    variantLabel: specVariantLabel,\n    offShelfReason: editingProduct.value?.offShelfReason,\n    offShelfDetail: editingProduct.value?.offShelfDetail,\n  });\nconst buildOperationsPricePayload = (): Pick<\n  FinishedProductPayload,\n  'name' | 'status' | 'guidePrices' | 'markupPrices'\n",
+          "after": "    salesAttributeFields: salesAttributeFields.value,\n    specMode: confirmedSpecMode.value,\n    specDimensions: confirmedSpecDimensions.value,\n    variantLabel: specVariantLabel,\n  });\nconst buildOperationsPricePayload = (): Pick<\n  FinishedProductPayload,\n  'name' | 'status' | 'guidePrices' | 'markupPrices'\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    specRows: specRows.value,\n    priceLevels: productPriceLevels.value,\n    variantLabel: specVariantLabel,\n  });\nconst upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string) => {\n  const nextItem = toStockItem(record);\n  if (offShelfReason) nextItem.offShelfReason = offShelfReason;\n  const index = dataItems.value.findIndex((item) => item.id === record.id);\n  if (index >= 0) dataItems.value[index] = nextItem;\n  else dataItems.value.unshift(nextItem);\n  return nextItem;\n",
+          "after": "    specRows: specRows.value,\n    priceLevels: productPriceLevels.value,\n    variantLabel: specVariantLabel,\n  });\nconst upsertStockItem = (record: FinishedProductRecord) => {\n  const nextItem = toStockItem(record);\n  const index = dataItems.value.findIndex((item) => item.id === record.id);\n  if (index >= 0) dataItems.value[index] = nextItem;\n  else dataItems.value.unshift(nextItem);\n  return nextItem;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    toProductPayload(item, {\n      status: status === 'offShelf' ? 'warehouse' : status,\n      operation: status === 'offShelf' ? 'offShelf' : undefined,\n      stock: afterStock,\n      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,\n      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,\n    }),\n  );\n  upsertStockItem(updated, status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined);\n};\nconst handleConfirm = async () => {\n  const type = confirmState.type;\n  const product = confirmState.product;\n",
+          "after": "    toProductPayload(item, {\n      status: status === 'offShelf' ? 'warehouse' : status,\n      operation: status === 'offShelf' ? 'offShelf' : undefined,\n      stock: afterStock,\n      offShelfReason: status === 'offShelf' ? reason : undefined,\n      offShelfDetail: status === 'offShelf' ? detail : undefined,\n    }),\n  );\n  upsertStockItem(updated);\n};\nconst handleConfirm = async () => {\n  const type = confirmState.type;\n  const product = confirmState.product;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "            </template>\n          </AdminListLayout> </template\n        ><template v-else-if=\"formPageVisible\">\n          <section ref=\"productFormRoot\" class=\"form-shell\">\n            <AdminSectionCard class=\"form-heading-card\" aria-label=\"发布商品信息\">\n              <div class=\"form-title-row\">\n                <div>\n                  <h1>{{ formPageTitle }}</h1>\n",
           "after": "            </template>\n          </AdminListLayout> </template\n        ><template v-else-if=\"formPageVisible\">\n          <section ref=\"productFormRoot\" class=\"form-shell\">\n            <t-alert\n              v-if=\"editingProduct?.status === 'warehouse' && editingProduct.offShelfReason\"\n              theme=\"warning\"\n              title=\"最近下架信息\"\n            >\n              {{ editingProduct.offShelfReason }} · {{ editingProduct.offShelfDetail || '—' }}\n              {{ editingProduct.offShelfByName || '未记录' }} · {{ editingProduct.offShelfAt || '未记录' }}\n            </t-alert>\n            <AdminSectionCard class=\"form-heading-card\" aria-label=\"发布商品信息\">\n              <div class=\"form-title-row\">\n                <div>\n                  <h1>{{ formPageTitle }}</h1>\n",
@@ -8028,6 +8326,72 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'warehouse'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n                          filterable\n                          placeholder=\"请选择下架原因\"\n                        >\n                          <t-option v-for=\"item in offShelfReasons\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                        </t-select>\n                      </t-form-item>\n                      <t-form-item label=\"下架人\">\n                        <t-input v-model=\"currentFilter.offShelvedBy\" clearable placeholder=\"请输入下架人\" />\n                      </t-form-item>\n                    </template>\n                    <t-form-item label=\"产地\">\n                      <t-select v-model=\"currentFilter.origin\" clearable filterable placeholder=\"请选择产地\">\n",
+          "after": "                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'warehouse'\">\n                      <t-form-item label=\"入库类型\">\n                        <t-select\n                          v-model=\"currentFilter.warehouseEntryType\"\n                          clearable\n                          filterable\n                          placeholder=\"请选择入库类型\"\n                        >\n                          <t-option\n                            v-for=\"item in warehouseEntryTypes\"\n                            :key=\"item.value\"\n                            :label=\"item.label\"\n                            :value=\"item.value\"\n                          />\n                        </t-select>\n                      </t-form-item>\n                      <t-form-item label=\"入库人\">\n                        <t-input v-model=\"currentFilter.warehouseEntryBy\" clearable placeholder=\"请输入入库人\" />\n                      </t-form-item>\n                    </template>\n                    <t-form-item label=\"产地\">\n                      <t-select v-model=\"currentFilter.origin\" clearable filterable placeholder=\"请选择产地\">\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n                >\n                  <template #selectTitle>\n                    <t-checkbox\n                      :checked=\"pageAllSelected\"\n",
+          "after": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n                  @sort-change=\"onTimeSortChange\"\n                >\n                  <template #selectTitle>\n                    <t-checkbox\n                      :checked=\"pageAllSelected\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "                      <span>{{ row.tenant }}</span>\n                      <span class=\"store-text\">{{ row.store }}</span>\n                    </div>\n                  </template>\n                  <template #offShelfReason=\"{ row }\">\n                    <div class=\"off-shelf-reason-cell\">\n                      <span class=\"off-shelf-reason-primary\">{{\n                        latestOffShelfRecord(row)?.standardReason || '-'\n                      }}</span>\n                      <div class=\"off-shelf-reason-detail-row\">\n                        <t-tooltip\n                          class=\"off-shelf-detail-tooltip\"\n                          :content=\"latestOffShelfRecord(row)?.detailReason || '-'\"\n                          placement=\"bottom-left\"\n                        >\n                          <span class=\"off-shelf-reason-secondary\">{{\n                            latestOffShelfRecord(row)?.detailReason || '-'\n                          }}</span>\n                        </t-tooltip>\n                        <t-tooltip content=\"查看历史下架原因\">\n                          <t-button\n                            :theme=\"buttonTheme('off-shelf-history')\"\n                            class=\"off-shelf-history-trigger\"\n                            variant=\"text\"\n                            shape=\"square\"\n                            size=\"small\"\n                            aria-label=\"查看历史下架原因\"\n                            @click=\"openOffShelfHistory(row)\"\n                          >\n                            <template #icon><t-icon name=\"browse\" /></template>\n                          </t-button>\n                        </t-tooltip>\n                      </div>\n                    </div>\n                  </template>\n                  <template #offShelvedByName=\"{ row }\">\n                    {{ latestOffShelfRecord(row)?.offShelvedByName || '-' }}\n                  </template>\n                  <template #offShelvedAt=\"{ row }\">\n                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}\n                  </template>\n                  <template #stateOperatorName=\"{ row }\"\n                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n",
+          "after": "                      <span>{{ row.tenant }}</span>\n                      <span class=\"store-text\">{{ row.store }}</span>\n                    </div>\n                  </template>\n                  <template #warehouseEntry=\"{ row }\"\n                    ><WarehouseEntryInformation class=\"off-shelf-reason-cell\" :entry=\"row\">\n                      <t-tooltip\n                        v-if=\"row.warehouseEntryType === 'offShelf' && row.offShelfRecords.length\"\n                        content=\"查看历史下架原因\"\n                      >\n                        <t-button\n                          :theme=\"buttonTheme('off-shelf-history')\"\n                          class=\"off-shelf-history-trigger\"\n                          variant=\"text\"\n                          shape=\"square\"\n                          size=\"small\"\n                          aria-label=\"查看历史下架原因\"\n                          @click=\"openOffShelfHistory(row)\"\n                          ><template #icon><t-icon name=\"browse\" /></template\n                        ></t-button>\n                      </t-tooltip> </WarehouseEntryInformation\n                  ></template>\n                  <template #stateOperatorName=\"{ row }\"\n                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "            />\n          </template>\n        </AdminListLayout>\n        <t-alert\n          v-if=\"\n            editingRowId &&\n            tableData.find((item) => item.id === editingRowId)?.status === 'warehouse' &&\n            latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)\n          \"\n          theme=\"warning\"\n          title=\"最近下架信息\"\n        >\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.standardReason }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.detailReason || '—' }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedByName || '未记录' }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedAt || '未记录' }}\n        </t-alert>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n",
+          "after": "            />\n          </template>\n        </AdminListLayout>\n        <t-alert\n          v-if=\"editingRowId && tableData.find((item) => item.id === editingRowId)?.status === 'warehouse'\"\n          title=\"本次入库信息\"\n          theme=\"info\"\n        >\n          <WarehouseEntryInformation :entry=\"tableData.find((item) => item.id === editingRowId)!\" />\n          {{ tableData.find((item) => item.id === editingRowId)?.stateOperatorName || '历史记录未记录' }}\n          {{ formatDateTime(tableData.find((item) => item.id === editingRowId)?.stateOperatedAt) }}\n        </t-alert>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >\n      <t-space v-if=\"detailDrawerRow\" direction=\"vertical\" size=\"large\" class=\"slab-detail-drawer\">\n        <t-alert v-if=\"sourceBlocked(detailDrawerRow)\" theme=\"warning\" :message=\"detailDrawerRow.sourceMessage\" />\n        <t-alert\n          v-if=\"detailDrawerRow.operationsSnapshotMissing\"\n          theme=\"warning\"\n",
+          "after": "      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >\n      <t-space v-if=\"detailDrawerRow\" direction=\"vertical\" size=\"large\" class=\"slab-detail-drawer\">\n        <t-card v-if=\"detailDrawerRow.status === 'warehouse'\" title=\"本次入库信息\"\n          ><WarehouseEntryInformation :entry=\"detailDrawerRow\"\n        /></t-card>\n        <t-button\n          v-if=\"detailDrawerRow.offShelfRecords.length\"\n          variant=\"text\"\n          :theme=\"buttonTheme('off-shelf-history')\"\n          @click=\"openOffShelfHistory(detailDrawerRow)\"\n          >查看历史下架原因</t-button\n        >\n        <t-alert v-if=\"sourceBlocked(detailDrawerRow)\" theme=\"warning\" :message=\"detailDrawerRow.sourceMessage\" />\n        <t-alert\n          v-if=\"detailDrawerRow.operationsSnapshotMissing\"\n          theme=\"warning\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "after": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\nimport { warehouseEntryTypes } from '@/services/warehouseEntry';\nimport { useStateActivitySort } from '@/composables/useStateActivitySort';\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';\nimport { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';\nimport { useSlabOperationLogs } from '../shared/useSlabOperationLogs';\nimport { slabBatchButtons, slabRowButtons, type SlabBatchAction, type SlabRowAction } from '../shared/slabPageActions';\nimport { filterSlabItems, latestOffShelfRecord, offShelfTimestamp } from '../shared/slabListFilter';\nimport { createSlabFormRules } from '../shared/slabFormRules';\nimport {\n  tabs,\n  pageSizeOptions,\n",
+          "after": "import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';\nimport { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';\nimport { useSlabOperationLogs } from '../shared/useSlabOperationLogs';\nimport { slabBatchButtons, slabRowButtons, type SlabBatchAction, type SlabRowAction } from '../shared/slabPageActions';\nimport { filterSlabItems, offShelfTimestamp } from '../shared/slabListFilter';\nimport { createSlabFormRules } from '../shared/slabFormRules';\nimport {\n  tabs,\n  pageSizeOptions,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "type SalesNumberChangeContext = {\n  type?: string;\n};\nconst activeTab = ref<SlabTab>('warehouse');\nconst loginUser = computed(() => getLoginUser());\nconst productPermissionPrefix = computed(() => `${'admin'}.slab-management`);\nconst sourceBlocked = (row: SlabItem) => Boolean(row.sourceUnavailable);\nconst slabPermissionScope: Record<SlabTab, string> = {\n",
+          "after": "type SalesNumberChangeContext = {\n  type?: string;\n};\nconst activeTab = ref<SlabTab>('warehouse');\nconst { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {\n  currentPagination.value.current = 1;\n});\nconst loginUser = computed(() => getLoginUser());\nconst productPermissionPrefix = computed(() => `${'admin'}.slab-management`);\nconst sourceBlocked = (row: SlabItem) => Boolean(row.sourceUnavailable);\nconst slabPermissionScope: Record<SlabTab, string> = {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    store: record.warehouse || '-',\n    publisherType: normalizePublisherType(record.publisherType),\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt || '',\n    price: {\n      cost: record.costPrice == null ? '' : String(record.costPrice),\n",
+          "after": "    store: record.warehouse || '-',\n    publisherType: normalizePublisherType(record.publisherType),\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    warehouseEntryType: record.warehouseEntryType,\n    warehouseEntryReason: record.warehouseEntryReason,\n    warehouseEntryDetail: record.warehouseEntryDetail,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt || '',\n    price: {\n      cost: record.costPrice == null ? '' : String(record.costPrice),\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    { colKey: 'color', title: '色系', width: 110 },\n    { colKey: 'grade', title: '等级', width: 160, align: 'center' },\n    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value),\n  ];\n  if (activeTab.value === 'warehouse')\n    baseColumns.push({ colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n    width: operationWidths[activeTab.value],\n",
+          "after": "    { colKey: 'color', title: '色系', width: 110 },\n    { colKey: 'grade', title: '等级', width: 160, align: 'center' },\n    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value, toggleTimeSort),\n  ];\n  if (activeTab.value === 'warehouse')\n    baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n    width: operationWidths[activeTab.value],\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  if (productMode.value === 'create') return '发布商品';\n  if (productMode.value === 'edit') return '编辑商品';\n  return '查看商品';\n});\nconst filteredData = computed(() => filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value));\nconst pageData = computed(() => {\n  const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;\n  return filteredData.value.slice(start, start + currentPagination.value.pageSize);\n});\n",
+          "after": "  if (productMode.value === 'create') return '发布商品';\n  if (productMode.value === 'edit') return '编辑商品';\n  return '查看商品';\n});\nconst filteredData = computed(() =>\n  filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value, descending.value),\n);\nconst pageData = computed(() => {\n  const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;\n  return filteredData.value.slice(start, start + currentPagination.value.pageSize);\n});\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
           "before": "                      <t-select v-model=\"currentFilter.variety\" clearable filterable placeholder=\"请选择品种\">\n                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'offShelf'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n",
           "after": "                      <t-select v-model=\"currentFilter.variety\" clearable filterable placeholder=\"请选择品种\">\n                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'warehouse'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n",
           "stage": "before-migrations",
@@ -8885,6 +9249,24 @@
       "content": "0dd9d8474550747540a59b8d6ca025fb1df41d55c45cf4de371330fe65141330",
       "approvedBusinessPatches": [
         {
+          "before": "    const timeDifference = offShelfTimestamp(current) - offShelfTimestamp(latest);\n    return timeDifference > 0 || (timeDifference === 0 && current.id > latest.id) ? current : latest;\n  }, undefined);\n\nexport const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter: FilterState) => {\n  const matchedItems = items.filter((item) => {\n    const statusMatched = item.status === activeTab;\n    const keyword = filter.keyword.trim().toLowerCase();\n    const keywordMatched =\n",
+          "after": "    const timeDifference = offShelfTimestamp(current) - offShelfTimestamp(latest);\n    return timeDifference > 0 || (timeDifference === 0 && current.id > latest.id) ? current : latest;\n  }, undefined);\n\nexport const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter: FilterState, descending = true) => {\n  const matchedItems = items.filter((item) => {\n    const statusMatched = item.status === activeTab;\n    const keyword = filter.keyword.trim().toLowerCase();\n    const keywordMatched =\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    const colorMatched = !filter.color || item.color === filter.color;\n    const gradeMatched = !filter.grade || item.grade === filter.grade;\n    const supplierKeyword = filter.supplier.trim().toLowerCase();\n    const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);\n    const latestRecord = latestOffShelfRecord(item);\n    const offShelfReasonMatched =\n      activeTab !== 'warehouse' || !filter.offShelfReason || latestRecord?.standardReason === filter.offShelfReason;\n    const offShelvedByKeyword = filter.offShelvedBy.trim().toLowerCase();\n    const offShelvedByMatched =\n      activeTab !== 'warehouse' ||\n      !offShelvedByKeyword ||\n      latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);\n    return (\n      statusMatched &&\n      keywordMatched &&\n      varietyMatched &&\n",
+          "after": "    const colorMatched = !filter.color || item.color === filter.color;\n    const gradeMatched = !filter.grade || item.grade === filter.grade;\n    const supplierKeyword = filter.supplier.trim().toLowerCase();\n    const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);\n    const entryTypeMatched =\n      activeTab !== 'warehouse' || !filter.warehouseEntryType || item.warehouseEntryType === filter.warehouseEntryType;\n    const entryBy = filter.warehouseEntryBy.trim().toLowerCase();\n    const entryByMatched =\n      activeTab !== 'warehouse' || !entryBy || Boolean(item.stateOperatorName?.toLowerCase().includes(entryBy));\n    return (\n      statusMatched &&\n      keywordMatched &&\n      varietyMatched &&\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "      textureMatched &&\n      colorMatched &&\n      gradeMatched &&\n      supplierMatched &&\n      offShelfReasonMatched &&\n      offShelvedByMatched\n    );\n  });\n  return sortByStateActivity(matchedItems);\n};\n",
+          "after": "      textureMatched &&\n      colorMatched &&\n      gradeMatched &&\n      supplierMatched &&\n      entryTypeMatched &&\n      entryByMatched\n    );\n  });\n  return sortByStateActivity(matchedItems, descending);\n};\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
           "before": "    const supplierKeyword = filter.supplier.trim().toLowerCase();\n    const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);\n    const latestRecord = latestOffShelfRecord(item);\n    const offShelfReasonMatched =\n      activeTab !== 'offShelf' || !filter.offShelfReason || latestRecord?.standardReason === filter.offShelfReason;\n    const offShelvedByKeyword = filter.offShelvedBy.trim().toLowerCase();\n    const offShelvedByMatched =\n      activeTab !== 'offShelf' ||\n      !offShelvedByKeyword ||\n      latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);\n    return (\n      statusMatched &&\n",
           "after": "    const supplierKeyword = filter.supplier.trim().toLowerCase();\n    const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);\n    const latestRecord = latestOffShelfRecord(item);\n    const offShelfReasonMatched =\n      activeTab !== 'warehouse' || !filter.offShelfReason || latestRecord?.standardReason === filter.offShelfReason;\n    const offShelvedByKeyword = filter.offShelvedBy.trim().toLowerCase();\n    const offShelvedByMatched =\n      activeTab !== 'warehouse' ||\n      !offShelvedByKeyword ||\n      latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);\n    return (\n      statusMatched &&\n",
           "stage": "before-migrations",
@@ -8981,6 +9363,30 @@
       "content": "40b03fb3326340845096248764ed124c1fa4484c81cb75ae49eb1d156eff8d26",
       "approvedBusinessPatches": [
         {
+          "before": "import type { SlabOffShelfRecord, SlabOperationType, SlabPrice, SlabPublisherType, SlabStatus } from '@/services/slabs';\nimport type { OperationLogPriceTierRow } from './operationLogPriceTiers';\n\nexport interface FilterState {\n",
+          "after": "import type { WarehouseEntryInformation } from '@/services/warehouseEntry';\nimport type { SlabOffShelfRecord, SlabOperationType, SlabPrice, SlabPublisherType, SlabStatus } from '@/services/slabs';\nimport type { OperationLogPriceTierRow } from './operationLogPriceTiers';\n\nexport interface FilterState {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  texture: string;\n  color: string;\n  grade: string;\n  supplier: string;\n  offShelfReason: string;\n  offShelvedBy: string;\n}\nexport interface OperationLogFilterState {\n  keyword: string;\n  operationType: '' | SlabOperationType;\n",
+          "after": "  texture: string;\n  color: string;\n  grade: string;\n  supplier: string;\n  warehouseEntryType: string;\n  warehouseEntryBy: string;\n}\nexport interface OperationLogFilterState {\n  keyword: string;\n  operationType: '' | SlabOperationType;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  url?: string;\n  coverUrl?: string;\n  type: 'image' | 'video';\n}\nexport interface SlabItem {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceUnavailable?: boolean;\n",
+          "after": "  url?: string;\n  coverUrl?: string;\n  type: 'image' | 'video';\n}\nexport interface SlabItem extends WarehouseEntryInformation {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceUnavailable?: boolean;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  texture: '',\n  color: '',\n  grade: '',\n  supplier: '',\n  offShelfReason: '',\n  offShelvedBy: '',\n});\nexport const makeProductForm = (): ProductForm => ({\n  variety: '',\n  origin: '',\n",
+          "after": "  texture: '',\n  color: '',\n  grade: '',\n  supplier: '',\n  warehouseEntryType: '',\n  warehouseEntryBy: '',\n});\nexport const makeProductForm = (): ProductForm => ({\n  variety: '',\n  origin: '',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
           "before": "  label: string;\n}[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'offShelf', label: '已下架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nexport const pageSizeOptions = [10, 20, 50];\n",
           "after": "  label: string;\n}[] = [\n  { value: 'warehouse', label: '仓库中' },\n  { value: 'selling', label: '已上架' },\n  { value: 'soldOut', label: '已售完' },\n  { value: 'recycle', label: '回收站' },\n];\nexport const pageSizeOptions = [10, 20, 50];\n",
           "stage": "before-migrations",
@@ -9034,6 +9440,72 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'warehouse'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n                          filterable\n                          placeholder=\"请选择下架原因\"\n                        >\n                          <t-option v-for=\"item in offShelfReasons\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                        </t-select>\n                      </t-form-item>\n                      <t-form-item label=\"下架人\">\n                        <t-input v-model=\"currentFilter.offShelvedBy\" clearable placeholder=\"请输入下架人\" />\n                      </t-form-item>\n                    </template>\n                    <t-form-item label=\"产地\">\n                      <t-select v-model=\"currentFilter.origin\" clearable filterable placeholder=\"请选择产地\">\n",
+          "after": "                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'warehouse'\">\n                      <t-form-item label=\"入库类型\">\n                        <t-select\n                          v-model=\"currentFilter.warehouseEntryType\"\n                          clearable\n                          filterable\n                          placeholder=\"请选择入库类型\"\n                        >\n                          <t-option\n                            v-for=\"item in warehouseEntryTypes\"\n                            :key=\"item.value\"\n                            :label=\"item.label\"\n                            :value=\"item.value\"\n                          />\n                        </t-select>\n                      </t-form-item>\n                      <t-form-item label=\"入库人\">\n                        <t-input v-model=\"currentFilter.warehouseEntryBy\" clearable placeholder=\"请输入入库人\" />\n                      </t-form-item>\n                    </template>\n                    <t-form-item label=\"产地\">\n                      <t-select v-model=\"currentFilter.origin\" clearable filterable placeholder=\"请选择产地\">\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n                >\n                  <template #selectTitle>\n                    <t-checkbox\n                      :checked=\"pageAllSelected\"\n",
+          "after": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n                  @sort-change=\"onTimeSortChange\"\n                >\n                  <template #selectTitle>\n                    <t-checkbox\n                      :checked=\"pageAllSelected\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "                      <span>{{ row.tenant }}</span>\n                      <span class=\"store-text\">{{ row.store }}</span>\n                    </div>\n                  </template>\n                  <template #offShelfReason=\"{ row }\">\n                    <div class=\"off-shelf-reason-cell\">\n                      <span class=\"off-shelf-reason-primary\">{{\n                        latestOffShelfRecord(row)?.standardReason || '-'\n                      }}</span>\n                      <div class=\"off-shelf-reason-detail-row\">\n                        <t-tooltip\n                          class=\"off-shelf-detail-tooltip\"\n                          :content=\"latestOffShelfRecord(row)?.detailReason || '-'\"\n                          placement=\"bottom-left\"\n                        >\n                          <span class=\"off-shelf-reason-secondary\">{{\n                            latestOffShelfRecord(row)?.detailReason || '-'\n                          }}</span>\n                        </t-tooltip>\n                        <t-tooltip content=\"查看历史下架原因\">\n                          <t-button\n                            :theme=\"buttonTheme('off-shelf-history')\"\n                            class=\"off-shelf-history-trigger\"\n                            variant=\"text\"\n                            shape=\"square\"\n                            size=\"small\"\n                            aria-label=\"查看历史下架原因\"\n                            @click=\"openOffShelfHistory(row)\"\n                          >\n                            <template #icon><t-icon name=\"browse\" /></template>\n                          </t-button>\n                        </t-tooltip>\n                      </div>\n                    </div>\n                  </template>\n                  <template #offShelvedByName=\"{ row }\">\n                    {{ latestOffShelfRecord(row)?.offShelvedByName || '-' }}\n                  </template>\n                  <template #offShelvedAt=\"{ row }\">\n                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}\n                  </template>\n                  <template #stateOperatorName=\"{ row }\"\n                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n",
+          "after": "                      <span>{{ row.tenant }}</span>\n                      <span class=\"store-text\">{{ row.store }}</span>\n                    </div>\n                  </template>\n                  <template #warehouseEntry=\"{ row }\"\n                    ><WarehouseEntryInformation class=\"off-shelf-reason-cell\" :entry=\"row\">\n                      <t-tooltip\n                        v-if=\"row.warehouseEntryType === 'offShelf' && row.offShelfRecords.length\"\n                        content=\"查看历史下架原因\"\n                      >\n                        <t-button\n                          :theme=\"buttonTheme('off-shelf-history')\"\n                          class=\"off-shelf-history-trigger\"\n                          variant=\"text\"\n                          shape=\"square\"\n                          size=\"small\"\n                          aria-label=\"查看历史下架原因\"\n                          @click=\"openOffShelfHistory(row)\"\n                          ><template #icon><t-icon name=\"browse\" /></template\n                        ></t-button>\n                      </t-tooltip> </WarehouseEntryInformation\n                  ></template>\n                  <template #stateOperatorName=\"{ row }\"\n                    ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template\n                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "            />\n          </template>\n        </AdminListLayout>\n        <t-alert\n          v-if=\"\n            editingRowId &&\n            tableData.find((item) => item.id === editingRowId)?.status === 'warehouse' &&\n            latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)\n          \"\n          theme=\"warning\"\n          title=\"最近下架信息\"\n        >\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.standardReason }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.detailReason || '—' }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedByName || '未记录' }}\n          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedAt || '未记录' }}\n        </t-alert>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n",
+          "after": "            />\n          </template>\n        </AdminListLayout>\n        <t-alert\n          v-if=\"editingRowId && tableData.find((item) => item.id === editingRowId)?.status === 'warehouse'\"\n          title=\"本次入库信息\"\n          theme=\"info\"\n        >\n          <WarehouseEntryInformation :entry=\"tableData.find((item) => item.id === editingRowId)!\" />\n          {{ tableData.find((item) => item.id === editingRowId)?.stateOperatorName || '历史记录未记录' }}\n          {{ formatDateTime(tableData.find((item) => item.id === editingRowId)?.stateOperatedAt) }}\n        </t-alert>\n        <SlabProductFormLayout\n          ref=\"productLayoutRef\"\n          v-model:visible=\"productDialogVisible\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >\n      <t-space v-if=\"detailDrawerRow\" direction=\"vertical\" size=\"large\" class=\"slab-detail-drawer\">\n        <t-card class=\"slab-detail-section\" title=\"图文描述\">\n          <div class=\"slab-detail-media-grid\">\n            <button\n              v-for=\"media in detailMediaItems\"\n",
+          "after": "      :footer=\"false\"\n      @close=\"closeDetailDrawer\"\n    >\n      <t-space v-if=\"detailDrawerRow\" direction=\"vertical\" size=\"large\" class=\"slab-detail-drawer\">\n        <t-card v-if=\"detailDrawerRow.status === 'warehouse'\" title=\"本次入库信息\"\n          ><WarehouseEntryInformation :entry=\"detailDrawerRow\"\n        /></t-card>\n        <t-button\n          v-if=\"detailDrawerRow.offShelfRecords.length\"\n          variant=\"text\"\n          :theme=\"buttonTheme('off-shelf-history')\"\n          @click=\"openOffShelfHistory(detailDrawerRow)\"\n          >查看历史下架原因</t-button\n        >\n        <t-card class=\"slab-detail-section\" title=\"图文描述\">\n          <div class=\"slab-detail-media-grid\">\n            <button\n              v-for=\"media in detailMediaItems\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { preventZeroQuantity } from '@/utils/quantityInput';\n",
+          "after": "  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\nimport { warehouseEntryTypes } from '@/services/warehouseEntry';\nimport { useStateActivitySort } from '@/composables/useStateActivitySort';\nimport { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { preventZeroQuantity } from '@/utils/quantityInput';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';\nimport { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';\nimport { useSlabOperationLogs } from '../shared/useSlabOperationLogs';\nimport { slabBatchButtons, slabRowButtons, type SlabBatchAction, type SlabRowAction } from '../shared/slabPageActions';\nimport { filterSlabItems, latestOffShelfRecord, offShelfTimestamp } from '../shared/slabListFilter';\nimport { createSlabFormRules } from '../shared/slabFormRules';\nimport {\n  tabs,\n  pageSizeOptions,\n",
+          "after": "import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';\nimport { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';\nimport { useSlabOperationLogs } from '../shared/useSlabOperationLogs';\nimport { slabBatchButtons, slabRowButtons, type SlabBatchAction, type SlabRowAction } from '../shared/slabPageActions';\nimport { filterSlabItems, offShelfTimestamp } from '../shared/slabListFilter';\nimport { createSlabFormRules } from '../shared/slabFormRules';\nimport {\n  tabs,\n  pageSizeOptions,\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "type SalesNumberChangeContext = {\n  type?: string;\n};\nconst activeTab = ref<SlabTab>('warehouse');\nconst loginUser = computed(() => getLoginUser());\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);\nconst sourceBlocked: (row: SlabItem) => boolean = () => false;\nconst slabPermissionScope: Record<SlabTab, string> = {\n",
+          "after": "type SalesNumberChangeContext = {\n  type?: string;\n};\nconst activeTab = ref<SlabTab>('warehouse');\nconst { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {\n  currentPagination.value.current = 1;\n});\nconst loginUser = computed(() => getLoginUser());\nconst productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);\nconst sourceBlocked: (row: SlabItem) => boolean = () => false;\nconst slabPermissionScope: Record<SlabTab, string> = {\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    store: record.warehouse || '-',\n    publisherType: normalizePublisherType(record.publisherType),\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt || '',\n    price: {\n      cost: record.costPrice == null ? '' : String(record.costPrice),\n",
+          "after": "    store: record.warehouse || '-',\n    publisherType: normalizePublisherType(record.publisherType),\n    stateOperatorName: record.stateOperatorName,\n    stateOperatedAt: record.stateOperatedAt,\n    warehouseEntryType: record.warehouseEntryType,\n    warehouseEntryReason: record.warehouseEntryReason,\n    warehouseEntryDetail: record.warehouseEntryDetail,\n    createdByName: record.createdByName?.trim() || '-',\n    createdAt: record.createdAt || '',\n    price: {\n      cost: record.costPrice == null ? '' : String(record.costPrice),\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "    { colKey: 'color', title: '色系', width: 110 },\n    { colKey: 'grade', title: '等级', width: 160, align: 'center' },\n    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value),\n  ];\n  if (activeTab.value === 'warehouse')\n    baseColumns.push({ colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n    width: operationWidths[activeTab.value],\n",
+          "after": "    { colKey: 'color', title: '色系', width: 110 },\n    { colKey: 'grade', title: '等级', width: 160, align: 'center' },\n    { colKey: 'size', title: '尺寸', width: 170 },\n    { colKey: 'tenant', title: '供应商', width: 180 },\n    ...stateActivityColumns(activeTab.value, toggleTimeSort),\n  ];\n  if (activeTab.value === 'warehouse')\n    baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });\n  baseColumns.push({\n    colKey: 'operation',\n    title: '操作',\n    width: operationWidths[activeTab.value],\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  if (productMode.value === 'create') return '发布商品';\n  if (productMode.value === 'edit') return '编辑商品';\n  return '查看商品';\n});\nconst filteredData = computed(() => filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value));\nconst pageData = computed(() => {\n  const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;\n  return filteredData.value.slice(start, start + currentPagination.value.pageSize);\n});\n",
+          "after": "  if (productMode.value === 'create') return '发布商品';\n  if (productMode.value === 'edit') return '编辑商品';\n  return '查看商品';\n});\nconst filteredData = computed(() =>\n  filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value, descending.value),\n);\nconst pageData = computed(() => {\n  const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;\n  return filteredData.value.slice(start, start + currentPagination.value.pageSize);\n});\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "                      <t-select v-model=\"currentFilter.variety\" clearable filterable placeholder=\"请选择品种\">\n                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'offShelf'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n",
           "after": "                      <t-select v-model=\"currentFilter.variety\" clearable filterable placeholder=\"请选择品种\">\n                        <t-option v-for=\"item in varietyOptions\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                      </t-select>\n                    </t-form-item>\n                    <template v-if=\"activeTab === 'warehouse'\">\n                      <t-form-item label=\"下架原因\">\n                        <t-select\n                          v-model=\"currentFilter.offShelfReason\"\n                          clearable\n",
@@ -11092,6 +11564,30 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "import { request } from './http';\nimport type { ProductCategoryRecord } from './productCategories';\nimport type { ProductAttributeRecord } from './productAttributes';\nimport type { SupplierRecord } from './suppliers';\n",
+          "after": "import type { WarehouseEntryInformation } from './warehouseEntry';\nimport { request } from './http';\nimport type { ProductCategoryRecord } from './productCategories';\nimport type { ProductAttributeRecord } from './productAttributes';\nimport type { SupplierRecord } from './suppliers';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  sizeValue?: string;\n  stock: number;\n}\n\nexport interface FinishedProductRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  sourceOffShelfReason?: string;\n  sourceOffShelfDetail?: string;\n  sourceOffShelfAt?: string;\n  operationsDeleted?: boolean;\n  id: number;\n  categoryId?: number;\n  supplierId?: number;\n",
+          "after": "  sizeValue?: string;\n  stock: number;\n}\n\nexport interface FinishedProductRecord extends WarehouseEntryInformation {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';\n  sourceUnavailable?: boolean;\n  sourceMessage?: string;\n  operationsDeleted?: boolean;\n  id: number;\n  categoryId?: number;\n  supplierId?: number;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  attributes?: FinishedProductAttributeEntry[];\n  variants?: FinishedProductVariant[];\n  specDimensions?: FinishedSpecDimension[];\n  attributeDisplayOrder?: { product: string[]; sales: string[] };\n  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  offShelfByName?: string;\n  createdByName?: string;\n  createdByAccountId?: number;\n  status?: FinishedProductStatus;\n  createdAt?: string;\n",
+          "after": "  attributes?: FinishedProductAttributeEntry[];\n  variants?: FinishedProductVariant[];\n  specDimensions?: FinishedSpecDimension[];\n  attributeDisplayOrder?: { product: string[]; sales: string[] };\n  createdByName?: string;\n  createdByAccountId?: number;\n  status?: FinishedProductStatus;\n  createdAt?: string;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  variants: FinishedProductVariant[];\n  specDimensions?: FinishedSpecDimension[];\n  attributeDisplayOrder?: { product: string[]; sales: string[] };\n  offShelfReason?: string;\n  offShelfAt?: string;\n  offShelfDetail?: string;\n  status: FinishedProductStatus;\n  operation?: 'offShelf';\n}\n",
+          "after": "  variants: FinishedProductVariant[];\n  specDimensions?: FinishedSpecDimension[];\n  attributeDisplayOrder?: { product: string[]; sales: string[] };\n  offShelfReason?: string;\n  offShelfDetail?: string;\n  status: FinishedProductStatus;\n  operation?: 'offShelf';\n}\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
           "before": "}\n\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\n\nexport interface FinishedProductPrice {\n  priceSource?: 'auto' | 'manual';\n  sourceConfigurationId?: number;\n",
           "after": "}\n\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type FinishedProductStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\n\nexport interface FinishedProductPrice {\n  priceSource?: 'auto' | 'manual';\n  sourceConfigurationId?: number;\n",
           "stage": "before-migrations",
@@ -11476,6 +11972,18 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "    ];\n    expect(sortByStateActivity(records).map((row) => row.id)).toEqual([1, 2]);\n    expect(records.map((row) => row.id)).toEqual([2, 1]);\n  });\n  it('uses creation only for unknown history and stabilizes equal state times', () => {\n    expect(sortByStateActivity([{ id: 1 }, { id: 2 }]).map((row) => row.id)).toEqual([2, 1]);\n    expect(\n      sortByStateActivity([\n        { id: 1, createdAt: '2026-10-12' },\n        { id: 2, stateOperatedAt: '2026-10-11' },\n      ]).map((row) => row.id),\n    ).toEqual([1, 2]);\n  });\n  it('shows only sold-out time and no creation columns in any state', () => {\n    expect(stateActivityColumns('soldOut').map((column) => column.title)).toEqual(['售完时间']);\n    for (const [state, titles] of Object.entries({\n",
+          "after": "    ];\n    expect(sortByStateActivity(records).map((row) => row.id)).toEqual([1, 2]);\n    expect(records.map((row) => row.id)).toEqual([2, 1]);\n  });\n  it('keeps missing state times last without substituting creation and stabilizes equal times', () => {\n    expect(sortByStateActivity([{ id: 1 }, { id: 2 }]).map((row) => row.id)).toEqual([2, 1]);\n    expect(\n      sortByStateActivity([\n        { id: 1, createdAt: '2026-10-12' },\n        { id: 2, stateOperatedAt: '2026-10-11' },\n      ]).map((row) => row.id),\n    ).toEqual([2, 1]);\n  });\n  it('shows only sold-out time and no creation columns in any state', () => {\n    expect(stateActivityColumns('soldOut').map((column) => column.title)).toEqual(['售完时间']);\n    for (const [state, titles] of Object.entries({\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "      expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);\n    }\n  });\n});\n",
+          "after": "      expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);\n    }\n  });\n});\n\nit('sorts complete arrays in either direction with stable ties and missing times last', () => {\n  const records = [\n    { id: 1, stateOperatedAt: '2026-10-01T00:00:00Z' },\n    { id: 3, stateOperatedAt: '2026-10-02T00:00:00Z' },\n    { id: 2, stateOperatedAt: '2026-10-02T00:00:00Z' },\n    { id: 4, createdAt: '2030-01-01' },\n    { id: 5, stateOperatedAt: '1970-01-01T00:00:00Z' },\n  ];\n  expect(sortByStateActivity(records, false).map((r) => r.id)).toEqual([5, 1, 2, 3, 4]);\n  expect(sortByStateActivity(records, true).map((r) => r.id)).toEqual([3, 2, 1, 5, 4]);\n  expect(records.map((r) => r.id)).toEqual([1, 3, 2, 4, 5]);\n});\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
           "before": "    expect(stateActivityColumns('soldOut').map((column) => column.title)).toEqual(['售完时间']);\n    for (const [state, titles] of Object.entries({\n      warehouse: ['入库人', '入库时间'],\n      selling: ['上架人', '上架时间'],\n      offShelf: ['下架人', '下架时间'],\n      recycle: ['移入人', '移入时间'],\n    })) {\n      expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);\n    }\n",
           "after": "    expect(stateActivityColumns('soldOut').map((column) => column.title)).toEqual(['售完时间']);\n    for (const [state, titles] of Object.entries({\n      warehouse: ['入库人', '入库时间'],\n      selling: ['上架人', '上架时间'],\n      recycle: ['移入人', '移入时间'],\n    })) {\n      expect(stateActivityColumns(state).map((column) => column.title)).toEqual(titles);\n    }\n",
           "stage": "before-migrations",
@@ -11499,6 +12007,12 @@
       "content": "7342589e51af41298d3f49d9895b2160e3ae2c77a62e9cde91dfaa86a75be53e",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\n\nconst labels: Record<string, [string, string]> = {\n  warehouse: ['入库人', '入库时间'],\n  selling: ['上架人', '上架时间'],\n  soldOut: ['', '售完时间'],\n  recycle: ['移入人', '移入时间'],\n};\nexport function stateActivityColumns(status: string): PrimaryTableCol<TableRowData>[] {\n  const [actor, time] = labels[status];\n  return [\n    ...(actor ? [{ colKey: 'stateOperatorName', title: actor, width: 120, align: 'center' as const }] : []),\n    { colKey: 'stateOperatedAt', title: time, width: 180, align: 'center' },\n  ];\n}\ninterface ActivityRecord {\n  id: number;\n  stateOperatedAt?: string;\n  createdAt?: string;\n}\nconst timestamp = (value?: string) => {\n  const number = value ? Date.parse(value) : 0;\n  return Number.isFinite(number) ? number : 0;\n};\nexport function sortByStateActivity<T extends ActivityRecord>(records: T[]): T[] {\n  return [...records].sort(\n    (a, b) => timestamp(b.stateOperatedAt || b.createdAt) - timestamp(a.stateOperatedAt || a.createdAt) || b.id - a.id,\n  );\n}\n",
+          "after": "import { Button } from 'tdesign-vue-next';\nimport type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\n\nconst labels: Record<string, [string, string]> = {\n  warehouse: ['入库人', '入库时间'],\n  selling: ['上架人', '上架时间'],\n  soldOut: ['', '售完时间'],\n  recycle: ['移入人', '移入时间'],\n};\nexport function stateActivityColumns(status: string, toggleTimeSort?: () => void): PrimaryTableCol<TableRowData>[] {\n  const [actor, time] = labels[status];\n  return [\n    ...(actor ? [{ colKey: 'stateOperatorName', title: actor, width: 120, align: 'center' as const }] : []),\n    {\n      colKey: 'stateOperatedAt',\n      title: toggleTimeSort\n        ? (h) => h(Button, { variant: 'text', theme: 'default', size: 'small', onClick: toggleTimeSort }, () => time)\n        : time,\n      width: 180,\n      align: 'center',\n      sorter: true,\n    },\n  ];\n}\ninterface ActivityRecord {\n  id: number;\n  stateOperatedAt?: string;\n  createdAt?: string;\n}\nconst timestamp = (value?: string) => {\n  const number = value ? Date.parse(value) : Number.NaN;\n  return Number.isFinite(number) ? number : null;\n};\nexport function sortByStateActivity<T extends ActivityRecord>(records: T[], descending = true): T[] {\n  const direction = descending ? -1 : 1;\n  return [...records].sort((a, b) => {\n    const left = timestamp(a.stateOperatedAt);\n    const right = timestamp(b.stateOperatedAt);\n    if (left === null || right === null) return left !== null ? -1 : right !== null ? 1 : direction * (a.id - b.id);\n    return direction * (left - right || a.id - b.id);\n  });\n}\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "\nconst labels: Record<string, [string, string]> = {\n  warehouse: ['入库人', '入库时间'],\n  selling: ['上架人', '上架时间'],\n  offShelf: ['下架人', '下架时间'],\n  soldOut: ['', '售完时间'],\n  recycle: ['移入人', '移入时间'],\n};\nexport function stateActivityColumns(status: string): PrimaryTableCol<TableRowData>[] {\n",
           "after": "\nconst labels: Record<string, [string, string]> = {\n  warehouse: ['入库人', '入库时间'],\n  selling: ['上架人', '上架时间'],\n  soldOut: ['', '售完时间'],\n  recycle: ['移入人', '移入时间'],\n};\nexport function stateActivityColumns(status: string): PrimaryTableCol<TableRowData>[] {\n",
@@ -11582,6 +12096,18 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "import { request } from './http';\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type SlabStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\n",
+          "after": "import type { WarehouseEntryInformation } from './warehouseEntry';\nimport { request } from './http';\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type SlabStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  offShelvedByName: string;\n  offShelvedByAccountId?: number;\n}\n\nexport interface SlabRecord {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';\n",
+          "after": "  offShelvedByName: string;\n  offShelvedByAccountId?: number;\n}\n\nexport interface SlabRecord extends WarehouseEntryInformation {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
           "before": "import { request } from './http';\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type SlabStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\nexport type SlabPublishTargetStatus = Extract<SlabStatus, 'warehouse' | 'selling'>;\nexport type SlabPublisherType = '平台发布' | '接口获取';\nexport interface SlabPrice {\n  storeLevelId: number;\n",
           "after": "import { request } from './http';\nimport { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';\n\nexport type SlabStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\nexport type SlabPublishTargetStatus = Extract<SlabStatus, 'warehouse' | 'selling'>;\nexport type SlabPublisherType = '平台发布' | '接口获取';\nexport interface SlabPrice {\n  storeLevelId: number;\n",
           "stage": "before-migrations",
@@ -11621,6 +12147,24 @@
       "content": "65eac08f8d07f400e23212357ee2abf50d5d1e8a13787544e7c0568dc9b0f701",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "import { request } from './http';\nimport type { FinishedProductAttributeEntry, FinishedSpecDimension } from './finishedProducts';\n\nexport type StoreFinishedStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\n",
+          "after": "import type { WarehouseEntryInformation } from './warehouseEntry';\nimport { request } from './http';\nimport type { FinishedProductAttributeEntry, FinishedSpecDimension } from './finishedProducts';\n\nexport type StoreFinishedStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  color?: string;\n  sizeValue?: string;\n}\n\nexport interface StoreFinishedProduct {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  attributeNames?: Record<string, string>;\n",
+          "after": "  color?: string;\n  sizeValue?: string;\n}\n\nexport interface StoreFinishedProduct extends WarehouseEntryInformation {\n  stateOperatorName?: string;\n  stateOperatedAt?: string;\n\n  attributeNames?: Record<string, string>;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
+        {
+          "before": "  specDimensions: FinishedSpecDimension[];\n  skus: StoreSkuPrice[];\n  createdByName?: string;\n  createdAt?: string;\n  offShelfByName?: string;\n  offShelfReason?: string;\n  offShelfDetail?: string;\n  offShelfAt?: string;\n}\n\nexport interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePrice' | 'priceMode' | 'saleCoefficient'> {\n  partnerPrice: number | null;\n",
+          "after": "  specDimensions: FinishedSpecDimension[];\n  skus: StoreSkuPrice[];\n  createdByName?: string;\n  createdAt?: string;\n}\n\nexport interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePrice' | 'priceMode' | 'saleCoefficient'> {\n  partnerPrice: number | null;\n",
+          "stage": "before-migrations",
+          "reason": "用户确认V1.2通用入库信息及状态时间排序：按真实入库途径展示标签和说明，四类时间增加双向排序，保留其余页面、权限、历史日志及业务流程。"
+        },
         {
           "before": "import { request } from './http';\nimport type { FinishedProductAttributeEntry, FinishedSpecDimension } from './finishedProducts';\n\nexport type StoreFinishedStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';\n\nexport interface StoreSkuPrice {\n  skuId: number;\n  label: string;\n",
           "after": "import { request } from './http';\nimport type { FinishedProductAttributeEntry, FinishedSpecDimension } from './finishedProducts';\n\nexport type StoreFinishedStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';\n\nexport interface StoreSkuPrice {\n  skuId: number;\n  label: string;\n",

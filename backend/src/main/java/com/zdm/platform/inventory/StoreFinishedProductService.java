@@ -33,9 +33,8 @@ public class StoreFinishedProductService {
       Integer totalStock, String imageUrl, List<String> imageUrls, String videoUrl,
       String detail, Long categoryId, String categoryName,
       List<FinishedProductAttributeEntry> attributes, List<FinishedSpecDimension> specDimensions,
-      List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, String offShelfReason,
-      String offShelfDetail, LocalDateTime offShelfAt, Map<String, String> attributeNames,
-      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt, String offShelfByName) {
+      List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, Map<String, String> attributeNames,
+      String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt, String warehouseEntryType, String warehouseEntryReason, String warehouseEntryDetail) {
     public ProductView {
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
@@ -275,7 +274,7 @@ public class StoreFinishedProductService {
   public List<ProductView> list() {
     var store = scopes.require();
     List<Map<String, Object>> listings = jdbc.queryForList("""
-        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
+        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state, activity.warehouse_entry_type, activity.warehouse_entry_reason, activity.warehouse_entry_detail
         FROM store_finished_products listing
         LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
         LEFT JOIN product_state_activity activity ON activity.kind='store-finished' AND activity.business_client_code='store' AND activity.record_id=listing.id
@@ -370,11 +369,9 @@ public class StoreFinishedProductService {
     String nextState = "offShelf".equals(target) ? "warehouse" : target;
     jdbc.update("""
         UPDATE store_finished_products
-        SET status = ?, off_shelf_reason = ?, off_shelf_detail = ?,
-          off_shelf_at = CASE WHEN ? = 'offShelf' THEN CURRENT_TIMESTAMP ELSE NULL END
+        SET status = ?
         WHERE id = ? AND tenant_id = ? AND store_id = ?
-        """, nextState, "offShelf".equals(target) ? reason : null,
-        "offShelf".equals(target) ? detail : null, target, id, store.tenantId(), store.storeId());
+        """, nextState, id, store.tenantId(), store.storeId());
     String type = switch (target) {
       case "selling" -> "SHELF";
       case "offShelf" -> "OFF_SHELF";
@@ -584,6 +581,10 @@ public class StoreFinishedProductService {
     try {
       var snapshot = (com.fasterxml.jackson.databind.node.ObjectNode) json.readTree(listing.get("invalidated_snapshot").toString());
       invalidationMedia.render(snapshot, true);
+      for (String field : List.of("type", "reason", "detail")) {
+        String property = "warehouseEntry" + Character.toUpperCase(field.charAt(0)) + field.substring(1);
+        snapshot.set(property, json.valueToTree("warehouse".equals(listing.get("status")) ? listing.get("warehouse_entry_" + field) : null));
+      }
       snapshot.put("sourceMessage", FinishedSourceMessage.normalize((String) listing.get("invalidated_reason")));
       return json.treeToValue(snapshot, ProductView.class);
     }
@@ -669,26 +670,22 @@ public class StoreFinishedProductService {
         product.getMainImageUrls() == null ? List.of() : product.getMainImageUrls(), product.getVideoUrl(),
         product.getDetail(), product.getCategoryId(), categoryName,
         product.getAttributes() == null ? List.of() : product.getAttributes(), product.getSpecDimensions(),
-        prices, (String) listing.get("created_by_name"), timestamp(listing.get("created_at")), (String) listing.get("off_shelf_reason"),
-        (String) listing.get("off_shelf_detail"), timestamp(listing.get("off_shelf_at")),
+        prices, (String) listing.get("created_by_name"), timestamp(listing.get("created_at")),
         attributeNames.entrySet().stream().filter(entry -> prices.stream()
             .anyMatch(sku -> sku.salesAttributes() != null && sku.salesAttributes().containsKey(entry.getKey())))
             .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName, number(listing.get("store_category_id")),
         pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))), flag(listing.get("sale_price_attention")),
         effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_name") : null,
         effective.equals(listing.get("activity_state")) ? timestamp(listing.get("state_operated_at")) : null,
-        "warehouse".equals(status) && listing.get("off_shelf_at") != null ? latestOffShelfActor(listing) : null);
+
+        "warehouse".equals(status) ? (String)listing.get("warehouse_entry_type") : null,
+        "warehouse".equals(status) ? (String)listing.get("warehouse_entry_reason") : null,
+        "warehouse".equals(status) ? (String)listing.get("warehouse_entry_detail") : null);
     return legacyHistoricalView(listing, rendered);
   }
 
   // Pre-migration invalid records have no invalidation-time snapshot. Use their genuine
   // selection snapshot, explicitly labelled; never pretend current source prices are historical.
-  private String latestOffShelfActor(Map<String, Object> listing) {
-    List<String> names = jdbc.queryForList("SELECT operator_name FROM store_finished_operation_logs WHERE tenant_id=? AND store_id=? AND listing_id=? AND (operation_type='OFF_SHELF' OR (operation_type='SOURCE_UPDATE' AND before_status='selling' AND after_status='warehouse')) ORDER BY operated_at DESC,id DESC LIMIT 1",
-        String.class, listing.get("tenant_id"), listing.get("store_id"), listing.get("id"));
-    return names.isEmpty() ? null : names.getFirst();
-  }
-
   private ProductView legacyHistoricalView(Map<String, Object> listing, ProductView current) {
     if (!invalidated(listing) || listing.get("invalidated_snapshot") != null) { return current; }
     List<String> logs = jdbc.queryForList("""
@@ -826,7 +823,7 @@ public class StoreFinishedProductService {
 
   private Map<String, Object> listing(CityPartnerStoreScope.Store store, Long id, boolean lock) {
     List<Map<String, Object>> rows = jdbc.queryForList("""
-        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state
+        SELECT listing.*, creator.display_name AS created_by_name, activity.occurred_at AS state_operated_at, CASE WHEN activity.operator_account_id IS NOT NULL THEN COALESCE(state_actor.display_name,'账号已不可用') WHEN activity.operator_client_code='system' THEN '系统' ELSE NULL END AS state_operator_name, activity.state AS activity_state, activity.warehouse_entry_type, activity.warehouse_entry_reason, activity.warehouse_entry_detail
         FROM store_finished_products listing
         LEFT JOIN accounts creator ON creator.id=listing.selected_by_account_id
         LEFT JOIN product_state_activity activity ON activity.kind='store-finished' AND activity.business_client_code='store' AND activity.record_id=listing.id
@@ -903,7 +900,7 @@ public class StoreFinishedProductService {
         """, store.tenantId(), store.storeId(), listingId, productId, name, type, summary,
         before, after, serialized, store.accountId(), store.operatorName());
     Long logId=jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
-    stateActivities.record("store-finished","store",listingId,before,after,store.accountId(),"store");
+    stateActivities.record("store-finished","store",listingId,before,after,store.accountId(),"store",type,WarehouseEntryInformation.changedText(changes.get("下架原因")),WarehouseEntryInformation.changedText(changes.get("详细说明")));
     return logId;
   }
 }

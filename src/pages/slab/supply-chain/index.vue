@@ -30,18 +30,23 @@
                       </t-select>
                     </t-form-item>
                     <template v-if="activeTab === 'warehouse'">
-                      <t-form-item label="下架原因">
+                      <t-form-item label="入库类型">
                         <t-select
-                          v-model="currentFilter.offShelfReason"
+                          v-model="currentFilter.warehouseEntryType"
                           clearable
                           filterable
-                          placeholder="请选择下架原因"
+                          placeholder="请选择入库类型"
                         >
-                          <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
+                          <t-option
+                            v-for="item in warehouseEntryTypes"
+                            :key="item.value"
+                            :label="item.label"
+                            :value="item.value"
+                          />
                         </t-select>
                       </t-form-item>
-                      <t-form-item label="下架人">
-                        <t-input v-model="currentFilter.offShelvedBy" clearable placeholder="请输入下架人" />
+                      <t-form-item label="入库人">
+                        <t-input v-model="currentFilter.warehouseEntryBy" clearable placeholder="请输入入库人" />
                       </t-form-item>
                     </template>
                     <t-form-item label="产地">
@@ -156,9 +161,11 @@
                   row-key="id"
                   :data="pageData"
                   :columns="columns"
+                  :sort="tableSort"
                   :loading="loading"
                   hover
                   table-layout="fixed"
+                  @sort-change="onTimeSortChange"
                 >
                   <template #selectTitle>
                     <t-checkbox
@@ -201,43 +208,24 @@
                       <span class="store-text">{{ row.store }}</span>
                     </div>
                   </template>
-                  <template #offShelfReason="{ row }">
-                    <div class="off-shelf-reason-cell">
-                      <span class="off-shelf-reason-primary">{{
-                        latestOffShelfRecord(row)?.standardReason || '-'
-                      }}</span>
-                      <div class="off-shelf-reason-detail-row">
-                        <t-tooltip
-                          class="off-shelf-detail-tooltip"
-                          :content="latestOffShelfRecord(row)?.detailReason || '-'"
-                          placement="bottom-left"
-                        >
-                          <span class="off-shelf-reason-secondary">{{
-                            latestOffShelfRecord(row)?.detailReason || '-'
-                          }}</span>
-                        </t-tooltip>
-                        <t-tooltip content="查看历史下架原因">
-                          <t-button
-                            :theme="buttonTheme('off-shelf-history')"
-                            class="off-shelf-history-trigger"
-                            variant="text"
-                            shape="square"
-                            size="small"
-                            aria-label="查看历史下架原因"
-                            @click="openOffShelfHistory(row)"
-                          >
-                            <template #icon><t-icon name="browse" /></template>
-                          </t-button>
-                        </t-tooltip>
-                      </div>
-                    </div>
-                  </template>
-                  <template #offShelvedByName="{ row }">
-                    {{ latestOffShelfRecord(row)?.offShelvedByName || '-' }}
-                  </template>
-                  <template #offShelvedAt="{ row }">
-                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
-                  </template>
+                  <template #warehouseEntry="{ row }"
+                    ><WarehouseEntryInformation class="off-shelf-reason-cell" :entry="row">
+                      <t-tooltip
+                        v-if="row.warehouseEntryType === 'offShelf' && row.offShelfRecords.length"
+                        content="查看历史下架原因"
+                      >
+                        <t-button
+                          :theme="buttonTheme('off-shelf-history')"
+                          class="off-shelf-history-trigger"
+                          variant="text"
+                          shape="square"
+                          size="small"
+                          aria-label="查看历史下架原因"
+                          @click="openOffShelfHistory(row)"
+                          ><template #icon><t-icon name="browse" /></template
+                        ></t-button>
+                      </t-tooltip> </WarehouseEntryInformation
+                  ></template>
                   <template #stateOperatorName="{ row }"
                     ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
                   >
@@ -294,18 +282,13 @@
           </template>
         </AdminListLayout>
         <t-alert
-          v-if="
-            editingRowId &&
-            tableData.find((item) => item.id === editingRowId)?.status === 'warehouse' &&
-            latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)
-          "
-          theme="warning"
-          title="最近下架信息"
+          v-if="editingRowId && tableData.find((item) => item.id === editingRowId)?.status === 'warehouse'"
+          title="本次入库信息"
+          theme="info"
         >
-          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.standardReason }}
-          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.detailReason || '—' }}
-          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedByName || '未记录' }}
-          {{ latestOffShelfRecord(tableData.find((item) => item.id === editingRowId)!)?.offShelvedAt || '未记录' }}
+          <WarehouseEntryInformation :entry="tableData.find((item) => item.id === editingRowId)!" />
+          {{ tableData.find((item) => item.id === editingRowId)?.stateOperatorName || '历史记录未记录' }}
+          {{ formatDateTime(tableData.find((item) => item.id === editingRowId)?.stateOperatedAt) }}
         </t-alert>
         <SlabProductFormLayout
           ref="productLayoutRef"
@@ -579,6 +562,16 @@
       @close="closeDetailDrawer"
     >
       <t-space v-if="detailDrawerRow" direction="vertical" size="large" class="slab-detail-drawer">
+        <t-card v-if="detailDrawerRow.status === 'warehouse'" title="本次入库信息"
+          ><WarehouseEntryInformation :entry="detailDrawerRow"
+        /></t-card>
+        <t-button
+          v-if="detailDrawerRow.offShelfRecords.length"
+          variant="text"
+          :theme="buttonTheme('off-shelf-history')"
+          @click="openOffShelfHistory(detailDrawerRow)"
+          >查看历史下架原因</t-button
+        >
         <t-card class="slab-detail-section" title="图文描述">
           <div class="slab-detail-media-grid">
             <button
@@ -973,6 +966,9 @@
 </template>
 
 <script setup lang="ts">
+import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
+import { warehouseEntryTypes } from '@/services/warehouseEntry';
+import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
@@ -986,7 +982,7 @@ import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPrice
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
 import { useSlabOperationLogs } from '../shared/useSlabOperationLogs';
 import { slabBatchButtons, slabRowButtons, type SlabBatchAction, type SlabRowAction } from '../shared/slabPageActions';
-import { filterSlabItems, latestOffShelfRecord, offShelfTimestamp } from '../shared/slabListFilter';
+import { filterSlabItems, offShelfTimestamp } from '../shared/slabListFilter';
 import { createSlabFormRules } from '../shared/slabFormRules';
 import {
   tabs,
@@ -1078,6 +1074,9 @@ type SalesNumberChangeContext = {
   type?: string;
 };
 const activeTab = ref<SlabTab>('warehouse');
+const { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {
+  currentPagination.value.current = 1;
+});
 const loginUser = computed(() => getLoginUser());
 const productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);
 const sourceBlocked: (row: SlabItem) => boolean = () => false;
@@ -1375,6 +1374,9 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     publisherType: normalizePublisherType(record.publisherType),
     stateOperatorName: record.stateOperatorName,
     stateOperatedAt: record.stateOperatedAt,
+    warehouseEntryType: record.warehouseEntryType,
+    warehouseEntryReason: record.warehouseEntryReason,
+    warehouseEntryDetail: record.warehouseEntryDetail,
     createdByName: record.createdByName?.trim() || '-',
     createdAt: record.createdAt || '',
     price: {
@@ -1544,10 +1546,10 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'grade', title: '等级', width: 160, align: 'center' },
     { colKey: 'size', title: '尺寸', width: 170 },
     { colKey: 'tenant', title: '供应商', width: 180 },
-    ...stateActivityColumns(activeTab.value),
+    ...stateActivityColumns(activeTab.value, toggleTimeSort),
   ];
   if (activeTab.value === 'warehouse')
-    baseColumns.push({ colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });
+    baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });
   baseColumns.push({
     colKey: 'operation',
     title: '操作',
@@ -1579,7 +1581,9 @@ const productDialogTitle = computed(() => {
   if (productMode.value === 'edit') return '编辑商品';
   return '查看商品';
 });
-const filteredData = computed(() => filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value));
+const filteredData = computed(() =>
+  filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value, descending.value),
+);
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
   return filteredData.value.slice(start, start + currentPagination.value.pageSize);

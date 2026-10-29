@@ -340,7 +340,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     log.setOperatedAt(now);
     log.setCreatedAt(now);
     save(log);
-    stateActivities.record("slab",log.getBusinessClientCode(),slab.getId(),beforeStatus,afterStatus,log.getOperatorAccountId(),externalOperation?"external-api":log.getOperatorClientCode());
+    stateActivities.record("slab",log.getBusinessClientCode(),slab.getId(),beforeStatus,afterStatus,log.getOperatorAccountId(),externalOperation?"external-api":log.getOperatorClientCode(),operationType,standardReason,detailReason);
     retainSnapshot(log.getId(), changes);
   }
 

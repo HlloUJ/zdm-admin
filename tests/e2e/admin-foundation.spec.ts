@@ -134,8 +134,8 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   await expect(page.locator('.filter-fields .t-form__label')).toHaveText([
     '大板：',
     '品种：',
-    '下架原因：',
-    '下架人：',
+    '入库类型：',
+    '入库人：',
     '产地：',
     '纹理：',
     '色系：',
@@ -595,8 +595,8 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
       await expect(fields.locator('.t-form__label')).toHaveText([
         '大板：',
         '品种：',
-        '下架原因：',
-        '下架人：',
+        '入库类型：',
+        '入库人：',
         '产地：',
         '纹理：',
         '色系：',
@@ -633,12 +633,11 @@ test('shows warehouse actor and retained down-shelf reason instead of creator me
             status: 'warehouse',
             createdByName: '商品创建者',
             createdAt: '2026-07-01T01:00:00',
-            offShelfByName: '实际下架人',
-            offShelfAt: '2026-09-17T02:00:00',
             stateOperatorName: '实际下架人',
             stateOperatedAt: '2026-09-17T02:00:00Z',
-            offShelfReason: '商品信息有误',
-            offShelfDetail: '待核对尺寸',
+            warehouseEntryType: 'offShelf',
+            warehouseEntryReason: '商品信息有误',
+            warehouseEntryDetail: '待核对尺寸',
           },
         ],
       },
@@ -650,7 +649,7 @@ test('shows warehouse actor and retained down-shelf reason instead of creator me
     .getByText(/^仓库中(?: [0-9]+)?$/)
     .click();
   const headers = await page.locator('thead th').allTextContents();
-  expect(headers.join('|')).toContain('下架原因/详细说明|入库人|入库时间');
+  expect(headers.join('|')).toContain('入库类型 / 详细说明|入库人|入库时间');
   expect(headers.join('|')).not.toContain('创建人');
   expect(headers.join('|')).not.toContain('创建时间');
   const row = page.locator('tbody tr').filter({ hasText: '下架展示测试商品' });

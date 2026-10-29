@@ -119,6 +119,7 @@
                   row-key="id"
                   :data="pageRows"
                   :columns="columns"
+                  :sort="tableSort"
                   :loading="loading"
                   :row-attributes="
                     ({ row }: { row: StoreFinishedProduct }) =>
@@ -130,6 +131,7 @@
                   "
                   hover
                   table-layout="fixed"
+                  @sort-change="onTimeSortChange"
                 >
                   <template #selectTitle
                     ><t-checkbox :checked="pageAllSelected" :indeterminate="pagePartlySelected" @change="togglePage"
@@ -164,10 +166,7 @@
                   <template #stateOperatedAt="{ row }">{{
                     row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'
                   }}</template>
-                  <template #offShelfReason="{ row }">
-                    <t-tooltip :content="row.offShelfDetail || '—'">{{ row.offShelfReason || '—' }}</t-tooltip>
-                  </template>
-                  <template #offShelfAt="{ row }">{{ time(row.offShelfAt) }}</template>
+                  <template #warehouseEntry="{ row }"><WarehouseEntryInformation :entry="row" /></template>
                   <template #operation="{ row }">
                     <div class="table-actions">
                       <t-link
@@ -478,6 +477,8 @@
 </template>
 
 <script setup lang="ts">
+import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
+import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { useCommodityModule } from '@/composables/useCommodityModule';
 const commodity = useCommodityModule();
 
@@ -555,6 +556,9 @@ const tabs = computed(() =>
     })),
 );
 const activeTab = ref<StoreFinishedStatus>('warehouse');
+const { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {
+  page.value = 1;
+});
 const activeScope = computed(() => (activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value));
 const rows = ref<StoreFinishedProduct[]>([]);
 const loading = ref(false);
@@ -622,7 +626,7 @@ const batchConfirmDescriptions: Partial<Record<ActionKind, string>> = {
 };
 const submittingOffShelf = ref(false);
 const filteredRows = computed(() =>
-  sortByStateActivity(rows.value).filter(
+  sortByStateActivity(rows.value, descending.value).filter(
     (row) =>
       row.effectiveStatus === activeTab.value &&
       (!appliedFilter.keyword || `${row.name} ${row.productId}`.includes(appliedFilter.keyword)) &&
@@ -839,8 +843,10 @@ const operationWidths: Record<StoreFinishedStatus, number> = {
 };
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...baseColumns,
-  ...stateActivityColumns(activeTab.value),
-  ...(activeTab.value === 'warehouse' ? [{ colKey: 'offShelfReason', title: '下架原因', minWidth: 140 }] : []),
+  ...stateActivityColumns(activeTab.value, toggleTimeSort),
+  ...(activeTab.value === 'warehouse'
+    ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]
+    : []),
   { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },
 ]);
 const poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [

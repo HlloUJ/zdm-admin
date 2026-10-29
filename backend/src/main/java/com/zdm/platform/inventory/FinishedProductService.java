@@ -69,7 +69,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     this.detailContent = new FinishedProductDetailContent(mediaAssetService);
     this.writeValidator = new FinishedProductWriteValidator(jdbcTemplate, mediaAssetService,
         identityProvider, detailContent, lifecycle);
-    this.listDetails = new FinishedProductListDetails(lifecycle, priceService, guidePriceService,
+    this.listDetails = new FinishedProductListDetails(priceService, guidePriceService,
         variantMapper, attributeEntryMapper, jdbcTemplate, mediaAssetService);
   }
 
@@ -164,7 +164,6 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     writeValidator.validateAndNormalize(product);
     CurrentIdentity identity = identityProvider.require();
     product.setId(null);
-    product.setOffShelfAt(null);
     product.setPublisherType(publisher);
     product.setCreatedByAccountId(identity.accountId());
     product.setCreatedAt(LocalDateTime.now());
@@ -210,19 +209,13 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     product.setStatus(existing.getStatus());
     product.setSourceStatus(existing.getSourceStatus());
     product.setOperationsDeleted(existing.getOperationsDeleted());
-    product.setSourceOffShelfReason(existing.getSourceOffShelfReason());
-    product.setSourceOffShelfDetail(existing.getSourceOffShelfDetail());
-    product.setSourceOffShelfAt(existing.getSourceOffShelfAt());
     boolean costChanged = !sourceCosts(existing).equals(sourceCosts(product));
     writeValidator.validateAndNormalize(product);
     product.setGuidePrice(existing.getGuidePrice());
-    product.setOffShelfReason(existing.getOffShelfReason());
-    product.setOffShelfDetail(existing.getOffShelfDetail());
     product.setId(id);
     product.setPublisherType(existing.getPublisherType());
     product.setCreatedByAccountId(existing.getCreatedByAccountId());
     product.setCreatedAt(existing.getCreatedAt());
-    product.setOffShelfAt(existing.getOffShelfAt());
     try {
       updateById(product);
     } catch (DuplicateKeyException exception) {
@@ -364,23 +357,17 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
           throw new IllegalArgumentException("请选择下架原因并从已上架下架回仓库");
         }
         if (request.getOffShelfReason().length() > 80 || request.getOffShelfDetail() != null && request.getOffShelfDetail().length() > 500) { throw new IllegalArgumentException("下架说明超出长度限制"); }
-        existing.setOffShelfReason(request.getOffShelfReason());
-        existing.setOffShelfDetail(request.getOffShelfDetail());
-        existing.setOffShelfAt(LocalDateTime.now());
-      } else {
-        existing.setOffShelfReason(null);
-        existing.setOffShelfDetail(null);
-        existing.setOffShelfAt(null);
       }
       // attachDetails renders source content for responses; never persist it during an operation-only update.
       lambdaUpdate().eq(FinishedProduct::getId, id)
           .set(FinishedProduct::getStatus, existing.getStatus())
-          .set(FinishedProduct::getOffShelfReason, existing.getOffShelfReason())
-          .set(FinishedProduct::getOffShelfDetail, existing.getOffShelfDetail())
-          .set(FinishedProduct::getOffShelfAt, existing.getOffShelfAt())
+
+
+
           .update();
     }
     FinishedProduct updated = attachDetails(getById(id));
+    if ("offShelf".equals(request.getOperation())) { updated.setOffShelfReason(request.getOffShelfReason()); updated.setOffShelfDetail(request.getOffShelfDetail()); }
     operationLogs.recordOperation(updated, before, operationLogs.snapshot(updated), "offShelf".equals(request.getOperation()) ? "OFF_SHELF" : null);
     return stateActivities.attach("finished",lifecycle.isSupplyChain()?"supply-chain":"admin",List.of(updated)).getFirst();
   }
@@ -496,27 +483,10 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     mediaReferenceService.replace(MEDIA_DOMAIN, product.getId(), media);
   }
 
-  void attachOffShelfOperator(FinishedProduct product) {
-    product.setOffShelfByName(null);
-    boolean supplyChain = lifecycle.isSupplyChain();
-    if (!"warehouse".equals(supplyChain ? product.getSourceStatus() : product.getStatus())) {
-      return;
-    }
-    List<String> names = jdbcTemplate.queryForList("""
-        SELECT operator_name FROM finished_operation_logs
-        WHERE product_id = ? AND business_client_code = ? AND operation_type = 'OFF_SHELF'
-        ORDER BY operated_at DESC, id DESC LIMIT 1
-        """, String.class, product.getId(), supplyChain ? "supply-chain" : "admin");
-    if (!names.isEmpty()) {
-      product.setOffShelfByName(names.getFirst());
-    }
-  }
-
   private FinishedProduct attachDetails(FinishedProduct product) {
     if (product == null) {
       return null;
     }
-    attachOffShelfOperator(product);
     List<Long> imageIds = jdbcTemplate.queryForList("""
         SELECT media_id FROM media_references
         WHERE business_domain = ? AND business_id = ?

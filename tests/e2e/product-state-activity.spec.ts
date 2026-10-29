@@ -64,6 +64,9 @@ for (const surface of surfaces) {
         createdAt: recent ? '2020-01-01T00:00:00' : '2026-10-01T00:00:00',
         stateOperatedAt: recent ? '2026-10-12T02:00:00.000000Z' : '2026-10-01T02:00:00.000000Z',
         stateOperatorName: '状态操作员',
+        warehouseEntryType: state === 'warehouse' ? (recent ? 'offShelf' : 'firstEntry') : null,
+        warehouseEntryReason: state === 'warehouse' && recent ? '价格调整' : null,
+        warehouseEntryDetail: null,
         variants: [],
         attributes: [],
         specDimensions: [],
@@ -106,6 +109,10 @@ for (const surface of surfaces) {
       const rows = main.locator('tbody tr');
       await expect(rows.first()).toContainText(`${states[index]}-最近变更`);
       await expect(rows.last()).toContainText(`${states[index]}-新创建`);
+      await main.getByRole('button', { name: timeTitles[index], exact: true }).click();
+      await expect(rows.first()).toContainText(`${states[index]}-新创建`);
+      await main.getByRole('button', { name: timeTitles[index], exact: true }).click();
+      await expect(rows.first()).toContainText(`${states[index]}-最近变更`);
       if (actorTitles[index]) {
         await expect(main.getByRole('columnheader', { name: actorTitles[index], exact: true })).toBeVisible();
         await expect(rows.first()).toContainText('状态操作员');
@@ -323,5 +330,95 @@ for (const surface of surfaces) {
     expect(writes).toBe(1);
     await main.locator('.t-tabs__nav-item').filter({ hasText: '回收站' }).click();
     await expect(main.locator('tbody tr').filter({ hasText: '直接删除商品' })).toHaveCount(1);
+  });
+}
+
+for (const surface of surfaces) {
+  test(`${surface.path} current entry labels and complete-list time sorting survive pagination`, async ({ page }) => {
+    const unmocked = await installStateMocks(page, surface.kind);
+    await page.addInitScript((surface) => {
+      localStorage.setItem('zdm-admin-token', 'dev-token');
+      localStorage.setItem(
+        'zdm-admin-user',
+        JSON.stringify({
+          id: 1,
+          name: '入库测试人员',
+          clientCode: surface.client === 'store' ? 'admin' : surface.client,
+          roles: [surface.client === 'store' ? 'STORE_ADMIN' : 'OPERATOR'],
+          permissions: ['all'],
+          dataPermission: 'all',
+          ...(surface.client === 'store' ? { tenantId: 1, storeId: 2, storeType: 'cityPartner' } : {}),
+        }),
+      );
+    }, surface);
+    const records = Array.from({ length: 15 }, (_, index) => ({
+      id: 700 + index,
+      productId: 700 + index,
+      name: `入库验证商品-${String(index).padStart(2, '0')}`,
+      sku: `ENTRY-${index}`,
+      serialNo: `ENTRY-${index}`,
+      status: 'warehouse',
+      sourceStatus: surface.client === 'supply-chain' ? 'warehouse' : 'selling',
+      effectiveStatus: 'warehouse',
+      stock: 2,
+      totalStock: 2,
+      sourceUnavailable: false,
+      stateOperatorName: '入库操作人',
+      stateOperatedAt: `2026-10-${String(index + 1).padStart(2, '0')}T02:00:00Z`,
+      warehouseEntryType: index === 13 ? 'offShelf' : index === 12 ? 'recycleRestore' : 'firstEntry',
+      warehouseEntryReason: index === 13 ? '价格调整' : null,
+      warehouseEntryDetail: null,
+      variants: [],
+      attributes: [],
+      specDimensions: [],
+      markupPrices: [],
+      guidePrices: [],
+      skus: [],
+      offShelfRecords: [],
+      imageUrls: [],
+      mainImageUrls: [],
+      attributeNames: {},
+      categoryName: '',
+    }));
+    const endpoint =
+      surface.kind === 'slab'
+        ? 'slabs'
+        : surface.kind === 'accessory'
+          ? 'accessory-products'
+          : surface.kind === 'store-accessory'
+            ? 'store-accessory-products'
+            : surface.kind === 'store'
+              ? 'store-finished-products'
+              : 'finished-products';
+    await page.route(`**/api/admin/${endpoint}`, (route) => route.fulfill({ json: { code: 0, data: records } }));
+    if (surface.client === 'store')
+      await page.route(`**/api/admin/${endpoint}/categories`, (route) =>
+        route.fulfill({ json: { code: 0, data: [] } }),
+      );
+    await page.route(`**/api/admin/${endpoint}/attribute-template-options`, (route) =>
+      route.fulfill({ json: { code: 0, data: [] } }),
+    );
+    await page.goto(surface.path);
+    const main = page.getByRole('main');
+    const rows = main.locator('tbody tr');
+    await expect(rows.first()).toContainText('入库验证商品-14');
+    const cell = (name: string) =>
+      rows
+        .filter({ hasText: name })
+        .locator('td')
+        .filter({ has: page.locator('.t-tag') });
+    await expect(cell('入库验证商品-14')).toHaveText('首次入库');
+    await expect(cell('入库验证商品-12')).toHaveText('回收恢复');
+    await expect(cell('入库验证商品-13')).toContainText('下架入库');
+    await expect(cell('入库验证商品-13')).toContainText('价格调整');
+    await expect(cell('入库验证商品-13')).toContainText('未填写详细说明');
+    await main.locator('.t-pagination__btn-next').click();
+    await expect(main.locator('.t-pagination__number.t-is-current')).toHaveText('2');
+    await main.getByRole('button', { name: '入库时间', exact: true }).click();
+    await expect(main.locator('.t-pagination__number.t-is-current')).toHaveText('1');
+    await expect(rows.first()).toContainText('入库验证商品-00');
+    await main.getByRole('button', { name: '入库时间', exact: true }).click();
+    await expect(rows.first()).toContainText('入库验证商品-14');
+    expect(unmocked).toEqual([]);
   });
 }

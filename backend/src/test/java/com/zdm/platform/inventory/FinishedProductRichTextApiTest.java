@@ -102,12 +102,18 @@ class FinishedProductRichTextApiTest extends SpringContainerTestSupport {
         """.formatted(images.get(5).path("url").asText(), video.path("url").asText()));
     payload.put("sku", "   ");
     payload.put("createdByName", "伪造创建人");
+    payload.put("warehouseEntryType", "recycleRestore");
+    payload.put("warehouseEntryReason", "伪造原因");
+    payload.put("warehouseEntryDetail", "伪造说明");
     payload.put("createdByAccountId", 99999);
     payload.put("createdAt", "2000-01-01T00:00:00");
     LocalDateTime beforeCreate = LocalDateTime.now().minusSeconds(1);
     JsonNode created = data(mvc.perform(post("/api/admin/finished-products").header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
     long id = created.path("id").asLong();
+    assertThat(created.path("warehouseEntryType").asText()).isEqualTo("firstEntry");
+    assertThat(created.path("warehouseEntryReason").isNull()).isTrue();
+    assertThat(created.path("warehouseEntryDetail").isNull()).isTrue();
     payload.set("variants", created.path("variants").deepCopy());
     assertThat(id).isPositive();
     Long createLogId = jdbc.queryForObject("SELECT id FROM finished_operation_logs WHERE product_id=? AND operation_type='CREATE'", Long.class, id);
@@ -163,14 +169,14 @@ class FinishedProductRichTextApiTest extends SpringContainerTestSupport {
     payload.put("offShelfAt", "2000-01-01T00:00:00");
     JsonNode offShelf = data(mvc.perform(put("/api/admin/finished-products/{id}", secondId).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));
-    assertThat(LocalDateTime.parse(offShelf.path("sourceOffShelfAt").asText())).isBetween(beforeOffShelf, LocalDateTime.now().plusSeconds(1));
-    assertThat(offShelf.path("sourceOffShelfDetail").asText()).isEqualTo("供应商调整价格，待复核");
-    assertThat(jdbc.queryForObject("SELECT source_off_shelf_detail FROM finished_products WHERE id=?", String.class, secondId))
+    assertThat(java.time.Instant.parse(offShelf.path("stateOperatedAt").asText()).atZone(java.time.ZoneId.systemDefault()).toLocalDateTime()).isBetween(beforeOffShelf, LocalDateTime.now().plusSeconds(1));
+    assertThat(offShelf.path("warehouseEntryDetail").asText()).isEqualTo("供应商调整价格，待复核");
+    assertThat(jdbc.queryForObject("SELECT warehouse_entry_detail FROM product_state_activity WHERE kind='finished' AND business_client_code='supply-chain' AND record_id=?", String.class, secondId))
         .isEqualTo("供应商调整价格，待复核");
     payload.putNull("offShelfDetail");
     mvc.perform(put("/api/admin/finished-products/{id}",secondId).header("Authorization",token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))).andExpect(status().isBadRequest());
-    assertThat(jdbc.queryForObject("SELECT source_off_shelf_detail FROM finished_products WHERE id=?",String.class,secondId)).isEqualTo("供应商调整价格，待复核");
+    assertThat(jdbc.queryForObject("SELECT warehouse_entry_detail FROM product_state_activity WHERE kind='finished' AND business_client_code='supply-chain' AND record_id=?",String.class,secondId)).isEqualTo("供应商调整价格，待复核");
     payload.put("status", "recycle").remove("operation");
     data(mvc.perform(put("/api/admin/finished-products/{id}", secondId).header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(payload))));

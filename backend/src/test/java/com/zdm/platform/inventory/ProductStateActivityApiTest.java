@@ -184,6 +184,10 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT " + state + " FROM " + table(kind) + " WHERE id=99880", String.class)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND business_client_code=? AND operation_type='OFF_SHELF' AND before_status='selling' AND after_status='warehouse'", Long.class, client)).isEqualTo(1L);
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND business_client_code=? AND operation_type IN ('RESTORE','RESTORE_WAREHOUSE','RESTORE_RECYCLE')", Long.class, client)).isZero();
+    var entry = jdbc.queryForMap("SELECT warehouse_entry_type,warehouse_entry_reason,warehouse_entry_detail FROM product_state_activity WHERE kind=? AND business_client_code=? AND record_id=99880",kind,client);
+    assertThat(entry.get("warehouse_entry_type")).isEqualTo("offShelf");
+    assertThat(entry.get("warehouse_entry_reason")).isEqualTo("价格调整");
+    assertThat(entry.get("warehouse_entry_detail")).isEqualTo("重新核价");
     mvc.perform(put(url + (slab ? "/batch-status" : "/99880")).contentType("application/json").content(down))
         .andExpect(status().isBadRequest());
     jdbc.update("UPDATE " + table(kind) + " SET " + state + "='selling' WHERE id=99880");
@@ -202,6 +206,12 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
       mvc.perform(post(url).contentType("application/json").content("{\"name\":\"取消状态校验\",\"status\":\"offShelf\"}"))
           .andExpect(status().isBadRequest());
     }
+    String restore = slab ? "{\"ids\":[99880],\"status\":\"warehouse\"}" : "{\"name\":\"状态时间商品\",\"status\":\"warehouse\"}";
+    mvc.perform(put(url + (slab ? "/batch-status" : "/99880")).contentType("application/json").content(restore)).andExpect(status().isOk());
+    var restoredEntry = jdbc.queryForMap("SELECT warehouse_entry_type,warehouse_entry_reason,warehouse_entry_detail FROM product_state_activity WHERE kind=? AND business_client_code=? AND record_id=99880",kind,client);
+    assertThat(restoredEntry.get("warehouse_entry_type")).isEqualTo("recycleRestore");
+    assertThat(restoredEntry.get("warehouse_entry_reason")).isNull();
+    assertThat(restoredEntry.get("warehouse_entry_detail")).isNull();
     String canceled = slab ? "{\"ids\":[99880],\"status\":\"offShelf\"}" : "{\"status\":\"offShelf\"}";
     mvc.perform(put(url + (slab ? "/batch-status" : "/99880")).contentType("application/json").content(canceled))
         .andExpect(status().isBadRequest());

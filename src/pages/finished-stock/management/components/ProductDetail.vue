@@ -1,13 +1,15 @@
 <template>
   <t-space direction="vertical" size="large" class="product-detail">
-    <t-alert v-if="product.status === 'warehouse' && product.offShelfReason" theme="warning" title="最近下架信息">
-      {{ product.offShelfReason }} · {{ product.offShelfDetail || '—' }} {{ product.offShelfByName || '未记录' }} ·
-      {{ product.offShelfAt || '未记录' }}
-    </t-alert>
+    <component :is="drawerLayout ? Card : AdminSectionCard" v-if="product.status === 'warehouse'" title="本次入库信息">
+      <WarehouseEntryInformation :entry="product" />
+      {{ product.stateOperatorName || '历史记录未记录' }} ·
+      {{ product.stateOperatedAt ? formatProductDateTime(product.stateOperatedAt) : '历史记录未记录' }}
+    </component>
     <t-alert v-if="operations && product.sourceUnavailable" theme="warning" :message="sourceMessage" />
     <component
       :is="drawerLayout ? Card : AdminSectionCard"
       :title="drawerLayout ? '图文描述' : undefined"
+      data-product-section="description"
       :class="{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }"
     >
       <h3
@@ -46,6 +48,7 @@
     <component
       :is="drawerLayout ? Card : AdminSectionCard"
       :title="drawerLayout ? '基础信息' : undefined"
+      data-product-section="base"
       :class="{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }"
     >
       <h3
@@ -165,6 +168,9 @@
 </template>
 
 <script setup lang="ts">
+import { formatProductDateTime } from '@/utils/formatProductDateTime';
+import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
+import type { WarehouseEntryInformation as WarehouseEntry } from '@/services/warehouseEntry';
 import { computed, type VNode } from 'vue';
 import { AdminSectionCard } from '@/components/foundation';
 import PriceSourceToggle from './PriceSourceToggle.vue';
@@ -180,7 +186,9 @@ import type {
   FinishedProductGuidePrice,
   FinishedSpecDimension,
 } from '@/services/finishedProducts';
-interface DetailProduct {
+interface DetailProduct extends WarehouseEntry {
+  stateOperatorName?: string;
+  stateOperatedAt?: string;
   id: number;
   name: string;
   code: string;
@@ -194,10 +202,6 @@ interface DetailProduct {
   sourceMessage?: string;
   createdByName: string;
   createdAt?: string;
-  offShelfByName?: string;
-  offShelfReason?: string;
-  offShelfAt?: string;
-  offShelfDetail?: string;
   image: string;
   mainImageUrls?: string[];
   videoUrl?: string;

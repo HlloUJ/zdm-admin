@@ -80,8 +80,8 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
       mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(path)
           .contentType("application/json").content(body)).andExpect(status().isOk())
           .andExpect(jsonPath(batch ? "$.data[0].status" : "$.data.status").value("warehouse"))
-          .andExpect(jsonPath(batch ? "$.data[0].offShelfReason" : "$.data.offShelfReason").value("商品信息调整"))
-          .andExpect(jsonPath(batch ? "$.data[0].offShelfByName" : "$.data.offShelfByName").value("门店测试员工"));
+          .andExpect(jsonPath(batch ? "$.data[0].warehouseEntryReason" : "$.data.warehouseEntryReason").value("商品信息调整"))
+          .andExpect(jsonPath(batch ? "$.data[0].warehouseEntryType" : "$.data.warehouseEntryType").value("offShelf"));
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=99791", Integer.class)).isEqualTo(logsBefore + 1);
       assertThat(jdbc.queryForObject("SELECT operation_type FROM store_finished_operation_logs WHERE listing_id=99791 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("OFF_SHELF");
       assertThat(jdbc.queryForObject("SELECT after_status FROM store_finished_operation_logs WHERE listing_id=99791 ORDER BY id DESC LIMIT 1", String.class)).isEqualTo("warehouse");
@@ -103,6 +103,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     jdbc.update("INSERT INTO store_categories(id,store_id,scope,name) VALUES(99941,99941,'finished','状态分类')");
     identity(99941L);
     var selected=products.select(List.of(99941L)).getFirst();
+    assertThat(selected.warehouseEntryType()).isEqualTo("firstEntry");
     products.saveEdit(selected.id(),99941L,List.of(new StoreFinishedProductService.SalePriceInput(99941L,new BigDecimal("40"),"manual",new BigDecimal("2"))));
     for (String target : List.of("selling", "offShelf", "recycle", "warehouse")) {
       var response=products.changeStatus(selected.id(),target,"商品暂停售卖",null);
@@ -113,6 +114,8 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
       assertThat(response.stateOperatorName()).isEqualTo(refreshed.stateOperatorName());
       assertThat(response.stateOperatedAt()).isEqualTo(refreshed.stateOperatedAt());
       assertThat(response.createdAt()).isEqualTo(selected.createdAt());
+      if ("offShelf".equals(target)) { assertThat(response.warehouseEntryType()).isEqualTo("offShelf"); assertThat(response.warehouseEntryReason()).isEqualTo("商品暂停售卖"); }
+      if ("warehouse".equals(target)) { assertThat(response.warehouseEntryType()).isEqualTo("recycleRestore"); assertThat(response.warehouseEntryReason()).isNull(); assertThat(response.warehouseEntryDetail()).isNull(); }
     }
   }
   @Test
@@ -1225,7 +1228,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(log.path("销售规格").path("after").get(0).path("salePrice").decimalValue()).isEqualByComparingTo("125");
     assertThat(log.path("销售规格").path("after").get(2).path("salePrice").isNull()).isTrue();
     identity(99601L);
-    if ("selling".equals(status)) { assertThat(products.detail(listing).offShelfByName()).isEqualTo("上游测试人员"); }
+    if ("selling".equals(status)) { assertThat(products.detail(listing).stateOperatorName()).isEqualTo(jdbc.queryForObject("SELECT display_name FROM accounts WHERE id=1", String.class)); assertThat(products.detail(listing).warehouseEntryType()).isEqualTo("offShelf"); assertThat(products.detail(listing).warehouseEntryReason()).isEqualTo(StoreFinishedSalePriceService.ATTENTION); }
     assertThat(products.detail(listing).salePriceAttention()).isTrue();
     assertThat(products.detail(listing).sourceUnavailable()).isFalse();
     assertThat(products.detail(listing).skus()).hasSize(3);
@@ -1272,7 +1275,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, listing)).isEqualTo("selling");
     assertThat(jdbc.queryForObject("SELECT sale_price_attention FROM store_finished_products WHERE id=?", Boolean.class, listing)).isFalse();
     assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, other)).isEqualTo("warehouse");
-    assertThat(jdbc.queryForObject("SELECT off_shelf_reason FROM store_finished_products WHERE id=?", String.class, other)).isEqualTo(StoreFinishedSalePriceService.ATTENTION);
+    assertThat(jdbc.queryForObject("SELECT warehouse_entry_reason FROM product_state_activity WHERE kind='store-finished' AND business_client_code='store' AND record_id=?", String.class, other)).isEqualTo(StoreFinishedSalePriceService.ATTENTION);
   }
 
   @Test

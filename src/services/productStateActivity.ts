@@ -1,3 +1,4 @@
+import { Button } from 'tdesign-vue-next';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 
 const labels: Record<string, [string, string]> = {
@@ -6,11 +7,19 @@ const labels: Record<string, [string, string]> = {
   soldOut: ['', '售完时间'],
   recycle: ['移入人', '移入时间'],
 };
-export function stateActivityColumns(status: string): PrimaryTableCol<TableRowData>[] {
+export function stateActivityColumns(status: string, toggleTimeSort?: () => void): PrimaryTableCol<TableRowData>[] {
   const [actor, time] = labels[status];
   return [
     ...(actor ? [{ colKey: 'stateOperatorName', title: actor, width: 120, align: 'center' as const }] : []),
-    { colKey: 'stateOperatedAt', title: time, width: 180, align: 'center' },
+    {
+      colKey: 'stateOperatedAt',
+      title: toggleTimeSort
+        ? (h) => h(Button, { variant: 'text', theme: 'default', size: 'small', onClick: toggleTimeSort }, () => time)
+        : time,
+      width: 180,
+      align: 'center',
+      sorter: true,
+    },
   ];
 }
 interface ActivityRecord {
@@ -19,11 +28,15 @@ interface ActivityRecord {
   createdAt?: string;
 }
 const timestamp = (value?: string) => {
-  const number = value ? Date.parse(value) : 0;
-  return Number.isFinite(number) ? number : 0;
+  const number = value ? Date.parse(value) : Number.NaN;
+  return Number.isFinite(number) ? number : null;
 };
-export function sortByStateActivity<T extends ActivityRecord>(records: T[]): T[] {
-  return [...records].sort(
-    (a, b) => timestamp(b.stateOperatedAt || b.createdAt) - timestamp(a.stateOperatedAt || a.createdAt) || b.id - a.id,
-  );
+export function sortByStateActivity<T extends ActivityRecord>(records: T[], descending = true): T[] {
+  const direction = descending ? -1 : 1;
+  return [...records].sort((a, b) => {
+    const left = timestamp(a.stateOperatedAt);
+    const right = timestamp(b.stateOperatedAt);
+    if (left === null || right === null) return left !== null ? -1 : right !== null ? 1 : direction * (a.id - b.id);
+    return direction * (left - right || a.id - b.id);
+  });
 }

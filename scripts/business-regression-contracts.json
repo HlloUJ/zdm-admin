@@ -22,7 +22,10 @@
         "src/services/functionCatalog.ts",
         "src/services/functionCatalogAdminData.ts",
         "src/services/functionCatalogStoreData.ts",
-        "src/services/functionCatalogSupplyData.ts"
+        "src/services/functionCatalogSupplyData.ts",
+        "backend/src/main/java/com/zdm/platform/inventory/WarehouseEntryInformation.java",
+        "src/services/warehouseEntry.ts",
+        "src/composables/useStateActivitySort.ts"
       ],
       "tables": [
         "product_state_activity",
@@ -103,6 +106,7 @@
         "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedUpstreamLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/StorePriceRuleController.java",
         "backend/src/main/java/com/zdm/platform/inventory/StorePriceRuleService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/WarehouseEntryInformation.java",
         "backend/src/main/java/com/zdm/platform/media/MediaAdminController.java",
         "backend/src/main/java/com/zdm/platform/media/MediaLifecycleMigrationService.java",
         "backend/src/main/java/com/zdm/platform/store/StoreCategoryController.java",
@@ -114,8 +118,10 @@
         "backend/src/main/java/com/zdm/platform/supplier/SupplierService.java",
         "backend/src/main/java/com/zdm/platform/tenant/TenantController.java",
         "backend/src/main/java/com/zdm/platform/tenant/TenantService.java",
+        "src/components/WarehouseEntryInformation.vue",
         "src/components/permission/PermissionAssignmentMatrix.vue",
         "src/composables/useCommodityModule.ts",
+        "src/composables/useStateActivitySort.ts",
         "src/modules/accessory/routes.ts",
         "src/pages/finished-stock/management/components/FinishedCreationSnapshot.vue",
         "src/pages/finished-stock/management/components/FinishedEditChanges.vue",
@@ -170,7 +176,8 @@
         "src/services/slabs.ts",
         "src/services/storeAccessoryStock.ts",
         "src/services/storeFinishedStock.ts",
-        "src/services/terminalFunctionPolicies.ts"
+        "src/services/terminalFunctionPolicies.ts",
+        "src/services/warehouseEntry.ts"
       ],
       "browserTests": [
         "tests/e2e/accessory-management.spec.ts",
@@ -210,26 +217,29 @@
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java",
-        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java"
+        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java"
       ],
       "protectedTests": {
-        "tests/e2e/product-state-activity.spec.ts": "61b331414921d1ced597c0405515031b877dec8f27fe5c613edc78fe6cae1318",
+        "tests/e2e/product-state-activity.spec.ts": "cbad2b1495acb2ab2398806bc83660eb107818d3b5003189cd6b139a6720fa24",
         "tests/e2e/finished-stock.spec.ts": "3c022fef1f37b123147914c34f8c65bc96275c65d74f8b7a678f98234bd1ce87",
         "tests/e2e/accessory-management.spec.ts": "c8501bae4ff414db1ba4105f9f0344ea3421c21cd9b4ad2b054188c96a029516",
         "tests/e2e/slab-collaboration.spec.ts": "cd53c43eceffbfd446ccf1fd216baac52e5ea087cbe18247c3abb7853da3ea52",
-        "tests/e2e/store-finished-stock.spec.ts": "2d632ff009e86b304f1c4a5b380b13c7aeccacb9e3ad09d8c97b202d121b7a83",
-        "tests/e2e/store-accessory-management.spec.ts": "457271f209aea19f8481a2a061f18d9155f2968b69311b8522d02f59b4bd0f61",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "7ed302daa5d817c09f3258894b03893f808e05f64dfbc4b1375216f7ef795aad",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "80709b6a8571b70ef9b40624f90f89e89c0f42913094e2a85ad712bfd5b33fd4",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "a684d07fb036f3fd112502225fdbc06f57b7bcc8ed8602deb830323db56a000b",
+        "tests/e2e/store-finished-stock.spec.ts": "e0312f4d26558605ab53c9d1dee15f001ba56da3fdd7dbeaaf8d6166b6be22db",
+        "tests/e2e/store-accessory-management.spec.ts": "4474f87ae7d9bf5d3d2e516a3b6b13f623044c96a976a3f4e44207570df518d0",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "bbf40a606486fe8cf7e0549ef3954309752d54c737f84044d33088e98d60ee00",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "dc2c3fcd1020d7348bcd0fbf03bdc931f405a69b8668f3c3cdeae827cc8ad88d",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "bfcb6b03e627cc14680cace0a0972d262a9db3cc07d97842a86d7501e0bd0ebc",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "0f511eb1a551cb8e795a52a463c204231c4f6da60525a1653acb1318a0b51ff2",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "00afc65311b86b46d943b5fdbf375f5362483fe495dffc6f21c953ff7d334f6f",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "a719033e240e5671452c05f23a44ba4e2806b9e4f65c9a1c5ab027daeb14731b",
         "tests/e2e/accessory-permissions.spec.ts": "d088c5bc7c3dd02a723e45534f3877ac6d0605cc763288622b69501e49e90a09",
-        "tests/e2e/admin-foundation.spec.ts": "b875b68ca2919268cd75520ce7eab4379207b0e389a6b027b187596b78d15a8a",
+        "tests/e2e/admin-foundation.spec.ts": "7f4251fc201011a9ca5dd0f1432a1ce32f3f66c3e207cbcbbb37c923cf8fe5eb",
         "tests/e2e/collapsed-menu-hover.spec.ts": "a51200c9d155d1e2389eaeb727b129ac52dab42121d86fc25e3a7e04b7893e50",
-        "tests/e2e/feedback-foundation.spec.ts": "acdbe722f21b77a351f4cd811a49047481ceb9ada9e43bce61fe811ef92c43f5",
+        "tests/e2e/feedback-foundation.spec.ts": "46d789a1ce91fea6c0e8b2e271f7fbfc5bbbfac910991fa8d90b1dd114d97811",
         "tests/e2e/finished-stock-permissions.spec.ts": "4ef1e34ae7814e9feb803caaf6a975781a912e75fa2018448351879cd9148a04",
         "tests/e2e/login.spec.ts": "95a37dab5cf03f2bbd14a2bba406aa2b3bbdaad59bb42985436ff85bd7827958",
         "tests/e2e/markup-configuration.spec.ts": "5ba9ef84aef59fcec2465399ec0d6638fd006902f851e85e8f1ef141e63012f9",
@@ -245,14 +255,17 @@
         "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "752403c60269e0d67a0701829e38ae971d3d474a489b5b36209d92bd7cc9b720",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java": "a96eecb919ee227cb1db0a3207c33ac9f4b53e5be3e2a9da04088e1f0def7de7",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java": "070e539aca7eb6fbe8da2c7bfa2173707994ad62f1e5dc7087042331335edce9",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "879235a0faee60b6fbd2b4fa7089bc0cd4b54caf413fea9dae70108fb39bb58f",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "b4e3e2589d6b6972da99285b3642853a00cc3c7ef1c5b9fc0ff980cd8f5d468d",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "97768eae0f4967e63e2bb45fe6e9e34aa364ad740e0808e0ad3ac229d0c23e99",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "bde62e7120d3739e89b4ca6f52dcf59d38b694711754ccc0e23109ef6bad5c0d",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "90f6ce04efa8698d667167458de92baff1a0cdce262759f428e16254d175615e",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "62101df16f1623f4f3fcc17c68364f6820d30ef5e54d08bd83018fc3bd5726cf",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "ea2e528f739d304c957d87672f9bc59fadbd815b4456e32c9194a6e5e4f9f265",
         "tests/e2e/accessory-api-mocks.ts": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
         "tests/e2e/pagination-responsive.spec.ts": "58b17d0767df10f71b821d4b7379567a17a9d419282325ab7a25fbcc370a3991",
-        "tests/e2e/store-order-prototype.spec.ts": "e9abcbb1ae989a747a2d6abe9c76fe51cb3757eb62f756c144afaf61ceb1fe42"
+        "tests/e2e/store-order-prototype.spec.ts": "e9abcbb1ae989a747a2d6abe9c76fe51cb3757eb62f756c144afaf61ceb1fe42",
+        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "8b5fac37e17b3485552745c378e9c1283cae147658617511e64a044c57d26ff3",
+        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783"
       },
       "testChanges": [
         {
@@ -434,6 +447,114 @@
           "before": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
           "after": "a684d07fb036f3fd112502225fdbc06f57b7bcc8ed8602deb830323db56a000b",
           "reason": "用户确认商品下架回仓PRD：保留已有断言，并补齐配件门店单条和批量下架真实API回归、独立动作权限及唯一日志断言。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "92c1d6fe48013d207a9006f66049f22b8164af4a0263f998f6d4742e8212dd8f",
+          "after": "7f4251fc201011a9ca5dd0f1432a1ce32f3f66c3e207cbcbbb37c923cf8fe5eb",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "b875b68ca2919268cd75520ce7eab4379207b0e389a6b027b187596b78d15a8a",
+          "after": "7f4251fc201011a9ca5dd0f1432a1ce32f3f66c3e207cbcbbb37c923cf8fe5eb",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/feedback-foundation.spec.ts",
+          "before": "74114444a974d28f566a7c6403124365a0e515ea7a1d675bfec84b5119f052e6",
+          "after": "46d789a1ce91fea6c0e8b2e271f7fbfc5bbbfac910991fa8d90b1dd114d97811",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/feedback-foundation.spec.ts",
+          "before": "acdbe722f21b77a351f4cd811a49047481ceb9ada9e43bce61fe811ef92c43f5",
+          "after": "46d789a1ce91fea6c0e8b2e271f7fbfc5bbbfac910991fa8d90b1dd114d97811",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/product-state-activity.spec.ts",
+          "before": "f1113b5a247e70570295c0ae102448220c495f7e45f1254cdc0dbb1f3b70648f",
+          "after": "cbad2b1495acb2ab2398806bc83660eb107818d3b5003189cd6b139a6720fa24",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/product-state-activity.spec.ts",
+          "before": "61b331414921d1ced597c0405515031b877dec8f27fe5c613edc78fe6cae1318",
+          "after": "cbad2b1495acb2ab2398806bc83660eb107818d3b5003189cd6b139a6720fa24",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "573eb6f864dbeba824a3b0f413be0b06159d2c0eb538b5820aa21c9ba505b6df",
+          "after": "4474f87ae7d9bf5d3d2e516a3b6b13f623044c96a976a3f4e44207570df518d0",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "457271f209aea19f8481a2a061f18d9155f2968b69311b8522d02f59b4bd0f61",
+          "after": "4474f87ae7d9bf5d3d2e516a3b6b13f623044c96a976a3f4e44207570df518d0",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "922ff10f1c9f988a9a9259faed91513f02578ee56df7baba49dbfd46dfdcc94a",
+          "after": "e0312f4d26558605ab53c9d1dee15f001ba56da3fdd7dbeaaf8d6166b6be22db",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "2d632ff009e86b304f1c4a5b380b13c7aeccacb9e3ad09d8c97b202d121b7a83",
+          "after": "e0312f4d26558605ab53c9d1dee15f001ba56da3fdd7dbeaaf8d6166b6be22db",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
+          "after": "bbf40a606486fe8cf7e0549ef3954309752d54c737f84044d33088e98d60ee00",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "7ed302daa5d817c09f3258894b03893f808e05f64dfbc4b1375216f7ef795aad",
+          "after": "bbf40a606486fe8cf7e0549ef3954309752d54c737f84044d33088e98d60ee00",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "74b7b07dad5e8e7cfae7631328e60caa89ef7f01dc326fb29fa2fa96b6aded32",
+          "after": "dc2c3fcd1020d7348bcd0fbf03bdc931f405a69b8668f3c3cdeae827cc8ad88d",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "80709b6a8571b70ef9b40624f90f89e89c0f42913094e2a85ad712bfd5b33fd4",
+          "after": "dc2c3fcd1020d7348bcd0fbf03bdc931f405a69b8668f3c3cdeae827cc8ad88d",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
+          "after": "bfcb6b03e627cc14680cace0a0972d262a9db3cc07d97842a86d7501e0bd0ebc",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "a684d07fb036f3fd112502225fdbc06f57b7bcc8ed8602deb830323db56a000b",
+          "after": "bfcb6b03e627cc14680cace0a0972d262a9db3cc07d97842a86d7501e0bd0ebc",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java",
+          "before": "879235a0faee60b6fbd2b4fa7089bc0cd4b54caf413fea9dae70108fb39bb58f",
+          "after": "97768eae0f4967e63e2bb45fe6e9e34aa364ad740e0808e0ad3ac229d0c23e99",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java",
+          "before": "b4e3e2589d6b6972da99285b3642853a00cc3c7ef1c5b9fc0ff980cd8f5d468d",
+          "after": "bde62e7120d3739e89b4ca6f52dcf59d38b694711754ccc0e23109ef6bad5c0d",
+          "reason": "用户确认V1.2通用入库信息与时间排序：替换已移除的商品当前下架字段依赖，保留真实下架日志、权限与隔离断言；补入库类型、恢复清除、防伪造、升级保留及双向跨页排序。"
         }
       ],
       "routes": [

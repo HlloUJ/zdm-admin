@@ -1,9 +1,14 @@
 import { sortByStateActivity } from '@/services/productStateActivity';
 import type { FilterState, StockItem, StockStatus } from './finishedStockPageModel';
 
-export const filterFinishedStockItems = (items: StockItem[], activeTab: StockStatus, filter: FilterState) => {
+export const filterFinishedStockItems = (
+  items: StockItem[],
+  activeTab: StockStatus,
+  filter: FilterState,
+  descending = true,
+) => {
   const keyword = filter.keyword.trim().toLocaleLowerCase();
-  const sorted = sortByStateActivity(items);
+  const sorted = sortByStateActivity(items, descending);
   return sorted.filter((item) => {
     if (item.status !== activeTab) return false;
     if (

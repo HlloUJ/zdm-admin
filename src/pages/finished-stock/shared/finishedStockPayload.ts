@@ -21,8 +21,6 @@ interface ProductPayloadContext {
   specMode: SpecMode;
   specDimensions: FinishedSpecDimension[];
   variantLabel: (row: SpecRow) => string;
-  offShelfReason?: string;
-  offShelfDetail?: string;
 }
 
 export const buildFinishedProductPayload = (context: ProductPayloadContext): FinishedProductPayload => {
@@ -66,8 +64,6 @@ export const buildFinishedProductPayload = (context: ProductPayloadContext): Fin
       costPrice: Number(row.cost),
       stock: Number(row.quantity || 0),
     })),
-    offShelfReason: context.offShelfReason,
-    offShelfDetail: context.offShelfDetail,
     status,
   };
 };

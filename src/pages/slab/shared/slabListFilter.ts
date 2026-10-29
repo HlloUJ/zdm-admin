@@ -15,7 +15,7 @@ export const latestOffShelfRecord = (row: SlabItem) =>
     return timeDifference > 0 || (timeDifference === 0 && current.id > latest.id) ? current : latest;
   }, undefined);
 
-export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter: FilterState) => {
+export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter: FilterState, descending = true) => {
   const matchedItems = items.filter((item) => {
     const statusMatched = item.status === activeTab;
     const keyword = filter.keyword.trim().toLowerCase();
@@ -31,14 +31,11 @@ export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter
     const gradeMatched = !filter.grade || item.grade === filter.grade;
     const supplierKeyword = filter.supplier.trim().toLowerCase();
     const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);
-    const latestRecord = latestOffShelfRecord(item);
-    const offShelfReasonMatched =
-      activeTab !== 'warehouse' || !filter.offShelfReason || latestRecord?.standardReason === filter.offShelfReason;
-    const offShelvedByKeyword = filter.offShelvedBy.trim().toLowerCase();
-    const offShelvedByMatched =
-      activeTab !== 'warehouse' ||
-      !offShelvedByKeyword ||
-      latestRecord?.offShelvedByName.toLowerCase().includes(offShelvedByKeyword);
+    const entryTypeMatched =
+      activeTab !== 'warehouse' || !filter.warehouseEntryType || item.warehouseEntryType === filter.warehouseEntryType;
+    const entryBy = filter.warehouseEntryBy.trim().toLowerCase();
+    const entryByMatched =
+      activeTab !== 'warehouse' || !entryBy || Boolean(item.stateOperatorName?.toLowerCase().includes(entryBy));
     return (
       statusMatched &&
       keywordMatched &&
@@ -48,9 +45,9 @@ export const filterSlabItems = (items: SlabItem[], activeTab: SlabStatus, filter
       colorMatched &&
       gradeMatched &&
       supplierMatched &&
-      offShelfReasonMatched &&
-      offShelvedByMatched
+      entryTypeMatched &&
+      entryByMatched
     );
   });
-  return sortByStateActivity(matchedItems);
+  return sortByStateActivity(matchedItems, descending);
 };

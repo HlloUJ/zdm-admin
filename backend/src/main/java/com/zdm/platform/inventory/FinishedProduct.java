@@ -22,6 +22,22 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
   public void setStateOperatedAt(java.time.LocalDateTime value) { stateOperatedAt=value; }
   public String getStateOperatorName() { return stateOperatorName; }
   public void setStateOperatorName(String value) { stateOperatorName=value; }
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String warehouseEntryType;
+  public String getWarehouseEntryType() { return warehouseEntryType; }
+  public void setWarehouseEntryType(String value) { warehouseEntryType=value; }
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String warehouseEntryReason;
+  public String getWarehouseEntryReason() { return warehouseEntryReason; }
+  public void setWarehouseEntryReason(String value) { warehouseEntryReason=value; }
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String warehouseEntryDetail;
+  public String getWarehouseEntryDetail() { return warehouseEntryDetail; }
+  public void setWarehouseEntryDetail(String value) { warehouseEntryDetail=value; }
+
   @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
   private List<FinishedSpecDimension> specDimensions;
 
@@ -44,15 +60,6 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
     attributeDisplayOrder = value == null ? null : new java.util.LinkedHashMap<>(value);
   }
 
-  private String sourceOffShelfReason;
-  private String sourceOffShelfDetail;
-  private java.time.LocalDateTime sourceOffShelfAt;
-  public String getSourceOffShelfReason() { return sourceOffShelfReason; }
-  public void setSourceOffShelfReason(String value) { sourceOffShelfReason=value; }
-  public String getSourceOffShelfDetail() { return sourceOffShelfDetail; }
-  public void setSourceOffShelfDetail(String value) { sourceOffShelfDetail=value; }
-  public java.time.LocalDateTime getSourceOffShelfAt() { return sourceOffShelfAt; }
-  public void setSourceOffShelfAt(java.time.LocalDateTime value) { sourceOffShelfAt=value; }
   private String sourceStatus = "warehouse";
   @TableField(updateStrategy = FieldStrategy.NEVER)
   private String sourceBlockReason;
@@ -111,20 +118,15 @@ public class FinishedProduct extends BaseEntity implements com.zdm.platform.secu
   private String publisherType;
   private Integer totalStock;
   private BigDecimal guidePrice;
-  @TableField(exist = false)
-  private String offShelfByName;
-  public String getOffShelfByName() { return offShelfByName; }
-  public void setOffShelfByName(String value) { offShelfByName = value; }
-
   @com.baomidou.mybatisplus.annotation.TableField(exist = false)
   private String operation;
   public String getOperation() { return operation; }
   public void setOperation(String value) { operation = value; }
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
   private String offShelfReason;
-  private java.time.LocalDateTime offShelfAt;
-  public java.time.LocalDateTime getOffShelfAt() { return offShelfAt; }
-  public void setOffShelfAt(java.time.LocalDateTime value) { this.offShelfAt = value; }
-  @TableField(updateStrategy = FieldStrategy.ALWAYS)
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.WRITE_ONLY)
   private String offShelfDetail;
   public String getOffShelfDetail() { return offShelfDetail; }
   public void setOffShelfDetail(String value) { this.offShelfDetail = value; }

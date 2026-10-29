@@ -1,3 +1,4 @@
+import type { WarehouseEntryInformation } from './warehouseEntry';
 import { request } from './http';
 import type { FinishedProductAttributeEntry, FinishedSpecDimension } from './finishedProducts';
 
@@ -20,7 +21,7 @@ export interface StoreSkuPrice {
   sizeValue?: string;
 }
 
-export interface StoreFinishedProduct {
+export interface StoreFinishedProduct extends WarehouseEntryInformation {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
@@ -50,10 +51,6 @@ export interface StoreFinishedProduct {
   skus: StoreSkuPrice[];
   createdByName?: string;
   createdAt?: string;
-  offShelfByName?: string;
-  offShelfReason?: string;
-  offShelfDetail?: string;
-  offShelfAt?: string;
 }
 
 export interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePrice' | 'priceMode' | 'saleCoefficient'> {
