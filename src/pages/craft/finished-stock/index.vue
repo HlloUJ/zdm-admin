@@ -696,7 +696,7 @@ onMounted(loadCrafts);
 }
 
 .craft-image__empty {
-  font-size: var(--td-font-size-body-small);
+  font: var(--td-font-body-small);
 }
 
 .table-actions {

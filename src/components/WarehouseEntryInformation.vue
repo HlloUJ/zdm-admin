@@ -12,33 +12,71 @@
     >
       {{ warehouseEntryLabel(entry.warehouseEntryType) }}
     </t-tag>
-    <template v-if="entry.warehouseEntryType === 'offShelf'">
-      <span v-if="entry.warehouseEntryReason">{{ entry.warehouseEntryReason }}</span>
-      <t-tooltip
-        v-model:visible="detailTooltipVisible"
-        :disabled="tooltipDisabled"
-        :content="entry.warehouseEntryDetail || '未填写详细说明'"
-        placement="bottom-left"
-      >
-        <span data-entry-detail>{{ entry.warehouseEntryDetail || '未填写详细说明' }}</span>
-      </t-tooltip>
-    </template>
-    <template v-else-if="!['firstEntry', 'recycleRestore'].includes(entry.warehouseEntryType || '')">
-      <span v-if="entry.warehouseEntryReason">{{ entry.warehouseEntryReason }}</span>
-      <span v-if="entry.warehouseEntryDetail">{{ entry.warehouseEntryDetail }}</span>
-    </template>
+    <t-tooltip
+      v-if="summary"
+      v-model:visible="detailTooltipVisible"
+      :disabled="tooltipDisabled || !isTruncated"
+      :content="summary"
+      placement="bottom-left"
+    >
+      <t-typography-text
+        ref="summaryText"
+        data-entry-detail
+        class="warehouse-entry-summary"
+        theme="secondary"
+        :content="summary"
+        :ellipsis="{ row: 2 }"
+      />
+    </t-tooltip>
     <slot />
   </t-space>
 </template>
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue';
 import { warehouseEntryLabel, type WarehouseEntryInformation } from '@/services/warehouseEntry';
 const props = defineProps<{ entry: WarehouseEntryInformation; tooltipDisabled?: boolean }>();
+const summary = computed(() => {
+  const entry = props.entry;
+  if (['firstEntry', 'recycleRestore'].includes(entry.warehouseEntryType || '')) return '';
+  const detail = entry.warehouseEntryDetail || (entry.warehouseEntryType === 'offShelf' ? '未填写详细说明' : '');
+  return [entry.warehouseEntryReason, detail].filter(Boolean).join('；');
+});
 const detailTooltipVisible = ref(false);
+const summaryText = ref<ComponentPublicInstance>();
+const isTruncated = ref(false);
+let observer: ResizeObserver | undefined;
+const measureTruncation = () => {
+  const element = (summaryText.value?.$el as HTMLElement | undefined)?.querySelector('p');
+  isTruncated.value = Boolean(
+    element && (element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1),
+  );
+};
 watch(
-  () => props.tooltipDisabled,
+  [summary, summaryText],
+  async () => {
+    await nextTick();
+    observer?.disconnect();
+    const element = summaryText.value?.$el as HTMLElement | undefined;
+    if (element && typeof ResizeObserver !== 'undefined') {
+      observer = new ResizeObserver(measureTruncation);
+      observer.observe(element);
+    }
+    measureTruncation();
+  },
+  { flush: 'post' },
+);
+onBeforeUnmount(() => observer?.disconnect());
+watch(
+  () => props.tooltipDisabled || !isTruncated.value,
   (disabled) => {
     if (disabled) detailTooltipVisible.value = false;
   },
 );
 </script>
+
+<style scoped>
+.warehouse-entry-summary {
+  margin: 0;
+  font: var(--td-font-body-small);
+}
+</style>

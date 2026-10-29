@@ -11,7 +11,11 @@ const render = (entry: Record<string, string | null>) =>
         stubs: {
           't-space': { template: '<div><slot /></div>' },
           't-tag': { template: '<span data-test="tag"><slot /></span>' },
-          't-tooltip': { template: '<span><slot /></span>' },
+          't-tooltip': {
+            props: ['content', 'disabled'],
+            template: '<span :data-full-text="content" :data-disabled="String(disabled)"><slot /></span>',
+          },
+          't-typography-text': { props: ['content', 'ellipsis', 'theme'], template: '<span>{{ content }}</span>' },
         },
       },
     },
@@ -33,7 +37,10 @@ describe('current warehouse entry presentation', () => {
     expect(view.text()).toContain('下架入库');
     expect(view.text()).toContain('价格调整');
     expect(view.text()).toContain('未填写详细说明');
+    expect(view.find('[data-entry-detail]').text()).toBe('价格调整；未填写详细说明');
+    expect(view.find('[data-full-text]').attributes('data-full-text')).toBe('价格调整；未填写详细说明');
     expect(view.text()).not.toContain('—');
+    expect(view.find('[data-full-text]').attributes('data-disabled')).toBe('true');
     expect(entry.warehouseEntryDetail).toBeNull();
   });
   it('shows actual detail and never guesses first entry from missing provenance', () => {

@@ -700,3 +700,22 @@ test('does not add empty-cell padding to the finished stock horizontal scroll wi
     }
   }
 });
+
+for (const path of ['/product-category', '/product-attribute', '/product-attribute-value']) {
+  test(`${path} source description uses secondary typography without shrinking native controls`, async ({ page }) => {
+    await page.goto(path);
+    const main = page.getByRole('main');
+    await expect(main.locator('.source-caption')).toHaveCSS('font-size', '12px');
+    await expect(main.locator('.source-caption')).toHaveCSS('line-height', '20px');
+    await expect(main.getByRole('button', { name: '查询', exact: true })).toHaveCSS('font-size', '14px');
+  });
+}
+test('dashboard metric explanations use canonical secondary typography', async ({ page }) => {
+  await page.goto('/dashboard');
+  const hints = page.getByRole('main').locator('.metric-card small');
+  await expect(hints).toHaveCount(4);
+  for (const hint of await hints.all()) {
+    await expect(hint).toHaveCSS('font-size', '12px');
+    await expect(hint).toHaveCSS('line-height', '20px');
+  }
+});

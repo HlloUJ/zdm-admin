@@ -83,7 +83,8 @@
     "src/components/foundation/official/textarea-count-layout.css",
     "src/pages/order/prototype/SalesOrderList.vue",
     "src/components/foundation/official/responsive-layout.css",
-    "src/services/productStateActivity.css"
+    "src/services/productStateActivity.css",
+    "src/components/WarehouseEntryInformation.vue"
   ],
   "contracts": {
     "src/App.vue": {
@@ -1280,6 +1281,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "  object-fit: cover;\n}\n\n.craft-image__empty {\n  font-size: var(--td-font-size-body-small);\n}\n\n.table-actions {\n  display: flex;\n",
+          "after": "  object-fit: cover;\n}\n\n.craft-image__empty {\n  font: var(--td-font-body-small);\n}\n\n.table-actions {\n  display: flex;\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
+        {
           "before": "const canDeleteCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.delete`));\n\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 72, align: 'left' },\n  { colKey: 'image', title: '工艺图片', width: 112, align: 'center' },\n  { colKey: 'name', title: '工艺名称', minWidth: 160 },\n  { colKey: 'type', title: '工艺类型', width: 120 },\n  { colKey: 'width', title: '工艺宽度（mm）', width: 150, ellipsisTitle: true },\n  { colKey: 'status', title: '状态', width: 100, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
           "after": "const canDeleteCraft = computed(() => hasPermission(loginUser.value, `${craftPermissionPrefix}.delete`));\n\nconst columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  { colKey: 'index', title: '序号', width: 72, align: 'left' },\n  { colKey: 'image', title: '工艺图片', width: 112 },\n  { colKey: 'name', title: '工艺名称', minWidth: 160 },\n  { colKey: 'type', title: '工艺类型', width: 120 },\n  { colKey: 'width', title: '工艺宽度（mm）', width: 150, ellipsisTitle: true },\n  { colKey: 'status', title: '状态', width: 100 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
           "stage": "before-migrations",
@@ -2438,6 +2445,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": ".metric-card small {\n  color: var(--td-text-color-secondary);\n}\n\n.metric-card strong {\n  font: var(--td-font-headline-medium);\n}\n\n",
+          "after": ".metric-card small {\n  color: var(--td-text-color-secondary);\n}\n\n.metric-card small {\n  font: var(--td-font-body-small);\n}\n\n.metric-card strong {\n  font: var(--td-font-headline-medium);\n}\n\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-22 authorized narrow dashboard list containment: reuse shared zero-minimum grid track, preserve desktop and all business content.",
           "before": "class=\"dashboard-grid\"",
@@ -2689,6 +2702,12 @@
       "template": "e1c3c75dd26a35f84d110982fa0f5eab7a7eaaf827f6c2a5ad9af8753399af06",
       "approvedBusinessPatches": [
         {
+          "before": "\n.sales-log-table :deep(.historical-sku-id) {\n  margin-top: var(--td-comp-margin-xs);\n  color: var(--td-text-color-secondary);\n  font-size: var(--td-font-size-body-small);\n}\n\n.sales-log-table :deep(.sales-value-added) {\n  color: var(--td-brand-color-active);\n",
+          "after": "\n.sales-log-table :deep(.historical-sku-id) {\n  margin-top: var(--td-comp-margin-xs);\n  color: var(--td-text-color-secondary);\n  font: var(--td-font-body-small);\n}\n\n.sales-log-table :deep(.sales-value-added) {\n  color: var(--td-brand-color-active);\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
+        {
           "reason": "2026-10-27 用户要求三个模块日志缺价原因标红，使用官方Typography错误色，保留文案和业务规则。",
           "stage": "before-migrations",
           "before": "import { computed, h, onBeforeUnmount, onMounted, ref } from 'vue';\nimport { getLoginUser } from '@/services/auth';\nimport PriceSourceToggle from './PriceSourceToggle.vue';\nimport type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport { layeredCellSpan, orderLayeredRows } from '../layeredSpecs';\nimport type {\n  FinishedSpecDimension,\n",
@@ -2822,6 +2841,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "  gap: 4px;\n}\n.product-code {\n  color: var(--td-text-color-secondary);\n  font-size: var(--td-font-size-body-small);\n}\n.product-detail__media {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));\n",
+          "after": "  gap: 4px;\n}\n.product-code {\n  color: var(--td-text-color-secondary);\n  font: var(--td-font-body-small);\n}\n.product-detail__media {\n  display: grid;\n  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
         {
           "before": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <t-alert v-if=\"product.status === 'warehouse' && product.offShelfReason\" theme=\"warning\" title=\"最近下架信息\">\n      {{ product.offShelfReason }} · {{ product.offShelfDetail || '—' }} {{ product.offShelfByName || '未记录' }} ·\n      {{ product.offShelfAt || '未记录' }}\n    </t-alert>\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n      :class=\"{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }\"\n    >\n      <h3\n        v-if=\"!drawerLayout\"\n",
           "after": "<template>\n  <t-space direction=\"vertical\" size=\"large\" class=\"product-detail\">\n    <component :is=\"drawerLayout ? Card : AdminSectionCard\" v-if=\"product.status === 'warehouse'\" title=\"本次入库信息\">\n      <WarehouseEntryInformation :entry=\"product\" />\n      {{ product.stateOperatorName || '历史记录未记录' }} ·\n      {{ product.stateOperatedAt ? formatProductDateTime(product.stateOperatedAt) : '历史记录未记录' }}\n    </component>\n    <t-alert v-if=\"operations && product.sourceUnavailable\" theme=\"warning\" :message=\"sourceMessage\" />\n    <component\n      :is=\"drawerLayout ? Card : AdminSectionCard\"\n      :title=\"drawerLayout ? '图文描述' : undefined\"\n      data-product-section=\"description\"\n      :class=\"{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }\"\n    >\n      <h3\n        v-if=\"!drawerLayout\"\n",
@@ -7216,6 +7241,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "}\n.source-caption {\n  margin-top: var(--td-comp-margin-s);\n  color: var(--td-text-color-secondary);\n  font-size: var(--td-font-size-body-medium);\n}\n:deep(.zdm-admin-list-layout__toolbar) {\n  display: block;\n  min-height: 0;\n",
+          "after": "}\n.source-caption {\n  margin-top: var(--td-comp-margin-s);\n  color: var(--td-text-color-secondary);\n  font: var(--td-font-body-small);\n}\n:deep(.zdm-admin-list-layout__toolbar) {\n  display: block;\n  min-height: 0;\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
+        {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
           "before": "    <AdminDialog\n      v-model:visible=\"dialogVisible\"\n      confirm-function=\"submit\"\n      header=\"新增\"\n",
@@ -7350,6 +7381,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "}\n.source-caption {\n  margin-top: var(--td-comp-margin-s);\n  color: var(--td-text-color-secondary);\n  font-size: var(--td-font-size-body-medium);\n}\n:deep(.zdm-admin-list-layout__toolbar) {\n  display: block;\n  min-height: 0;\n",
+          "after": "}\n.source-caption {\n  margin-top: var(--td-comp-margin-s);\n  color: var(--td-text-color-secondary);\n  font: var(--td-font-body-small);\n}\n:deep(.zdm-admin-list-layout__toolbar) {\n  display: block;\n  min-height: 0;\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
         {
           "reason": "2026-10-16 user approved global execution captions: create confirmation, edit save confirmation, registered complete operation names and explicit batch; preserve all original business behavior.",
           "stage": "before-migrations",
@@ -7501,6 +7538,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "}\n.source-caption {\n  margin-top: var(--td-comp-margin-s);\n  color: var(--td-text-color-secondary);\n  font-size: var(--td-font-size-body-medium);\n}\n:deep(.zdm-admin-list-layout__toolbar) {\n  display: block;\n  min-height: 0;\n",
+          "after": "}\n.source-caption {\n  margin-top: var(--td-comp-margin-s);\n  color: var(--td-text-color-secondary);\n  font: var(--td-font-body-small);\n}\n:deep(.zdm-admin-list-layout__toolbar) {\n  display: block;\n  min-height: 0;\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
         {
           "before": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSortCategory.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28 }] : []),\n  { colKey: 'name', title: '分类名称', minWidth: 240, align: 'left' },\n  { colKey: 'level', title: '分类级别', width: 120, align: 'left' },\n  { colKey: 'productCount', title: '关联商品', width: 120, align: 'center' },\n  { colKey: 'status', title: '状态', width: 100, align: 'center' },\n  { colKey: 'sort', title: '排序', width: 100, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 200, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 200,\n",
           "after": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSortCategory.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28 }] : []),\n  { colKey: 'name', title: '分类名称', minWidth: 240, align: 'left' },\n  { colKey: 'level', title: '分类级别', width: 120, align: 'left' },\n  { colKey: 'productCount', title: '关联商品', width: 120 },\n  { colKey: 'status', title: '状态', width: 100 },\n  { colKey: 'sort', title: '排序', width: 100 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 200 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 200,\n",
@@ -13293,6 +13336,18 @@
       "designReference": "store-order-partition-card-2026-10-21",
       "approvedBusinessPatches": [
         {
+          "before": "              </div>\n              <div>\n                <span class=\"meta-label\">负责人</span><span>{{ order.ownerName }}</span>\n              </div>\n              <div>\n                <span class=\"meta-label\">创建人</span><span>{{ order.creator }}</span>\n              </div>\n              <div>\n                <span class=\"meta-label\">创建时间</span><span>{{ dateTime(order.createdAt) }}</span>\n              </div>\n            </div>\n            <div class=\"order-card__actions\">\n",
+          "after": "              </div>\n              <div>\n                <span class=\"meta-label\">负责人</span><span>{{ order.ownerName }}</span>\n              </div>\n              <div class=\"meta-secondary\">\n                <span class=\"meta-label\">创建人</span><span>{{ order.creator }}</span>\n              </div>\n              <div class=\"meta-secondary\">\n                <span class=\"meta-label\">创建时间</span><span>{{ dateTime(order.createdAt) }}</span>\n              </div>\n            </div>\n            <div class=\"order-card__actions\">\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
+        {
+          "before": "  flex-wrap: wrap;\n}\n.meta-label,\n.meta-phone {\n  color: var(--td-text-color-secondary);\n}\n.customer-name {\n  font: var(--td-font-mark-medium);\n}\n",
+          "after": "  flex-wrap: wrap;\n}\n.meta-label,\n.meta-phone {\n  font: var(--td-font-body-small);\n  color: var(--td-text-color-secondary);\n}\n.meta-secondary {\n  font: var(--td-font-body-small);\n}\n.customer-name {\n  font: var(--td-font-mark-medium);\n}\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：入库原因说明分号合并、最多两行且仅截断时显示完整气泡、恢复原标签间距；清单内次级信息使用完整小字体，保留原颜色和业务。"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-10-22 用户明确批准名称、标题和编号仅作普通展示；移除客户姓名与订单号的详情触发，保留独立详情权限、复制、业务逻辑及布局。",
           "before": "              <strong\n                ><span\n                  :role=\"can('detail', order) ? 'link' : undefined\"\n                  :tabindex=\"can('detail', order) ? 0 : undefined\"\n                  @click=\"can('detail', order) && emit('action', 'detail', order)\"\n                  @keydown.enter=\"can('detail', order) && emit('action', 'detail', order)\"\n                  >{{ order.id }}</span\n                ></strong\n",
@@ -13303,6 +13358,20 @@
           "reason": "2026-10-22 user approved reusing public pagination styles and removing legacy style hooks only; all business props and handlers retained.",
           "before": "class=\"order-pagination\"",
           "after": "class=\"zdm-admin-pagination\""
+        }
+      ]
+    },
+    "src/components/WarehouseEntryInformation.vue": {
+      "script": "f80d4248a221f4283805d7f14c4657b80213ce9d48390a5812309b60f1e8e12b",
+      "template": "214145c82b74bb3207e82581b1ab20da0d6cee12c040d34da3eccfa6d1a05329",
+      "baselineRevision": "b8fb48caa3197afb5b898ab747435f135dc9a695",
+      "baselineNote": "该组件晚于原视觉迁移基线新增，本次首次登记其样式；保护快照来自本轮修改前HEAD，不重建任何已有合同。",
+      "approvedBusinessPatches": [
+        {
+          "before": "<template>\n  <t-space direction=\"vertical\" size=\"small\" align=\"start\">\n    <t-tag\n      :theme=\"\n        entry.warehouseEntryType === 'offShelf'\n          ? 'warning'\n          : entry.warehouseEntryType === 'firstEntry'\n            ? 'primary'\n            : 'default'\n      \"\n      variant=\"light\"\n    >\n      {{ warehouseEntryLabel(entry.warehouseEntryType) }}\n    </t-tag>\n    <template v-if=\"entry.warehouseEntryType === 'offShelf'\">\n      <span v-if=\"entry.warehouseEntryReason\">{{ entry.warehouseEntryReason }}</span>\n      <t-tooltip\n        v-model:visible=\"detailTooltipVisible\"\n        :disabled=\"tooltipDisabled\"\n        :content=\"entry.warehouseEntryDetail || '未填写详细说明'\"\n        placement=\"bottom-left\"\n      >\n        <span data-entry-detail>{{ entry.warehouseEntryDetail || '未填写详细说明' }}</span>\n      </t-tooltip>\n    </template>\n    <template v-else-if=\"!['firstEntry', 'recycleRestore'].includes(entry.warehouseEntryType || '')\">\n      <span v-if=\"entry.warehouseEntryReason\">{{ entry.warehouseEntryReason }}</span>\n      <span v-if=\"entry.warehouseEntryDetail\">{{ entry.warehouseEntryDetail }}</span>\n    </template>\n    <slot />\n  </t-space>\n</template>\n<script setup lang=\"ts\">\nimport { ref, watch } from 'vue';\nimport { warehouseEntryLabel, type WarehouseEntryInformation } from '@/services/warehouseEntry';\nconst props = defineProps<{ entry: WarehouseEntryInformation; tooltipDisabled?: boolean }>();\nconst detailTooltipVisible = ref(false);\nwatch(\n  () => props.tooltipDisabled,\n  (disabled) => {\n    if (disabled) detailTooltipVisible.value = false;\n  },\n);\n</script>\n",
+          "after": "<template>\n  <t-space direction=\"vertical\" size=\"small\" align=\"start\">\n    <t-tag\n      :theme=\"\n        entry.warehouseEntryType === 'offShelf'\n          ? 'warning'\n          : entry.warehouseEntryType === 'firstEntry'\n            ? 'primary'\n            : 'default'\n      \"\n      variant=\"light\"\n    >\n      {{ warehouseEntryLabel(entry.warehouseEntryType) }}\n    </t-tag>\n    <t-tooltip\n      v-if=\"summary\"\n      v-model:visible=\"detailTooltipVisible\"\n      :disabled=\"tooltipDisabled || !isTruncated\"\n      :content=\"summary\"\n      placement=\"bottom-left\"\n    >\n      <t-typography-text\n        ref=\"summaryText\"\n        data-entry-detail\n        class=\"warehouse-entry-summary\"\n        theme=\"secondary\"\n        :content=\"summary\"\n        :ellipsis=\"{ row: 2 }\"\n      />\n    </t-tooltip>\n    <slot />\n  </t-space>\n</template>\n<script setup lang=\"ts\">\nimport { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue';\nimport { warehouseEntryLabel, type WarehouseEntryInformation } from '@/services/warehouseEntry';\nconst props = defineProps<{ entry: WarehouseEntryInformation; tooltipDisabled?: boolean }>();\nconst summary = computed(() => {\n  const entry = props.entry;\n  if (['firstEntry', 'recycleRestore'].includes(entry.warehouseEntryType || '')) return '';\n  const detail = entry.warehouseEntryDetail || (entry.warehouseEntryType === 'offShelf' ? '未填写详细说明' : '');\n  return [entry.warehouseEntryReason, detail].filter(Boolean).join('；');\n});\nconst detailTooltipVisible = ref(false);\nconst summaryText = ref<ComponentPublicInstance>();\nconst isTruncated = ref(false);\nlet observer: ResizeObserver | undefined;\nconst measureTruncation = () => {\n  const element = (summaryText.value?.$el as HTMLElement | undefined)?.querySelector('p');\n  isTruncated.value = Boolean(\n    element && (element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1),\n  );\n};\nwatch(\n  [summary, summaryText],\n  async () => {\n    await nextTick();\n    observer?.disconnect();\n    const element = summaryText.value?.$el as HTMLElement | undefined;\n    if (element && typeof ResizeObserver !== 'undefined') {\n      observer = new ResizeObserver(measureTruncation);\n      observer.observe(element);\n    }\n    measureTruncation();\n  },\n  { flush: 'post' },\n);\nonBeforeUnmount(() => observer?.disconnect());\nwatch(\n  () => props.tooltipDisabled || !isTruncated.value,\n  (disabled) => {\n    if (disabled) detailTooltipVisible.value = false;\n  },\n);\n</script>\n\n<style scoped>\n.warehouse-entry-summary {\n  margin: 0;\n  font: var(--td-font-body-small);\n}\n</style>\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.7/V1.8：原因说明合并、两行省略、仅实际截断时完整气泡，次级字体及恢复原标签间距；保留原入库标签和历史弹窗气泡关闭。"
         }
       ]
     }

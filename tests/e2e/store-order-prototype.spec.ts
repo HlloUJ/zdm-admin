@@ -298,6 +298,10 @@ test('status tabs keep native scale and alignment while order amounts follow col
   await page.goto(productWarehouseUrl('/store/order-management/sales'));
   const tabs = page.locator('.sales-order-filter-card .t-tabs__nav-item');
   await expect(tabs).toHaveCount(5);
+  for (const selector of ['.meta-phone', '.meta-label', '.meta-secondary']) {
+    await expect(page.locator(selector).first()).toHaveCSS('font-size', '12px');
+    await expect(page.locator(selector).first()).toHaveCSS('line-height', '20px');
+  }
   const amount = page.locator('.order-metric__amount').first();
   // The accepted compact card uses mark-medium; expanding restores title-large.
   await expect(amount).toHaveCSS('font-size', '14px');

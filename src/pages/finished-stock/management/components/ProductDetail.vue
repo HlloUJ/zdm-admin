@@ -448,7 +448,7 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol }) =>
 }
 .product-code {
   color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-small);
+  font: var(--td-font-body-small);
 }
 .product-detail__media {
   display: grid;

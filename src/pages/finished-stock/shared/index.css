@@ -142,10 +142,14 @@
   gap: 4px;
 }
 
-.product-code,
+.product-code {
+  color: var(--td-text-color-secondary);
+  font: var(--td-font-body-small);
+}
+
 .store-text {
   color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-small);
+  font: var(--td-font-body-small);
 }
 
 .form-shell {
@@ -426,6 +430,7 @@
 }
 
 .category-picker-path {
+  font: var(--td-font-body-small);
   margin-top: 12px;
   color: var(--td-text-color-secondary);
 }

@@ -917,12 +917,16 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(historyTrigger).toHaveCSS('opacity', '0');
   const detailText = offShelfRow.locator('[data-entry-detail]');
   await detailText.hover();
-  await expect(page.locator('.t-popup__content:visible').getByText(latestDetailReason, { exact: true })).toBeVisible();
+  await expect(
+    page.locator('.t-popup__content:visible').getByText(`库存异常；${latestDetailReason}`, { exact: true }),
+  ).toBeVisible();
   await expect(historyTrigger).toHaveCSS('opacity', '1');
   await historyTrigger.click();
   const historyDialog = page.locator('.t-dialog:visible').filter({ hasText: '历史下架原因' });
   await expect(historyDialog).toBeVisible();
-  await expect(page.locator('.t-popup__content:visible').getByText(latestDetailReason, { exact: true })).toHaveCount(0);
+  await expect(
+    page.locator('.t-popup__content:visible').getByText(`库存异常；${latestDetailReason}`, { exact: true }),
+  ).toHaveCount(0);
   const historyRows = historyDialog.locator('tbody tr');
   await expect(historyRows).toHaveCount(2);
   await expect(historyRows.nth(0)).toContainText('库存异常');

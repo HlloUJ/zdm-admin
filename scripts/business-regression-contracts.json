@@ -300,9 +300,9 @@
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "27ff2ff5fcdf02b917425ed3e714bf9a47fafebb817775de33541cff82d2da7e",
         "tests/e2e/accessory-permissions.spec.ts": "715ec12dcf7117d6f8db7869c3471be56c96f616db92e25469cb96c8d53cfed5",
-        "tests/e2e/admin-foundation.spec.ts": "0826c903075bf41b90889452e990b581c522d6f4e78c149606e22a9b1568bea6",
+        "tests/e2e/admin-foundation.spec.ts": "5be97635da48a1778d0aa3faf341e7151c62e972d813a2347567d4660b61df7b",
         "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
-        "tests/e2e/feedback-foundation.spec.ts": "ca6bc903f838da881b3583b198994922b8f9cb79fd54e29b0bcc8bf971b1c3ef",
+        "tests/e2e/feedback-foundation.spec.ts": "3417bb2a812249632155aa88fdf3593ada446b8c3e945c0925313cc0e70d8898",
         "tests/e2e/finished-stock-permissions.spec.ts": "1847061ef35f374d1ca3b50de4278b21c4769cd956217faa59daa9900e72fed8",
         "tests/e2e/login.spec.ts": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
         "tests/e2e/markup-configuration.spec.ts": "f6537e115a129a012269ec8318142c897fd9532454ff1c7aa160c97f81c8cea5",
@@ -325,11 +325,11 @@
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
         "tests/e2e/accessory-api-mocks.ts": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
         "tests/e2e/pagination-responsive.spec.ts": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
-        "tests/e2e/store-order-prototype.spec.ts": "fbc9d640af1746f8e871839710fb27d711ff76397c13c8ffda60840d35abf145",
+        "tests/e2e/store-order-prototype.spec.ts": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "8b5fac37e17b3485552745c378e9c1283cae147658617511e64a044c57d26ff3",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "d257830cf49e65507121b872b9f0fc67b0582b44b166c13dbb23956b1ebe5e77",
+        "tests/e2e/product-all-view.spec.ts": "ec07d84f2affcb69af9811fe30d13397b5b014bb4b568cfb8235411820efdd61",
         "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "6e1d79598ca04efefba7f308776f189437f7ee6aa56f2fd40042d1597a5b452b",
@@ -1320,6 +1320,54 @@
           "before": "bdae1bc1aacbc411ea90139b720a4a51e104b31ea0ed98951258affd843779be",
           "after": "d257830cf49e65507121b872b9f0fc67b0582b44b166c13dbb23956b1ebe5e77",
           "reason": "用户确认V1.6：恢复普通列原生左对齐，八个商品入口创建时间升降序；原断言不变，增加表头/内容左对齐和完整列表分页排序验证；保留原超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/feedback-foundation.spec.ts",
+          "before": "ca6bc903f838da881b3583b198994922b8f9cb79fd54e29b0bcc8bf971b1c3ef",
+          "after": "3417bb2a812249632155aa88fdf3593ada446b8c3e945c0925313cc0e70d8898",
+          "reason": "用户确认V1.7：完整气泡显示合并的原因和说明，同步旧气泡精确文案；补两行省略、次级字体及间距验证，保留历史弹窗等其他断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/feedback-foundation.spec.ts",
+          "before": "74114444a974d28f566a7c6403124365a0e515ea7a1d675bfec84b5119f052e6",
+          "after": "3417bb2a812249632155aa88fdf3593ada446b8c3e945c0925313cc0e70d8898",
+          "reason": "用户确认V1.7：完整气泡显示合并的原因和说明，同步旧气泡精确文案；补两行省略、次级字体及间距验证，保留历史弹窗等其他断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "d257830cf49e65507121b872b9f0fc67b0582b44b166c13dbb23956b1ebe5e77",
+          "after": "9451fa86b4d9760952386f02c42e0acf0ab046ddca684c4dfac5be2c8ad53800",
+          "reason": "用户确认V1.7：完整气泡显示合并的原因和说明，同步旧气泡精确文案；补两行省略、次级字体及间距验证，保留历史弹窗等其他断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "0826c903075bf41b90889452e990b581c522d6f4e78c149606e22a9b1568bea6",
+          "after": "5be97635da48a1778d0aa3faf341e7151c62e972d813a2347567d4660b61df7b",
+          "reason": "用户授权V1.7/V1.8：补齐次级字体及入库说明合并、截断才显示气泡；精确更新完整气泡文案，补字体/行高/间距及原金额层级回归，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "92c1d6fe48013d207a9006f66049f22b8164af4a0263f998f6d4742e8212dd8f",
+          "after": "5be97635da48a1778d0aa3faf341e7151c62e972d813a2347567d4660b61df7b",
+          "reason": "用户授权V1.7/V1.8：补齐次级字体及入库说明合并、截断才显示气泡；精确更新完整气泡文案，补字体/行高/间距及原金额层级回归，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "fbc9d640af1746f8e871839710fb27d711ff76397c13c8ffda60840d35abf145",
+          "after": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "reason": "用户授权V1.7/V1.8：补齐次级字体及入库说明合并、截断才显示气泡；精确更新完整气泡文案，补字体/行高/间距及原金额层级回归，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "9451fa86b4d9760952386f02c42e0acf0ab046ddca684c4dfac5be2c8ad53800",
+          "after": "ec07d84f2affcb69af9811fe30d13397b5b014bb4b568cfb8235411820efdd61",
+          "reason": "用户授权V1.7/V1.8：补齐次级字体及入库说明合并、截断才显示气泡；精确更新完整气泡文案，补字体/行高/间距及原金额层级回归，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "d257830cf49e65507121b872b9f0fc67b0582b44b166c13dbb23956b1ebe5e77",
+          "after": "ec07d84f2affcb69af9811fe30d13397b5b014bb4b568cfb8235411820efdd61",
+          "reason": "用户授权V1.7/V1.8：补齐次级字体及入库说明合并、截断才显示气泡；精确更新完整气泡文案，补字体/行高/间距及原金额层级回归，保留其余断言、超时和零重试。"
         }
       ],
       "routes": [

@@ -35,7 +35,7 @@
 }
 .product-code {
   color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-small);
+  font: var(--td-font-body-small);
 }
 .product-image {
   width: 64px;

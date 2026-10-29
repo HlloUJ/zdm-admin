@@ -287,3 +287,70 @@ for (const surface of surfaces) {
     await expect(main.getByRole('columnheader', { name: '入库时间', exact: true })).toBeVisible();
   });
 }
+
+test('warehouse entry combines full reason and detail with two-line secondary text and tooltip', async ({ page }) => {
+  const surface = surfaces.find((s) => s.path === '/supply-chain/finished-stock-management')!;
+  const records = await setup(page, surface);
+  const full = '价格调整；' + '更新商品图片和价格后重新上架，'.repeat(30);
+  await page.route(`**/api/admin/${surface.kind}`, (route) =>
+    route.fulfill({
+      json: { code: 0, data: [{ ...records[0], warehouseEntryDetail: full.slice('价格调整；'.length) }] },
+    }),
+  );
+  await page.reload();
+  const main = page.getByRole('main');
+  const summary = main.locator('[data-entry-detail]');
+  await expect(summary).toHaveText(full);
+  await expect(summary).toHaveClass(/t-typography--secondary/);
+  const metrics = await summary.evaluate((el) => {
+    const clamp = el.querySelector('[style*="line-clamp"]') || el;
+    const box = clamp.getBoundingClientRect();
+    return {
+      height: box.height,
+      lineHeight: parseFloat(getComputedStyle(el).lineHeight),
+      scrollHeight: clamp.scrollHeight,
+      clamp: getComputedStyle(clamp).webkitLineClamp,
+      font: parseFloat(getComputedStyle(el).fontSize),
+      cellFont: parseFloat(getComputedStyle(el.closest('td')!).fontSize),
+    };
+  });
+  expect(metrics.clamp).toBe('2');
+  expect(metrics.height).toBeLessThanOrEqual(metrics.lineHeight * 2 + 1);
+  expect(metrics.scrollHeight).toBeGreaterThan(metrics.height);
+  expect(metrics.font).toBeLessThan(metrics.cellFont);
+  const platform = main.locator('.store-text').first();
+  const font = await platform.evaluate((el) => ({
+    font: getComputedStyle(el).font,
+    color: getComputedStyle(el).color,
+  }));
+  const summaryStyle = await summary.evaluate((el) => {
+    const tag = el.closest('td')!.querySelector('.t-tag')!;
+    const style = getComputedStyle(el);
+    return {
+      font: style.font,
+      color: style.color,
+      marginTop: style.marginTop,
+      marginBottom: style.marginBottom,
+      gap: el.getBoundingClientRect().top - tag.getBoundingClientRect().bottom,
+    };
+  });
+  expect(summaryStyle.font).toBe(font.font);
+  expect(summaryStyle.color).toBe(font.color);
+  expect(summaryStyle.marginTop).toBe('0px');
+  expect(summaryStyle.marginBottom).toBe('0px');
+  expect(summaryStyle.gap).toBeLessThanOrEqual(metrics.lineHeight / 2);
+  await summary.hover();
+  await expect(page.locator('.t-popup__content:visible').getByText(full, { exact: true })).toBeVisible();
+  const productId = main.locator('.product-code').first();
+  await expect(productId).toHaveCSS('font-size', '12px');
+  await expect(productId).toHaveCSS('line-height', '20px');
+  await page.route(`**/api/admin/${surface.kind}`, (route) =>
+    route.fulfill({ json: { code: 0, data: [{ ...records[0], warehouseEntryDetail: '调整后上架' }] } }),
+  );
+  await page.reload();
+  await expect(summary).toHaveText('价格调整；调整后上架');
+  await summary.hover();
+  await expect(
+    page.locator('.t-popup__content:visible').getByText('价格调整；调整后上架', { exact: true }),
+  ).toHaveCount(0);
+});

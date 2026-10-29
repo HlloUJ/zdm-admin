@@ -764,7 +764,7 @@ onMounted(loadCategories);
 .source-caption {
   margin-top: var(--td-comp-margin-s);
   color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-medium);
+  font: var(--td-font-body-small);
 }
 :deep(.zdm-admin-list-layout__toolbar) {
   display: block;
