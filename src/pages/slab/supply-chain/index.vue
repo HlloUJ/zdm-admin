@@ -549,7 +549,7 @@
                   />
                 </t-form-item>
               </div>
-              <t-form-item v-if="isProductFormPage" label="上架" required-mark>
+              <t-form-item v-if="isProductFormPage && canSetShelfStatus" label="上架" required-mark>
                 <t-radio-group v-model="publishTargetStatus">
                   <t-radio value="selling" :disabled="!canPublishToShelf">立刻上架</t-radio>
                   <t-radio value="warehouse" :disabled="productMode === 'edit' && editingSourceStatus === 'selling'"
@@ -1101,7 +1101,9 @@ const slabPermissionScope: Record<SlabTab, string> = {
   recycle: 'recycle',
 };
 const slabPermission = (status: SlabTab, action: string) =>
-  `${productPermissionPrefix.value}.${slabPermissionScope[status]}.${action}`;
+  action === 'publish'
+    ? `${productPermissionPrefix.value}.publish`
+    : `${productPermissionPrefix.value}.${slabPermissionScope[status]}.${action}`;
 const hasSlabAction = (status: SlabTab, action: string) =>
   hasPermission(loginUser.value, slabPermission(status, action));
 const canViewOperationLogs = computed(() =>
@@ -1130,12 +1132,8 @@ const publishTargetStatus = ref<SlabPublishTargetStatus>('warehouse');
 const productTab = ref('images');
 const editingRowId = ref<number | null>(null);
 const editingSourceStatus = computed(() => tableData.value.find((row) => row.id === editingRowId.value)?.status);
-const canPublishToShelf = computed(
-  () =>
-    editingSourceStatus.value === 'selling' ||
-    hasSlabAction('warehouse', 'shelf') ||
-    (productMode.value === 'create' && hasSlabAction('selling', 'publish')),
-);
+const canSetShelfStatus = computed(() => hasSlabAction('warehouse', 'shelf'));
+const canPublishToShelf = computed(() => editingSourceStatus.value === 'selling' || canSetShelfStatus.value);
 const productFormRef = ref<FormInstanceFunctions>();
 const salesFormRef = ref<FormInstanceFunctions>();
 const priceDrawerRoot = ref<HTMLElement>();
@@ -1621,7 +1619,7 @@ const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
 const batchButtons = computed(() =>
   activeTab.value === 'all'
-    ? hasSlabAction('warehouse', 'publish') || hasSlabAction('selling', 'publish')
+    ? hasSlabAction('warehouse', 'publish')
       ? [{ label: '发布商品', action: 'publish' as const, icon: 'add' }]
       : []
     : slabBatchButtons(activeTab.value, hasSlabAction),

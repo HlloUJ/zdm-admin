@@ -801,7 +801,7 @@ const batchAction = computed(() => {
   return action && can(activeScope.value, action.permission) ? action : null;
 });
 const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
-  ...(['all', 'warehouse'].includes(activeTab.value) && can('warehouse', 'select')
+  ...(['all', 'warehouse'].includes(activeTab.value) && canGlobal('select')
     ? [{ id: 'select', label: '商品中心', icon: 'add' }]
     : []),
   ...(batchAction.value

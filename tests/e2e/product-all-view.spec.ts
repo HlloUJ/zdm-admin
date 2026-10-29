@@ -181,3 +181,55 @@ for (const surface of surfaces) {
     await expect(page.locator('.admin-side-menu').getByText(moduleName, { exact: true })).toHaveCount(0);
   });
 }
+
+async function enterSourceProductForm(page: Page, surface: Surface) {
+  if (surface.kind !== 'slabs') {
+    const picker = page.getByTestId('finished-category-picker');
+    for (const name of [surface.kind === 'accessory-products' ? '配件' : '成品现货', '餐桌', '石材餐桌', '奢石餐桌']) {
+      await picker.getByRole('button', { name, exact: true }).click();
+    }
+    await page.getByRole('button', { name: '确认，下一步', exact: true }).click();
+    await expect(page.getByRole('navigation', { name: '商品信息分区导航' })).toBeVisible();
+  } else {
+    await expect(page.getByRole('textbox', { name: '请输入大板编号' })).toBeVisible();
+  }
+}
+for (const surface of surfaces.filter((s) => s.client === 'supply-chain')) {
+  test(`${surface.path} global publishing works across tabs and hides shelving without its grant`, async ({ page }) => {
+    const p = prefix(surface);
+    await setup(page, surface, [`${p}.all.view`, `${p}.warehouse.view`, `${p}.selling.view`, `${p}.publish`]);
+    const main = page.getByRole('main');
+    for (const label of ['全部', '仓库中', '已上架']) {
+      await main.locator('.t-tabs__nav-item').filter({ hasText: label }).click();
+      await expect(main.getByRole('button', { name: '发布商品', exact: true })).toBeVisible();
+      await expect(main.getByRole('button', { name: '操作日志', exact: true })).toHaveCount(0);
+      await expect(main.locator('tbody tr').getByText('编辑', { exact: true })).toHaveCount(0);
+    }
+    await main.getByRole('button', { name: '发布商品', exact: true }).click();
+    await enterSourceProductForm(page, surface);
+    await expect(page.getByRole('radio', { name: '立刻上架', exact: true })).toHaveCount(0);
+    await expect(page.getByRole('radio', { name: '暂不上架', exact: true })).toHaveCount(0);
+  });
+  test(`${surface.path} shelving grant reveals the field with warehouse selected by default`, async ({ page }) => {
+    const p = prefix(surface);
+    await setup(page, surface, [`${p}.warehouse.view`, `${p}.publish`, `${p}.warehouse.shelf`]);
+    await page.getByRole('main').getByRole('button', { name: '发布商品', exact: true }).click();
+    await enterSourceProductForm(page, surface);
+    await expect(page.getByRole('radio', { name: '立刻上架', exact: true })).toBeEnabled();
+    await expect(page.getByRole('radio', { name: '暂不上架', exact: true })).toBeChecked();
+  });
+}
+for (const surface of surfaces.filter((s) => s.client === 'store')) {
+  test(`${surface.path} one global product-center grant works in All and warehouse`, async ({ page }) => {
+    const p = prefix(surface);
+    await setup(page, surface, [`${p}.all.view`, `${p}.warehouse.view`, `${p}.selling.view`, `${p}.select`]);
+    const main = page.getByRole('main');
+    for (const label of ['全部', '仓库中']) {
+      await main.locator('.t-tabs__nav-item').filter({ hasText: label }).click();
+      await expect(main.getByRole('button', { name: '商品中心', exact: true })).toBeVisible();
+      await expect(main.getByRole('button', { name: '操作日志', exact: true })).toHaveCount(0);
+    }
+    await main.locator('.t-tabs__nav-item').filter({ hasText: '已上架' }).click();
+    await expect(main.getByRole('button', { name: '商品中心', exact: true })).toHaveCount(0);
+  });
+}

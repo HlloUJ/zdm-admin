@@ -128,9 +128,10 @@ public class AccessoryProductController extends AdminCrudController<AccessoryPro
   @Override
   @PostMapping
   public ApiResponse<AccessoryProduct> create(@Valid @RequestBody AccessoryProduct product) {
-    permissionGuard.requireAnyPermission(permission("warehouse","publish"),permission("selling","publish"));
+    if (!isSupplyChain()) { throw new org.springframework.security.access.AccessDeniedException("此操作属于供应链协同系统"); }
+    permissionGuard.requirePermission(prefix() + ".publish");
     permissionGuard.requireDataPermission();
-    if(isSupplyChain() && "selling".equals(product.getStatus()) && !"接口获取".equals(product.getPublisherType())) { permissionGuard.requireAnyPermission(permission("warehouse","shelf"),permission("selling","publish")); }
+    if (isSupplyChain() && "selling".equals(product.getStatus())) { permissionGuard.requirePermission(permission("warehouse", "shelf")); }
     return ApiResponse.ok(visiblePrices(service.createWithDetails(product)));
   }
 
@@ -292,7 +293,7 @@ public class AccessoryProductController extends AdminCrudController<AccessoryPro
 
   private void requireProductFormPermission() {
     permissionGuard.requireAnyPermission(prefix() + ".create", prefix() + ".edit",
-        permission("warehouse", "publish"), permission("selling", "publish"),
+        prefix() + ".publish",
         permission("warehouse", "edit"), permission("selling", "edit"));
   }
 

@@ -203,7 +203,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     identityWithPermissions(99751L);
     mvc.perform(get("/api/admin/store-finished-products/categories"))
         .andExpect(status().isForbidden());
-    identityWithPermissions(99751L, "store.finished-stock-management.warehouse.select");
+    identityWithPermissions(99751L, "store.finished-stock-management.select");
     mvc.perform(get("/api/admin/store-finished-products/pool-categories"))
         .andExpect(status().isOk());
     assertThat(products.poolCategories()).filteredOn(item -> item.id() == 99753L)
@@ -231,7 +231,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_products WHERE finished_product_id=99751", Long.class)).isZero();
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE finished_product_id=99751", Long.class)).isZero();
 
-    identityWithPermissions(99752L, "store.finished-stock-management.warehouse.select");
+    identityWithPermissions(99752L, "store.finished-stock-management.select");
     mvc.perform(get("/api/admin/store-finished-products/pool/99751"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.storeLevelName").value("商品中心乙级"))
@@ -253,7 +253,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThatThrownBy(() -> products.listCategories()).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     assertThatThrownBy(() -> products.poolCategories()).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
     assertThatThrownBy(() -> products.poolDetail(99751L)).isInstanceOf(org.springframework.security.access.AccessDeniedException.class);
-    identityWithPermissions(99751L, "store.finished-stock-management.warehouse.select");
+    identityWithPermissions(99751L, "store.finished-stock-management.select");
     jdbc.update("UPDATE finished_products SET detail='<p>挑选时图文</p>' WHERE id=99751");
     jdbc.update("INSERT INTO media_assets (id,public_id,storage_key,media_type,mime_type,owner_client_code) VALUES "
         + "(99751,UUID(),'store-snapshot-image','image','image/png','supply-chain'),"
@@ -309,9 +309,9 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
         .contains("历史供应商");
     identityWithPermissions(99752L, "store.finished-stock-management.operation-log.view");
     assertThatThrownBy(() -> products.logDetail(logId)).isInstanceOf(IllegalArgumentException.class);
-    identityWithPermissions(99751L, "store.finished-stock-management.warehouse.select");
+    identityWithPermissions(99751L, "store.finished-stock-management.select");
     assertThatThrownBy(() -> products.poolDetail(99751L)).isInstanceOf(IllegalArgumentException.class);
-    identityWithPermissions(99752L, "store.finished-stock-management.warehouse.select");
+    identityWithPermissions(99752L, "store.finished-stock-management.select");
     assertThat(products.poolDetail(99751L).id()).isEqualTo(99751L);
     jdbc.update("UPDATE finished_products SET status='warehouse' WHERE id=99751");
     assertThatThrownBy(() -> products.poolDetail(99751L)).isInstanceOf(IllegalArgumentException.class);

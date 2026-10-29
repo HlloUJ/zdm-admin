@@ -6551,7 +6551,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         operatorId,
         "15926628996",
         "大板共享操作员",
-        "supply-chain.slab-management.view,supply-chain.slab-management.warehouse.publish,"
+        "supply-chain.slab-management.view,supply-chain.slab-management.publish,"
             + "supply-chain.slab-management.warehouse.edit,supply-chain.slab-management.recycle.restore,"
             + "supply-chain.slab-management.warehouse.delete,supply-chain.slab-management.recycle.purge,"
             + "supply-chain.slab-management.operation-log.view");

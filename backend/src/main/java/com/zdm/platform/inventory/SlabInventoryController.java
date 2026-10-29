@@ -49,8 +49,7 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     permissionGuard.requireAnyPermission(
         prefix() + ".create",
         prefix() + ".edit",
-        permission("warehouse", "publish"),
-        permission("selling", "publish"),
+        prefix() + ".publish",
         permission("warehouse", "edit"),
         permission("selling", "edit"));
     return ApiResponse.ok(mediaAssetService.upload(file, MediaStorageService.defaultImageSizeLimit()));
@@ -62,8 +61,7 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
         prefix() + ".create",
         prefix() + ".edit",
         prefix() + ".delete",
-        permission("warehouse", "publish"),
-        permission("selling", "publish"),
+        prefix() + ".publish",
         permission("warehouse", "edit"),
         permission("selling", "edit"));
     return ApiResponse.ok(service.cleanupTemporaryMedia(mediaId));
@@ -118,8 +116,9 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @Override
   @PostMapping
   public ApiResponse<SlabInventory> create(@Valid @RequestBody SlabInventory inventory) {
-    permissionGuard.requireAnyPermission(permission("warehouse","publish"),permission("selling","publish"));
-    if(isSupplyChain() && "selling".equals(inventory.getStatus()) && !"接口获取".equals(inventory.getPublisherType())) { permissionGuard.requireAnyPermission(permission("warehouse","shelf"),permission("selling","publish")); }
+    if (!isSupplyChain()) { throw new org.springframework.security.access.AccessDeniedException("此操作属于供应链协同系统"); }
+    permissionGuard.requirePermission(prefix() + ".publish");
+    if (isSupplyChain() && "selling".equals(inventory.getStatus())) { permissionGuard.requirePermission(permission("warehouse", "shelf")); }
     return ApiResponse.ok(visiblePrices(service.createWithPrices(inventory)));
   }
 
@@ -132,7 +131,13 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     String scope = statusScope(isSupplyChain()?existing.getSourceStatus():existing.getStatus());
     if (!List.of("warehouse","selling").contains(scope)) { throw new IllegalArgumentException("当前状态不能编辑"); }
     permissionGuard.requirePermission(permission(scope,"edit"));
-    if(isSupplyChain() && !Objects.equals(existing.getSourceStatus(),inventory.getStatus())) { requireStatusTransition(existing.getSourceStatus(),inventory.getStatus()); }
+    if (isSupplyChain() && !Objects.equals(existing.getSourceStatus(), inventory.getStatus())) {
+      if ("warehouse".equals(existing.getSourceStatus()) && "selling".equals(inventory.getStatus())) {
+        permissionGuard.requireAnyPermission(permission("warehouse", "shelf"), permission("warehouse", "batch-shelf"));
+      } else {
+        throw new org.springframework.security.access.AccessDeniedException("请使用对应状态操作修改商品状态");
+      }
+    }
     return ApiResponse.ok(visiblePrices(service.updateWithPrices(id, inventory)));
   }
 

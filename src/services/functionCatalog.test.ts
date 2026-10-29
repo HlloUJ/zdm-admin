@@ -132,12 +132,12 @@ describe('full function catalog', () => {
         .find((p) => p.value === `supply-chain.${module}`)!;
       expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);
       expect(sourcePage.tabs.slice(1).map((tab) => tab.actions.map((action) => action.label))).toEqual([
-        ['查看', '发布商品', '批量上架', '上架', '编辑', '删除'],
-        ['查看', '发布商品', '批量下架', '下架', '编辑', '删除'],
+        ['查看', '批量上架', '上架', '编辑', '删除'],
+        ['查看', '批量下架', '下架', '编辑', '删除'],
         ['查看', '详情'],
         ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],
       ]);
-      expect(source).toContain(`supply-chain.${module}.warehouse.publish`);
+      expect(source).toContain(`supply-chain.${module}.publish`);
       expect(source).toContain(`supply-chain.${module}.warehouse.shelf`);
       expect(source).toContain(`supply-chain.${module}.selling.off-shelf`);
       expect(source).not.toContain(`supply-chain.${module}.off-shelf.restore`);
@@ -199,14 +199,14 @@ describe('full function catalog', () => {
       '回收站',
     ]);
     const storeValues = getFunctionCatalogPermissionValues(terminalFunctionTrees.store);
-    expect(storeValues).toContain('store.finished-stock-management.warehouse.select');
+    expect(storeValues).toContain('store.finished-stock-management.select');
     expect(stock.menus[0].pages[0].tabs.slice(1, 3).map((tab) => tab.actions.map((action) => action.label))).toEqual([
-      ['查看', '商品中心', '批量上架', '上架', '编辑', '删除'],
+      ['查看', '批量上架', '上架', '编辑', '删除'],
       ['查看', '批量下架', '下架', '编辑', '删除'],
     ]);
     expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');
     expect(storeValues).toContain('store.finished-stock-management.selling.delete');
-    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['操作日志']);
+    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['商品中心', '操作日志']);
     expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');
     const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;
     expect(pricing.menus[0].direct).toBe(true);

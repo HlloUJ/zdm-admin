@@ -7,6 +7,26 @@ import org.junit.jupiter.api.Test;
 
 class FunctionPermissionNormalizerTest {
   @Test
+  void productGlobalEntriesNeverImplyViewsLogsOrShelf() {
+    for (String module : List.of("finished-stock-management", "accessory-management", "slab-management")) {
+      String prefix = "supply-chain." + module;
+      assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix + ".publish"))).containsExactly(prefix + ".publish");
+      for (String scope : List.of("warehouse", "selling")) {
+        assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix + "." + scope + ".publish")))
+            .containsExactly(prefix + "." + scope + ".view", prefix + ".publish");
+      }
+    }
+    for (String module : List.of("finished-stock-management", "accessory-management")) {
+      String prefix = "store." + module;
+      assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix + ".select"))).containsExactly(prefix + ".select");
+      assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix + ".warehouse.select")))
+          .containsExactly(prefix + ".warehouse.view", prefix + ".select");
+    }
+    assertThat(FunctionPermissionNormalizer.normalize(List.of("admin.slab-management.warehouse.edit")))
+        .containsExactly("admin.slab-management.warehouse.view", "admin.slab-management.warehouse.edit");
+  }
+
+  @Test
   void retiredStorePricePermissionsNeverExpandIntoNewGrants() {
     String retired = "store.price-configuration.view,store.price-configuration.create,"
         + "store.price-configuration.edit,store.price-configuration.toggle-status,store.price-configuration.delete";

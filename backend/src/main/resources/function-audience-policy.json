@@ -1,5 +1,17 @@
 [
   {
+    "prefix": "admin.finished-stock-management.publish",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.accessory-management.publish",
+    "scope": "removed"
+  },
+  {
+    "prefix": "admin.slab-management.publish",
+    "scope": "removed"
+  },
+  {
     "prefix": "admin.supplier-management.manage-supply-types",
     "scope": "admin-only"
   },

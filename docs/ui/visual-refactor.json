@@ -4739,6 +4739,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "  const action = batchActions[activeTab.value];\n  return action && can(activeScope.value, action.permission) ? action : null;\n});\nconst storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [\n  ...(['all', 'warehouse'].includes(activeTab.value) && can('warehouse', 'select')\n    ? [{ id: 'select', label: '商品中心', icon: 'add' }]\n    : []),\n  ...(batchAction.value\n    ? [\n",
+          "after": "  const action = batchActions[activeTab.value];\n  return action && can(activeScope.value, action.permission) ? action : null;\n});\nconst storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [\n  ...(['all', 'warehouse'].includes(activeTab.value) && canGlobal('select')\n    ? [{ id: 'select', label: '商品中心', icon: 'add' }]\n    : []),\n  ...(batchAction.value\n    ? [\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
           "before": "        <AdminListLayout v-else-if=\"tabs.length\" class=\"finished-list-layout\">\n          <template #toolbar>\n            <div class=\"list-controls\">\n              <t-tabs\n                v-if=\"true\"\n                :value=\"activeTab\"\n                class=\"status-tabs\"\n                @change=\"\n                  activeTab = String($event) as StoreFinishedStatus;\n                  resetSelection();\n                \"\n              >\n                <t-tab-panel v-for=\"tab in tabs\" :key=\"tab.value\" :value=\"tab.value\" :label=\"tab.label\" />\n",
           "after": "        <AdminListLayout v-else-if=\"tabs.length\" class=\"finished-list-layout\">\n          <template #toolbar>\n            <div class=\"list-controls\">\n              <t-tabs\n                v-if=\"tabs.length > 1\"\n                :value=\"activeTab\"\n                class=\"status-tabs\"\n                @change=\"\n                  activeTab = String($event) as StoreFinishedTab;\n                  resetSelection();\n                \"\n              >\n                <t-tab-panel v-for=\"tab in tabs\" :key=\"tab.value\" :value=\"tab.value\" :label=\"tab.label\" />\n",
           "stage": "before-migrations",
@@ -6026,6 +6032,30 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "                <t-form-item label=\"总库存\">\n                  <t-input-number :model-value=\"totalStock\" theme=\"normal\" :min=\"0\" disabled />\n                </t-form-item>\n                <t-form-item\n                  v-if=\"!isOperationsEdit\"\n                  label=\"上架\"\n                  v-bind=\"requiredFieldFeedback(productForm.shelfNow, '上架方式', submitAttempted, true)\"\n                  required-mark\n                >\n",
+          "after": "                <t-form-item label=\"总库存\">\n                  <t-input-number :model-value=\"totalStock\" theme=\"normal\" :min=\"0\" disabled />\n                </t-form-item>\n                <t-form-item\n                  v-if=\"!isOperationsEdit && canSetShelfStatus\"\n                  label=\"上架\"\n                  v-bind=\"requiredFieldFeedback(productForm.shelfNow, '上架方式', submitAttempted, true)\"\n                  required-mark\n                >\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst hasFinishedAction = (action: string, status = activeTab.value) =>\n  hasPermission(getLoginUser(), `${productPermissionPrefix.value}.${finishedScope[status]}.${action}`);\nconst { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermissionTabs({\n  tabs,\n  activeTab,\n  canAccess: (tab) =>\n",
+          "after": "  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst hasFinishedAction = (action: string, status = activeTab.value) =>\n  hasPermission(\n    getLoginUser(),\n    action === 'publish'\n      ? `${productPermissionPrefix.value}.publish`\n      : `${productPermissionPrefix.value}.${finishedScope[status]}.${action}`,\n  );\nconst { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermissionTabs({\n  tabs,\n  activeTab,\n  canAccess: (tab) =>\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "  paginations[tab].current = 1;\n});\nconst selectedKeySet = computed(() => new Set(selectedKeys.value));\nconst formPageTitle = computed(() => (formPageMode.value === 'create' ? '发布商品' : '编辑商品'));\nconst hasLegacyEditPermission = () => hasPermission(getLoginUser(), `${productPermissionPrefix.value}.edit`);\nconst canChooseShelfNow = computed(\n  () =>\n    (!editingProduct.value && (hasFinishedAction('shelf', 'warehouse') || hasFinishedAction('publish', 'selling'))) ||\n    editingProduct.value?.status === 'selling' ||\n    hasLegacyEditPermission() ||\n    hasFinishedAction('shelf', editingProduct.value?.status || 'warehouse') ||\n    hasFinishedAction('batch-shelf', editingProduct.value?.status || 'warehouse'),\n);\nconst canChooseShelfLater = computed(\n  () =>\n    !editingProduct.value ||\n    editingProduct.value.status === 'warehouse' ||\n",
+          "after": "  paginations[tab].current = 1;\n});\nconst selectedKeySet = computed(() => new Set(selectedKeys.value));\nconst formPageTitle = computed(() => (formPageMode.value === 'create' ? '发布商品' : '编辑商品'));\nconst canSetShelfStatus = computed(() => hasFinishedAction('shelf', 'warehouse'));\nconst canChooseShelfNow = computed(() => editingProduct.value?.status === 'selling' || canSetShelfStatus.value);\nconst canChooseShelfLater = computed(\n  () =>\n    !editingProduct.value ||\n    editingProduct.value.status === 'warehouse' ||\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "  () => pageData.value.some((item) => selectedKeySet.value.has(item.id)) && !pageAllSelected.value,\n);\nconst batchButtons = computed(() => {\n  if (activeTab.value === 'all')\n    return hasFinishedAction('publish', 'warehouse') || hasFinishedAction('publish', 'selling')\n      ? [{ action: 'publish' as const, label: '发布商品', icon: 'add' }]\n      : [];\n  const map: Record<\n    StockStatus,\n    {\n      action: BatchAction;\n",
+          "after": "  () => pageData.value.some((item) => selectedKeySet.value.has(item.id)) && !pageAllSelected.value,\n);\nconst batchButtons = computed(() => {\n  if (activeTab.value === 'all')\n    return hasFinishedAction('publish') ? [{ action: 'publish' as const, label: '发布商品', icon: 'add' }] : [];\n  const map: Record<\n    StockStatus,\n    {\n      action: BatchAction;\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
         {
           "before": "                  v-if=\"showFinishedTabRail\"\n                  :value=\"activeTab\"\n                  class=\"status-tabs\"\n                  @change=\"\n                    activeTab = String($event) as StockStatus;\n                    handleTabChange();\n                  \"\n                >\n                  <t-tab-panel\n",
           "after": "                  v-if=\"showFinishedTabRail\"\n                  :value=\"activeTab\"\n                  class=\"status-tabs\"\n                  @change=\"\n                    activeTab = String($event) as StockTab;\n                    handleTabChange();\n                  \"\n                >\n                  <t-tab-panel\n",
@@ -9886,6 +9916,30 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "                    @change=\"clearSalesFieldError('sku')\"\n                  />\n                </t-form-item>\n              </div>\n              <t-form-item v-if=\"isProductFormPage\" label=\"上架\" required-mark>\n                <t-radio-group v-model=\"publishTargetStatus\">\n                  <t-radio value=\"selling\" :disabled=\"!canPublishToShelf\">立刻上架</t-radio>\n                  <t-radio value=\"warehouse\" :disabled=\"productMode === 'edit' && editingSourceStatus === 'selling'\"\n                    >暂不上架</t-radio\n",
+          "after": "                    @change=\"clearSalesFieldError('sku')\"\n                  />\n                </t-form-item>\n              </div>\n              <t-form-item v-if=\"isProductFormPage && canSetShelfStatus\" label=\"上架\" required-mark>\n                <t-radio-group v-model=\"publishTargetStatus\">\n                  <t-radio value=\"selling\" :disabled=\"!canPublishToShelf\">立刻上架</t-radio>\n                  <t-radio value=\"warehouse\" :disabled=\"productMode === 'edit' && editingSourceStatus === 'selling'\"\n                    >暂不上架</t-radio\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst slabPermission = (status: SlabTab, action: string) =>\n  `${productPermissionPrefix.value}.${slabPermissionScope[status]}.${action}`;\nconst hasSlabAction = (status: SlabTab, action: string) =>\n  hasPermission(loginUser.value, slabPermission(status, action));\nconst canViewOperationLogs = computed(() =>\n  hasPermission(loginUser.value, `${productPermissionPrefix.value}.operation-log.view`),\n",
+          "after": "  soldOut: 'sold-out',\n  recycle: 'recycle',\n};\nconst slabPermission = (status: SlabTab, action: string) =>\n  action === 'publish'\n    ? `${productPermissionPrefix.value}.publish`\n    : `${productPermissionPrefix.value}.${slabPermissionScope[status]}.${action}`;\nconst hasSlabAction = (status: SlabTab, action: string) =>\n  hasPermission(loginUser.value, slabPermission(status, action));\nconst canViewOperationLogs = computed(() =>\n  hasPermission(loginUser.value, `${productPermissionPrefix.value}.operation-log.view`),\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "const publishTargetStatus = ref<SlabPublishTargetStatus>('warehouse');\nconst productTab = ref('images');\nconst editingRowId = ref<number | null>(null);\nconst editingSourceStatus = computed(() => tableData.value.find((row) => row.id === editingRowId.value)?.status);\nconst canPublishToShelf = computed(\n  () =>\n    editingSourceStatus.value === 'selling' ||\n    hasSlabAction('warehouse', 'shelf') ||\n    (productMode.value === 'create' && hasSlabAction('selling', 'publish')),\n);\nconst productFormRef = ref<FormInstanceFunctions>();\nconst salesFormRef = ref<FormInstanceFunctions>();\nconst priceDrawerRoot = ref<HTMLElement>();\nconst priceDrawerFormRef = ref<FormInstanceFunctions>();\n",
+          "after": "const publishTargetStatus = ref<SlabPublishTargetStatus>('warehouse');\nconst productTab = ref('images');\nconst editingRowId = ref<number | null>(null);\nconst editingSourceStatus = computed(() => tableData.value.find((row) => row.id === editingRowId.value)?.status);\nconst canSetShelfStatus = computed(() => hasSlabAction('warehouse', 'shelf'));\nconst canPublishToShelf = computed(() => editingSourceStatus.value === 'selling' || canSetShelfStatus.value);\nconst productFormRef = ref<FormInstanceFunctions>();\nconst salesFormRef = ref<FormInstanceFunctions>();\nconst priceDrawerRoot = ref<HTMLElement>();\nconst priceDrawerFormRef = ref<FormInstanceFunctions>();\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "const paginationTotal = computed(() => filteredData.value.length);\nconst pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));\nconst batchButtons = computed(() =>\n  activeTab.value === 'all'\n    ? hasSlabAction('warehouse', 'publish') || hasSlabAction('selling', 'publish')\n      ? [{ label: '发布商品', action: 'publish' as const, icon: 'add' }]\n      : []\n    : slabBatchButtons(activeTab.value, hasSlabAction),\n);\n",
+          "after": "const paginationTotal = computed(() => filteredData.value.length);\nconst pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));\nconst batchButtons = computed(() =>\n  activeTab.value === 'all'\n    ? hasSlabAction('warehouse', 'publish')\n      ? [{ label: '发布商品', action: 'publish' as const, icon: 'add' }]\n      : []\n    : slabBatchButtons(activeTab.value, hasSlabAction),\n);\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
           "before": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"tableSort\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n                  @sort-change=\"onTimeSortChange\"\n",
           "after": "                  :row-class-name=\"({ row }: { row: SlabItem }) => (sourceBlocked(row) ? 'source-unavailable' : '')\"\n                  row-key=\"id\"\n                  :data=\"pageData\"\n                  :columns=\"columns\"\n                  :sort=\"activeTab === 'all' ? undefined : tableSort\"\n                  :sort-icon=\"stateActivitySortIcon\"\n                  :loading=\"loading\"\n                  hover\n                  table-layout=\"fixed\"\n                  @sort-change=\"onTimeSortChange\"\n",
           "stage": "before-migrations",
@@ -12010,7 +12064,21 @@
     },
     "src/services/auth.ts": {
       "content": "134279d1224efab5afba09d5036dd764dca7e8962ccf694c9a74cb736b212263",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "import { shallowRef } from 'vue';\nimport { expandLegacyScopedPermission } from './functionPermissionCompatibility';\nimport { clearAuthToken, request, setAuthToken } from './http';\n\nconst AUTH_USER_STORAGE_KEY = 'zdm-admin-user';\n\n",
+          "after": "import { shallowRef } from 'vue';\nimport { expandLegacyScopedPermission } from './functionPermissionCompatibility';\nimport { isProductGlobalAction } from './productGlobalPermissions';\nimport { clearAuthToken, request, setAuthToken } from './http';\n\nconst AUTH_USER_STORAGE_KEY = 'zdm-admin-user';\n\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "    if (suffix === 'query' || suffix === '查询') {\n      normalized.add(viewPermission);\n      return;\n    }\n    if (suffix !== 'view' && separatorIndex >= 0) normalized.add(viewPermission);\n    normalized.add(permission);\n  });\n  return Array.from(normalized);\n};\n",
+          "after": "    if (suffix === 'query' || suffix === '查询') {\n      normalized.add(viewPermission);\n      return;\n    }\n    if (suffix !== 'view' && separatorIndex >= 0 && !isProductGlobalAction(permission)) normalized.add(viewPermission);\n    normalized.add(permission);\n  });\n  return Array.from(normalized);\n};\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        }
+      ]
     },
     "src/services/crafts.ts": {
       "content": "7d017b0a3f0317c01873352e4f7cf6d7035ef806fa04c882ffa9a8d766c7c0ed",
@@ -12207,6 +12275,18 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "        .flatMap((m) => m.pages)\n        .find((p) => p.value === `supply-chain.${module}`)!;\n      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);\n      expect(sourcePage.tabs.slice(1).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n        ['查看', '发布商品', '批量上架', '上架', '编辑', '删除'],\n        ['查看', '发布商品', '批量下架', '下架', '编辑', '删除'],\n        ['查看', '详情'],\n        ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],\n      ]);\n      expect(source).toContain(`supply-chain.${module}.warehouse.publish`);\n      expect(source).toContain(`supply-chain.${module}.warehouse.shelf`);\n      expect(source).toContain(`supply-chain.${module}.selling.off-shelf`);\n      expect(source).not.toContain(`supply-chain.${module}.off-shelf.restore`);\n      expect(source).toContain(`supply-chain.${module}.selling.delete`);\n",
+          "after": "        .flatMap((m) => m.pages)\n        .find((p) => p.value === `supply-chain.${module}`)!;\n      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);\n      expect(sourcePage.tabs.slice(1).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n        ['查看', '批量上架', '上架', '编辑', '删除'],\n        ['查看', '批量下架', '下架', '编辑', '删除'],\n        ['查看', '详情'],\n        ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],\n      ]);\n      expect(source).toContain(`supply-chain.${module}.publish`);\n      expect(source).toContain(`supply-chain.${module}.warehouse.shelf`);\n      expect(source).toContain(`supply-chain.${module}.selling.off-shelf`);\n      expect(source).not.toContain(`supply-chain.${module}.off-shelf.restore`);\n      expect(source).toContain(`supply-chain.${module}.selling.delete`);\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "      '已售完',\n      '回收站',\n    ]);\n    const storeValues = getFunctionCatalogPermissionValues(terminalFunctionTrees.store);\n    expect(storeValues).toContain('store.finished-stock-management.warehouse.select');\n    expect(stock.menus[0].pages[0].tabs.slice(1, 3).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n      ['查看', '商品中心', '批量上架', '上架', '编辑', '删除'],\n      ['查看', '批量下架', '下架', '编辑', '删除'],\n    ]);\n    expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');\n    expect(storeValues).toContain('store.finished-stock-management.selling.delete');\n    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['操作日志']);\n    expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');\n    const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;\n    expect(pricing.menus[0].direct).toBe(true);\n    expect(pricing.menus[0].pages[0].actions).toEqual([]);\n",
+          "after": "      '已售完',\n      '回收站',\n    ]);\n    const storeValues = getFunctionCatalogPermissionValues(terminalFunctionTrees.store);\n    expect(storeValues).toContain('store.finished-stock-management.select');\n    expect(stock.menus[0].pages[0].tabs.slice(1, 3).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n      ['查看', '批量上架', '上架', '编辑', '删除'],\n      ['查看', '批量下架', '下架', '编辑', '删除'],\n    ]);\n    expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');\n    expect(storeValues).toContain('store.finished-stock-management.selling.delete');\n    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['商品中心', '操作日志']);\n    expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');\n    const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;\n    expect(pricing.menus[0].direct).toBe(true);\n    expect(pricing.menus[0].pages[0].actions).toEqual([]);\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
           "before": "      const sourcePage = terminalFunctionTrees['supply-chain']\n        .flatMap((m) => m.menus)\n        .flatMap((m) => m.pages)\n        .find((p) => p.value === `supply-chain.${module}`)!;\n      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['仓库中', '已上架', '已售完', '回收站']);\n      expect(sourcePage.tabs.map((tab) => tab.actions.map((action) => action.label))).toEqual([\n        ['查看', '发布商品', '批量上架', '上架', '编辑', '删除'],\n        ['查看', '发布商品', '批量下架', '下架', '编辑', '删除'],\n        ['查看', '详情'],\n        ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],\n",
           "after": "      const sourcePage = terminalFunctionTrees['supply-chain']\n        .flatMap((m) => m.menus)\n        .flatMap((m) => m.pages)\n        .find((p) => p.value === `supply-chain.${module}`)!;\n      expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);\n      expect(sourcePage.tabs.slice(1).map((tab) => tab.actions.map((action) => action.label))).toEqual([\n        ['查看', '发布商品', '批量上架', '上架', '编辑', '删除'],\n        ['查看', '发布商品', '批量下架', '下架', '编辑', '删除'],\n        ['查看', '详情'],\n        ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],\n",
           "stage": "before-migrations",
@@ -12338,6 +12418,24 @@
       "content": "1209bc105a9465acd24974c6fd642993f1463bc39659f30d418a2eae55f6f190",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "import { productAllViewPages } from './productAllView';\nimport { storeOrderPrototype } from '@/pages/order/prototype/resources';\nimport { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\n",
+          "after": "import { isProductGlobalAction } from './productGlobalPermissions';\nimport { productAllViewPages } from './productAllView';\nimport { storeOrderPrototype } from '@/pages/order/prototype/resources';\nimport { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "  { label: '查看', value: `${scope}.view` },\n  ...actions.filter((action) => !isViewPermission(action.value) && !isLegacyReadAction(action)),\n];\n\n// Explicitly registered existing product pages; action references retain their original state grants.\n\nconst productTabsWithAll = (page: FunctionPage): FunctionTab[] => {\n  if (!productAllViewPages.has(page.value)) return page.tabs;\n  const original = page.tabs.filter((tab) => tab.value !== `${page.value}.all`);\n  const referencedActions = original\n    .filter((tab) => /\\.(warehouse|selling)$/.test(tab.value))\n    .flatMap((tab) =>\n      tab.actions\n        .filter((action) => /\\.(publish|select|shelf|off-shelf|edit|delete)$/.test(action.value))\n        .map((action) => ({ ...action, label: `${tab.label} · ${action.label}` })),\n    );\n  return [{ label: '全部', value: `${page.value}.all`, actions: referencedActions }, ...original];\n};\n\nexport const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>\n  modules.map((module) => ({\n",
+          "after": "  { label: '查看', value: `${scope}.view` },\n  ...actions.filter((action) => !isViewPermission(action.value) && !isLegacyReadAction(action)),\n];\n\n// All aggregates existing product states; action grants remain with their owning states.\n\nconst productTabsWithAll = (page: FunctionPage): FunctionTab[] => {\n  if (!productAllViewPages.has(page.value)) return page.tabs;\n  const original = page.tabs.filter((tab) => tab.value !== `${page.value}.all`);\n  return [{ label: '全部', value: `${page.value}.all`, actions: [] }, ...original];\n};\n\nexport const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>\n  modules.map((module) => ({\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "  return permission;\n};\n\nexport const getRowViewPermissionValue = (row: FunctionCatalogRow) =>\n  row.actions.find((action) => isViewPermission(action.value))?.value;\n\nexport const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], permissions: string[]) => {\n  if (permissions.includes('all')) return ['all'];\n\n",
+          "after": "  return permission;\n};\n\nexport const getRowViewPermissionValue = (row: FunctionCatalogRow) =>\n  row.tabLabels.includes('页面全局') && row.actions.some((action) => isProductGlobalAction(action.value))\n    ? undefined\n    : row.actions.find((action) => isViewPermission(action.value))?.value;\n\nexport const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], permissions: string[]) => {\n  if (permissions.includes('all')) return ['all'];\n\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
         {
           "before": "import { storeOrderPrototype } from '@/pages/order/prototype/resources';\nimport { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n",
           "after": "import { productAllViewPages } from './productAllView';\nimport { storeOrderPrototype } from '@/pages/order/prototype/resources';\nimport { isFunctionAllowedForAudience } from './functionAudience';\nimport { verifiedFunctionCatalog } from './functionCatalogAdminData';\nimport {\n",
@@ -12471,6 +12569,18 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "      pages: [\n        {\n          label: '成品现货管理页',\n          value: 'store.finished-stock-management',\n          actions: [{ label: '操作日志', value: 'store.finished-stock-management.operation-log.view' }],\n          tabs: [\n            {\n              label: '仓库中',\n              value: 'store.finished-stock-management.warehouse',\n              actions: [\n                ['select', '商品中心'],\n                ['batch-shelf', '批量上架'],\n                ['shelf', '上架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n",
+          "after": "      pages: [\n        {\n          label: '成品现货管理页',\n          value: 'store.finished-stock-management',\n          actions: [\n            { label: '商品中心', value: 'store.finished-stock-management.select' },\n            { label: '操作日志', value: 'store.finished-stock-management.operation-log.view' },\n          ],\n          tabs: [\n            {\n              label: '仓库中',\n              value: 'store.finished-stock-management.warehouse',\n              actions: [\n                ['batch-shelf', '批量上架'],\n                ['shelf', '上架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "      pages: [\n        {\n          label: '配件管理页',\n          value: 'store.accessory-management',\n          actions: [{ label: '操作日志', value: 'store.accessory-management.operation-log.view' }],\n          tabs: [\n            {\n              label: '仓库中',\n              value: 'store.accessory-management.warehouse',\n              actions: [\n                ['select', '商品中心'],\n                ['batch-shelf', '批量上架'],\n                ['shelf', '上架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n",
+          "after": "      pages: [\n        {\n          label: '配件管理页',\n          value: 'store.accessory-management',\n          actions: [\n            { label: '商品中心', value: 'store.accessory-management.select' },\n            { label: '操作日志', value: 'store.accessory-management.operation-log.view' },\n          ],\n          tabs: [\n            {\n              label: '仓库中',\n              value: 'store.accessory-management.warehouse',\n              actions: [\n                ['batch-shelf', '批量上架'],\n                ['shelf', '上架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
           "before": "              actions: [\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.selling.${code}` })),\n            },\n            {\n              label: '已下架',\n              value: 'store.finished-stock-management.off-shelf',\n              actions: [\n                ['batch-restore', '批量放回到仓库'],\n                ['detail', '详情'],\n                ['restore', '放回仓库'],\n                ['delete', '删除'],\n              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.off-shelf.${code}` })),\n            },\n            {\n              label: '已售完',\n              value: 'store.finished-stock-management.sold-out',\n",
           "after": "              actions: [\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.selling.${code}` })),\n            },\n            {\n              label: '已售完',\n              value: 'store.finished-stock-management.sold-out',\n",
           "stage": "before-migrations",
@@ -12549,6 +12659,18 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "          label:\n            key === 'slab-management' ? '大板管理页' : key === 'accessory-management' ? '配件管理页' : '成品现货管理页',\n          value: prefix,\n          audiences: ['supply-chain'],\n          actions: [{ label: '操作日志', value: `${prefix}.operation-log.view` }],\n          tabs: [\n            {\n              label: '仓库中',\n              value: `${prefix}.warehouse`,\n              actions: actions('warehouse', [\n                ['publish', '发布商品'],\n                ['batch-shelf', '批量上架'],\n                ['shelf', '上架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n",
+          "after": "          label:\n            key === 'slab-management' ? '大板管理页' : key === 'accessory-management' ? '配件管理页' : '成品现货管理页',\n          value: prefix,\n          audiences: ['supply-chain'],\n          actions: [\n            { label: '发布商品', value: `${prefix}.publish` },\n            { label: '操作日志', value: `${prefix}.operation-log.view` },\n          ],\n          tabs: [\n            {\n              label: '仓库中',\n              value: `${prefix}.warehouse`,\n              actions: actions('warehouse', [\n                ['batch-shelf', '批量上架'],\n                ['shelf', '上架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "            {\n              label: '已上架',\n              value: `${prefix}.selling`,\n              actions: actions('selling', [\n                ['publish', '发布商品'],\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n",
+          "after": "            {\n              label: '已上架',\n              value: `${prefix}.selling`,\n              actions: actions('selling', [\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
           "before": "                ['publish', '发布商品'],\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n              ]),\n            },\n            {\n              label: '已下架',\n              value: `${prefix}.off-shelf`,\n              actions: actions('off-shelf', [\n                ['batch-restore', '批量放回到仓库'],\n                ['detail', '详情'],\n                ['restore', '放回仓库'],\n                ['delete', '删除'],\n              ]),\n            },\n            { label: '已售完', value: `${prefix}.sold-out`, actions: actions('sold-out', [['detail', '详情']]) },\n",
           "after": "                ['publish', '发布商品'],\n                ['batch-off-shelf', '批量下架'],\n                ['off-shelf', '下架'],\n                ['edit', '编辑'],\n                ['delete', '删除'],\n              ]),\n            },\n            { label: '已售完', value: `${prefix}.sold-out`, actions: actions('sold-out', [['detail', '详情']]) },\n",
           "stage": "before-migrations",
@@ -12564,7 +12686,21 @@
     },
     "src/services/functionPermissionCompatibility.ts": {
       "content": "48a37f5ef5fbd2214e05260e920996778a69a012850ab9d585af9d6fb38d87b9",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "const legacyScopedPermissionPrefixes = [\n  'admin.product-data-center.attribute',\n  'admin.product-data-center.attribute-value',\n] as const;\n",
+          "after": "import { expandLegacyProductGlobalPermission } from './productGlobalPermissions';\n\nconst legacyScopedPermissionPrefixes = [\n  'admin.product-data-center.attribute',\n  'admin.product-data-center.attribute-value',\n] as const;\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        },
+        {
+          "before": "  delete: 'delete',\n};\n\nexport const expandLegacyScopedPermission = (permission: string) => {\n  const categorySortPrefix = ['finished', 'accessory']\n    .map((scope) => `admin.product-data-center.category.${scope}`)\n    .find((prefix) => permission === `${prefix}.move-up` || permission === `${prefix}.move-down`);\n  if (categorySortPrefix) return [`${categorySortPrefix}.sort`];\n",
+          "after": "  delete: 'delete',\n};\n\nexport const expandLegacyScopedPermission = (permission: string) => {\n  const productGlobal = expandLegacyProductGlobalPermission(permission);\n  if (productGlobal) return productGlobal;\n  const categorySortPrefix = ['finished', 'accessory']\n    .map((scope) => `admin.product-data-center.category.${scope}`)\n    .find((prefix) => permission === `${prefix}.move-up` || permission === `${prefix}.move-down`);\n  if (categorySortPrefix) return [`${categorySortPrefix}.sort`];\n",
+          "stage": "before-migrations",
+          "reason": "用户授权V1.4：发布/商品中心提升页面全局，全部仅查看，保留状态权限；无上架权限隐藏字段且新增入库/编辑保留状态。"
+        }
+      ]
     },
     "src/services/http.ts": {
       "content": "22725a6e76f7579d796f8d4cfbd4d72ec0c71c0c4b8916d47c1e1a436262794a",

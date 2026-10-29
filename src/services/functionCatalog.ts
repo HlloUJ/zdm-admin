@@ -1,3 +1,4 @@
+import { isProductGlobalAction } from './productGlobalPermissions';
 import { productAllViewPages } from './productAllView';
 import { storeOrderPrototype } from '@/pages/order/prototype/resources';
 import { isFunctionAllowedForAudience } from './functionAudience';
@@ -88,19 +89,12 @@ const withDefaultViewAction = (scope: string, actions: FunctionAction[]) => [
   ...actions.filter((action) => !isViewPermission(action.value) && !isLegacyReadAction(action)),
 ];
 
-// Explicitly registered existing product pages; action references retain their original state grants.
+// All aggregates existing product states; action grants remain with their owning states.
 
 const productTabsWithAll = (page: FunctionPage): FunctionTab[] => {
   if (!productAllViewPages.has(page.value)) return page.tabs;
   const original = page.tabs.filter((tab) => tab.value !== `${page.value}.all`);
-  const referencedActions = original
-    .filter((tab) => /\.(warehouse|selling)$/.test(tab.value))
-    .flatMap((tab) =>
-      tab.actions
-        .filter((action) => /\.(publish|select|shelf|off-shelf|edit|delete)$/.test(action.value))
-        .map((action) => ({ ...action, label: `${tab.label} · ${action.label}` })),
-    );
-  return [{ label: '全部', value: `${page.value}.all`, actions: referencedActions }, ...original];
+  return [{ label: '全部', value: `${page.value}.all`, actions: [] }, ...original];
 };
 
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>
@@ -506,7 +500,9 @@ const toCanonicalPermission = (permission: string) => {
 };
 
 export const getRowViewPermissionValue = (row: FunctionCatalogRow) =>
-  row.actions.find((action) => isViewPermission(action.value))?.value;
+  row.tabLabels.includes('页面全局') && row.actions.some((action) => isProductGlobalAction(action.value))
+    ? undefined
+    : row.actions.find((action) => isViewPermission(action.value))?.value;
 
 export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], permissions: string[]) => {
   if (permissions.includes('all')) return ['all'];

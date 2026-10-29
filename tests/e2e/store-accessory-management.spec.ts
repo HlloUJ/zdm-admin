@@ -7,7 +7,7 @@ import { installAdminApiMocks } from './accessory-api-mocks';
 const ok = (data: unknown) => ({ code: 0, message: 'ok', data });
 const permissions = [
   'store.accessory-management.warehouse.view',
-  'store.accessory-management.warehouse.select',
+  'store.accessory-management.select',
   'store.accessory-management.warehouse.edit',
   'store.accessory-management.warehouse.shelf',
   'store.accessory-management.warehouse.delete',

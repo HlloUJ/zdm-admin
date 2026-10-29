@@ -59,21 +59,21 @@ public class StoreAccessoryProductController {
 
   @GetMapping("/pool-categories")
   public ApiResponse<List<StoreAccessoryProductService.PoolCategory>> poolCategories() {
-    guard.requirePermission(PREFIX + ".warehouse.select");
+    guard.requirePermission(PREFIX + ".select");
     guard.requireDataPermission();
     return ApiResponse.ok(service.poolCategories());
   }
 
   @GetMapping("/pool")
   public ApiResponse<List<StoreAccessoryProductService.PoolProduct>> pool() {
-    guard.requirePermission(PREFIX + ".warehouse.select");
+    guard.requirePermission(PREFIX + ".select");
     guard.requireDataPermission();
     return ApiResponse.ok(service.pool());
   }
 
   @GetMapping("/pool/{id}")
   public ApiResponse<StoreAccessoryProductService.PoolDetail> poolDetail(@PathVariable Long id) {
-    guard.requirePermission(PREFIX + ".warehouse.select");
+    guard.requirePermission(PREFIX + ".select");
     guard.requireDataPermission();
     return ApiResponse.ok(service.poolDetail(id));
   }
@@ -81,7 +81,7 @@ public class StoreAccessoryProductController {
   @PostMapping("/select")
   public ApiResponse<List<StoreAccessoryProductService.ProductView>> select(
       @Valid @RequestBody SelectRequest request) {
-    guard.requirePermission(PREFIX + ".warehouse.select");
+    guard.requirePermission(PREFIX + ".select");
     guard.requireDataPermission();
     return ApiResponse.ok(service.select(request.productIds()));
   }

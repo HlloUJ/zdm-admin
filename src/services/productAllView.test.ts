@@ -34,7 +34,7 @@ describe('product All view', () => {
     expect(sortProductsByCreation(rows).map((row) => row.id)).toEqual([2, 1, 99, 3]);
     expect(rows.map((row) => row.id)).toEqual([1, 99, 2, 3]);
   });
-  it('registers only the eight real pages, references existing operations and does not auto-grant All', () => {
+  it('registers only the eight real pages, keeps All view-only and does not auto-grant it', () => {
     const pages = fullFunctionCatalog
       .flatMap((module) => module.menus)
       .flatMap((menu) => menu.pages)
@@ -59,11 +59,7 @@ describe('product All view', () => {
       const all = page.tabs[0];
       expect(all.label).toBe('全部');
       expect(all.actions[0]).toEqual({ label: '查看', value: `${page.value}.all.view` });
-      expect(
-        all.actions
-          .slice(1)
-          .every((action) => /\.(warehouse|selling)\.(publish|select|shelf|off-shelf|edit|delete)$/.test(action.value)),
-      ).toBe(true);
+      expect(all.actions).toEqual([{ label: '查看', value: `${page.value}.all.view` }]);
       const module = fullFunctionCatalog.find((module) =>
         module.menus.some((menu) => menu.pages.some((candidate) => candidate.value === page.value)),
       )!;

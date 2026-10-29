@@ -21,6 +21,24 @@ class EffectivePermissionResolverTest {
   }
 
   @Test
+  void oldAndNewProductEntriesIntersectWithoutCreatingStateOrShelfGrants() {
+    AuthAccount account = employeeAccount(7L, 17L, 3L, "cityPartner");
+    String prefix = "store.finished-stock-management";
+    when(authAccountMapper.findAdminPermissionValues(7L, 17L)).thenReturn(List.of(prefix + ".select"));
+    when(authAccountMapper.findTerminalPermissionValue("cityPartner")).thenReturn(prefix + ".warehouse.select");
+    assertThat(resolver.resolve(account)).containsExactly(prefix + ".select");
+    when(authAccountMapper.findTerminalPermissionValue("cityPartner")).thenReturn("");
+    assertThat(resolver.resolve(account)).isEmpty();
+    account.setStoreId(null); account.setStoreType(null); account.setClientCode("supply-chain");
+    prefix = "supply-chain.slab-management";
+    when(authAccountMapper.findAdminPermissionValues(7L, 17L)).thenReturn(List.of(prefix + ".publish"));
+    when(authAccountMapper.findTerminalPermissionValue("supply-chain")).thenReturn(prefix + ".selling.publish");
+    assertThat(resolver.resolve(account)).containsExactly(prefix + ".publish");
+    when(authAccountMapper.findTerminalPermissionValue("supply-chain")).thenReturn("");
+    assertThat(resolver.resolve(account)).isEmpty();
+  }
+
+  @Test
   void storeEmployeePermissionsAreIntersectedWithTerminalScope() {
     AuthAccount account = employeeAccount(7L, 17L, 3L, "cityPartner");
     when(authAccountMapper.findAdminPermissionValues(7L, 17L)).thenReturn(List.of(

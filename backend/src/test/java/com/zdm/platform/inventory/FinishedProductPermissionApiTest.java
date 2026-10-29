@@ -157,7 +157,7 @@ class FinishedProductPermissionApiTest extends SpringContainerTestSupport {
     jdbc.update("INSERT INTO store_levels (id,name,sort_order,status) VALUES (99550,'运营测试级别',1,'enabled')");
     jdbc.update("INSERT INTO finished_markup_configurations (id,name,store_level_id,price_coefficient,status,legacy_seeded,sort_order) VALUES (99550,'运营测试级别',99550,1.5,'enabled',false,1)");
     jdbc.update("INSERT INTO finished_guide_price_settings (id,price_coefficient) VALUES (1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
-    identityFor("supply-chain","all", "warehouse.view", "warehouse.publish", "warehouse.shelf");
+    identityFor("supply-chain","all", "warehouse.view", "publish", "warehouse.shelf");
     long image = upload("image/png", "test.png");
     long video = upload("video/webm", "test.webm");
     ObjectNode payload = (ObjectNode) json.readTree("""

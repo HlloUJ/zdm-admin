@@ -657,7 +657,7 @@
                   <t-input-number :model-value="totalStock" theme="normal" :min="0" disabled />
                 </t-form-item>
                 <t-form-item
-                  v-if="!isOperationsEdit"
+                  v-if="!isOperationsEdit && canSetShelfStatus"
                   label="上架"
                   v-bind="requiredFieldFeedback(productForm.shelfNow, '上架方式', submitAttempted, true)"
                   required-mark
@@ -1234,7 +1234,12 @@ const finishedScope: Record<StockTab, string> = {
   recycle: 'recycle',
 };
 const hasFinishedAction = (action: string, status = activeTab.value) =>
-  hasPermission(getLoginUser(), `${productPermissionPrefix.value}.${finishedScope[status]}.${action}`);
+  hasPermission(
+    getLoginUser(),
+    action === 'publish'
+      ? `${productPermissionPrefix.value}.publish`
+      : `${productPermissionPrefix.value}.${finishedScope[status]}.${action}`,
+  );
 const { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermissionTabs({
   tabs,
   activeTab,
@@ -1830,15 +1835,8 @@ watch(activeTab, (tab) => {
 });
 const selectedKeySet = computed(() => new Set(selectedKeys.value));
 const formPageTitle = computed(() => (formPageMode.value === 'create' ? '发布商品' : '编辑商品'));
-const hasLegacyEditPermission = () => hasPermission(getLoginUser(), `${productPermissionPrefix.value}.edit`);
-const canChooseShelfNow = computed(
-  () =>
-    (!editingProduct.value && (hasFinishedAction('shelf', 'warehouse') || hasFinishedAction('publish', 'selling'))) ||
-    editingProduct.value?.status === 'selling' ||
-    hasLegacyEditPermission() ||
-    hasFinishedAction('shelf', editingProduct.value?.status || 'warehouse') ||
-    hasFinishedAction('batch-shelf', editingProduct.value?.status || 'warehouse'),
-);
+const canSetShelfStatus = computed(() => hasFinishedAction('shelf', 'warehouse'));
+const canChooseShelfNow = computed(() => editingProduct.value?.status === 'selling' || canSetShelfStatus.value);
 const canChooseShelfLater = computed(
   () =>
     !editingProduct.value ||
@@ -1900,9 +1898,7 @@ const pagePartiallySelected = computed(
 );
 const batchButtons = computed(() => {
   if (activeTab.value === 'all')
-    return hasFinishedAction('publish', 'warehouse') || hasFinishedAction('publish', 'selling')
-      ? [{ action: 'publish' as const, label: '发布商品', icon: 'add' }]
-      : [];
+    return hasFinishedAction('publish') ? [{ action: 'publish' as const, label: '发布商品', icon: 'add' }] : [];
   const map: Record<
     StockStatus,
     {

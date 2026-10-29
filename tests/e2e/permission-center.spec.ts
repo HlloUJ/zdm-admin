@@ -1121,7 +1121,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
     ['操作日志'],
-    ['查看', '仓库中 · 上架', '仓库中 · 编辑', '仓库中 · 删除', '已上架 · 下架', '已上架 · 编辑', '已上架 · 删除'],
+    ['查看'],
     ['查看', '批量上架', '上架', '编辑', '删除'],
     ['查看', '批量下架', '下架', '编辑', '删除'],
     ['查看', '详情'],
@@ -1909,4 +1909,124 @@ test('store role customer matrix retains bulk assignment and removes retired sta
     'store.customer-management.daily.edit',
     'store.customer-management.daily.view',
   ]);
+});
+
+for (const [terminal, action, client, modules] of [
+  [
+    '供应链协同系统',
+    '发布商品',
+    'supply-chain',
+    ['finished-stock-management', 'accessory-management', 'slab-management'],
+  ],
+  ['城市合伙人门店管理后台', '商品中心', 'store', ['finished-stock-management', 'accessory-management']],
+] as const) {
+  test(`${terminal} saves global ${action} once per module without selecting logs or state views`, async ({ page }) => {
+    await page.goto('/terminal-function-allocation');
+    const main = page.getByRole('main');
+    await main.locator('.terminal-tabs').getByText(terminal, { exact: true }).click();
+    await main.getByRole('button', { name: '清空全部', exact: true }).click();
+    await main.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
+    const matrix = main.locator('.permission-matrix');
+    const globals = matrix
+      .locator('tbody tr')
+      .filter({ has: page.locator('.permission-tab-cell').getByText('页面全局', { exact: true }) });
+    await expect(globals).toHaveCount(modules.length);
+    for (let i = 0; i < modules.length; i++) {
+      await expect(globals.nth(i).locator('.permission-action-grid .t-checkbox')).toHaveText([action, '操作日志']);
+      await globals.nth(i).getByText(action, { exact: true }).click();
+      await expect(globals.nth(i).getByRole('checkbox', { name: '操作日志', exact: true })).not.toBeChecked();
+    }
+    const allRows = matrix
+      .locator('tbody tr')
+      .filter({ has: page.locator('.permission-tab-cell').getByText('全部', { exact: true }) });
+    await expect(allRows).toHaveCount(modules.length);
+    for (let i = 0; i < modules.length; i++)
+      await expect(allRows.nth(i).locator('.permission-action-grid .t-checkbox')).toHaveText(['查看']);
+    const saved = page.waitForRequest(
+      (r) => r.method() === 'PUT' && r.url().endsWith(`/terminal-function-policies/${client}`),
+    );
+    await main.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
+    expect((await saved).postDataJSON().functionPermissions.split(',').sort()).toEqual(
+      modules.map((m) => `${client}.${m}.${client === 'store' ? 'select' : 'publish'}`).sort(),
+    );
+    await page.reload();
+    await main.locator('.terminal-tabs').getByText(terminal, { exact: true }).click();
+    await main.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
+    for (let i = 0; i < modules.length; i++)
+      await expect(globals.nth(i).getByRole('checkbox', { name: action, exact: true })).toBeChecked();
+  });
+}
+
+test('store role uses terminal global product-center candidates and saves without hidden state or log grants', async ({
+  page,
+}) => {
+  await page.addInitScript(() =>
+    localStorage.setItem(
+      'zdm-admin-user',
+      JSON.stringify({
+        id: 7,
+        name: '管理员',
+        clientCode: 'admin',
+        tenantId: 1,
+        storeId: 2,
+        storeType: 'cityPartner',
+        roles: ['STORE_ADMIN'],
+        permissions: ['all'],
+        dataPermission: 'all',
+      }),
+    ),
+  );
+  const grant = 'store.finished-stock-management.select';
+  let permissions = '';
+  await page.route('**/api/admin/roles**', async (route) => {
+    if (route.request().url().includes('permission-scope'))
+      return route.fulfill({ json: { code: 0, data: { audience: 'store', functionPermissions: grant } } });
+    if (route.request().method() === 'PUT') {
+      permissions = route.request().postDataJSON().functionPermissions;
+      return route.fulfill({
+        json: {
+          code: 0,
+          data: {
+            id: 702,
+            name: '普通导购',
+            code: 'GUIDE',
+            status: 'enabled',
+            dataScope: 'all',
+            createdAt: '2026-10-16T10:00:00',
+            functionPermissions: permissions,
+          },
+        },
+      });
+    }
+    return route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          {
+            id: 702,
+            name: '普通导购',
+            code: 'GUIDE',
+            status: 'enabled',
+            dataScope: 'all',
+            functionPermissions: permissions,
+            createdAt: '2026-10-16T10:00:00',
+          },
+        ],
+      },
+    });
+  });
+  await page.goto('/role-management');
+  const open = async () =>
+    page.locator('tbody tr').filter({ hasText: '普通导购' }).getByText('权限', { exact: true }).click();
+  await open();
+  const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
+  const matrix = dialog.locator('.permission-matrix');
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(['商品中心']);
+  await matrix.getByText('商品中心', { exact: true }).click();
+  await dialog.getByRole('button', { name: '确认配置权限', exact: true }).click();
+  await expect(dialog).toBeHidden();
+  expect(permissions).toBe(grant);
+  await open();
+  await expect(dialog.getByRole('checkbox', { name: '商品中心', exact: true })).toBeChecked();
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(['商品中心']);
 });

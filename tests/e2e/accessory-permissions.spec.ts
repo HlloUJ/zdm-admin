@@ -48,8 +48,8 @@ test('one tab hides rail and only grants requested row operation', async ({ page
   await expect(main.getByRole('button', { name: '发布商品' })).toHaveCount(0);
   await expect(main.getByText('操作日志', { exact: true })).toHaveCount(0);
   await main.locator('.table-actions .t-link').getByText('编辑', { exact: true }).click();
-  await expect(main.getByRole('radio', { name: '立刻上架', exact: true })).toBeDisabled();
-  await expect(main.getByRole('radio', { name: '暂不上架', exact: true })).toBeEnabled();
+  await expect(main.getByRole('radio', { name: '立刻上架', exact: true })).toHaveCount(0);
+  await expect(main.getByRole('radio', { name: '暂不上架', exact: true })).toHaveCount(0);
 });
 for (const canViewPrice of [true, false]) {
   test(`supply-chain warehouse actions are ${canViewPrice ? 'available when granted' : 'hidden without permission'}`, async ({
@@ -566,7 +566,7 @@ for (const client of ['supply-chain', 'admin']) {
 
 test('supply-chain publish alone does not display selected count', async ({ page }) => {
   const prefix = 'supply-chain.accessory-management.';
-  await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.publish'], 'supply-chain');
+  await setup(page, [prefix + 'warehouse.view', prefix + 'publish'], 'supply-chain');
   await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   const main = page.getByRole('main');
   await expect(main.getByRole('button', { name: '发布商品', exact: true })).toBeVisible();

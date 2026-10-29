@@ -7,7 +7,7 @@ import { installAdminApiMocks } from './admin-api-mocks';
 const ok = (data: unknown) => ({ code: 0, message: 'ok', data });
 const permissions = [
   'store.finished-stock-management.warehouse.view',
-  'store.finished-stock-management.warehouse.select',
+  'store.finished-stock-management.select',
   'store.finished-stock-management.warehouse.edit',
   'store.finished-stock-management.warehouse.shelf',
   'store.finished-stock-management.warehouse.delete',
