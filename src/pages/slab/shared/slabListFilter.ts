@@ -37,11 +37,6 @@ export const filterSlabItems = (
     const gradeMatched = !filter.grade || item.grade === filter.grade;
     const supplierKeyword = filter.supplier.trim().toLowerCase();
     const supplierMatched = !supplierKeyword || item.tenant.toLowerCase().includes(supplierKeyword);
-    const entryTypeMatched =
-      activeTab !== 'warehouse' || !filter.warehouseEntryType || item.warehouseEntryType === filter.warehouseEntryType;
-    const entryBy = filter.warehouseEntryBy.trim().toLowerCase();
-    const entryByMatched =
-      activeTab !== 'warehouse' || !entryBy || Boolean(item.stateOperatorName?.toLowerCase().includes(entryBy));
     return (
       statusMatched &&
       keywordMatched &&
@@ -50,9 +45,7 @@ export const filterSlabItems = (
       textureMatched &&
       colorMatched &&
       gradeMatched &&
-      supplierMatched &&
-      entryTypeMatched &&
-      entryByMatched
+      supplierMatched
     );
   });
   return activeTab === 'all'

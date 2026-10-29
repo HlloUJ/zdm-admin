@@ -7,8 +7,8 @@ class WarehouseEntryInformationTest {
    assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse",operation,null,null).type()).isEqualTo("firstEntry");
   }
   assertThat(WarehouseEntryInformation.fromEvent("recycle","warehouse","RESTORE",null,null).type()).isEqualTo("recycleRestore");
-  assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse","REENTRY",null,null).type()).isEqualTo("sourceReentry");
-  assertThat(WarehouseEntryInformation.fromEvent("selling","warehouse","UPDATE",null,null).type()).isEqualTo("editReturn");
+  assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse","REENTRY",null,null).type()).isNull();
+  assertThat(WarehouseEntryInformation.fromEvent("selling","warehouse","UPDATE",null,null).type()).isNull();
   assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse",null,null,null).type()).isNull();
  }
  @Test void onlyDownIngressCarriesCurrentReasonAndOtherTransitionsClearIt() {

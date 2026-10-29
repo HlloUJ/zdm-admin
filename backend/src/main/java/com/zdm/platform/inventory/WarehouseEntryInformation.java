@@ -9,8 +9,6 @@ public record WarehouseEntryInformation(String type, String reason, String detai
       case "SOURCE_UPDATE" -> "selling".equals(before) ? "offShelf" : null;
       case "RESTORE", "RESTORE_WAREHOUSE", "RESTORE_RECYCLE" -> "recycle".equals(before) ? "recycleRestore" : null;
       case "CREATE", "SELECT", "SOURCE_SHELF" -> before == null ? "firstEntry" : null;
-      case "REENTRY" -> "sourceReentry";
-      case "UPDATE" -> "selling".equals(before) ? "editReturn" : null;
       default -> null;
     };
     return new WarehouseEntryInformation(type, "offShelf".equals(type) ? reason : null,

@@ -10,8 +10,6 @@ export interface FilterState {
   color: string;
   grade: string;
   supplier: string;
-  warehouseEntryType: string;
-  warehouseEntryBy: string;
 }
 export interface OperationLogFilterState {
   keyword: string;
@@ -189,8 +187,6 @@ export const makeFilterState = (): FilterState => ({
   color: '',
   grade: '',
   supplier: '',
-  warehouseEntryType: '',
-  warehouseEntryBy: '',
 });
 export const makeProductForm = (): ProductForm => ({
   variety: '',

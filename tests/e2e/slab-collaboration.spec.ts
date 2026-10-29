@@ -53,6 +53,15 @@ async function setup(page: Page, status: string, sourceStatus = 'selling', detai
         data: {
           ...record,
           name: '最新协同大板',
+          offShelfRecords: [
+            {
+              id: 91,
+              standardReason: '价格调整',
+              detailReason: '历史说明',
+              offShelvedByName: '历史操作人',
+              offShelvedAt: '2026-09-20T09:00:00',
+            },
+          ],
           sourceOffShelfRecords: [{ id: 1, standardReason: '库存异常', detailReason: '待核对库存' }],
         },
       },
@@ -68,6 +77,7 @@ for (const status of ['soldOut', 'recycle']) {
     await page.getByRole('main').locator('.table-actions').getByText('详情', { exact: true }).click();
     const drawer = page.locator('.t-drawer--open').filter({ hasText: '大板详情' });
     await expect(drawer.getByText('最新协同大板', { exact: true })).toBeVisible();
+    await expect(drawer.getByRole('button', { name: '查看历史下架原因', exact: true })).toHaveCount(0);
     await expect(drawer.locator('.t-card__title')).toHaveText(['图文描述', '基础信息', '销售信息']);
     await expect(drawer.locator('.slab-detail-section-title')).toHaveCount(0);
     await expect(drawer.getByText('库存异常', { exact: true })).toHaveCount(0);

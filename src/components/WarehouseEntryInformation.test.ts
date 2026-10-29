@@ -45,6 +45,10 @@ describe('current warehouse entry presentation', () => {
   });
   it('shows actual detail and never guesses first entry from missing provenance', () => {
     expect(render({ warehouseEntryType: 'offShelf', warehouseEntryDetail: '核对规格' }).text()).toContain('核对规格');
-    expect(render({ warehouseEntryType: null }).text()).toBe('历史入库');
+    for (const type of [null, 'sourceReentry', 'editReturn', 'unknown']) {
+      const view = render({ warehouseEntryType: type });
+      expect(view.findAll('[data-test="tag"]')).toHaveLength(0);
+      expect(view.text()).toBe('');
+    }
   });
 });

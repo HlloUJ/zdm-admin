@@ -15,7 +15,7 @@ public class ProductStateActivityService {
   record(kind,business,id,before,after,account,source,null,null,null);
  }
  public void record(String kind,String business,Long id,String before,String after,Long account,String source,String operation,String reason,String detail) {
-  if(after==null || java.util.Objects.equals(before,after) && !"REENTRY".equals(operation)) { return; }
+  if(after==null || java.util.Objects.equals(before,after)) { return; }
   var entry=WarehouseEntryInformation.fromEvent(before,after,operation,reason,detail);
   jdbc.update("INSERT INTO product_state_activity(kind,business_client_code,record_id,state,operator_account_id,operator_client_code,occurred_at,warehouse_entry_type,warehouse_entry_reason,warehouse_entry_detail) VALUES(?,?,?,?,?,?,UTC_TIMESTAMP(6),?,?,?) ON DUPLICATE KEY UPDATE state=?,operator_account_id=?,operator_client_code=?,occurred_at=UTC_TIMESTAMP(6),warehouse_entry_type=?,warehouse_entry_reason=?,warehouse_entry_detail=?",kind,business,id,after,account,source,entry.type(),entry.reason(),entry.detail(),after,account,source,entry.type(),entry.reason(),entry.detail());
  }

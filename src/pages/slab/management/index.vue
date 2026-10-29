@@ -29,26 +29,6 @@
                         <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
                       </t-select>
                     </t-form-item>
-                    <template v-if="activeTab === 'warehouse'">
-                      <t-form-item label="入库类型">
-                        <t-select
-                          v-model="currentFilter.warehouseEntryType"
-                          clearable
-                          filterable
-                          placeholder="请选择入库类型"
-                        >
-                          <t-option
-                            v-for="item in warehouseEntryTypes"
-                            :key="item.value"
-                            :label="item.label"
-                            :value="item.value"
-                          />
-                        </t-select>
-                      </t-form-item>
-                      <t-form-item label="入库人">
-                        <t-input v-model="currentFilter.warehouseEntryBy" clearable placeholder="请输入入库人" />
-                      </t-form-item>
-                    </template>
                     <t-form-item label="产地">
                       <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择产地">
                         <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
@@ -673,13 +653,6 @@
       @close="closeDetailDrawer"
     >
       <t-space v-if="detailDrawerRow" direction="vertical" size="large" class="slab-detail-drawer">
-        <t-button
-          v-if="detailDrawerRow.offShelfRecords.length"
-          variant="text"
-          :theme="buttonTheme('off-shelf-history')"
-          @click="openOffShelfHistory(detailDrawerRow)"
-          >查看历史下架原因</t-button
-        >
         <t-alert v-if="sourceBlocked(detailDrawerRow)" theme="warning" :message="detailDrawerRow.sourceMessage" />
         <t-alert
           v-if="detailDrawerRow.operationsSnapshotMissing"
@@ -1169,7 +1142,6 @@ import { useRoute } from 'vue-router';
 import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
-import { warehouseEntryTypes } from '@/services/warehouseEntry';
 import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';

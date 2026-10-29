@@ -283,13 +283,14 @@
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java",
         "backend/src/test/java/com/zdm/platform/security/EffectivePermissionResolverTest.java",
-        "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java"
+        "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java"
       ],
       "protectedTests": {
-        "tests/e2e/product-state-activity.spec.ts": "5c2d0187c83ec86ef3e6f4ece985e384f7ddcbcf067ef34fa97c2eadcd4cce2b",
+        "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
         "tests/e2e/finished-stock.spec.ts": "38ebaf05295f4cc743ab3778346d9b1b8a8a884a449f58a692ba6dc78343950a",
         "tests/e2e/accessory-management.spec.ts": "64af88acb197b415b7f7c26a1b261940f57b9a03d66e4fc54d8e3e260547fe95",
-        "tests/e2e/slab-collaboration.spec.ts": "7c1b31d05b50270a2d7e2b1bac9ebac28a6dd877ae4faff46389d118c8698211",
+        "tests/e2e/slab-collaboration.spec.ts": "d1b29192c7e0d09d1fb3c5ec8869e6abfb0086daa5947a08a37584bc08959971",
         "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
         "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "24c244651a0cf743ead693e157e379b358d5782f21e393ed9ec33396804a552f",
@@ -326,7 +327,7 @@
         "tests/e2e/accessory-api-mocks.ts": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
         "tests/e2e/pagination-responsive.spec.ts": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
         "tests/e2e/store-order-prototype.spec.ts": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
-        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "8b5fac37e17b3485552745c378e9c1283cae147658617511e64a044c57d26ff3",
+        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
         "tests/e2e/product-all-view.spec.ts": "ec07d84f2affcb69af9811fe30d13397b5b014bb4b568cfb8235411820efdd61",
@@ -334,7 +335,8 @@
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "6e1d79598ca04efefba7f308776f189437f7ee6aa56f2fd40042d1597a5b452b",
         "backend/src/test/java/com/zdm/platform/security/EffectivePermissionResolverTest.java": "244db8e06b91f8ca411a8e91f55c4efafd2561a90b035528de6d75e8ddb37e0b",
-        "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java": "9f3dee717ec95bff55c0351f718cdfe956e98324849bec98dd0e2da014836018"
+        "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java": "9f3dee717ec95bff55c0351f718cdfe956e98324849bec98dd0e2da014836018",
+        "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java": "b5c2589b50e90976401dba166539890aff278f434fcde20a62b2d5ffa7879f52"
       },
       "testChanges": [
         {
@@ -1404,6 +1406,54 @@
           "before": "336b5cf9915015361f5597143c534fe6971a83434c99a3d5f06c6151d9b2f39e",
           "after": "1cccc4b0fd932b46bbaadbd95790c44b51b4ca0a666f30e672f0cd60ecec6927",
           "reason": "用户确认移除额外详情编辑入库分区，补充不可见断言，保留原全部业务断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-state-activity.spec.ts",
+          "before": "5c2d0187c83ec86ef3e6f4ece985e384f7ddcbcf067ef34fa97c2eadcd4cce2b",
+          "after": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
+          "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-state-activity.spec.ts",
+          "before": "f1113b5a247e70570295c0ae102448220c495f7e45f1254cdc0dbb1f3b70648f",
+          "after": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
+          "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "7c1b31d05b50270a2d7e2b1bac9ebac28a6dd877ae4faff46389d118c8698211",
+          "after": "cff6b1e93efb3675bcc6f9e161583c40a6f5a9bbb094706a117d11c5cc968575",
+          "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
+          "after": "cff6b1e93efb3675bcc6f9e161583c40a6f5a9bbb094706a117d11c5cc968575",
+          "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java",
+          "before": "8b5fac37e17b3485552745c378e9c1283cae147658617511e64a044c57d26ff3",
+          "after": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
+          "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "cff6b1e93efb3675bcc6f9e161583c40a6f5a9bbb094706a117d11c5cc968575",
+          "after": "d1b29192c7e0d09d1fb3c5ec8869e6abfb0086daa5947a08a37584bc08959971",
+          "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "7c1b31d05b50270a2d7e2b1bac9ebac28a6dd877ae4faff46389d118c8698211",
+          "after": "d1b29192c7e0d09d1fb3c5ec8869e6abfb0086daa5947a08a37584bc08959971",
+          "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
+          "after": "d1b29192c7e0d09d1fb3c5ec8869e6abfb0086daa5947a08a37584bc08959971",
+          "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
         }
       ],
       "routes": [

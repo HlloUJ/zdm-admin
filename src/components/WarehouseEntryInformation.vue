@@ -1,6 +1,7 @@
 <template>
   <t-space direction="vertical" size="small" align="start">
     <t-tag
+      v-if="warehouseEntryLabel(entry.warehouseEntryType)"
       :theme="
         entry.warehouseEntryType === 'offShelf'
           ? 'warning'

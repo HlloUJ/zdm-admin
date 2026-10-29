@@ -106,6 +106,8 @@ for (const surface of surfaces) {
       await main.locator('.t-tabs__nav-item').filter({ hasText: titles[index] }).click();
       await expect(main.getByRole('columnheader', { name: timeTitles[index], exact: true })).toBeVisible();
       if (states[index] === 'warehouse') {
+        await expect(main.locator('.zdm-admin-filter-form').getByText('入库类型', { exact: true })).toHaveCount(0);
+        await expect(main.locator('.zdm-admin-filter-form').getByText('入库人', { exact: true })).toHaveCount(0);
         const columnKeys = await main
           .locator('thead th')
           .evaluateAll((headers) => headers.map((header) => header.getAttribute('data-colkey')));
