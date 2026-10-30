@@ -90,13 +90,15 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
             label: '大板管理页',
             value: 'admin.slab-management',
             audiences: ['admin'],
-            actions: [{ label: '操作日志', value: 'admin.slab-management.operation-log.view' }],
+            actions: [
+              { label: '批量上架', value: 'admin.slab-management.batch-shelf' },
+              { label: '操作日志', value: 'admin.slab-management.operation-log.view' },
+            ],
             tabs: [
               {
                 label: '仓库中',
                 value: 'admin.slab-management.warehouse',
                 actions: [
-                  { label: '批量上架', value: 'admin.slab-management.warehouse.batch-shelf' },
                   { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
                   { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
                   { label: '删除', value: 'admin.slab-management.warehouse.delete' },

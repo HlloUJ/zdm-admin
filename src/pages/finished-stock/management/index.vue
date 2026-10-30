@@ -1161,10 +1161,15 @@
     >
       {{ confirmState.content }}
     </AdminConfirmDialog>
+    <OperationsBatchShelfResult v-model:visible="batchShelfResultVisible" :result="batchShelfResult" />
   </div>
 </template>
 
 <script setup lang="ts">
+import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
+import { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';
+const batchShelfResultVisible = ref(false);
+const batchShelfResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
 import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
@@ -1950,7 +1955,10 @@ const pagePartiallySelected = computed(
   () => pageData.value.some((item) => selectedKeySet.value.has(item.id)) && !pageAllSelected.value,
 );
 const batchButtons = computed(() => {
-  if (activeTab.value === 'all') return [];
+  if (activeTab.value === 'all')
+    return hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`)
+      ? [{ action: 'batchShelf' as const, label: '批量上架', icon: 'upload' }]
+      : [];
   const map: Record<
     StockStatus,
     {
@@ -1978,7 +1986,12 @@ const batchButtons = computed(() => {
   };
   const actions = [...map[activeTab.value]];
   return actions.filter((button) =>
-    hasFinishedAction(finishedActionCodes[button.action], button.action === 'batchPurge' ? 'recycle' : activeTab.value),
+    button.action === 'batchShelf'
+      ? hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`)
+      : hasFinishedAction(
+          finishedActionCodes[button.action],
+          button.action === 'batchPurge' ? 'recycle' : activeTab.value,
+        ),
   );
 });
 const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
@@ -2008,11 +2021,14 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
       ? productCreationColumns(toggleTimeSort)
       : stateActivityColumns(activeTab.value, toggleTimeSort)),
   ];
-  if (!['all', 'soldOut'].includes(activeTab.value)) {
+  if (
+    activeTab.value !== 'soldOut' &&
+    (activeTab.value !== 'all' || hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`))
+  ) {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
   if (activeTab.value === 'warehouse' || activeTab.value === 'all') {
-    base.splice(activeTab.value === 'all' ? 3 : 4, 0, {
+    base.splice(base.findIndex((column) => column.colKey === 'supplier') + 1, 0, {
       colKey: 'warehouseEntry',
       title: '入库类型 / 详细说明',
       minWidth: 240,
@@ -2867,44 +2883,21 @@ const handleConfirm = async () => {
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
       if (sourceBlocked(product)) await loadInventoryData();
     } else if (type === 'batchShelf') {
-      {
-        const ids = [...selectedKeys.value];
-        const failed = new Map<number, string>();
-        let succeeded = 0;
-        for (const id of ids) {
-          delete shelfErrors[id];
-          try {
-            await updateProductStatus(id, 'selling');
-            succeeded++;
-          } catch (error) {
-            failed.set(id, error instanceof Error ? error.message : '上架失败，请重试');
-          }
-        }
-        await loadInventoryData();
-        for (const [id, message] of failed) {
-          const latest = dataItems.value.find((item) => item.id === id);
-          if (latest?.status === 'selling') {
-            succeeded++;
-            failed.delete(id);
-          } else if (latest && !sourceBlocked(latest)) {
-            shelfErrors[id] = message;
-          }
-        }
-        selectedKeys.value = ids.filter(
-          (id) =>
-            failed.has(id) &&
-            dataItems.value.some((item) => item.id === id && !sourceBlocked(item) && item.status === 'warehouse'),
-        );
-        currentPagination.value.current = Math.min(
-          currentPagination.value.current,
-          Math.max(1, Math.ceil(filteredData.value.length / currentPagination.value.pageSize)),
-        );
-        closeConfirmDialog();
-        const message = `已上架 ${succeeded} 个商品，未上架 ${failed.size} 个商品`;
-        if (failed.size) adminFeedback.warning(message);
-        else adminFeedback.success(message);
-        return;
-      }
+      const ids = [...selectedKeys.value];
+      batchShelfResult.value = await batchShelfProducts(
+        commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
+        ids,
+      );
+      selectedKeys.value = [];
+      ids.forEach((id) => delete shelfErrors[id]);
+      closeConfirmDialog();
+      batchShelfResultVisible.value = true;
+      await loadInventoryData();
+      currentPagination.value.current = Math.min(
+        currentPagination.value.current,
+        Math.max(1, Math.ceil(filteredData.value.length / currentPagination.value.pageSize)),
+      );
+      return;
     } else if (type === 'batchRestore') {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'warehouse')));
       selectedKeys.value = [];

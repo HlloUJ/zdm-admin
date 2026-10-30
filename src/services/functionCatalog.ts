@@ -144,14 +144,16 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
               label: '成品现货管理页',
               value: 'admin.finished-stock-management',
               audiences: ['admin'],
-              actions: [{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }],
+              actions: [
+                { label: '批量上架', value: 'admin.finished-stock-management.batch-shelf' },
+                { label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' },
+              ],
               tabs: [
                 {
                   label: '仓库中',
                   value: 'admin.finished-stock-management.warehouse',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.warehouse.view' },
-                    { label: '批量上架', value: 'admin.finished-stock-management.warehouse.batch-shelf' },
                     { label: '上架', value: 'admin.finished-stock-management.warehouse.shelf' },
                     { label: '编辑', value: 'admin.finished-stock-management.warehouse.edit' },
                     { label: '删除', value: 'admin.finished-stock-management.warehouse.delete' },
@@ -202,14 +204,16 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
               label: '配件管理页',
               value: 'admin.accessory-management',
               audiences: ['admin'],
-              actions: [{ label: '操作日志', value: 'admin.accessory-management.operation-log.view' }],
+              actions: [
+                { label: '批量上架', value: 'admin.accessory-management.batch-shelf' },
+                { label: '操作日志', value: 'admin.accessory-management.operation-log.view' },
+              ],
               tabs: [
                 {
                   label: '仓库中',
                   value: 'admin.accessory-management.warehouse',
                   actions: [
                     { label: '查看', value: 'admin.accessory-management.warehouse.view' },
-                    { label: '批量上架', value: 'admin.accessory-management.warehouse.batch-shelf' },
                     { label: '上架', value: 'admin.accessory-management.warehouse.shelf' },
                     { label: '编辑', value: 'admin.accessory-management.warehouse.edit' },
                     { label: '删除', value: 'admin.accessory-management.warehouse.delete' },

@@ -10,6 +10,7 @@ export type Confirmation =
   | { kind: 'operation'; action: keyof typeof registry.confirmationActions; batch: boolean }
   | { kind: 'close'; text: '关闭' | '我知道了' }
   | { kind: 'navigation'; action: keyof typeof registry.confirmationNavigation }
+  | { kind: 'acknowledgement'; action: keyof typeof registry.confirmationAcknowledgements }
   | { kind: 'none' };
 
 export function formConfirmation(mode: FormMode): Confirmation {
@@ -41,6 +42,10 @@ export function confirmationText(confirmation: Confirmation): string {
       if (!Object.hasOwn(registry.confirmationNavigation, confirmation.action))
         throw new Error('Unregistered confirmation navigation');
       return registry.confirmationNavigation[confirmation.action];
+    case 'acknowledgement':
+      if (!Object.hasOwn(registry.confirmationAcknowledgements, confirmation.action))
+        throw new Error('Unregistered acknowledgement');
+      return registry.confirmationAcknowledgements[confirmation.action];
     case 'none':
       return '';
     default:

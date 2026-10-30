@@ -470,7 +470,9 @@ test('operations incomplete shelf warns before confirmation without updating pro
   expect(updates).toBe(0);
 });
 
-test('operations batch shelf continues after failure and retains the failed row with its warning', async ({ page }) => {
+test('operations batch shelf continues after failure and shows grouped failures and clears selection', async ({
+  page,
+}) => {
   await setup(page, [prefix + 'warehouse.view', prefix + 'warehouse.batch-shelf']);
   const products = [991, 992, 993].map((id) => ({
     id,
@@ -483,27 +485,36 @@ test('operations batch shelf continues after failure and retains the failed row 
   }));
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: products } }));
   const updates: number[] = [];
-  await page.route(/\/api\/admin\/finished-products\/99[123]$/, (route) => {
-    const id = Number(route.request().url().split('/').pop());
-    updates.push(id);
-    if (id === 992)
-      return route.fulfill({ status: 400, json: { code: 400, message: '请完善全部成品现货价格后再上架' } });
-    const product = products.find((item) => item.id === id)!;
-    product.status = 'selling';
-    return route.fulfill({ json: { code: 0, data: product } });
+  await page.route('**/api/admin/finished-products/batch-shelf', (route) => {
+    const ids = route.request().postDataJSON().ids as number[];
+    updates.push(...ids);
+    products.filter((item) => item.id !== 992).forEach((item) => (item.status = 'selling'));
+    return route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          total: 3,
+          successCount: 2,
+          failureCount: 1,
+          failures: [{ id: 992, code: 'VALIDATION_FAILED', reason: '请完善全部成品现货价格后再上架' }],
+        },
+      },
+    });
   });
   await page.goto(productWarehouseUrl('/finished-stock-management'));
   await expect(page.locator('tbody tr')).toHaveCount(3);
   await page.locator('thead .t-checkbox').click();
   await page.getByRole('button', { name: '批量上架', exact: true }).click();
   await page.locator('.t-dialog:visible').getByRole('button', { name: /^确认/ }).click();
-  await expect(page.getByText('已上架 2 个商品，未上架 1 个商品', { exact: true })).toBeVisible();
+  const result = page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' });
+  await expect(result).toContainText('成功上架2件，失败1件。');
+  await expect(result).toContainText('992');
+  await expect(result).toContainText('请完善全部成品现货价格后再上架');
   expect(updates).toEqual([993, 992, 991]);
-  await expect(page.locator('tbody tr')).toHaveCount(1);
-  await expect(page.locator('tbody tr')).toContainText('批量验收商品992');
-  await expect(page.locator('tbody tr').getByRole('checkbox')).toBeChecked();
-  await expect(page.locator('.finished-row-warning')).toContainText('请完善全部成品现货价格后再上架');
-  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  await result.getByRole('button', { name: '确认', exact: true }).click();
+  await expect(page.getByRole('main').locator('tbody tr')).toHaveCount(1);
+  await expect(page.getByRole('main').locator('tbody tr')).toContainText('批量验收商品992');
+  await expect(page.getByRole('main').locator('tbody tr').getByRole('checkbox')).not.toBeChecked();
 });
 
 for (const client of ['supply-chain', 'admin']) {

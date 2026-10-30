@@ -74,7 +74,8 @@ public final class FunctionPermissionNormalizer {
   }
 
   public static boolean isProductGlobalAction(String permission) {
-    return permission.matches("supply-chain\\.(finished-stock-management|accessory-management|slab-management)\\.publish")
+    return permission.matches("admin\\.(finished-stock-management|accessory-management|slab-management)\\.batch-shelf")
+        || permission.matches("supply-chain\\.(finished-stock-management|accessory-management|slab-management)\\.publish")
         || permission.matches("store\\.(finished-stock-management|accessory-management)\\.select");
   }
 
@@ -83,6 +84,8 @@ public final class FunctionPermissionNormalizer {
   }
 
   private static Stream<String> expandLegacyScopedPermission(String permission) {
+    var batch = java.util.regex.Pattern.compile("^(admin\\.(?:finished-stock-management|accessory-management|slab-management))\\.warehouse\\.batch-shelf$").matcher(permission);
+    if (batch.matches()) { return Stream.of(permission, batch.group(1) + ".warehouse.view", batch.group(1) + ".batch-shelf"); }
     var product = java.util.regex.Pattern.compile(
         "^(supply-chain\\.(?:finished-stock-management|accessory-management|slab-management))\\.(warehouse|selling)\\.publish$|^(store\\.(?:finished-stock-management|accessory-management))\\.(warehouse)\\.select$")
         .matcher(permission);

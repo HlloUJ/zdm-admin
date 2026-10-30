@@ -88,9 +88,10 @@ for (const surface of surfaces) {
     await expect(main.locator('.t-tabs__nav-item').first()).toHaveClass(/t-is-active/);
     await expect(main.getByRole('columnheader', { name: '创建人', exact: true })).toBeVisible();
     await expect(main.getByRole('columnheader', { name: '创建时间', exact: true })).toBeVisible();
-    for (const header of await main.locator('thead th').all()) await expect(header).toHaveCSS('text-align', 'left');
+    for (const header of await main.locator('thead th').all())
+      await expect(header).toHaveCSS('text-align', (await header.getByRole('checkbox').count()) ? 'center' : 'left');
     for (const cell of await main.locator('tbody tr').first().locator('td').all())
-      await expect(cell).toHaveCSS('text-align', 'left');
+      await expect(cell).toHaveCSS('text-align', (await cell.getByRole('checkbox').count()) ? 'center' : 'left');
     for (const label of ['商品状态', '状态变更时间', '入库时间', '上架时间'])
       await expect(main.getByRole('columnheader', { name: label, exact: true })).toHaveCount(0);
     await expect(main.getByRole('combobox', { name: '商品状态', exact: true })).toHaveCount(0);
@@ -100,8 +101,11 @@ for (const surface of surfaces) {
     await expect(rows.last()).toContainText('汇总商品-warehouse');
     await expect(rows.first()).toContainText('真实创建人');
     await expect(rows.first()).not.toContainText('本次状态操作人');
-    await expect(main.locator('thead').getByRole('checkbox')).toHaveCount(0);
-    await expect(main.getByRole('button', { name: /批量上架|批量下架/ })).toHaveCount(0);
+    await expect(main.locator('thead').getByRole('checkbox')).toHaveCount(surface.client === 'admin' ? 1 : 0);
+    await expect(main.getByRole('button', { name: '批量上架', exact: true })).toHaveCount(
+      surface.client === 'admin' ? 1 : 0,
+    );
+    await expect(main.getByRole('button', { name: '批量下架', exact: true })).toHaveCount(0);
     for (const [state, label, action] of [
       ['warehouse', '仓库中', '上架'],
       ['selling', '已上架', '下架'],

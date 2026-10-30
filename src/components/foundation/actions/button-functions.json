@@ -407,5 +407,8 @@
   },
   "confirmationNavigation": {
     "select-category": "确认，下一步"
+  },
+  "confirmationAcknowledgements": {
+    "productBatchShelfResult": "确认"
   }
 }

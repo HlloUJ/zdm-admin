@@ -1134,10 +1134,15 @@
       </t-table>
       <t-empty v-else description="暂无下架记录" />
     </AdminDialog>
+    <OperationsBatchShelfResult v-model:visible="batchShelfResultVisible" :result="batchShelfResult" />
   </div>
 </template>
 
 <script setup lang="ts">
+import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
+import { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';
+const batchShelfResultVisible = ref(false);
+const batchShelfResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
 import { useRoute } from 'vue-router';
 import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
@@ -1786,7 +1791,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     align: 'left',
     fixed: 'right',
   });
-  return activeTab.value === 'all' ? baseColumns.filter((col) => col.colKey !== 'select') : baseColumns;
+  return activeTab.value === 'all' && !hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`)
+    ? baseColumns.filter((col) => col.colKey !== 'select')
+    : baseColumns;
 });
 const currentFilter = computed(() => filters[activeTab.value]);
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
@@ -1824,7 +1831,15 @@ const shelfErrors = reactive<Record<number, string>>({});
 const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
 const batchButtons = computed(() =>
-  activeTab.value === 'all' ? [] : slabBatchButtons(activeTab.value, hasSlabAction),
+  activeTab.value === 'all'
+    ? hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`)
+      ? [{ label: '批量上架', action: 'batchShelf' as const, icon: 'upload' }]
+      : []
+    : slabBatchButtons(activeTab.value, (tab, action) =>
+        action === 'batch-shelf'
+          ? hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`)
+          : hasSlabAction(tab, action),
+      ),
 );
 const tabLabel = (tab: { label: string; value: SlabTab }) => {
   const count = tableData.value.filter((item) =>
@@ -2702,37 +2717,13 @@ const handleConfirmSubmit = async () => {
     }
     if (type === 'batchShelf') {
       const ids = [...selectedKeys.value];
-      const failed = new Map<number, string>();
-      let succeeded = 0;
-      for (const id of ids) {
-        delete shelfErrors[id];
-        try {
-          await updateSlabStatus(id, 'selling');
-          succeeded++;
-        } catch (error) {
-          failed.set(id, error instanceof Error ? error.message : '上架失败，请重试');
-        }
-      }
-      await loadSlabs();
-      for (const [id, message] of failed) {
-        const latest = tableData.value.find((item) => item.id === id);
-        if (latest?.status === 'selling') {
-          succeeded++;
-          failed.delete(id);
-        } else if (latest && !sourceBlocked(latest)) {
-          shelfErrors[id] = message;
-        }
-      }
-      selectedKeys.value = ids.filter(
-        (id) =>
-          failed.has(id) &&
-          tableData.value.some((item) => item.id === id && !sourceBlocked(item) && item.status === 'warehouse'),
-      );
-      ensureCurrentPage();
+      batchShelfResult.value = await batchShelfProducts('slabs', ids);
+      selectedKeys.value = [];
+      ids.forEach((id) => delete shelfErrors[id]);
       closeConfirmDialog();
-      const message = `已上架 ${succeeded} 个大板，未上架 ${failed.size} 个大板`;
-      if (failed.size) adminFeedback.warning(message);
-      else adminFeedback.success(message);
+      batchShelfResultVisible.value = true;
+      await loadSlabs();
+      ensureCurrentPage();
       return;
     }
     if (type === 'purge' && row) {

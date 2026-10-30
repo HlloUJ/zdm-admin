@@ -33,7 +33,9 @@
         "backend/src/main/resources/function-audience-policy.json",
         "src/services/productGlobalPermissions.ts",
         "src/services/functionPermissionCompatibility.ts",
-        "src/services/auth.ts"
+        "src/services/auth.ts",
+        "src/services/operationsBatchShelf.ts",
+        "src/components/OperationsBatchShelfResult.vue"
       ],
       "tables": [
         "product_state_activity",
@@ -94,6 +96,8 @@
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductWriteValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedSpecValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedSupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductLifecycleService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductStateActivityService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabInvalidationSnapshotService.java",
@@ -148,6 +152,7 @@
         "backend/src/main/resources/function-audience-policy.json",
         "src/components/AdminSideMenu.vue",
         "src/components/AdminTopNav.vue",
+        "src/components/OperationsBatchShelfResult.vue",
         "src/components/ProductListStatusTag.vue",
         "src/components/WarehouseEntryInformation.vue",
         "src/components/permission/PermissionAssignmentMatrix.vue",
@@ -226,6 +231,7 @@
         "src/services/functionCatalogStoreData.ts",
         "src/services/functionCatalogSupplyData.ts",
         "src/services/functionPermissionCompatibility.ts",
+        "src/services/operationsBatchShelf.ts",
         "src/services/orderPrototypePreview.ts",
         "src/services/productAllView.ts",
         "src/services/productGlobalPermissions.ts",
@@ -260,7 +266,8 @@
         "tests/e2e/store-product-menu.spec.ts",
         "tests/e2e/pagination-responsive.spec.ts",
         "tests/e2e/store-order-prototype.spec.ts",
-        "tests/e2e/product-all-view.spec.ts"
+        "tests/e2e/product-all-view.spec.ts",
+        "tests/e2e/operations-batch-shelf.spec.ts"
       ],
       "backendTests": [
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
@@ -284,7 +291,8 @@
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java",
         "backend/src/test/java/com/zdm/platform/security/EffectivePermissionResolverTest.java",
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java",
-        "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java"
+        "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java"
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
@@ -300,15 +308,15 @@
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "27ff2ff5fcdf02b917425ed3e714bf9a47fafebb817775de33541cff82d2da7e",
-        "tests/e2e/accessory-permissions.spec.ts": "715ec12dcf7117d6f8db7869c3471be56c96f616db92e25469cb96c8d53cfed5",
+        "tests/e2e/accessory-permissions.spec.ts": "aa1213f4163b18f53a26b433c491e1402a779c7897078a169393d84db2cba70d",
         "tests/e2e/admin-foundation.spec.ts": "5be97635da48a1778d0aa3faf341e7151c62e972d813a2347567d4660b61df7b",
         "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
         "tests/e2e/feedback-foundation.spec.ts": "3417bb2a812249632155aa88fdf3593ada446b8c3e945c0925313cc0e70d8898",
-        "tests/e2e/finished-stock-permissions.spec.ts": "1847061ef35f374d1ca3b50de4278b21c4769cd956217faa59daa9900e72fed8",
+        "tests/e2e/finished-stock-permissions.spec.ts": "96690ee0728c57b121ecb752bcbe8e42c555177778a847ffa379ccf74482e379",
         "tests/e2e/login.spec.ts": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
         "tests/e2e/markup-configuration.spec.ts": "f6537e115a129a012269ec8318142c897fd9532454ff1c7aa160c97f81c8cea5",
         "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
-        "tests/e2e/permission-center.spec.ts": "7727aa01f1b12b524b78a78145d379e2dc15dc8fbd707658a78aa8830262b606",
+        "tests/e2e/permission-center.spec.ts": "a1b5d17473d83bc3c43d041ad01dcc9fb90350424691a22341ccaf6e06f41b0d",
         "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
         "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
         "tests/e2e/slab-publish-layout.spec.ts": "1cccc4b0fd932b46bbaadbd95790c44b51b4ca0a666f30e672f0cd60ecec6927",
@@ -330,13 +338,18 @@
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "ec07d84f2affcb69af9811fe30d13397b5b014bb4b568cfb8235411820efdd61",
+        "tests/e2e/product-all-view.spec.ts": "3bff54d544d2534e71d3c310996b5c1078fde6922879a8c19dadf1d4a8b46a2c",
         "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
-        "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "6e1d79598ca04efefba7f308776f189437f7ee6aa56f2fd40042d1597a5b452b",
+        "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "e1b507b5cb26e8bb984a733d149dc2931369c7d2f5aab5702190ecf55ae3c0d3",
         "backend/src/test/java/com/zdm/platform/security/EffectivePermissionResolverTest.java": "244db8e06b91f8ca411a8e91f55c4efafd2561a90b035528de6d75e8ddb37e0b",
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java": "9f3dee717ec95bff55c0351f718cdfe956e98324849bec98dd0e2da014836018",
-        "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java": "b5c2589b50e90976401dba166539890aff278f434fcde20a62b2d5ffa7879f52"
+        "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java": "b5c2589b50e90976401dba166539890aff278f434fcde20a62b2d5ffa7879f52",
+        "tests/e2e/operations-batch-shelf.spec.ts": "74533ffdc10b350e969cd17581c19acdc313946aefb236785b6422d512f7248d",
+        "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java": "120223be8f4f069949e4056a60029a173f73b9ea4c278d4fcf736d24e202084d",
+        "src/services/operationsBatchShelf.test.ts": "538f45bbccd3fb65c5acba5207107b2846d2ae31d17e12a3c48beeb67f6c40b3",
+        "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
+        "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7"
       },
       "testChanges": [
         {
@@ -1508,6 +1521,54 @@
           "before": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
           "after": "edc02a65b4b6fb2d5d364df54a1311e4d639246ffe6e6aa5b381b7790325be82",
           "reason": "用户仅确认门店库存恢复不新增日志及移除两个上架筛选；补充恢复状态时间和历史日志不变断言，保留原全部断言、超时与零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-permissions.spec.ts",
+          "before": "715ec12dcf7117d6f8db7869c3471be56c96f616db92e25469cb96c8d53cfed5",
+          "after": "aa1213f4163b18f53a26b433c491e1402a779c7897078a169393d84db2cba70d",
+          "reason": "用户确认仅运营三模块全部/仓库批量上架：同步权限由仓库移到页面全局、混合结果弹窗和新增选择列居中断言；保留其余断言、超时、零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock-permissions.spec.ts",
+          "before": "1847061ef35f374d1ca3b50de4278b21c4769cd956217faa59daa9900e72fed8",
+          "after": "96690ee0728c57b121ecb752bcbe8e42c555177778a847ffa379ccf74482e379",
+          "reason": "用户确认仅运营三模块全部/仓库批量上架：同步权限由仓库移到页面全局、混合结果弹窗和新增选择列居中断言；保留其余断言、超时、零重试。"
+        },
+        {
+          "file": "tests/e2e/permission-center.spec.ts",
+          "before": "7727aa01f1b12b524b78a78145d379e2dc15dc8fbd707658a78aa8830262b606",
+          "after": "a1b5d17473d83bc3c43d041ad01dcc9fb90350424691a22341ccaf6e06f41b0d",
+          "reason": "用户确认仅运营三模块全部/仓库批量上架：同步权限由仓库移到页面全局、混合结果弹窗和新增选择列居中断言；保留其余断言、超时、零重试。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "ec07d84f2affcb69af9811fe30d13397b5b014bb4b568cfb8235411820efdd61",
+          "after": "3bff54d544d2534e71d3c310996b5c1078fde6922879a8c19dadf1d4a8b46a2c",
+          "reason": "用户确认仅运营三模块全部/仓库批量上架：同步权限由仓库移到页面全局、混合结果弹窗和新增选择列居中断言；保留其余断言、超时、零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java",
+          "before": "6e1d79598ca04efefba7f308776f189437f7ee6aa56f2fd40042d1597a5b452b",
+          "after": "e1b507b5cb26e8bb984a733d149dc2931369c7d2f5aab5702190ecf55ae3c0d3",
+          "reason": "用户确认仅运营三模块全部/仓库批量上架：同步权限由仓库移到页面全局、混合结果弹窗和新增选择列居中断言；保留其余断言、超时、零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock-permissions.spec.ts",
+          "before": "a9a22198ed96331cb3cb052d44729bb7a49e36fba04f23c07d5a864248fc777e",
+          "after": "96690ee0728c57b121ecb752bcbe8e42c555177778a847ffa379ccf74482e379",
+          "reason": "继承当前批次此前用户已批准测试变更；本次仅同步运营三模块全部/仓库批量上架及全局权限、结果弹窗，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-permissions.spec.ts",
+          "before": "8e2ebbaf06b34827b8413f2f036e9ab6c7461597d9c3693d66fc69a465eef1dc",
+          "after": "aa1213f4163b18f53a26b433c491e1402a779c7897078a169393d84db2cba70d",
+          "reason": "继承当前批次此前用户已批准测试变更；本次仅同步运营三模块全部/仓库批量上架及全局权限、结果弹窗，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/permission-center.spec.ts",
+          "before": "3ab23b4c807f89c55420477a5adf6353d24a6ec67a4bf280c4f0a3a95198152a",
+          "after": "a1b5d17473d83bc3c43d041ad01dcc9fb90350424691a22341ccaf6e06f41b0d",
+          "reason": "继承当前批次此前用户已批准测试变更；本次仅同步运营三模块全部/仓库批量上架及全局权限、结果弹窗，保留其余断言、超时和零重试。"
         }
       ],
       "routes": [
@@ -1533,6 +1594,7 @@
         "tests/e2e/login.spec.ts",
         "tests/e2e/markup-configuration.spec.ts",
         "tests/e2e/media-upload-standard.spec.ts",
+        "tests/e2e/operations-batch-shelf.spec.ts",
         "tests/e2e/permission-center.spec.ts",
         "tests/e2e/product-all-view.spec.ts",
         "tests/e2e/product-state-activity.spec.ts",
@@ -1549,7 +1611,10 @@
         "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java",
         "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java",
         "tests/e2e/accessory-api-mocks.ts",
-        "tests/e2e/product-test-navigation.ts"
+        "tests/e2e/product-test-navigation.ts",
+        "src/services/operationsBatchShelf.test.ts",
+        "src/components/OperationsBatchShelfResult.test.ts",
+        "src/components/foundation/actions/confirmation.test.ts"
       ]
     }
   ]

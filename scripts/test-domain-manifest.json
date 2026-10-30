@@ -154,7 +154,7 @@
       "dynamicImports": 0
     },
     "scripts/business-regression-contracts.json": {
-      "digest": "29cf4ae7d62623794a549ef876b32cb8fcc1a346e10243ac3c9d1d7cbee0a65b",
+      "digest": "2e72928f386a381f828492a42bb93d3170759f5f64822fb2d62297ca06ee6372",
       "imports": [],
       "dynamicImports": 0
     },
@@ -478,7 +478,7 @@
       "dynamicImports": 0
     },
     "scripts/confirmation-policy.mjs": {
-      "digest": "72c8ce0a1e4cec66958654f171d86e500fc67e22d69d716a73b828d729667175",
+      "digest": "1fc1066de6a19467c75c56d696c2599d0349b649ff461e7d873dd0766c54f3dc",
       "imports": ["src/components/foundation/actions/button-functions.json"],
       "dynamicImports": 0
     },
@@ -1154,7 +1154,7 @@
       "dynamicImports": 0
     },
     "scripts/ui-template-policy.test.mjs": {
-      "digest": "40a60676941ae380f0e6109b1c4c02360044ddb2c5068cb1a50e6236c8c3b60e",
+      "digest": "9d2395a8233830ef5d5be7bb6208026e5e912d259eb7b93cea33618cb66159ed",
       "imports": [
         "scripts/button-color-policy.mjs",
         "scripts/confirmation-policy.mjs",

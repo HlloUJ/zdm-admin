@@ -476,7 +476,6 @@ describe('finished stock catalog contract', () => {
         'admin.finished-stock-management.warehouse',
         [
           ['查看', 'admin.finished-stock-management.warehouse.view'],
-          ['批量上架', 'admin.finished-stock-management.warehouse.batch-shelf'],
           ['上架', 'admin.finished-stock-management.warehouse.shelf'],
           ['编辑', 'admin.finished-stock-management.warehouse.edit'],
           ['删除', 'admin.finished-stock-management.warehouse.delete'],
@@ -515,8 +514,11 @@ describe('finished stock catalog contract', () => {
         ],
       ],
     ]);
-    expect(page.tabs.slice(1).flatMap((tab) => tab.actions)).toHaveLength(19);
-    expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);
+    expect(page.tabs.slice(1).flatMap((tab) => tab.actions)).toHaveLength(18);
+    expect(page.actions).toEqual([
+      { label: '批量上架', value: 'admin.finished-stock-management.batch-shelf' },
+      { label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' },
+    ]);
     const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>
       value.startsWith('admin.finished-stock-management.'),
     );
@@ -587,7 +589,7 @@ describe('slab operations details', () => {
       .find((item) => item.value === 'admin.slab-management')!;
     expect(page.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);
     expect(page.tabs.slice(1, 3).map((tab) => tab.actions.map((action) => action.label))).toEqual([
-      ['查看', '批量上架', '上架', '编辑', '删除'],
+      ['查看', '上架', '编辑', '删除'],
       ['查看', '批量下架', '下架', '编辑', '删除'],
     ]);
     for (const tab of page.tabs.filter((tab) => !tab.value.endsWith('.all'))) {

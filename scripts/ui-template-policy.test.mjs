@@ -1118,3 +1118,19 @@ test('all shared batch drawers use native cards and check tags without retaining
   ])
     assert.ok(accessory.includes(`accessoryPage('${name}', ${component})`));
 });
+
+test('batch shelf result acknowledgement has an explicit narrow registry', () => {
+  assert.deepEqual(
+    confirmationViolations(
+      'src/components/Result.vue',
+      `<template><AdminDialog :confirmation="{ kind: 'acknowledgement', action: 'productBatchShelfResult' }" /></template>`,
+    ),
+    [],
+  );
+  assert.ok(
+    confirmationViolations(
+      'src/components/Result.vue',
+      `<template><AdminDialog :confirmation="{ kind: 'acknowledgement', action: 'unregistered' }" /></template>`,
+    ).length > 0,
+  );
+});

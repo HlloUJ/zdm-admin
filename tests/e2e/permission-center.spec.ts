@@ -1120,9 +1120,9 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const finishedRows = roleMatrix.locator('tbody tr');
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
-    ['操作日志'],
+    ['批量上架', '操作日志'],
     ['查看'],
-    ['查看', '批量上架', '上架', '编辑', '删除'],
+    ['查看', '上架', '编辑', '删除'],
     ['查看', '批量下架', '下架', '编辑', '删除'],
     ['查看', '详情'],
     ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],
@@ -1137,7 +1137,10 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(adminProductSecondMenuLabels);
   await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
   const slabGlobalPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '页面全局' }).last();
-  await expect(slabGlobalPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(['操作日志']);
+  await expect(slabGlobalPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
+    '批量上架',
+    '操作日志',
+  ]);
   await expect(roleMatrix.getByText('操作日志', { exact: true })).toHaveCount(3);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();

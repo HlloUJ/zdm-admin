@@ -27,6 +27,17 @@ class FunctionPermissionNormalizerTest {
   }
 
   @Test
+  void operationsBatchShelfIsGlobalWithoutGrantingSingleShelfOrViews() {
+    for (String module : List.of("finished-stock-management", "accessory-management", "slab-management")) {
+      String prefix = "admin." + module;
+      assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix + ".batch-shelf")))
+          .containsExactly(prefix + ".batch-shelf");
+      assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix + ".warehouse.batch-shelf")))
+          .containsExactly(prefix + ".warehouse.view", prefix + ".warehouse.batch-shelf", prefix + ".batch-shelf");
+    }
+  }
+
+  @Test
   void retiredStorePricePermissionsNeverExpandIntoNewGrants() {
     String retired = "store.price-configuration.view,store.price-configuration.create,"
         + "store.price-configuration.edit,store.price-configuration.toggle-status,store.price-configuration.delete";
