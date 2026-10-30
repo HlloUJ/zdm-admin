@@ -611,7 +611,7 @@ test('source specification editor exposes cost and stock without operations pric
     await picker.getByRole('button', { name, exact: true }).click();
   await page.getByRole('button', { name: '确认，下一步' }).click();
   await page.getByRole('button', { name: '创建规格', exact: true }).click();
-  await page.getByPlaceholder('请输入商品规格').fill('测试规格');
+  await page.getByPlaceholder('请输入商品规格').fill('测试规格'.repeat(12));
   await page
     .locator('.t-dialog:visible')
     .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
@@ -619,6 +619,44 @@ test('source specification editor exposes cost and stock without operations pric
   const table = page.locator('.spec-table-block');
   await expect(table.getByRole('columnheader', { name: '*成本价', exact: true })).toBeVisible();
   await expect(table.getByRole('columnheader', { name: /指导价/ })).toHaveCount(0);
+  const originalViewport = page.viewportSize()!;
+  await page.setViewportSize({ width: 1689, height: 1000 });
+  const tableEdges = () =>
+    table.evaluate((element) => {
+      const content = element.querySelector('.t-table__content')!;
+      const grid = content.querySelector('table')!;
+      const lastHeader = grid.querySelector('thead th:last-child')!;
+      const lastCell = grid.querySelector('tbody tr:first-child td:last-child')!;
+      const right = grid.getBoundingClientRect().right;
+      return {
+        headerGap: Math.abs(right - lastHeader.getBoundingClientRect().right),
+        rowGap: Math.abs(right - lastCell.getBoundingClientRect().right),
+        overflowing: content.scrollWidth > content.clientWidth + 1,
+      };
+    });
+  await expect.poll(tableEdges).toEqual({ headerGap: 0, rowGap: 0, overflowing: false });
+  await page.setViewportSize({ width: 900, height: 1000 });
+  await expect
+    .poll(() =>
+      table.locator('.t-table__content').evaluate((content) => {
+        const right = content.getBoundingClientRect().right;
+        const grid = content.querySelector('table')!;
+        const lastHeader = grid.querySelector('thead th:last-child')!;
+        const lastCell = grid.querySelector('tbody tr:first-child td:last-child')!;
+        return {
+          scrollable: content.scrollWidth > content.clientWidth,
+          headerVisible: Math.abs(right - lastHeader.getBoundingClientRect().right) <= 2,
+          rowVisible: Math.abs(right - lastCell.getBoundingClientRect().right) <= 2,
+        };
+      }),
+    )
+    .toEqual({ scrollable: true, headerVisible: true, rowVisible: true });
+  await table.locator('.t-table__content').evaluate((content) => {
+    content.scrollLeft = content.scrollWidth;
+  });
+  await expect(table.getByRole('columnheader', { name: '操作', exact: true })).toBeVisible();
+  await page.setViewportSize(originalViewport);
+
   await page.getByText('批量填写', { exact: true }).click();
   await expect(page.locator('.batch-field-grid').getByText('成本价', { exact: true })).toBeVisible();
   await expect(page.locator('.batch-field-grid').getByText('指导价', { exact: true })).toHaveCount(0);

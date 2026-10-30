@@ -469,13 +469,17 @@
                     <template #icon><t-icon name="add" /></template>
                     创建规格
                   </t-button>
-                  <div v-if="specRows.length" class="spec-table-block spec-table-block--stable-feedback">
+                  <div
+                    v-if="specRows.length"
+                    ref="specTableElement"
+                    class="spec-table-block spec-table-block--stable-feedback"
+                  >
                     <t-table
                       row-key="id"
                       :data="specRows"
                       :columns="specColumns"
                       :rowspan-and-colspan="specRowspanAndColspan"
-                      table-content-width="max-content"
+                      :table-content-width="specTableContentWidth"
                       bordered
                       hover
                       table-layout="auto"
@@ -1208,7 +1212,7 @@ import ProductDetail from '../management/components/ProductDetail.vue';
 import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
 import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
-import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 const tabs: TabConfig[] = [
   { value: 'all', label: '全部' },
@@ -1983,7 +1987,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
 });
 const requiredColumnTitle = (label: string) => () =>
   h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);
-const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
+const baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },
     { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 148 },
@@ -2018,6 +2022,48 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     ...(!isOperationsEdit.value ? tailColumns : []),
   ];
 });
+// Use the native content-sized table to measure columns before allocating spare width.
+// Pin those widths through Table props so validation tips cannot redistribute columns.
+const specTableElement = ref<HTMLElement>();
+const specColumnWidths = ref<number[]>([]);
+let specMeasurementVersion = 0;
+const specColumns = computed(() =>
+  baseSpecColumns.value.map((column, index) => ({
+    ...column,
+    ...(specColumnWidths.value[index] ? { width: specColumnWidths.value[index] } : {}),
+  })),
+);
+const specTableContentWidth = computed(() =>
+  specColumnWidths.value.length
+    ? `max(100%, ${specColumnWidths.value.reduce((sum, width) => sum + width, 0)}px)`
+    : 'max-content',
+);
+watch(
+  [
+    () =>
+      JSON.stringify([
+        baseSpecColumns.value.map((column) => [
+          column.colKey,
+          column.width,
+          column.minWidth,
+          typeof column.title === 'string' ? column.title : '',
+        ]),
+        salesAttributeFields.value.map((field) => [field.key, field.label, field.type, field.required]),
+      ]),
+    () => JSON.stringify(specRows.value.map((row) => row.specText ?? '')),
+  ],
+  async () => {
+    const version = ++specMeasurementVersion;
+    specColumnWidths.value = [];
+    await nextTick();
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    if (version !== specMeasurementVersion) return;
+    const headers = specTableElement.value?.querySelectorAll('thead th');
+    if (!headers || headers.length !== baseSpecColumns.value.length) return;
+    specColumnWidths.value = Array.from(headers, (header) => Math.ceil(header.getBoundingClientRect().width));
+  },
+  { flush: 'post' },
+);
 const specRowspanAndColspan = ({
   rowIndex,
   col,
