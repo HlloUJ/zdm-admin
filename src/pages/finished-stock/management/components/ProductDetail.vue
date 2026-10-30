@@ -160,8 +160,8 @@
               </template>
             </t-table>
           </component>
-          <t-descriptions :class="{ 'product-detail__sales-summary': !drawerLayout }" bordered :column="2">
-            <t-descriptions-item label="总库存" :span="2">{{ product.stock }}</t-descriptions-item>
+          <t-descriptions class="product-detail__sales-summary" bordered :column="drawerLayout ? 3 : 2">
+            <t-descriptions-item label="总库存" :span="drawerLayout ? 3 : 2">{{ product.stock }}</t-descriptions-item>
           </t-descriptions>
         </component>
       </slot>
