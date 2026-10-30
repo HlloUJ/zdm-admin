@@ -459,8 +459,15 @@ test('all independent image/video uploads share native Upload and leave rich tex
     'src/pages/slab/management/index.vue',
     'src/pages/craft/finished-stock/index.vue',
   ]) {
-    assert.match(read(file), /<AdminMediaUpload/);
-    assert.match(read(file), /import\s*\{[^}]*\bAdminMediaUpload\b[^}]*\}\s*from\s*'@\/components\/foundation'/);
+    if (file === 'src/pages/finished-stock/management/index.vue') {
+      assert.doesNotMatch(
+        read(file),
+        /AdminMediaUpload|ProductRichEditor|uploadFinishedProductMedia|createFinishedProduct/,
+      );
+    } else {
+      assert.match(read(file), /<AdminMediaUpload/);
+      assert.match(read(file), /import\s*\{[^}]*\bAdminMediaUpload\b[^}]*\}\s*from\s*'@\/components\/foundation'/);
+    }
     assert.doesNotMatch(read(file), /SupplyChainNativeMediaUpload|class="upload-grid/);
   }
   for (const file of files('src').filter((file) => /\.(vue|css)$/.test(file))) {
@@ -483,7 +490,10 @@ test('all independent image/video uploads share native Upload and leave rich tex
   assert.match(attachments, /#file-list-display/);
   assert.doesNotMatch(attachments, /<AdminMediaUpload|<style/);
   assert.match(read('src/pages/finished-stock/supply-chain/index.vue'), /<ProductRichEditor/);
-  assert.match(read('src/pages/finished-stock/management/index.vue'), /<ProductRichEditor/);
+  assert.doesNotMatch(
+    read('src/pages/finished-stock/management/index.vue'),
+    /ProductRichEditor|uploadFinishedProductMedia|createFinishedProduct|useFinishedStockSpecDialog/,
+  );
 });
 
 test('manual native form error states always include field messages and error text stays enabled', () => {
