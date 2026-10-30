@@ -281,8 +281,8 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     log.setProductName(product.getName());
     log.setMerchantCode(product.getSku());
     log.setPublisherType(product.getPublisherType());
-    log.setOperationType(reentry ? "REENTRY" : "SOURCE_SHELF");
-    log.setOperationSummary(reentry ? REENTRY_SUMMARY : SOURCE_SHELF_SUMMARY);
+    log.setOperationType("SOURCE_SHELF");
+    log.setOperationSummary(SOURCE_SHELF_SUMMARY);
     log.setAfterStatus(product.getStatus());
     log.setOperationSource(reentry ? "MANUAL" : "SUPPLY_CHAIN");
     log.setOperatorName(identity.displayName());
@@ -292,7 +292,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品入仓日志保存失败", error); }
     save(log);
-    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),log.getOperationType(),log.getStandardReason(),log.getDetailReason());
+    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),reentry ? "REENTRY" : log.getOperationType(),log.getStandardReason(),log.getDetailReason());
     Map<String, Long> references = new LinkedHashMap<>();
     retainMedia(snapshot, "after", references);
     history.retain("FINISHED_PRODUCT_LOG", log.getId(), references);
@@ -422,7 +422,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
       for (int i = 0; i < 3; i++) { args.add("%" + keyword.trim() + "%"); }
     }
     String sourceTarget = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')";
-    String visibleType = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' THEN CASE "
+    String visibleType = "CASE WHEN business_client_code='admin' AND operation_type='REENTRY' THEN 'SOURCE_SHELF' WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' THEN CASE "
         + sourceTarget + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' ELSE 'SOURCE_PURGE' END "
         + "WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
         + sourceTarget + " WHEN 'selling' THEN 'SOURCE_SHELF' WHEN 'offShelf' THEN 'SOURCE_OFF_SHELF'"
@@ -495,6 +495,10 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
   }
 
   private void normalizeOperation(FinishedOperationLog log) {
+    if ("admin".equals(log.getBusinessClientCode()) && "REENTRY".equals(log.getOperationType())) {
+      log.setOperationType("SOURCE_SHELF");
+      log.setOperationSummary(SOURCE_SHELF_SUMMARY);
+    }
     if ("PRICE_UPDATE".equals(log.getOperationType()) && "MANUAL".equals(log.getOperationSource())) {
       log.setOperationType("UPDATE");
       log.setOperationSummary("编辑商品");

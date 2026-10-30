@@ -291,7 +291,7 @@ public class AccessoryLifecycleService {
       else {
         var reentry = new LinkedHashMap<String, Object>(slabLogs.arrivalSnapshot(id));
         reentry.put("重新入仓原因", Map.of("before", "", "after", FinishedOperationLogService.REENTRY_SUMMARY));
-        record(kind, row, "admin", "REENTRY", null, null, "warehouse", reentry);
+        record(kind, row, "admin", "SOURCE_SHELF", null, null, "warehouse", reentry);
       }
     }
     sqlSession.clearCache();
@@ -362,7 +362,7 @@ public class AccessoryLifecycleService {
     log.put("before_status",before);log.put("after_status",after);
     log.put("operation_source",business.equals(actor.clientCode())?"MANUAL":"SUPPLY_CHAIN");log.put("operated_at",java.time.LocalDateTime.now());
     try { log.put("change_details",json.writeValueAsString(changes)); } catch(JsonProcessingException error) { throw new IllegalStateException("日志序列化失败",error); }
-    stateActivities.record(kind==Kind.ACCESSORY?"accessory":"slab",business,((Number)row.get("id")).longValue(),before,after,actor.accountId(),actor.clientCode(),type,(String)log.get("standard_reason"),(String)log.get("detail_reason"));
+    stateActivities.record(kind==Kind.ACCESSORY?"accessory":"slab",business,((Number)row.get("id")).longValue(),before,after,actor.accountId(),actor.clientCode(),changes.containsKey("重新入仓原因") ? "REENTRY" : type,(String)log.get("standard_reason"),(String)log.get("detail_reason"));
     Number logId = new SimpleJdbcInsert(jdbc).withTableName(kind.logs).usingColumns(log.keySet().toArray(String[]::new)).usingGeneratedKeyColumns("id").executeAndReturnKey(log);
     if(kind==Kind.SLAB) { slabLogs.retainSnapshot(logId.longValue(), changes); }
   }

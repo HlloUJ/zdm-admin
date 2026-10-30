@@ -176,17 +176,26 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
     if ("accessory".equals(kind)) { accessoryLifecycle.purgeOperations(AccessoryLifecycleService.Kind.ACCESSORY, 99880L); }
     else { lifecycle.purgeOperations("slab".equals(kind) ? ProductLifecycleService.Kind.SLAB : ProductLifecycleService.Kind.FINISHED, 99880L); }
     assertThat(jdbc.queryForMap("SELECT * FROM " + logs(kind) + " WHERE id=?", original.get("id"))).isEqualTo(original);
-    var log = jdbc.queryForMap("SELECT * FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND operation_type='REENTRY'");
+    var log = jdbc.queryForMap("SELECT * FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND operation_type='SOURCE_SHELF' AND id<>?", original.get("id"));
     assertThat(log).containsEntry("operator_client_code", "admin").containsEntry("operator_name", "真实触发人")
         .containsEntry("operation_source", "MANUAL").containsEntry("after_status", "warehouse");
     assertThat(((Number) log.get("operator_account_id")).longValue()).isEqualTo(1L);
-    assertThat(log.get("operation_summary")).isEqualTo(FinishedOperationLogService.REENTRY_SUMMARY);
+    assertThat(log.get("operation_summary")).isEqualTo(FinishedOperationLogService.SOURCE_SHELF_SUMMARY);
     assertThat(json.readTree((String) log.get("change_details")).path("重新入仓原因").path("after").asText()).isEqualTo(FinishedOperationLogService.REENTRY_SUMMARY);
     assertThat(jdbc.queryForObject("SELECT status FROM " + table(kind) + " WHERE id=99880", String.class)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT operations_deleted FROM " + table(kind) + " WHERE id=99880", Boolean.class)).isFalse();
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND operation_type='SOURCE_SHELF'", Long.class)).isEqualTo(1L);
-    String body = mvc.perform(get("/api/admin/" + endpoint(kind) + "/operation-logs").param("operationType", "REENTRY")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString();
-    assertThat(json.readTree(body).path("data").path("records")).hasSize(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND operation_type='SOURCE_SHELF'", Long.class)).isEqualTo(2L);
+    assertThat(jdbc.queryForObject("SELECT warehouse_entry_type FROM product_state_activity WHERE kind=? AND business_client_code='admin' AND record_id=99880", String.class, kind)).isNull();
+    jdbc.update("UPDATE " + logs(kind) + " SET operation_type='REENTRY' WHERE id=?", log.get("id"));
+    String body = mvc.perform(get("/api/admin/" + endpoint(kind) + "/operation-logs").param("operationType", "SOURCE_SHELF")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+    assertThat(json.readTree(body).path("data").path("records")).hasSize(2);
+    for (JsonNode visible : json.readTree(body).path("data").path("records")) {
+      assertThat(visible.path("operationType").asText()).isEqualTo("SOURCE_SHELF");
+      if (visible.path("id").asLong() == ((Number) log.get("id")).longValue()) {
+        assertThat(visible.path("operationSummary").asText()).isEqualTo(FinishedOperationLogService.SOURCE_SHELF_SUMMARY);
+      }
+    }
+    assertThat(jdbc.queryForObject("SELECT operation_type FROM " + logs(kind) + " WHERE id=?", String.class, log.get("id"))).isEqualTo("REENTRY");
   }
   @ParameterizedTest
   @org.junit.jupiter.params.provider.CsvSource({"finished,admin", "finished,supply-chain", "accessory,admin", "accessory,supply-chain", "slab,admin", "slab,supply-chain"})

@@ -20,7 +20,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper, SlabOperationLog> {
-  private static final String VISIBLE_TYPE = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' THEN CASE "
+  private static final String VISIBLE_TYPE = "CASE WHEN business_client_code='admin' AND operation_type='REENTRY' THEN 'SOURCE_SHELF' WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' THEN CASE "
       + "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')"
       + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' ELSE 'SOURCE_PURGE' END "
       + "WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
@@ -361,7 +361,6 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
       case "SOURCE_INTERNAL" -> "供应链状态变更";
       case "UPDATE" -> "编辑商品";
       case "PRICE_UPDATE" -> changes.containsKey("价格联动") ? "供应链成本变更，按当前系数重算售价" : "修改价格";
-      case "REENTRY" -> FinishedOperationLogService.REENTRY_SUMMARY;
       case "SOURCE_SHELF" -> beforeStatus == null ? "供应链已上架，商品进入运营管理平台仓库" : "来源重新上架，解除遮罩并保留运营状态";
       default -> "修改大板状态";
     };

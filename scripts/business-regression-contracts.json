@@ -293,7 +293,7 @@
         "tests/e2e/slab-collaboration.spec.ts": "d1b29192c7e0d09d1fb3c5ec8869e6abfb0086daa5947a08a37584bc08959971",
         "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
         "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "24c244651a0cf743ead693e157e379b358d5782f21e393ed9ec33396804a552f",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
         "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "e5265270725687b3fbcce3a20d87f86f8d3e18582f4170e9551dc7492ef72c00",
         "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "52e82e35ed16a3692e32570e86962855f3b2a8f38e3ea7d5891f7bc2a583e4de",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
@@ -1454,6 +1454,36 @@
           "before": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
           "after": "d1b29192c7e0d09d1fb3c5ec8869e6abfb0086daa5947a08a37584bc08959971",
           "reason": "用户确认V1.10撤回额外查询入口和分类规则，补消失断言与同状态不写入回归，保留其他断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "24c244651a0cf743ead693e157e379b358d5782f21e393ed9ec33396804a552f",
+          "after": "a14a0d27991ef11728d949fb365c503be55791d95193d6cea9019d2d4f396c5a",
+          "reason": "用户确认运营三模块取消重新入仓类型，调整为供应链上架并覆盖历史只读映射筛选，保留真实触发日志快照断言、超时与零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
+          "after": "a14a0d27991ef11728d949fb365c503be55791d95193d6cea9019d2d4f396c5a",
+          "reason": "用户确认运营三模块取消重新入仓类型，调整为供应链上架并覆盖历史只读映射筛选，保留真实触发日志快照断言、超时与零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "a14a0d27991ef11728d949fb365c503be55791d95193d6cea9019d2d4f396c5a",
+          "after": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
+          "reason": "用户确认运营三模块取消重新入仓类型，调整为供应链上架并覆盖历史只读映射筛选，保留真实触发日志快照断言、超时与零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "24c244651a0cf743ead693e157e379b358d5782f21e393ed9ec33396804a552f",
+          "after": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
+          "reason": "用户确认运营三模块取消重新入仓类型，调整为供应链上架并覆盖历史只读映射筛选，保留真实触发日志快照断言、超时与零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
+          "after": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
+          "reason": "用户确认运营三模块取消重新入仓类型，调整为供应链上架并覆盖历史只读映射筛选，保留真实触发日志快照断言、超时与零重试。"
         }
       ],
       "routes": [

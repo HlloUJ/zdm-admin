@@ -13090,6 +13090,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n  expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n});\n\nit('offers reentry only in operations and keeps its real trigger summary', () => {\n  const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';\n  expect(productOperationTypeLabel('REENTRY')).toBe('重新入仓');\n  expect(productLogFilterOptions('admin')).toContainEqual({ value: 'REENTRY', label: '重新入仓' });\n  expect(productLogFilterOptions('supply-chain').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productLogFilterOptions('store').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(reason);\n});\n",
+          "after": "  expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n  expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n});\n\nit('unifies legacy reentry labels and filters under source shelf', () => {\n  const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';\n  expect(productOperationTypeLabel('REENTRY')).toBe('供应链上架');\n  expect(productLogFilterOptions('admin')).toContainEqual({ value: 'SOURCE_SHELF', label: '供应链上架' });\n  expect(productLogFilterOptions('admin').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productLogFilterOptions('supply-chain').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productLogFilterOptions('store').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(\n    '供应链已上架，商品进入运营管理平台仓库',\n  );\n});\n",
+          "stage": "before-migrations",
+          "reason": "用户确认仅运营三模块取消重新入仓日志类型，新旧展示筛选统一供应链上架；原自动流程、真实触发信息和历史数据保留。"
+        },
+        {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
           "before": "  expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n  expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n});\n",
@@ -13101,6 +13107,24 @@
       "content": "f5a658e633d771320bfca7429be4eb47de8a58827bf89547a7c717dccec5e2ec",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "  PHYSICAL_DELETE: '物理删除',\n  PURGE: '彻底删除',\n  SOLD_OUT: '售完',\n  STATUS_UPDATE: '状态变更',\n  REENTRY: '重新入仓',\n  SOURCE_SHELF: '供应链上架',\n  SOURCE_OFF_SHELF: '供应链下架',\n  SOURCE_DELETE: '供应链彻底删除',\n  SOURCE_DELETE_TO_RECYCLE: '供应链删除至回收站',\n",
+          "after": "  PHYSICAL_DELETE: '物理删除',\n  PURGE: '彻底删除',\n  SOLD_OUT: '售完',\n  STATUS_UPDATE: '状态变更',\n  SOURCE_SHELF: '供应链上架',\n  SOURCE_OFF_SHELF: '供应链下架',\n  SOURCE_DELETE: '供应链彻底删除',\n  SOURCE_DELETE_TO_RECYCLE: '供应链删除至回收站',\n",
+          "stage": "before-migrations",
+          "reason": "用户确认仅运营三模块取消重新入仓日志类型，新旧展示筛选统一供应链上架；原自动流程、真实触发信息和历史数据保留。"
+        },
+        {
+          "before": "  return finishedSourceSummaries[row.operationType] || productOperationSummary(row);\n}\n\nexport function productOperationTypeLabel(type: string): string {\n  return productOperationTypes[type] || type;\n}\n\nexport function canonicalProductOperationType(type: string): string {\n  if (type === 'PRICE_UPDATE') return 'UPDATE';\n  return ['RESTORE_WAREHOUSE', 'RESTORE_RECYCLE'].includes(type) ? 'RESTORE' : type;\n}\n\nexport function productOperationSummary(\n  row: Pick<ProductOperationLogRow, 'operationType' | 'operationSummary'>,\n): string {\n  if (row.operationType === 'UPDATE' && /^该商品.*已被修改$/.test(row.operationSummary)) return row.operationSummary;\n  return fixedSummaries[row.operationType] || row.operationSummary;\n}\n\n",
+          "after": "  return finishedSourceSummaries[row.operationType] || productOperationSummary(row);\n}\n\nexport function productOperationTypeLabel(type: string): string {\n  return productOperationTypes[canonicalProductOperationType(type)] || type;\n}\n\nexport function canonicalProductOperationType(type: string): string {\n  if (type === 'REENTRY') return 'SOURCE_SHELF';\n  if (type === 'PRICE_UPDATE') return 'UPDATE';\n  return ['RESTORE_WAREHOUSE', 'RESTORE_RECYCLE'].includes(type) ? 'RESTORE' : type;\n}\n\nexport function productOperationSummary(\n  row: Pick<ProductOperationLogRow, 'operationType' | 'operationSummary'>,\n): string {\n  if (row.operationType === 'REENTRY') return '供应链已上架，商品进入运营管理平台仓库';\n  if (row.operationType === 'UPDATE' && /^该商品.*已被修改$/.test(row.operationSummary)) return row.operationSummary;\n  return fixedSummaries[row.operationType] || row.operationSummary;\n}\n\n",
+          "stage": "before-migrations",
+          "reason": "用户确认仅运营三模块取消重新入仓日志类型，新旧展示筛选统一供应链上架；原自动流程、真实触发信息和历史数据保留。"
+        },
+        {
+          "before": "  return productOperationTypeOptions([\n    ...(client === 'supply-chain'\n      ? ['CREATE', 'UPDATE', ...commonActions]\n      : client === 'admin'\n        ? [...commonActions, 'REENTRY', ...upstreamActions]\n        : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),\n  ]);\n}\n\n",
+          "after": "  return productOperationTypeOptions([\n    ...(client === 'supply-chain'\n      ? ['CREATE', 'UPDATE', ...commonActions]\n      : client === 'admin'\n        ? [...commonActions, ...upstreamActions]\n        : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),\n  ]);\n}\n\n",
+          "stage": "before-migrations",
+          "reason": "用户确认仅运营三模块取消重新入仓日志类型，新旧展示筛选统一供应链上架；原自动流程、真实触发信息和历史数据保留。"
+        },
         {
           "reason": "2026-10-27 用户确认三个模块各端所有状态移除操作人来源标签及专用字段，修复状态时间，自动重新入仓独立记录且保留真实原因与触发人。",
           "stage": "before-migrations",
