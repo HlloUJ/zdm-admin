@@ -84,7 +84,8 @@
     "src/pages/order/prototype/SalesOrderList.vue",
     "src/components/foundation/official/responsive-layout.css",
     "src/services/productStateActivity.css",
-    "src/components/WarehouseEntryInformation.vue"
+    "src/components/WarehouseEntryInformation.vue",
+    "src/components/OperationsBatchShelfResult.vue"
   ],
   "contracts": {
     "src/App.vue": {
@@ -13782,6 +13783,24 @@
           "after": "<template>\n  <t-space direction=\"vertical\" size=\"small\" align=\"start\">\n    <t-tag\n      :theme=\"\n        entry.warehouseEntryType === 'offShelf'\n          ? 'warning'\n          : entry.warehouseEntryType === 'firstEntry'\n            ? 'primary'\n            : 'default'\n      \"\n      variant=\"light\"\n    >\n      {{ warehouseEntryLabel(entry.warehouseEntryType) }}\n    </t-tag>\n    <t-tooltip\n      v-if=\"summary\"\n      v-model:visible=\"detailTooltipVisible\"\n      :disabled=\"tooltipDisabled || !isTruncated\"\n      :content=\"summary\"\n      placement=\"bottom-left\"\n    >\n      <t-typography-text\n        ref=\"summaryText\"\n        data-entry-detail\n        class=\"warehouse-entry-summary\"\n        theme=\"secondary\"\n        :content=\"summary\"\n        :ellipsis=\"{ row: 2 }\"\n      />\n    </t-tooltip>\n    <slot />\n  </t-space>\n</template>\n<script setup lang=\"ts\">\nimport { computed, nextTick, onBeforeUnmount, ref, watch, type ComponentPublicInstance } from 'vue';\nimport { warehouseEntryLabel, type WarehouseEntryInformation } from '@/services/warehouseEntry';\nconst props = defineProps<{ entry: WarehouseEntryInformation; tooltipDisabled?: boolean }>();\nconst summary = computed(() => {\n  const entry = props.entry;\n  if (['firstEntry', 'recycleRestore'].includes(entry.warehouseEntryType || '')) return '';\n  const detail = entry.warehouseEntryDetail || (entry.warehouseEntryType === 'offShelf' ? '未填写详细说明' : '');\n  return [entry.warehouseEntryReason, detail].filter(Boolean).join('；');\n});\nconst detailTooltipVisible = ref(false);\nconst summaryText = ref<ComponentPublicInstance>();\nconst isTruncated = ref(false);\nlet observer: ResizeObserver | undefined;\nconst measureTruncation = () => {\n  const element = (summaryText.value?.$el as HTMLElement | undefined)?.querySelector('p');\n  isTruncated.value = Boolean(\n    element && (element.scrollHeight > element.clientHeight + 1 || element.scrollWidth > element.clientWidth + 1),\n  );\n};\nwatch(\n  [summary, summaryText],\n  async () => {\n    await nextTick();\n    observer?.disconnect();\n    const element = summaryText.value?.$el as HTMLElement | undefined;\n    if (element && typeof ResizeObserver !== 'undefined') {\n      observer = new ResizeObserver(measureTruncation);\n      observer.observe(element);\n    }\n    measureTruncation();\n  },\n  { flush: 'post' },\n);\nonBeforeUnmount(() => observer?.disconnect());\nwatch(\n  () => props.tooltipDisabled || !isTruncated.value,\n  (disabled) => {\n    if (disabled) detailTooltipVisible.value = false;\n  },\n);\n</script>\n\n<style scoped>\n.warehouse-entry-summary {\n  margin: 0;\n  font: var(--td-font-body-small);\n}\n</style>\n",
           "stage": "before-migrations",
           "reason": "用户授权V1.7/V1.8：原因说明合并、两行省略、仅实际截断时完整气泡，次级字体及恢复原标签间距；保留原入库标签和历史弹窗气泡关闭。"
+        }
+      ]
+    },
+    "src/components/OperationsBatchShelfResult.vue": {
+      "script": "0339f6fe4ba34526b7f14da6c7500dc996baf73abd924e7a8f29dffa32c07131",
+      "template": "1b76def3a47984804ea3e108e90c922957db20ced8407d4c336cb92e44c29106",
+      "baselineRevision": "0cd1ce09ad5f132e206d7506d7af0369e335b0b5",
+      "baselineNote": "本组件晚于原视觉基线新增；本次首次登记采用修改前HEAD，保留现有业务脚本、结果内容及关闭事件。",
+      "approvedVisualPatches": [
+        {
+          "before": "    header=\"批量上架结果\"",
+          "after": "    header=\"批量上架结果\"\n    width=\"max-content\"\n    dialog-class-name=\"zdm-operation-result-dialog\"",
+          "reason": "2026-10-30用户确认仅批量上架结果弹框采用已批准的自适应宽度与溢出布局。"
+        },
+        {
+          "before": "table-layout=\"fixed\"",
+          "after": "table-layout=\"auto\"",
+          "reason": "同次确认按内容分配列宽，保留表头最小宽度及完整换行。"
         }
       ]
     }
