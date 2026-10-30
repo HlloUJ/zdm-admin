@@ -28,7 +28,6 @@ export function slabBatchButtons(status: SlabStatus, hasAction: PermissionCheck)
       { label: '发布商品', action: 'publish', icon: 'add' },
       { label: '批量下架', action: 'batchOffShelf', icon: 'download', className: 'brown-button' },
     ],
-    offShelf: [{ label: '批量放回到仓库', action: 'batchRestore', icon: 'rollback' }],
     soldOut: [],
     recycle: [
       { label: '批量放回到仓库', action: 'batchRestore', icon: 'rollback' },
@@ -71,12 +70,6 @@ export function slabRowButtons(status: SlabStatus, hasAction: PermissionCheck): 
     return filterActions([
       { label: '下架', action: 'offShelf' },
       { label: '编辑', action: 'edit' },
-    ]);
-  }
-  if (status === 'offShelf') {
-    return filterActions([
-      { label: '详情', action: 'detail' },
-      { label: '放回仓库', action: 'restore' },
       { label: '删除', action: 'delete' },
     ]);
   }

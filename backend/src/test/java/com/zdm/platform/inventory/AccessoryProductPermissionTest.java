@@ -34,15 +34,27 @@ class AccessoryProductPermissionTest {
   }
   @Test void onlySourceClientCanPublishAndEdit() {
     AccessoryProduct request=product("selling");
-    sourceController("selling.publish").create(request);
+    sourceController("publish", "warehouse.shelf").create(request);
     verify(service).createWithDetails(request);
-    assertThatThrownBy(() -> controller("selling.publish").create(request)).isInstanceOf(AccessDeniedException.class);
-    assertThatThrownBy(() -> sourceController("warehouse.publish").create(request)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> controller("publish").create(request)).isInstanceOf(AccessDeniedException.class);
+    assertThatThrownBy(() -> sourceController("publish").create(request)).isInstanceOf(AccessDeniedException.class);
     when(service.getById(1L)).thenReturn(product("selling"));
     sourceController("selling.edit").update(1L,request);
     verify(service).updateWithDetails(1L,request);
     controller("selling.edit").update(1L,request);
     verify(service).updateOperationWithDetails(1L,request,true);
+  }
+  @Test void globalPublishDoesNotGrantEditOrShelving() {
+    AccessoryProduct warehouse = product("warehouse");
+    sourceController("publish").create(warehouse);
+    verify(service).createWithDetails(warehouse);
+    for (String publisher : List.of("平台发布", "接口获取")) {
+      AccessoryProduct selling = product("selling");
+      selling.setPublisherType(publisher);
+      assertThatThrownBy(() -> sourceController("publish").create(selling)).isInstanceOf(AccessDeniedException.class);
+    }
+    when(service.getById(1L)).thenReturn(product("selling"));
+    assertThatThrownBy(() -> sourceController("publish").edit(1L, product("selling"))).isInstanceOf(AccessDeniedException.class);
   }
   @Test void statusPermissionsUseRestrictedUpdateAndRejectOtherOperations() {
     for (String permission : List.of("warehouse.shelf", "warehouse.batch-shelf")) {

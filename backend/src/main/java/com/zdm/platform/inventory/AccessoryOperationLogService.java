@@ -75,9 +75,6 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     values.put("发布类型", product.getPublisherType());
     values.put("创建人", product.getCreatedByName());
     values.put("创建时间", product.getCreatedAt());
-    values.put("下架原因", supplyChain ? product.getSourceOffShelfReason() : product.getOffShelfReason());
-    values.put("详细说明", supplyChain ? product.getSourceOffShelfDetail() : product.getOffShelfDetail());
-    values.put("下架时间", supplyChain ? product.getSourceOffShelfAt() : product.getOffShelfAt());
     values.put("规格维度", product.getSpecDimensions());
     values.put("销售规格", cleanRows(product.getVariants()));
     values.put("销售属性名称", salesAttributeNames(json.valueToTree(product.getVariants())));
@@ -174,6 +171,10 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     record(product, before, after, "UPDATE");
   }
 
+  public void recordOperation(AccessoryProduct product, Map<String, Object> before, Map<String, Object> after, String type) {
+    record(product, before, after, type);
+  }
+
   private void record(AccessoryProduct product, Map<String, Object> before, Map<String, Object> after, String forcedType) {
     Map<String, Object> changes = new LinkedHashMap<>();
     Map<String, Object> source = after == null ? before : after;
@@ -216,8 +217,12 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     log.setOperationSummary(labels.get(type));
     log.setBeforeStatus(previousStatus);
     log.setAfterStatus(nextStatus);
-    log.setStandardReason("supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfReason() : product.getOffShelfReason());
-    log.setDetailReason("supply-chain".equals(identities.require().clientCode()) ? product.getSourceOffShelfDetail() : product.getOffShelfDetail());
+    log.setStandardReason("OFF_SHELF".equals(type) ? product.getOffShelfReason() : null);
+    log.setDetailReason("OFF_SHELF".equals(type) ? product.getOffShelfDetail() : null);
+    if ("OFF_SHELF".equals(type)) {
+      changes.put("下架原因", Map.of("before", "", "after", product.getOffShelfReason()));
+      if (product.getOffShelfDetail() != null && !product.getOffShelfDetail().isBlank()) { changes.put("详细说明", Map.of("before", "", "after", product.getOffShelfDetail())); }
+    }
     log.setOperationSource("MANUAL");
     log.setOperatorName(identity.displayName());
     log.setOperatorAccountId(identity.accountId());
@@ -226,7 +231,7 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品操作日志保存失败", error); }
     save(log);
-    stateActivities.record("accessory",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode());
+    stateActivities.record("accessory",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),log.getOperationType(),log.getStandardReason(),log.getDetailReason());
     if ("admin".equals(identity.clientCode()) && storeUpstreamLogs != null
         && List.of("SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE").contains(type)) {
       storeUpstreamLogs.operationsChange(product.getId(), type, previousStatus, nextStatus);
@@ -276,8 +281,8 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     log.setProductName(product.getName());
     log.setMerchantCode(product.getSku());
     log.setPublisherType(product.getPublisherType());
-    log.setOperationType(reentry ? "REENTRY" : "SOURCE_SHELF");
-    log.setOperationSummary(reentry ? REENTRY_SUMMARY : SOURCE_SHELF_SUMMARY);
+    log.setOperationType("SOURCE_SHELF");
+    log.setOperationSummary(SOURCE_SHELF_SUMMARY);
     log.setAfterStatus(product.getStatus());
     log.setOperationSource(reentry ? "MANUAL" : "SUPPLY_CHAIN");
     log.setOperatorName(identity.displayName());
@@ -287,7 +292,7 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品入仓日志保存失败", error); }
     save(log);
-    stateActivities.record("accessory",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode());
+    stateActivities.record("accessory",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),reentry ? "REENTRY" : log.getOperationType(),log.getStandardReason(),log.getDetailReason());
     Map<String, Long> references = new LinkedHashMap<>();
     retainMedia(snapshot, "after", references);
     history.retain("ACCESSORY_PRODUCT_LOG", log.getId(), references);
@@ -417,7 +422,7 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
       for (int i = 0; i < 3; i++) { args.add("%" + keyword.trim() + "%"); }
     }
     String sourceTarget = "COALESCE(JSON_UNQUOTE(JSON_EXTRACT(change_details, '$.\"来源状态\".after')), '')";
-    String visibleType = "CASE WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' THEN CASE "
+    String visibleType = "CASE WHEN business_client_code='admin' AND operation_type='REENTRY' THEN 'SOURCE_SHELF' WHEN business_client_code='admin' AND operation_type='SOURCE_DELETE' THEN CASE "
         + sourceTarget + " WHEN 'recycle' THEN 'SOURCE_DELETE_TO_RECYCLE' ELSE 'SOURCE_PURGE' END "
         + "WHEN business_client_code='admin' AND operation_type='SOURCE_SYNC' THEN CASE "
         + sourceTarget + " WHEN 'selling' THEN 'SOURCE_SHELF' WHEN 'offShelf' THEN 'SOURCE_OFF_SHELF'"
@@ -490,6 +495,10 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
   }
 
   private void normalizeOperation(AccessoryOperationLog log) {
+    if ("admin".equals(log.getBusinessClientCode()) && "REENTRY".equals(log.getOperationType())) {
+      log.setOperationType("SOURCE_SHELF");
+      log.setOperationSummary(SOURCE_SHELF_SUMMARY);
+    }
     if ("PRICE_UPDATE".equals(log.getOperationType()) && "MANUAL".equals(log.getOperationSource())) {
       log.setOperationType("UPDATE");
       log.setOperationSummary("编辑商品");

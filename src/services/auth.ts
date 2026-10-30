@@ -1,5 +1,6 @@
 import { shallowRef } from 'vue';
 import { expandLegacyScopedPermission } from './functionPermissionCompatibility';
+import { isProductGlobalAction } from './productGlobalPermissions';
 import { clearAuthToken, request, setAuthToken } from './http';
 
 const AUTH_USER_STORAGE_KEY = 'zdm-admin-user';
@@ -68,7 +69,7 @@ const normalizeFunctionPermissions = (permissions: string[]) => {
       normalized.add(viewPermission);
       return;
     }
-    if (suffix !== 'view' && separatorIndex >= 0) normalized.add(viewPermission);
+    if (suffix !== 'view' && separatorIndex >= 0 && !isProductGlobalAction(permission)) normalized.add(viewPermission);
     normalized.add(permission);
   });
   return Array.from(normalized);

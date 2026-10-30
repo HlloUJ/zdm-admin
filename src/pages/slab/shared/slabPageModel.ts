@@ -1,3 +1,4 @@
+import type { WarehouseEntryInformation } from '@/services/warehouseEntry';
 import type { SlabOffShelfRecord, SlabOperationType, SlabPrice, SlabPublisherType, SlabStatus } from '@/services/slabs';
 import type { OperationLogPriceTierRow } from './operationLogPriceTiers';
 
@@ -9,8 +10,6 @@ export interface FilterState {
   color: string;
   grade: string;
   supplier: string;
-  offShelfReason: string;
-  offShelvedBy: string;
 }
 export interface OperationLogFilterState {
   keyword: string;
@@ -57,7 +56,7 @@ export interface DetailMediaItem {
   coverUrl?: string;
   type: 'image' | 'video';
 }
-export interface SlabItem {
+export interface SlabItem extends WarehouseEntryInformation {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
@@ -168,12 +167,12 @@ export type CornerFieldKey =
   | 'corner4Width';
 export type MeasurementField = 'length' | 'width' | 'height' | 'tolerance' | CornerFieldKey;
 export const tabs: {
-  value: SlabStatus;
+  value: SlabStatus | 'all';
   label: string;
 }[] = [
+  { value: 'all', label: '全部' },
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '已上架' },
-  { value: 'offShelf', label: '已下架' },
   { value: 'soldOut', label: '已售完' },
   { value: 'recycle', label: '回收站' },
 ];
@@ -188,8 +187,6 @@ export const makeFilterState = (): FilterState => ({
   color: '',
   grade: '',
   supplier: '',
-  offShelfReason: '',
-  offShelvedBy: '',
 });
 export const makeProductForm = (): ProductForm => ({
   variety: '',

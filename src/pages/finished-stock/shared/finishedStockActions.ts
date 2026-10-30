@@ -1,4 +1,4 @@
-export type FinishedStockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type FinishedStockStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';
 export type FinishedStockAction = 'edit' | 'detail' | 'shelf' | 'offShelf' | 'restore' | 'delete' | 'purge';
 
 export interface FinishedStockActionDefinition {
@@ -17,10 +17,6 @@ export const finishedStockActions: Record<FinishedStockStatus, readonly Finished
   selling: [
     { id: 'offShelf', label: '下架', permission: 'off-shelf' },
     { id: 'edit', label: '编辑', permission: 'edit' },
-  ],
-  offShelf: [
-    { id: 'detail', label: '详情', permission: 'detail' },
-    { id: 'restore', label: '放回仓库', permission: 'restore' },
     { id: 'delete', label: '删除', permission: 'delete' },
   ],
   soldOut: [{ id: 'detail', label: '详情', permission: 'detail' }],

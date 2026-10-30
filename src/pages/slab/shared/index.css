@@ -252,7 +252,7 @@
 .slab-image-placeholder {
   margin: auto;
   color: var(--td-text-color-placeholder);
-  font-size: var(--td-font-size-body-small);
+  font: var(--td-font-body-small);
 }
 
 .slab-meta {

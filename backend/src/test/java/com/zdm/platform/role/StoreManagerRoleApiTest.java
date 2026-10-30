@@ -91,6 +91,19 @@ class StoreManagerRoleApiTest extends SpringContainerTestSupport {
         .andExpect(status().isOk());
     assertThat(payload().getFunctionPermissions()).isEmpty();
   }
+  @Test void productCenterGlobalPermissionPersistsWithoutStateViewAndCannotExceedTerminal() throws Exception {
+    String permission = "store.finished-stock-management.select";
+    jdbc.update("UPDATE terminal_function_policies SET function_permissions=? WHERE terminal='store'", permission);
+    identity("admin",1L,991701L,"all","admin.permission-management.role-management.permission");
+    var p=payload(); p.setFunctionPermissions(permission);
+    mvc.perform(put("/api/admin/roles/"+id).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p)))
+        .andExpect(status().isOk());
+    assertThat(payload().getFunctionPermissions()).isEqualTo(permission);
+    p=payload(); p.setFunctionPermissions(permission + ",store.finished-stock-management.warehouse.edit");
+    mvc.perform(put("/api/admin/roles/"+id).contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(p)))
+        .andExpect(status().isForbidden());
+    assertThat(payload().getFunctionPermissions()).isEqualTo(permission);
+  }
   @Test void functionGrantAndDataScopeAndOrganizationRemainEnforced() throws Exception {
     identity("admin",1L,991701L,"all","admin.permission-management.role-management.edit");
     var p=payload();p.setFunctionPermissions("store.customer-management.daily.view");

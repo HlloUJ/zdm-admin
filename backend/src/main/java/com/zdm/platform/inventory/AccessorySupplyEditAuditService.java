@@ -101,7 +101,7 @@ public class AccessorySupplyEditAuditService {
           VALUES(?,?,?,?,?,'SOURCE_UPDATE',?,?,?,?,?,?,?)
           """, store.tenantId(), store.storeId(), store.id(), product.getId(), product.getName(), "该" + subject + "已被供应链修改",
           store.status(), nextStatus, changes.toString(), actor.accountId(), actor.displayName(), storeTime);
-      stateActivities.record("store-accessory","store",store.id(),store.status(),nextStatus,actor.accountId(),actor.clientCode());
+      stateActivities.record("store-accessory","store",store.id(),store.status(),nextStatus,actor.accountId(),actor.clientCode(),"SOURCE_UPDATE",!Objects.equals(store.status(),nextStatus) ? StoreAccessorySalePriceService.ATTENTION : null,null);
       Long id = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
       retain("STORE_ACCESSORY_PRODUCT_LOG", id, store.snapshot(), next);
     }
@@ -186,7 +186,7 @@ public class AccessorySupplyEditAuditService {
         """, product.getId(),product.getName(),product.getSku(),product.getPublisherType(),product.getCreatedByAccountId(),
         client,actor.clientCode(),actor.identityId(),type,summary,before.path("状态").asText(),after.path("状态").asText(),
         details.toString(),actor.displayName(),actor.accountId(),time,time);
-    stateActivities.record("accessory",client,product.getId(),before.path("状态").asText(),after.path("状态").asText(),actor.accountId(),actor.clientCode());
+    stateActivities.record("accessory",client,product.getId(),before.path("状态").asText(),after.path("状态").asText(),actor.accountId(),actor.clientCode(),type,null,null);
     Long id = jdbc.queryForObject("SELECT LAST_INSERT_ID()", Long.class);
     retain("ACCESSORY_PRODUCT_LOG", id, before, after);
   }

@@ -65,7 +65,7 @@ public final class FunctionPermissionNormalizer {
         continue;
       }
 
-      if (!"view".equals(suffix) && permission.contains(".")) {
+      if (!"view".equals(suffix) && permission.contains(".") && !isProductGlobalAction(permission)) {
         normalizedValues.add(viewPermission(permission));
       }
       normalizedValues.add(permission);
@@ -73,11 +73,28 @@ public final class FunctionPermissionNormalizer {
     return new ArrayList<>(normalizedValues);
   }
 
+  public static boolean isProductGlobalAction(String permission) {
+    return permission.matches("(admin|supply-chain)\\.(finished-stock-management|accessory-management|slab-management)\\.batch-shelf")
+        || permission.matches("store\\.(finished-stock-management|accessory-management)\\.batch-shelf")
+        || permission.matches("supply-chain\\.(finished-stock-management|accessory-management|slab-management)\\.publish")
+        || permission.matches("store\\.(finished-stock-management|accessory-management)\\.select");
+  }
+
   private static String suffix(String permission) {
     return permission.substring(permission.lastIndexOf('.') + 1);
   }
 
   private static Stream<String> expandLegacyScopedPermission(String permission) {
+    var batch = java.util.regex.Pattern.compile("^((?:admin|supply-chain)\\.(?:finished-stock-management|accessory-management|slab-management)|store\\.(?:finished-stock-management|accessory-management))\\.warehouse\\.batch-shelf$").matcher(permission);
+    if (batch.matches()) { return Stream.of(permission, batch.group(1) + ".warehouse.view", batch.group(1) + ".batch-shelf"); }
+    var product = java.util.regex.Pattern.compile(
+        "^(supply-chain\\.(?:finished-stock-management|accessory-management|slab-management))\\.(warehouse|selling)\\.publish$|^(store\\.(?:finished-stock-management|accessory-management))\\.(warehouse)\\.select$")
+        .matcher(permission);
+    if (product.matches()) {
+      String prefix = product.group(1) == null ? product.group(3) : product.group(1);
+      String scope = product.group(2) == null ? product.group(4) : product.group(2);
+      return Stream.of(prefix + "." + scope + ".view", prefix + (product.group(1) == null ? ".select" : ".publish"));
+    }
     String categorySortPrefix = Stream.of("finished", "accessory")
         .map(scope -> "admin.product-data-center.category." + scope)
         .filter(prefix -> permission.equals(prefix + ".move-up") || permission.equals(prefix + ".move-down"))

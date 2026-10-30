@@ -40,7 +40,7 @@
                   :value="activeTab"
                   class="status-tabs"
                   @change="
-                    activeTab = String($event) as StockStatus;
+                    activeTab = String($event) as StockTab;
                     handleTabChange();
                   "
                 >
@@ -160,9 +160,12 @@
                     row-key="id"
                     :data="pageData"
                     :columns="columns"
+                    :sort="tableSort"
+                    :sort-icon="stateActivitySortIcon"
                     :loading="loading"
                     hover
                     table-layout="fixed"
+                    @sort-change="onTimeSortChange"
                   >
                     <template #selectTitle>
                       <t-checkbox
@@ -191,7 +194,9 @@
                     <template #product="{ row }">
                       <div class="product-meta">
                         <div class="product-name">{{ row.name }}</div>
-                        <div class="product-code">ID：{{ row.id }}</div>
+                        <div class="product-code">
+                          ID：{{ row.id }} <ProductListStatusTag v-if="activeTab === 'all'" :status="row.status" />
+                        </div>
                       </div>
                     </template>
                     <template #supplier="{ row }">
@@ -201,18 +206,8 @@
                         <span class="store-text">平台仓</span>
                       </div>
                     </template>
-                    <template #offShelfAt="{ row }">{{
-                      row.offShelfAt ? formatDateTime(row.offShelfAt) : '未记录'
-                    }}</template>
                     <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-                    <template #offShelfReason="{ row }">
-                      <div class="off-shelf-reason-cell">
-                        <span>{{ row.offShelfReason || '—' }}</span>
-                        <t-tooltip :content="row.offShelfDetail || '—'" placement="bottom-left">
-                          <span class="off-shelf-reason-secondary">{{ row.offShelfDetail || '—' }}</span>
-                        </t-tooltip>
-                      </div>
-                    </template>
+                    <template #warehouseEntry="{ row }"><WarehouseEntryInformation :entry="row" /></template>
                     <template #stateOperatorName="{ row }"
                       ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
                     >
@@ -222,7 +217,7 @@
                     <template #operation="{ row }">
                       <div class="table-actions">
                         <t-link
-                          v-for="action in managementRowButtons"
+                          v-for="action in managementRowButtons(row)"
                           :key="action.id"
                           :theme="buttonTheme(buttonFunctionFor('stock', action.id))"
                           hover="color"
@@ -243,7 +238,9 @@
                   </t-space>
                   <t-space size="small">
                     <t-button
-                      v-if="hasFinishedAction(['warehouse', 'selling'].includes(activeTab) ? 'edit' : 'detail')"
+                      v-if="
+                        hasFinishedAction(['warehouse', 'selling'].includes(row.status) ? 'edit' : 'detail', row.status)
+                      "
                       size="small"
                       :theme="buttonTheme('view')"
                       @click="handleRowAction('detail', row)"
@@ -653,7 +650,7 @@
                   <t-input-number :model-value="totalStock" theme="normal" :min="0" disabled />
                 </t-form-item>
                 <t-form-item
-                  v-if="!isOperationsEdit"
+                  v-if="!isOperationsEdit && canSetShelfStatus"
                   label="上架"
                   v-bind="requiredFieldFeedback(productForm.shelfNow, '上架方式', submitAttempted, true)"
                   required-mark
@@ -1102,10 +1099,20 @@
     >
       {{ confirmState.content }}
     </AdminConfirmDialog>
+    <OperationsBatchShelfResult v-model:visible="allBatchResultVisible" :result="allBatchResult" />
   </div>
 </template>
 
 <script setup lang="ts">
+import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
+import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
+import type { BatchShelfResult } from '@/services/operationsBatchShelf';
+const allBatchResultVisible = ref(false);
+const allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
+import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
+import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
+import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
+import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { useCommodityModule } from '@/composables/useCommodityModule';
 const commodity = useCommodityModule();
 
@@ -1117,7 +1124,7 @@ import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
-import { stateActivityColumns } from '@/services/productStateActivity';
+import { stateActivitySortIcon, stateActivityColumns } from '@/services/productStateActivity';
 import { filterFinishedStockItems } from '../shared/finishedStockListFilter';
 import { finishedStockFormIssues } from '../shared/finishedStockFormValidation';
 import { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';
@@ -1129,6 +1136,7 @@ import type {
   FinishedStockToolbarAction,
   FinishedStockRowAction,
   StockStatus,
+  StockTab,
   PublisherType,
   RowAction,
   BatchAction,
@@ -1203,9 +1211,9 @@ import { AdminListLayout, AdminPagination } from '@/components/foundation';
 import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 const tabs: TabConfig[] = [
+  { value: 'all', label: '全部' },
   { value: 'warehouse', label: '仓库中' },
   { value: 'selling', label: '已上架' },
-  { value: 'offShelf', label: '已下架' },
   { value: 'soldOut', label: '已售完' },
   { value: 'recycle', label: '回收站' },
 ];
@@ -1213,20 +1221,30 @@ const pageSizeOptions = [10, 20, 50];
 const offShelfReasons = ['库存异常', '价格调整', '图片更新', '供应商申请'];
 const productPermissionPrefix = computed(() => `${'supply-chain'}.${commodity.moduleKey}`);
 const sourceBlocked: (row: StockItem) => boolean = () => false;
-const activeTab = ref<StockStatus>('warehouse');
-const finishedScope: Record<StockStatus, string> = {
+const activeTab = ref<StockTab>(initialProductListTab(useRoute().query.tab));
+const { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {
+  currentPagination.value.current = 1;
+});
+const finishedScope: Record<StockTab, string> = {
+  all: 'all',
   warehouse: 'warehouse',
   selling: 'selling',
-  offShelf: 'off-shelf',
   soldOut: 'sold-out',
   recycle: 'recycle',
 };
 const hasFinishedAction = (action: string, status = activeTab.value) =>
-  hasPermission(getLoginUser(), `${productPermissionPrefix.value}.${finishedScope[status]}.${action}`);
+  hasPermission(
+    getLoginUser(),
+    ['publish', 'batch-shelf'].includes(action)
+      ? `${productPermissionPrefix.value}.${action}`
+      : `${productPermissionPrefix.value}.${finishedScope[status]}.${action}`,
+  );
 const { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermissionTabs({
   tabs,
   activeTab,
-  canAccess: (tab) => hasFinishedAction('view', tab.value),
+  canAccess: (tab) =>
+    hasFinishedAction('view', tab.value) &&
+    (tab.value !== 'all' || hasFinishedAction('view', 'warehouse') || hasFinishedAction('view', 'selling')),
 });
 const finishedActionCodes: Record<string, string> = {
   publish: 'publish',
@@ -1508,24 +1526,24 @@ const defaultFilter = (): FilterState => ({
   category: '',
   supplier: '',
 });
-const filters = reactive<Record<StockStatus, FilterState>>({
+const filters = reactive<Record<StockTab, FilterState>>({
+  all: defaultFilter(),
   warehouse: defaultFilter(),
   selling: defaultFilter(),
-  offShelf: defaultFilter(),
   soldOut: defaultFilter(),
   recycle: defaultFilter(),
 });
-const appliedFilters = reactive<Record<StockStatus, FilterState>>({
+const appliedFilters = reactive<Record<StockTab, FilterState>>({
+  all: defaultFilter(),
   warehouse: defaultFilter(),
   selling: defaultFilter(),
-  offShelf: defaultFilter(),
   soldOut: defaultFilter(),
   recycle: defaultFilter(),
 });
-const paginations = reactive<Record<StockStatus, PaginationState>>({
+const paginations = reactive<Record<StockTab, PaginationState>>({
+  all: { current: 1, pageSize: 10 },
   warehouse: { current: 1, pageSize: 10 },
   selling: { current: 1, pageSize: 10 },
-  offShelf: { current: 1, pageSize: 10 },
   soldOut: { current: 1, pageSize: 10 },
   recycle: { current: 1, pageSize: 10 },
 });
@@ -1676,15 +1694,16 @@ const supplierOptions = computed(() => {
     .filter((supplier) => supplier.status !== 'disabled' && supplier.supplyTypes.some(isFinishedSupplyType))
     .map((supplier) => supplier.name);
 });
-const countByStatus = computed<Record<StockStatus, number>>(() => ({
+const countByStatus = computed<Record<StockTab, number>>(() => ({
+  all: dataItems.value.filter((item) => isAllProductStatus(item.status) && hasFinishedAction('view', item.status))
+    .length,
   warehouse: dataItems.value.filter((item) => item.status === 'warehouse').length,
   selling: dataItems.value.filter((item) => item.status === 'selling').length,
-  offShelf: dataItems.value.filter((item) => item.status === 'offShelf').length,
   soldOut: dataItems.value.filter((item) => item.status === 'soldOut').length,
   recycle: dataItems.value.filter((item) => item.status === 'recycle').length,
 }));
 const normalizeStatus = (status?: string): StockStatus =>
-  status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';
+  status === 'selling' || status === 'soldOut' || status === 'recycle' ? status : 'warehouse';
 const normalizePublisherType = (value?: string): PublisherType => (value === '接口获取' ? '接口获取' : '平台发布');
 const categoryPathById = (categoryId?: number) => {
   if (!categoryId) return '未分类';
@@ -1709,12 +1728,6 @@ const formatPriceRange = (guidePrice?: number) => {
   return value > 0 ? `￥${value.toFixed(2)}` : '-';
 };
 const toStockItem = (record: FinishedProductRecord): StockItem => {
-  record = {
-    ...record,
-    offShelfReason: record.sourceOffShelfReason,
-    offShelfDetail: record.sourceOffShelfDetail,
-    offShelfAt: record.sourceOffShelfAt,
-  };
   const status = normalizeStatus(record.sourceStatus);
   const publisherType = normalizePublisherType(record.publisherType);
   return {
@@ -1725,8 +1738,10 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     code: record.sku ?? '',
     stateOperatorName: record.stateOperatorName,
     stateOperatedAt: record.stateOperatedAt,
+    warehouseEntryType: record.warehouseEntryType,
+    warehouseEntryReason: record.warehouseEntryReason,
+    warehouseEntryDetail: record.warehouseEntryDetail,
     createdByName: record.createdByName?.trim() || '-',
-    offShelfByName: record.offShelfByName?.trim() || '未记录',
     createdAt: record.createdAt,
     image: record.mainImageUrl || '',
     name: record.name,
@@ -1751,12 +1766,12 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     specDimensions: record.specDimensions,
     priceRange: formatPriceRange(record.guidePrice),
     status,
-    offShelfReason: record.offShelfReason,
-    offShelfAt: record.offShelfAt,
-    offShelfDetail: record.offShelfDetail,
   };
 };
-const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): FinishedProductPayload => {
+const toProductPayload = (
+  item: StockItem,
+  patch: Partial<StockItem> & { offShelfReason?: string; offShelfDetail?: string } = {},
+): FinishedProductPayload => {
   const nextItem = { ...item, ...patch };
   return {
     categoryId: nextItem.categoryId,
@@ -1774,8 +1789,9 @@ const toProductPayload = (item: StockItem, patch: Partial<StockItem> = {}): Fini
     attributes: nextItem.attributes,
     variants: nextItem.variants,
     specDimensions: nextItem.specDimensions,
-    offShelfReason: nextItem.offShelfReason,
-    offShelfDetail: nextItem.offShelfDetail,
+    offShelfReason: patch.offShelfReason,
+    offShelfDetail: patch.offShelfDetail,
+    operation: nextItem.operation,
     status: nextItem.status,
   };
 };
@@ -1818,15 +1834,8 @@ watch(activeTab, (tab) => {
 });
 const selectedKeySet = computed(() => new Set(selectedKeys.value));
 const formPageTitle = computed(() => (formPageMode.value === 'create' ? '发布商品' : '编辑商品'));
-const hasLegacyEditPermission = () => hasPermission(getLoginUser(), `${productPermissionPrefix.value}.edit`);
-const canChooseShelfNow = computed(
-  () =>
-    (!editingProduct.value && (hasFinishedAction('shelf', 'warehouse') || hasFinishedAction('publish', 'selling'))) ||
-    editingProduct.value?.status === 'selling' ||
-    hasLegacyEditPermission() ||
-    hasFinishedAction('shelf', editingProduct.value?.status || 'warehouse') ||
-    hasFinishedAction('batch-shelf', editingProduct.value?.status || 'warehouse'),
-);
+const canSetShelfStatus = computed(() => hasFinishedAction('shelf', 'warehouse'));
+const canChooseShelfNow = computed(() => editingProduct.value?.status === 'selling' || canSetShelfStatus.value);
 const canChooseShelfLater = computed(
   () =>
     !editingProduct.value ||
@@ -1859,12 +1868,26 @@ onBeforeUnmount(() => {
   document.removeEventListener('visibilitychange', refreshVisibleProductTemplate);
 });
 const filteredData = computed(() =>
-  filterFinishedStockItems(dataItems.value, activeTab.value, currentAppliedFilter.value),
+  filterFinishedStockItems(
+    activeTab.value === 'all'
+      ? dataItems.value.filter((row) => hasFinishedAction('view', row.status))
+      : dataItems.value,
+    activeTab.value,
+    currentAppliedFilter.value,
+    descending.value,
+  ),
 );
 const paginationTotal = computed(() => filteredData.value.length);
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
   return filteredData.value.slice(start, start + currentPagination.value.pageSize);
+});
+watch(paginationTotal, (total) => {
+  if (activeTab.value === 'all')
+    currentPagination.value.current = Math.min(
+      currentPagination.value.current,
+      Math.max(1, Math.ceil(total / currentPagination.value.pageSize)),
+    );
 });
 const pageAllSelected = computed(
   () => pageData.value.length > 0 && pageData.value.every((item) => selectedKeySet.value.has(item.id)),
@@ -1873,6 +1896,13 @@ const pagePartiallySelected = computed(
   () => pageData.value.some((item) => selectedKeySet.value.has(item.id)) && !pageAllSelected.value,
 );
 const batchButtons = computed(() => {
+  if (activeTab.value === 'all')
+    return [
+      ...(hasFinishedAction('publish') ? [{ action: 'publish' as const, label: '发布商品', icon: 'add' }] : []),
+      ...(hasFinishedAction('batch-shelf')
+        ? [{ action: 'batchShelf' as const, label: '批量上架', icon: 'upload' }]
+        : []),
+    ];
   const map: Record<
     StockStatus,
     {
@@ -1891,7 +1921,6 @@ const batchButtons = computed(() => {
       { action: 'publish', label: '发布商品', icon: 'add' },
       { action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' },
     ],
-    offShelf: [{ action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' }],
     soldOut: [],
     recycle: [
       { action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' },
@@ -1918,9 +1947,9 @@ const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
 );
 // Fixed pixel widths; update only when the tab action buttons change.
 const operationWidths = {
+  all: 208,
   warehouse: 190,
-  selling: 152,
-  offShelf: 180,
+  selling: 208,
   soldOut: 104,
   recycle: 208,
 };
@@ -1929,13 +1958,19 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'product', title: '商品名称/ID', minWidth: 220 },
     { colKey: 'supplier', title: '供应商', width: 180 },
-    ...stateActivityColumns(activeTab.value),
+    ...(activeTab.value === 'all'
+      ? productCreationColumns(toggleTimeSort)
+      : stateActivityColumns(activeTab.value, toggleTimeSort)),
   ];
-  if (activeTab.value !== 'soldOut') {
+  if (activeTab.value !== 'soldOut' && (activeTab.value !== 'all' || hasFinishedAction('batch-shelf'))) {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
-  if (activeTab.value === 'offShelf') {
-    base.splice(4, 0, { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 });
+  if (activeTab.value === 'warehouse' || activeTab.value === 'all') {
+    base.splice(base.findIndex((column) => column.colKey === 'supplier') + 1, 0, {
+      colKey: 'warehouseEntry',
+      title: '入库类型 / 详细说明',
+      minWidth: 240,
+    });
   }
   base.push({
     colKey: 'operation',
@@ -2032,15 +2067,12 @@ const batchFillMatchedRows = computed(() =>
 );
 const tabLabel = (tab: TabConfig) => {
   const count = countByStatus.value[tab.value];
-  return count ? `${tab.label} ${count}` : tab.label;
+  return `${tab.label}（${count}）`;
 };
-const rowActions = () => finishedStockActions[activeTab.value].filter((action) => hasFinishedAction(action.permission));
-const managementRowButtons = computed<FinishedStockRowAction[]>(() => [
-  ...rowActions().map((action) => ({
-    id: action.id,
-    label: action.label,
-  })),
-]);
+const rowActions = (row: StockItem) =>
+  finishedStockActions[row.status].filter((action) => hasFinishedAction(action.permission, row.status));
+const managementRowButtons = (row: StockItem): FinishedStockRowAction[] =>
+  rowActions(row).map((action) => ({ id: action.id, label: action.label }));
 const handleManagementRowButton = (action: string, row: StockItem) => {
   handleRowAction(action as RowAction, row);
 };
@@ -2551,8 +2583,6 @@ const buildProductPayloadFromForm = (): FinishedProductPayload =>
     specMode: confirmedSpecMode.value,
     specDimensions: confirmedSpecDimensions.value,
     variantLabel: specVariantLabel,
-    offShelfReason: editingProduct.value?.offShelfReason,
-    offShelfDetail: editingProduct.value?.offShelfDetail,
   });
 const buildOperationsPricePayload = (): Pick<
   FinishedProductPayload,
@@ -2565,9 +2595,8 @@ const buildOperationsPricePayload = (): Pick<
     priceLevels: productPriceLevels.value,
     variantLabel: specVariantLabel,
   });
-const upsertStockItem = (record: FinishedProductRecord, offShelfReason?: string) => {
+const upsertStockItem = (record: FinishedProductRecord) => {
   const nextItem = toStockItem(record);
-  if (offShelfReason) nextItem.offShelfReason = offShelfReason;
   const index = dataItems.value.findIndex((item) => item.id === record.id);
   if (index >= 0) dataItems.value[index] = nextItem;
   else dataItems.value.unshift(nextItem);
@@ -2740,20 +2769,21 @@ const closeImagePreview = () => {
   imagePreviewVisible.value = false;
   imagePreviewSrc.value = '';
 };
-const updateProductStatus = async (id: number, status: StockStatus, reason?: string, detail?: string) => {
+const updateProductStatus = async (id: number, status: StockStatus | 'offShelf', reason?: string, detail?: string) => {
   const item = dataItems.value.find((product) => product.id === id);
   if (!item) return;
   const afterStock = status === 'soldOut' ? 0 : item.stock;
   const updated = await updateFinishedProduct(
     id,
     toProductPayload(item, {
-      status,
+      status: status === 'offShelf' ? 'warehouse' : status,
+      operation: status === 'offShelf' ? 'offShelf' : undefined,
       stock: afterStock,
-      offShelfReason: status === 'offShelf' ? reason || item.offShelfReason : undefined,
-      offShelfDetail: status === 'offShelf' ? (detail ?? item.offShelfDetail) : undefined,
+      offShelfReason: status === 'offShelf' ? reason : undefined,
+      offShelfDetail: status === 'offShelf' ? detail : undefined,
     }),
   );
-  upsertStockItem(updated, status === 'offShelf' ? reason || item.offShelfReason || '运营调整' : undefined);
+  upsertStockItem(updated);
 };
 const handleConfirm = async () => {
   const type = confirmState.type;
@@ -2771,6 +2801,16 @@ const handleConfirm = async () => {
     } else if (type === 'purge' && product) {
       await deleteFinishedProduct(product.id);
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
+    } else if (type === 'batchShelf' && activeTab.value === 'all') {
+      allBatchResult.value = await shelfProductsFromAll(
+        commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
+        [...selectedKeys.value],
+      );
+      selectedKeys.value = [];
+      closeConfirmDialog();
+      allBatchResultVisible.value = true;
+      await loadInventoryData();
+      return;
     } else if (type === 'batchShelf') {
       {
         // Publishing rebuilds prices; finish each transaction before starting the next product.

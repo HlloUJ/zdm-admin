@@ -1,69 +1,88 @@
 <template>
-  <t-space direction="vertical" size="large" class="product-detail">
+  <t-space direction="vertical" :size="drawerLayout ? 'medium' : 'large'" class="product-detail">
     <t-alert v-if="operations && product.sourceUnavailable" theme="warning" :message="sourceMessage" />
-    <component
-      :is="drawerLayout ? Card : AdminSectionCard"
-      :title="drawerLayout ? '图文描述' : undefined"
-      :class="{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }"
-    >
-      <h3
-        v-if="!drawerLayout"
-        class="product-detail__section-title"
-        :class="{ 'product-detail__card-title': operations && !editorLayout }"
-      >
-        图文描述
-      </h3>
-      <div class="product-detail__media" :class="{ 'product-detail__media--editor': editorLayout }">
-        <button v-for="(url, index) in images" :key="url" type="button" @click="emit('preview', { url }, 'image')">
-          <img :src="url" :alt="`商品主图${index + 1}`" />
-          <span>商品主图{{ index + 1 }}</span>
-        </button>
-        <button v-if="product.videoUrl" type="button" @click="emit('preview', { url: product.videoUrl }, 'video')">
-          <video :src="product.videoUrl" preload="metadata" muted playsinline />
-          <span>点击查看视频</span>
-        </button>
-      </div>
-      <t-empty v-if="!images.length && !product.videoUrl" description="暂无图片或视频" />
+    <t-space direction="vertical" size="large" class="product-detail">
       <component
-        :is="drawerLayout ? TypographyTitle : 'h4'"
-        :level="drawerLayout ? 'h5' : undefined"
-        :class="{ 'product-detail__subheading': !drawerLayout }"
-        >宝贝详情</component
+        :is="drawerLayout ? Card : AdminSectionCard"
+        :title="drawerLayout ? '图文描述' : undefined"
+        data-product-section="description"
+        :class="{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }"
       >
-      <HistoricalRichText
-        v-if="product.detail"
-        class="product-detail__description"
-        :html="description"
-        :media="descriptionMedia"
-        @preview="previewDescription"
-      />
-      <t-empty v-else description="暂无图文描述" />
-    </component>
-    <component
-      :is="drawerLayout ? Card : AdminSectionCard"
-      :title="drawerLayout ? '基础信息' : undefined"
-      :class="{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }"
-    >
-      <h3
-        v-if="!drawerLayout"
-        class="product-detail__section-title"
-        :class="{ 'product-detail__card-title': operations && !editorLayout }"
-      >
-        基础信息
-      </h3>
-      <template v-if="operations">
-        <t-descriptions bordered :column="3" class="product-detail__basic-table">
-          <t-descriptions-item label="商品名称" :span="3">{{ product.name }}</t-descriptions-item>
-          <t-descriptions-item label="ID" :span="3">{{ product.id }}</t-descriptions-item>
-          <t-descriptions-item label="商品分类" :span="3">{{ product.category || '未填写' }}</t-descriptions-item>
-        </t-descriptions>
+        <h3
+          v-if="!drawerLayout"
+          class="product-detail__section-title"
+          :class="{ 'product-detail__card-title': operations && !editorLayout }"
+        >
+          图文描述
+        </h3>
+        <div class="product-detail__media" :class="{ 'product-detail__media--editor': editorLayout }">
+          <button v-for="(url, index) in images" :key="url" type="button" @click="emit('preview', { url }, 'image')">
+            <img :src="url" :alt="`商品主图${index + 1}`" />
+            <span>商品主图{{ index + 1 }}</span>
+          </button>
+          <button v-if="product.videoUrl" type="button" @click="emit('preview', { url: product.videoUrl }, 'video')">
+            <video :src="product.videoUrl" preload="metadata" muted playsinline />
+            <span>点击查看视频</span>
+          </button>
+        </div>
+        <t-empty v-if="!images.length && !product.videoUrl" description="暂无图片或视频" />
         <component
           :is="drawerLayout ? TypographyTitle : 'h4'"
           :level="drawerLayout ? 'h5' : undefined"
-          :class="{ 'product-detail__attributes-heading': !drawerLayout }"
-          >商品属性</component
+          :class="{ 'product-detail__subheading': !drawerLayout }"
+          >宝贝详情</component
         >
-        <t-descriptions bordered :column="3" class="product-detail__basic-table">
+        <HistoricalRichText
+          v-if="product.detail"
+          class="product-detail__description"
+          :html="description"
+          :media="descriptionMedia"
+          @preview="previewDescription"
+        />
+        <t-empty v-else description="暂无图文描述" />
+      </component>
+      <component
+        :is="drawerLayout ? Card : AdminSectionCard"
+        :title="drawerLayout ? '基础信息' : undefined"
+        data-product-section="base"
+        :class="{ 'product-detail__bordered-card': !drawerLayout && operations && !editorLayout }"
+      >
+        <h3
+          v-if="!drawerLayout"
+          class="product-detail__section-title"
+          :class="{ 'product-detail__card-title': operations && !editorLayout }"
+        >
+          基础信息
+        </h3>
+        <template v-if="operations">
+          <t-descriptions bordered :column="3" class="product-detail__basic-table">
+            <t-descriptions-item label="商品名称" :span="3">{{ product.name }}</t-descriptions-item>
+            <t-descriptions-item label="ID" :span="3">{{ product.id }}</t-descriptions-item>
+            <t-descriptions-item label="商品分类" :span="3">{{ product.category || '未填写' }}</t-descriptions-item>
+          </t-descriptions>
+          <component
+            :is="drawerLayout ? TypographyTitle : 'h4'"
+            :level="drawerLayout ? 'h5' : undefined"
+            :class="{ 'product-detail__attributes-heading': !drawerLayout }"
+            >商品属性</component
+          >
+          <t-descriptions bordered :column="3" class="product-detail__basic-table">
+            <t-descriptions-item
+              v-for="attribute in product.attributes"
+              :key="attribute.attributeId"
+              :label="attribute.attributeName"
+            >
+              {{ attribute.value || '未填写' }}
+            </t-descriptions-item>
+            <t-descriptions-item v-if="!storeMode && !poolMode" label="供应商" :span="3">{{
+              product.supplier || '未填写'
+            }}</t-descriptions-item>
+          </t-descriptions>
+        </template>
+        <t-descriptions v-else bordered :column="2">
+          <t-descriptions-item label="商品名称" :span="2">{{ product.name }}</t-descriptions-item>
+          <t-descriptions-item label="ID">{{ product.id }}</t-descriptions-item>
+          <t-descriptions-item label="商品分类" :span="2">{{ product.category || '未填写' }}</t-descriptions-item>
           <t-descriptions-item
             v-for="attribute in product.attributes"
             :key="attribute.attributeId"
@@ -71,92 +90,82 @@
           >
             {{ attribute.value || '未填写' }}
           </t-descriptions-item>
-          <t-descriptions-item v-if="!storeMode && !poolMode" label="供应商" :span="3">{{
+          <t-descriptions-item v-if="!storeMode && !poolMode" label="供应商" :span="2">{{
             product.supplier || '未填写'
           }}</t-descriptions-item>
         </t-descriptions>
-      </template>
-      <t-descriptions v-else bordered :column="2">
-        <t-descriptions-item label="商品名称" :span="2">{{ product.name }}</t-descriptions-item>
-        <t-descriptions-item label="ID">{{ product.id }}</t-descriptions-item>
-        <t-descriptions-item label="商品分类" :span="2">{{ product.category || '未填写' }}</t-descriptions-item>
-        <t-descriptions-item
-          v-for="attribute in product.attributes"
-          :key="attribute.attributeId"
-          :label="attribute.attributeName"
-        >
-          {{ attribute.value || '未填写' }}
-        </t-descriptions-item>
-        <t-descriptions-item v-if="!storeMode && !poolMode" label="供应商" :span="2">{{
-          product.supplier || '未填写'
-        }}</t-descriptions-item>
-      </t-descriptions>
-      <slot name="basic-extra" />
-    </component>
-    <slot v-if="showSales !== false" name="sales" :rows="rows" :columns="columns" :span="span">
-      <component
-        :is="drawerLayout ? Card : AdminSectionCard"
-        :title="drawerLayout ? '销售信息' : undefined"
-        :class="{ 'product-detail__bordered-card': !drawerLayout && operations }"
-      >
-        <h3
-          v-if="!drawerLayout"
-          class="product-detail__section-title"
-          :class="{ 'product-detail__card-title': operations }"
-        >
-          销售信息
-        </h3>
-        <component
-          :is="drawerLayout ? TypographyTitle : 'h4'"
-          v-if="!operations"
-          :level="drawerLayout ? 'h5' : undefined"
-          >销售规格与价格</component
-        >
-        <component :is="operations ? SalesLogFullscreen : 'div'" :title="operations ? '销售规格与价格' : undefined">
-          <t-table
-            :class="{ 'product-detail__layered-table': layeredDimensions.length }"
-            row-key="key"
-            :data="rows"
-            :columns="columns"
-            :rowspan-and-colspan="span"
-            :table-layout="operations ? 'auto' : 'fixed'"
-            bordered
-          >
-            <template v-if="operations" #label="{ row }">
-              <div class="product-meta">
-                <div>{{ row.label }}</div>
-                <div class="product-code">SKU ID：{{ row.skuId }}</div>
-              </div>
-            </template>
-            <template v-for="key in operations ? ['cost', 'guide', 'partner'] : []" :key="key" #[key]="{ row }">
-              <span class="product-detail__price">{{ row[key] }}</span>
-            </template>
-            <template v-if="storeMode" #sale="{ row }">
-              <slot name="sale" :row="row">
-                <t-space align="center" size="small">
-                  <span>{{ row.salePrice == null || row.salePrice === '' ? '-' : row.salePrice }}</span>
-                  <PriceSourceToggle v-if="row.salePrice != null" :source="row.priceMode" :available="false" readonly />
-                </t-space>
-              </slot>
-            </template>
-            <template v-for="[id] in operations ? levels : []" :key="id" #[`price_${id}`]="{ row }">
-              <t-space align="center" size="small" class="product-detail__price">
-                <span>{{ row[`price_${id}`] }}</span>
-                <PriceSourceToggle
-                  v-if="row.priceSources[id]"
-                  :source="row.priceSources[id]"
-                  :available="false"
-                  readonly
-                />
-              </t-space>
-            </template>
-          </t-table>
-        </component>
-        <t-descriptions :class="{ 'product-detail__sales-summary': !drawerLayout }" bordered :column="2">
-          <t-descriptions-item label="总库存" :span="2">{{ product.stock }}</t-descriptions-item>
-        </t-descriptions>
+        <slot name="basic-extra" />
       </component>
-    </slot>
+      <slot v-if="showSales !== false" name="sales" :rows="rows" :columns="columns" :span="span">
+        <component
+          :is="drawerLayout ? Card : AdminSectionCard"
+          :title="drawerLayout ? '销售信息' : undefined"
+          :class="{ 'product-detail__bordered-card': !drawerLayout && operations }"
+        >
+          <h3
+            v-if="!drawerLayout"
+            class="product-detail__section-title"
+            :class="{ 'product-detail__card-title': operations }"
+          >
+            销售信息
+          </h3>
+          <component
+            :is="drawerLayout ? TypographyTitle : 'h4'"
+            v-if="!operations"
+            :level="drawerLayout ? 'h5' : undefined"
+            >销售规格与价格</component
+          >
+          <component :is="operations ? SalesLogFullscreen : 'div'" :title="operations ? '销售规格与价格' : undefined">
+            <t-table
+              :class="{ 'product-detail__layered-table': layeredDimensions.length }"
+              row-key="key"
+              :data="rows"
+              :columns="columns"
+              :rowspan-and-colspan="span"
+              :table-layout="operations ? 'auto' : 'fixed'"
+              bordered
+            >
+              <template v-if="operations" #label="{ row }">
+                <div class="product-meta">
+                  <div>{{ row.label }}</div>
+                  <div class="product-code">SKU ID：{{ row.skuId }}</div>
+                </div>
+              </template>
+              <template v-for="key in operations ? ['cost', 'guide', 'partner'] : []" :key="key" #[key]="{ row }">
+                <span class="product-detail__price">{{ row[key] }}</span>
+              </template>
+              <template v-if="storeMode" #sale="{ row }">
+                <slot name="sale" :row="row">
+                  <t-space align="center" size="small">
+                    <span>{{ row.salePrice == null || row.salePrice === '' ? '-' : row.salePrice }}</span>
+                    <PriceSourceToggle
+                      v-if="row.salePrice != null"
+                      :source="row.priceMode"
+                      :available="false"
+                      readonly
+                    />
+                  </t-space>
+                </slot>
+              </template>
+              <template v-for="[id] in operations ? levels : []" :key="id" #[`price_${id}`]="{ row }">
+                <t-space align="center" size="small" class="product-detail__price">
+                  <span>{{ row[`price_${id}`] }}</span>
+                  <PriceSourceToggle
+                    v-if="row.priceSources[id]"
+                    :source="row.priceSources[id]"
+                    :available="false"
+                    readonly
+                  />
+                </t-space>
+              </template>
+            </t-table>
+          </component>
+          <t-descriptions class="product-detail__sales-summary" bordered :column="drawerLayout ? 3 : 2">
+            <t-descriptions-item label="总库存" :span="drawerLayout ? 3 : 2">{{ product.stock }}</t-descriptions-item>
+          </t-descriptions>
+        </component>
+      </slot>
+    </t-space>
   </t-space>
 </template>
 
@@ -190,9 +199,6 @@ interface DetailProduct {
   sourceMessage?: string;
   createdByName: string;
   createdAt?: string;
-  offShelfReason?: string;
-  offShelfAt?: string;
-  offShelfDetail?: string;
   image: string;
   mainImageUrls?: string[];
   videoUrl?: string;
@@ -439,7 +445,7 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol }) =>
 }
 .product-code {
   color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-small);
+  font: var(--td-font-body-small);
 }
 .product-detail__media {
   display: grid;

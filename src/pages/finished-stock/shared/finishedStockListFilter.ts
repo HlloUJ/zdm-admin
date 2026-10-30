@@ -1,11 +1,18 @@
+import { isAllProductStatus, sortProductsByCreation } from '@/services/productAllView';
 import { sortByStateActivity } from '@/services/productStateActivity';
-import type { FilterState, StockItem, StockStatus } from './finishedStockPageModel';
+import type { FilterState, StockItem, StockTab } from './finishedStockPageModel';
 
-export const filterFinishedStockItems = (items: StockItem[], activeTab: StockStatus, filter: FilterState) => {
+export const filterFinishedStockItems = (
+  items: StockItem[],
+  activeTab: StockTab,
+  filter: FilterState,
+  descending = true,
+) => {
   const keyword = filter.keyword.trim().toLocaleLowerCase();
-  const sorted = sortByStateActivity(items);
+  const sorted =
+    activeTab === 'all' ? sortProductsByCreation(items, descending) : sortByStateActivity(items, descending);
   return sorted.filter((item) => {
-    if (item.status !== activeTab) return false;
+    if (activeTab === 'all' ? !isAllProductStatus(item.status) : item.status !== activeTab) return false;
     if (
       keyword &&
       ![item.name, String(item.id), item.code].some((value) => value.toLocaleLowerCase().includes(keyword))

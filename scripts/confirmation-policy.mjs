@@ -33,11 +33,15 @@ function validIntent(node) {
   const kind = literal(props.kind);
   if (kind === 'none') return true;
   if (kind === 'close') return ['关闭', '我知道了'].includes(literal(props.text));
+  if (kind === 'acknowledgement')
+    return Object.hasOwn(registry.confirmationAcknowledgements ?? {}, literal(props.action));
   if (kind === 'navigation') return Object.hasOwn(registry.confirmationNavigation, literal(props.action));
   return false;
 }
 export function confirmationRegistryViolations(candidate = registry) {
   const errors = [];
+  for (const [name, caption] of Object.entries(candidate.confirmationAcknowledgements ?? {}))
+    if (name !== 'productBatchShelfResult' || caption !== '确认') errors.push(`Invalid acknowledgement: ${name}`);
   for (const [name, caption] of Object.entries(candidate.confirmationActions ?? {}))
     if (!name.trim() || !caption.trim() || /确认|提交$|[／/]/.test(caption))
       errors.push(`Invalid confirmation action: ${name}`);

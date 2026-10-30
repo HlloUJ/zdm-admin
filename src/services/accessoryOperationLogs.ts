@@ -38,7 +38,6 @@ export const getFinishedOperationLog = (id: number) =>
 export const finishedLogStates: Record<string, string> = {
   warehouse: '仓库中',
   selling: '已上架',
-  offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',
   purged: '已彻底删除',

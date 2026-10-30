@@ -90,13 +90,15 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
             label: '大板管理页',
             value: 'admin.slab-management',
             audiences: ['admin'],
-            actions: [{ label: '操作日志', value: 'admin.slab-management.operation-log.view' }],
+            actions: [
+              { label: '批量上架', value: 'admin.slab-management.batch-shelf' },
+              { label: '操作日志', value: 'admin.slab-management.operation-log.view' },
+            ],
             tabs: [
               {
                 label: '仓库中',
                 value: 'admin.slab-management.warehouse',
                 actions: [
-                  { label: '批量上架', value: 'admin.slab-management.warehouse.batch-shelf' },
                   { label: '上架', value: 'admin.slab-management.warehouse.shelf' },
                   { label: '编辑', value: 'admin.slab-management.warehouse.edit' },
                   { label: '删除', value: 'admin.slab-management.warehouse.delete' },
@@ -109,16 +111,7 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
                   { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },
                   { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
                   { label: '编辑', value: 'admin.slab-management.selling.edit' },
-                ],
-              },
-              {
-                label: '已下架',
-                value: 'admin.slab-management.off-shelf',
-                actions: [
-                  { label: '批量放回到仓库', value: 'admin.slab-management.off-shelf.batch-restore' },
-                  { label: '详情', value: 'admin.slab-management.off-shelf.detail' },
-                  { label: '放回仓库', value: 'admin.slab-management.off-shelf.restore' },
-                  { label: '删除', value: 'admin.slab-management.off-shelf.delete' },
+                  { label: '删除', value: 'admin.slab-management.selling.delete' },
                 ],
               },
               {

@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { readFileSync } from 'node:fs';
 import { expect, test } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
@@ -45,7 +46,7 @@ for (const route of routes) {
     }, route);
     if (route.includes('accessory-management')) await installAccessoryApiMocks(page);
     else await installAdminApiMocks(page);
-    await page.goto(route);
+    await page.goto(productWarehouseUrl(route));
     const forms = page.locator('.t-form.zdm-admin-filter-form:visible');
     await expect(forms.first()).toBeVisible();
     for (const width of [1366, 1024, 992, 991, 768, 619, 375]) {

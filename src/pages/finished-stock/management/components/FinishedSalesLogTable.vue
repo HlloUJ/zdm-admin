@@ -388,7 +388,7 @@ const span = ({ rowIndex, col }: { rowIndex: number; col: PrimaryTableCol<TableR
 .sales-log-table :deep(.historical-sku-id) {
   margin-top: var(--td-comp-margin-xs);
   color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-small);
+  font: var(--td-font-body-small);
 }
 
 .sales-log-table :deep(.sales-value-added) {

@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -33,7 +34,7 @@ async function setup(page: Page, status: string, sourceStatus = 'selling', detai
     name: '协同大板',
     serialNo: 'SLAB-COLLAB',
     status,
-    sourceStatus,
+    sourceStatus: sourceStatus === 'offShelf' ? 'warehouse' : sourceStatus,
     sourceUnavailable: !['selling', 'soldOut'].includes(sourceStatus),
     sourceMessage: !['selling', 'soldOut'].includes(sourceStatus) ? sourceBlockMessage(sourceStatus) : null,
     stock: 2,
@@ -52,21 +53,31 @@ async function setup(page: Page, status: string, sourceStatus = 'selling', detai
         data: {
           ...record,
           name: '最新协同大板',
+          offShelfRecords: [
+            {
+              id: 91,
+              standardReason: '价格调整',
+              detailReason: '历史说明',
+              offShelvedByName: '历史操作人',
+              offShelvedAt: '2026-09-20T09:00:00',
+            },
+          ],
           sourceOffShelfRecords: [{ id: 1, standardReason: '库存异常', detailReason: '待核对库存' }],
         },
       },
     }),
   );
   await page.route('**/api/admin/slabs/action-check', (route) => route.fulfill({ json: { code: 0, data: true } }));
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   await expect(page.getByRole('main').getByText('协同大板', { exact: true })).toBeVisible();
 }
-for (const status of ['offShelf', 'soldOut', 'recycle']) {
+for (const status of ['soldOut', 'recycle']) {
   test(`运营 ${status} 详情读取最新数据且不提供编辑`, async ({ page }) => {
     await setup(page, status);
     await page.getByRole('main').locator('.table-actions').getByText('详情', { exact: true }).click();
     const drawer = page.locator('.t-drawer--open').filter({ hasText: '大板详情' });
     await expect(drawer.getByText('最新协同大板', { exact: true })).toBeVisible();
+    await expect(drawer.getByRole('button', { name: '查看历史下架原因', exact: true })).toHaveCount(0);
     await expect(drawer.locator('.t-card__title')).toHaveText(['图文描述', '基础信息', '销售信息']);
     await expect(drawer.locator('.slab-detail-section-title')).toHaveCount(0);
     await expect(drawer.getByText('库存异常', { exact: true })).toHaveCount(0);
@@ -120,15 +131,17 @@ test('运营角色候选目录五个状态均显示详情且默认不勾选', as
       },
     }),
   );
-  await page.goto('/role-management');
+  await page.goto(productWarehouseUrl('/role-management'));
   await page.locator('tbody tr').filter({ hasText: '大板运营角色' }).getByText('权限', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
   await dialog.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
   const rows = dialog.locator('.permission-matrix tbody tr');
   const first = rows.filter({ hasText: '大板管理页' }).first();
   const index = await first.evaluate((el) => Array.from(el.parentElement!.children).indexOf(el));
-  for (const [offset, label] of ['仓库中', '已上架', '已下架', '已售完', '回收站'].entries()) {
-    const row = rows.nth(index + offset + 1);
+  await expect(rows.nth(index + 1).locator('.permission-tab-text')).toHaveText('全部');
+  await expect(rows.nth(index + 1).getByRole('checkbox', { name: '查看', exact: true })).not.toBeChecked();
+  for (const [offset, label] of ['仓库中', '已上架', '已售完', '回收站'].entries()) {
+    const row = rows.nth(index + offset + 2);
     await expect(row.locator('.permission-tab-text')).toHaveText(label);
     await expect(row.getByRole('checkbox', { name: offset < 2 ? '编辑' : '详情', exact: true })).not.toBeChecked();
   }
@@ -162,7 +175,7 @@ test('操作时来源已下架会刷新遮罩并清除旧选择', async ({ page 
             name: '协同大板',
             serialNo: 'SLAB-COLLAB',
             status: 'selling',
-            sourceStatus: 'offShelf',
+            sourceStatus: 'warehouse',
             sourceUnavailable: true,
             sourceMessage: sourceBlockMessage('offShelf'),
           },
@@ -208,7 +221,7 @@ test('操作时来源不可用直接刷新遮罩，不显示 toast 或确认弹�
             name: '协同大板',
             serialNo: 'SLAB-COLLAB',
             status: 'selling',
-            sourceStatus: 'offShelf',
+            sourceStatus: 'warehouse',
             sourceUnavailable: true,
             sourceMessage: sourceBlockMessage('offShelf'),
           },
@@ -259,10 +272,6 @@ for (const [status, actions] of Object.entries({
   selling: [
     ['编辑', 'edit'],
     ['下架', 'off-shelf'],
-  ],
-  offShelf: [
-    ['详情', 'detail'],
-    ['放回仓库', 'restore'],
     ['删除', 'delete'],
   ],
   recycle: [
@@ -294,7 +303,7 @@ for (const [status, actions] of Object.entries({
                 name: '协同大板',
                 serialNo: 'SLAB-COLLAB',
                 status,
-                sourceStatus: 'offShelf',
+                sourceStatus: 'warehouse',
                 sourceUnavailable: true,
                 sourceMessage: sourceBlockMessage('offShelf'),
               },
@@ -311,7 +320,7 @@ for (const [status, actions] of Object.entries({
   }
 }
 
-test('批量上架部分成功，失败横幅可关闭并在页面刷新后清空', async ({ page }) => {
+test('批量上架部分成功，结果弹框可确认且刷新后不重复显示', async ({ page }) => {
   await setup(page, 'warehouse');
   await page.addInitScript(() => {
     const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
@@ -328,56 +337,52 @@ test('批量上架部分成功，失败横幅可关闭并在页面刷新后清�
     sourceMessage: null as string | null,
   }));
   await page.route('**/api/admin/slabs', (route) => route.fulfill({ json: { code: 0, data: records } }));
-  const requests: number[] = [];
-  await page.route('**/api/admin/slabs/batch-status', (route) => {
-    const id = route.request().postDataJSON().ids[0];
-    requests.push(id);
-    if (id === 99601) {
-      records[0].status = 'selling';
-      return route.fulfill({ json: { code: 0, data: true } });
-    }
-    if (id === 99603) {
-      records[2].sourceStatus = 'offShelf';
-      records[2].sourceUnavailable = true;
-      records[2].sourceMessage = sourceBlockMessage('offShelf');
-    }
+  let requests = 0;
+  await page.route('**/api/admin/slabs/batch-shelf', (route) => {
+    requests++;
+    expect([...route.request().postDataJSON().ids].sort()).toEqual([99601, 99602, 99603]);
+    records[0].status = 'selling';
+    records[2].sourceStatus = 'warehouse';
+    records[2].sourceUnavailable = true;
+    records[2].sourceMessage = sourceBlockMessage('offShelf');
     return route.fulfill({
-      status: 400,
-      json: { code: 400, message: id === 99602 ? '4级合伙人价格未填写' : '来源商品已下架' },
+      json: {
+        code: 0,
+        data: {
+          total: 3,
+          successCount: 1,
+          failureCount: 2,
+          failures: [
+            { id: 99602, code: 'VALIDATION_FAILED', reason: '4级合伙人价格未填写' },
+            { id: 99603, code: 'SOURCE_UNAVAILABLE', reason: '来源商品已下架' },
+          ],
+        },
+      },
     });
   });
   await page.reload();
-  await page.getByRole('main').locator('thead .t-checkbox').first().click();
-  await page.getByRole('button', { name: '批量上架', exact: true }).click();
+  const main = page.getByRole('main');
+  await main.locator('thead .t-checkbox').first().click();
+  await main.getByRole('button', { name: '批量上架', exact: true }).click();
   await page.getByRole('button', { name: '确认批量上架', exact: true }).click();
-  await expect(page.getByText('已上架 1 个大板，未上架 2 个大板', { exact: true })).toBeVisible();
-  const warning = page.getByRole('main').locator('.t-alert');
-  await expect(warning).toHaveCount(1);
-  await expect(warning).toContainText('4级合伙人价格未填写');
-  await expect(page.getByRole('main').locator('tbody tr')).toHaveCount(2);
-  const failedRow = page.getByRole('main').locator('tr[data-shelf-error-id="99602"]');
-  const rowBounds = await failedRow.boundingBox();
-  const bannerBounds = await warning.boundingBox();
-  const actionBounds = await failedRow.locator('.t-table__cell--fixed-right').boundingBox();
-  expect(bannerBounds!.y).toBeGreaterThan(rowBounds!.y);
-  expect(bannerBounds!.y + bannerBounds!.height).toBeLessThan(rowBounds!.y + rowBounds!.height);
-  expect(bannerBounds!.x + bannerBounds!.width).toBeGreaterThan(actionBounds!.x);
-  expect(bannerBounds!.x + bannerBounds!.width).toBeLessThanOrEqual(actionBounds!.x + actionBounds!.width);
-  const actions = await failedRow.locator('.table-actions').boundingBox();
-  expect(bannerBounds!.y + bannerBounds!.height).toBeLessThan(actions!.y);
-  // Native TDesign Alert: 22px text line + 16px padding above and below.
-  expect(bannerBounds!.height).toBe(54);
-  await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toHaveCount(1);
-  await expect(page.locator('.selection-info')).toContainText('已选 1 项');
-  expect([...requests].sort()).toEqual([99601, 99602, 99603]);
-  await warning.locator('.t-alert__close').click();
-  await expect(warning).toHaveCount(0);
-  await page.getByRole('button', { name: '批量上架', exact: true }).click();
-  await page.getByRole('button', { name: '确认批量上架', exact: true }).click();
-  await expect(warning).toContainText('4级合伙人价格未填写');
+  const result = page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' });
+  await expect(result).toContainText('成功上架1件，失败2件。');
+  await expect(result.getByRole('columnheader')).toHaveText(['商品ID', '失败原因']);
+  await expect(result.getByRole('row').filter({ hasText: '4级合伙人价格未填写' })).toContainText('99602');
+  await expect(result.getByRole('row').filter({ hasText: '来源商品已下架' })).toContainText('99603');
+  await result.getByRole('button', { name: '确认', exact: true }).click();
+  await expect(result).toBeHidden();
+  await expect(main.locator('tbody tr')).toHaveCount(2);
+  await expect(main.locator('.source-unavailable-overlay')).toHaveCount(1);
+  await expect(main.locator('.source-unavailable-overlay')).toContainText(sourceBlockMessage('offShelf'));
+  await expect(main.locator('.selection-info')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '批量上架', exact: true })).toBeDisabled();
+  expect(requests).toBe(1);
   await page.reload();
-  await expect(page.getByRole('main').getByText('大板99602', { exact: true })).toBeVisible();
-  await expect(warning).toHaveCount(0);
+  await expect(main.getByText('大板99602', { exact: true })).toBeVisible();
+  await expect(result).toBeHidden();
+  await expect(main.locator('.source-unavailable-overlay')).toHaveCount(1);
+  expect(requests).toBe(1);
 });
 
 test('彻底删除操作日志显示删除终态，与成品现货一致', async ({ page }) => {
@@ -574,7 +579,7 @@ for (const sourceRestored of [true, false]) {
       name: '协同大板',
       serialNo: 'SLAB-COLLAB',
       status: 'selling',
-      sourceStatus: sourceRestored ? 'selling' : 'offShelf',
+      sourceStatus: sourceRestored ? 'selling' : 'warehouse',
       sourceUnavailable: true,
       sourceMessage: '该商品已被供应链下架',
       stock: 2,

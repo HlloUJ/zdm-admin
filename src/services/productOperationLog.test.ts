@@ -53,11 +53,30 @@ it('keeps supply edit summaries and exposes the finished-only upstream edit filt
   expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);
 });
 
-it('offers reentry only in operations and keeps its real trigger summary', () => {
+it('unifies legacy reentry labels and filters under source shelf', () => {
   const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';
-  expect(productOperationTypeLabel('REENTRY')).toBe('重新入仓');
-  expect(productLogFilterOptions('admin')).toContainEqual({ value: 'REENTRY', label: '重新入仓' });
+  expect(productOperationTypeLabel('REENTRY')).toBe('供应链上架');
+  expect(productLogFilterOptions('admin')).toContainEqual({ value: 'SOURCE_SHELF', label: '供应链上架' });
+  expect(productLogFilterOptions('admin').some((item) => item.value === 'REENTRY')).toBe(false);
   expect(productLogFilterOptions('supply-chain').some((item) => item.value === 'REENTRY')).toBe(false);
   expect(productLogFilterOptions('store').some((item) => item.value === 'REENTRY')).toBe(false);
-  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(reason);
+  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(
+    '供应链已上架，商品进入运营管理平台仓库',
+  );
+});
+
+it('removes only obsolete upstream shelf filters from store products', () => {
+  for (const finished of [true, false]) {
+    const store = productLogFilterOptions('store', finished).map((item) => item.value);
+    expect(store).not.toContain('SOURCE_SHELF');
+    expect(store).not.toContain('OPERATIONS_SHELF');
+    expect(store).toContain('SHELF');
+    expect(store).toContain('SOURCE_OFF_SHELF');
+    expect(store).toContain('OPERATIONS_OFF_SHELF');
+    expect(store).toContain('SOURCE_DELETE_TO_RECYCLE');
+    expect(store).toContain('SOURCE_PURGE');
+    expect(store).toContain('OPERATIONS_DELETE_TO_RECYCLE');
+    expect(store).toContain('OPERATIONS_PURGE');
+    expect(productLogFilterOptions('admin', finished).map((item) => item.value)).toContain('SOURCE_SHELF');
+  }
 });

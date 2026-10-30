@@ -105,14 +105,16 @@ const storeFinishedStock: FunctionModule = {
         {
           label: '成品现货管理页',
           value: 'store.finished-stock-management',
-          actions: [{ label: '操作日志', value: 'store.finished-stock-management.operation-log.view' }],
+          actions: [
+            { label: '商品中心', value: 'store.finished-stock-management.select' },
+            { label: '批量上架', value: 'store.finished-stock-management.batch-shelf' },
+            { label: '操作日志', value: 'store.finished-stock-management.operation-log.view' },
+          ],
           tabs: [
             {
               label: '仓库中',
               value: 'store.finished-stock-management.warehouse',
               actions: [
-                ['select', '商品中心'],
-                ['batch-shelf', '批量上架'],
                 ['shelf', '上架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],
@@ -125,17 +127,8 @@ const storeFinishedStock: FunctionModule = {
                 ['batch-off-shelf', '批量下架'],
                 ['off-shelf', '下架'],
                 ['edit', '编辑'],
-              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.selling.${code}` })),
-            },
-            {
-              label: '已下架',
-              value: 'store.finished-stock-management.off-shelf',
-              actions: [
-                ['batch-restore', '批量放回到仓库'],
-                ['detail', '详情'],
-                ['restore', '放回仓库'],
                 ['delete', '删除'],
-              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.off-shelf.${code}` })),
+              ].map(([code, label]) => ({ label, value: `store.finished-stock-management.selling.${code}` })),
             },
             {
               label: '已售完',
@@ -177,14 +170,16 @@ const storeAccessoryStock: FunctionModule = {
         {
           label: '配件管理页',
           value: 'store.accessory-management',
-          actions: [{ label: '操作日志', value: 'store.accessory-management.operation-log.view' }],
+          actions: [
+            { label: '商品中心', value: 'store.accessory-management.select' },
+            { label: '批量上架', value: 'store.accessory-management.batch-shelf' },
+            { label: '操作日志', value: 'store.accessory-management.operation-log.view' },
+          ],
           tabs: [
             {
               label: '仓库中',
               value: 'store.accessory-management.warehouse',
               actions: [
-                ['select', '商品中心'],
-                ['batch-shelf', '批量上架'],
                 ['shelf', '上架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],
@@ -197,17 +192,8 @@ const storeAccessoryStock: FunctionModule = {
                 ['batch-off-shelf', '批量下架'],
                 ['off-shelf', '下架'],
                 ['edit', '编辑'],
-              ].map(([code, label]) => ({ label, value: `store.accessory-management.selling.${code}` })),
-            },
-            {
-              label: '已下架',
-              value: 'store.accessory-management.off-shelf',
-              actions: [
-                ['batch-restore', '批量放回到仓库'],
-                ['detail', '详情'],
-                ['restore', '放回仓库'],
                 ['delete', '删除'],
-              ].map(([code, label]) => ({ label, value: `store.accessory-management.off-shelf.${code}` })),
+              ].map(([code, label]) => ({ label, value: `store.accessory-management.selling.${code}` })),
             },
             {
               label: '已售完',

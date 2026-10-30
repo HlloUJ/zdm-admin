@@ -106,8 +106,7 @@ public class ProductLifecycleService {
     String source = (String) row.get("source_status");
     boolean allowed = switch (source) {
       case "warehouse" -> List.of("selling", "recycle").contains(target);
-      case "selling" -> "offShelf".equals(target);
-      case "offShelf" -> List.of("warehouse", "recycle").contains(target);
+      case "selling" -> List.of("offShelf", "recycle").contains(target);
       case "recycle" -> List.of("warehouse", "purged").contains(target);
       default -> false;
     };
@@ -146,6 +145,7 @@ public class ProductLifecycleService {
     requireSupplyChain();
     var row=lock(kind,id);
     String source=(String)row.get("source_status");
+    String nextState = "offShelf".equals(target) ? "warehouse" : target;
     validateSourceTransition(kind, id, row, target);
     if("offShelf".equals(target) && (reason==null || reason.isBlank())) { throw new IllegalArgumentException("请选择下架原因"); }
     if(reason!=null && reason.length()>80 || detail!=null && detail.length()>500) { throw new IllegalArgumentException("下架说明超出长度限制"); }
@@ -183,16 +183,14 @@ public class ProductLifecycleService {
     if ("warehouse".equals(target)) {
       jdbc.update("UPDATE "+kind.table+" SET source_status=? WHERE id=?",target,id);
     } else {
-      jdbc.update("UPDATE "+kind.table+" SET source_status=?,source_block_reason=? WHERE id=?",target,blockReason,id);
+      jdbc.update("UPDATE "+kind.table+" SET source_status=?,source_block_reason=? WHERE id=?",nextState,blockReason,id);
     }
     if("offShelf".equals(target)) {
-      if(kind==Kind.FINISHED) { jdbc.update("UPDATE finished_products SET source_off_shelf_reason=?,source_off_shelf_detail=?,source_off_shelf_at=NOW() WHERE id=?",reason,detail,id); }
-      else { jdbc.update("INSERT INTO slab_off_shelf_records (slab_id,business_client_code,standard_reason,detail_reason,off_shelved_at,off_shelved_by_name,off_shelved_by_account_id) VALUES (?,'supply-chain',?,?,NOW(),?,?)",id,reason,detail,identities.require().displayName(),identities.require().accountId()); }
+      if(kind==Kind.SLAB) { jdbc.update("INSERT INTO slab_off_shelf_records (slab_id,business_client_code,standard_reason,detail_reason,off_shelved_at,off_shelved_by_name,off_shelved_by_account_id) VALUES (?,'supply-chain',?,?,NOW(),?,?)",id,reason,detail,identities.require().displayName(),identities.require().accountId()); }
     }
     if(recreate) {
       jdbc.update("UPDATE "+kind.table+" SET operations_deleted=FALSE,status='warehouse' WHERE id=?",id);
-      if(kind==Kind.FINISHED) { jdbc.update("UPDATE finished_products SET off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?",id); }
-      else { jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'",id); }
+      if(kind==Kind.SLAB) { jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'",id); }
       if (kind == Kind.FINISHED) {
         jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
       }
@@ -206,7 +204,7 @@ public class ProductLifecycleService {
     Map<String,Object> sourceChanges=new LinkedHashMap<>();
     if(reason!=null) { sourceChanges.put("下架原因",Map.of("before","","after",reason)); }
     if(detail!=null) { sourceChanges.put("详细说明",Map.of("before","","after",detail)); }
-    if (recordSourceLog) { record(kind,row,"supply-chain",type,label,source,target,sourceChanges); }
+    if (recordSourceLog) { record(kind,row,"supply-chain",type,label,source,nextState,sourceChanges); }
     if (kind == Kind.FINISHED) { storeUpstreamLogs.sourceChange(id, source, target); }
 
     // Restoring the source does not revive an existing downstream operations record.
@@ -215,7 +213,7 @@ public class ProductLifecycleService {
       String result=kind!=Kind.FINISHED ? null : publish ? "来源已上架，商品进入运营仓库并计算价格" :
           "warehouse".equals(target) ? "来源放回仓库，等待再次上架" : "来源已下架或删除，运营商品仅可彻底删除";
       Map<String,Object> changes=new LinkedHashMap<>();
-      changes.put("来源状态",Map.of("before",source,"after",target));
+      changes.put("来源状态",Map.of("before",source,"after",nextState));
       if(recreate && kind == Kind.SLAB) { changes.putAll(slabLogs.arrivalSnapshot(id)); }
       if (kind == Kind.SLAB && !List.of("offShelf", "purged").contains(target)) {
         changes.putAll(sourceChanges);
@@ -282,7 +280,7 @@ public class ProductLifecycleService {
     if (kind == Kind.SLAB) { slabSnapshots.release(id); }
     if (row.get("operations_invalidated_at") != null && !unavailable((String) row.get("source_status"))) {
       if (kind == Kind.FINISHED) {
-        jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL,off_shelf_reason=NULL,off_shelf_detail=NULL,off_shelf_at=NULL WHERE id=?", id);
+        jdbc.update("UPDATE finished_products SET selection_generation=selection_generation+1,operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
       } else {
         jdbc.update("UPDATE slab_inventory SET operations_deleted=FALSE,status='warehouse',operations_invalidated_reason=NULL,operations_invalidated_at=NULL,operations_invalidated_snapshot=NULL WHERE id=?", id);
         jdbc.update("DELETE FROM slab_off_shelf_records WHERE slab_id=? AND business_client_code='admin'", id);
@@ -293,7 +291,7 @@ public class ProductLifecycleService {
       else {
         var reentry = new LinkedHashMap<String, Object>(slabLogs.arrivalSnapshot(id));
         reentry.put("重新入仓原因", Map.of("before", "", "after", FinishedOperationLogService.REENTRY_SUMMARY));
-        record(kind, row, "admin", "REENTRY", null, null, "warehouse", reentry);
+        record(kind, row, "admin", "SOURCE_SHELF", null, null, "warehouse", reentry);
       }
     }
     sqlSession.clearCache();
@@ -364,7 +362,7 @@ public class ProductLifecycleService {
     log.put("before_status",before);log.put("after_status",after);
     log.put("operation_source",business.equals(actor.clientCode())?"MANUAL":"SUPPLY_CHAIN");log.put("operated_at",java.time.LocalDateTime.now());
     try { log.put("change_details",json.writeValueAsString(changes)); } catch(JsonProcessingException error) { throw new IllegalStateException("日志序列化失败",error); }
-    stateActivities.record(kind==Kind.FINISHED?"finished":"slab",business,((Number)row.get("id")).longValue(),before,after,actor.accountId(),actor.clientCode());
+    stateActivities.record(kind==Kind.FINISHED?"finished":"slab",business,((Number)row.get("id")).longValue(),before,after,actor.accountId(),actor.clientCode(),changes.containsKey("重新入仓原因") ? "REENTRY" : type,(String)log.get("standard_reason"),(String)log.get("detail_reason"));
     Number logId = new SimpleJdbcInsert(jdbc).withTableName(kind.logs).usingColumns(log.keySet().toArray(String[]::new)).usingGeneratedKeyColumns("id").executeAndReturnKey(log);
     if(kind==Kind.SLAB) { slabLogs.retainSnapshot(logId.longValue(), changes); }
   }

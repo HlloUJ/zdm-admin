@@ -29,48 +29,31 @@
                         <t-option v-for="item in varietyOptions" :key="item" :label="item" :value="item" />
                       </t-select>
                     </t-form-item>
-                    <template v-if="activeTab === 'offShelf'">
-                      <t-form-item label="下架原因">
-                        <t-select
-                          v-model="currentFilter.offShelfReason"
-                          clearable
-                          filterable
-                          placeholder="请选择下架原因"
-                        >
-                          <t-option v-for="item in offShelfReasons" :key="item" :label="item" :value="item" />
-                        </t-select>
-                      </t-form-item>
-                      <t-form-item label="下架人">
-                        <t-input v-model="currentFilter.offShelvedBy" clearable placeholder="请输入下架人" />
-                      </t-form-item>
-                    </template>
-                    <template v-else>
-                      <t-form-item label="产地">
-                        <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择产地">
-                          <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
-                        </t-select>
-                      </t-form-item>
-                      <t-form-item label="纹理">
-                        <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择纹理">
-                          <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
-                        </t-select>
-                      </t-form-item>
-                      <t-form-item label="色系">
-                        <t-cascader
-                          v-model="currentFilter.color"
-                          :options="colorFilterCascaderOptions"
-                          :show-all-levels="false"
-                          :check-strictly="false"
-                          clearable
-                          filterable
-                          placeholder="请选择色系"
-                          trigger="hover"
-                          value-mode="onlyLeaf"
-                          value-type="single"
-                        />
-                      </t-form-item>
-                    </template>
-                    <t-form-item v-if="activeTab !== 'offShelf'" label="等级" class="grade-filter">
+                    <t-form-item label="产地">
+                      <t-select v-model="currentFilter.origin" clearable filterable placeholder="请选择产地">
+                        <t-option v-for="item in originOptions" :key="item" :label="item" :value="item" />
+                      </t-select>
+                    </t-form-item>
+                    <t-form-item label="纹理">
+                      <t-select v-model="currentFilter.texture" clearable filterable placeholder="请选择纹理">
+                        <t-option v-for="item in textureFilterOptions" :key="item" :label="item" :value="item" />
+                      </t-select>
+                    </t-form-item>
+                    <t-form-item label="色系">
+                      <t-cascader
+                        v-model="currentFilter.color"
+                        :options="colorFilterCascaderOptions"
+                        :show-all-levels="false"
+                        :check-strictly="false"
+                        clearable
+                        filterable
+                        placeholder="请选择色系"
+                        trigger="hover"
+                        value-mode="onlyLeaf"
+                        value-type="single"
+                      />
+                    </t-form-item>
+                    <t-form-item label="等级" class="grade-filter">
                       <t-select v-model="currentFilter.grade" clearable filterable placeholder="请选择等级">
                         <t-option
                           v-for="item in gradeFilterOptions"
@@ -80,7 +63,7 @@
                         />
                       </t-select>
                     </t-form-item>
-                    <t-form-item v-if="activeTab !== 'offShelf'" label="供应商" class="supplier-filter">
+                    <t-form-item label="供应商" class="supplier-filter">
                       <t-select v-model="currentFilter.supplier" clearable filterable placeholder="请选择供应商">
                         <t-option
                           v-for="item in supplierFilterOptions"
@@ -158,9 +141,12 @@
                   row-key="id"
                   :data="pageData"
                   :columns="columns"
+                  :sort="tableSort"
+                  :sort-icon="stateActivitySortIcon"
                   :loading="loading"
                   hover
                   table-layout="fixed"
+                  @sort-change="onTimeSortChange"
                 >
                   <template #selectTitle>
                     <t-checkbox
@@ -193,7 +179,9 @@
                   <template #slab="{ row }">
                     <div class="slab-meta">
                       <div class="slab-name">{{ row.name }}</div>
-                      <div class="slab-code">ID：{{ row.id }}</div>
+                      <div class="slab-code">
+                        ID：{{ row.id }} <ProductListStatusTag v-if="activeTab === 'all'" :status="row.status" />
+                      </div>
                       <div class="slab-code">大板编号：{{ row.code }}</div>
                     </div>
                   </template>
@@ -203,43 +191,31 @@
                       <span class="store-text">{{ row.store }}</span>
                     </div>
                   </template>
-                  <template #offShelfReason="{ row }">
-                    <div class="off-shelf-reason-cell">
-                      <span class="off-shelf-reason-primary">{{
-                        latestOffShelfRecord(row)?.standardReason || '-'
-                      }}</span>
-                      <div class="off-shelf-reason-detail-row">
-                        <t-tooltip
-                          class="off-shelf-detail-tooltip"
-                          :content="latestOffShelfRecord(row)?.detailReason || '-'"
-                          placement="bottom-left"
-                        >
-                          <span class="off-shelf-reason-secondary">{{
-                            latestOffShelfRecord(row)?.detailReason || '-'
-                          }}</span>
-                        </t-tooltip>
-                        <t-tooltip content="查看历史下架原因">
-                          <t-button
-                            :theme="buttonTheme('off-shelf-history')"
-                            class="off-shelf-history-trigger"
-                            variant="text"
-                            shape="square"
-                            size="small"
-                            aria-label="查看历史下架原因"
-                            @click="openOffShelfHistory(row)"
-                          >
-                            <template #icon><t-icon name="browse" /></template>
-                          </t-button>
-                        </t-tooltip>
-                      </div>
-                    </div>
-                  </template>
-                  <template #offShelvedByName="{ row }">
-                    {{ latestOffShelfRecord(row)?.offShelvedByName || '-' }}
-                  </template>
-                  <template #offShelvedAt="{ row }">
-                    {{ formatDateTime(latestOffShelfRecord(row)?.offShelvedAt) }}
-                  </template>
+                  <template #warehouseEntry="{ row }"
+                    ><WarehouseEntryInformation
+                      class="off-shelf-reason-cell"
+                      :entry="row"
+                      :tooltip-disabled="offShelfHistoryVisible"
+                    >
+                      <t-tooltip
+                        v-if="row.warehouseEntryType === 'offShelf' && row.offShelfRecords.length"
+                        v-model:visible="offShelfHistoryTooltips[row.id]"
+                        content="查看历史下架原因"
+                        :disabled="offShelfHistoryVisible"
+                      >
+                        <t-button
+                          :theme="buttonTheme('off-shelf-history')"
+                          class="off-shelf-history-trigger"
+                          variant="text"
+                          shape="square"
+                          size="small"
+                          aria-label="查看历史下架原因"
+                          @click="openOffShelfHistory(row)"
+                          ><template #icon><t-icon name="browse" /></template
+                        ></t-button>
+                      </t-tooltip> </WarehouseEntryInformation
+                  ></template>
+                  <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
                   <template #stateOperatorName="{ row }"
                     ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
                   >
@@ -249,7 +225,7 @@
                   <template #operation="{ row }">
                     <div class="table-actions">
                       <t-link
-                        v-for="action in rowActions()"
+                        v-for="action in rowActions(row)"
                         :key="action.action"
                         :theme="buttonTheme(buttonFunctionFor('stock', action.action))"
                         hover="color"
@@ -268,7 +244,7 @@
                 </t-space>
                 <t-space size="small">
                   <t-button
-                    v-if="hasSlabAction(activeTab, ['warehouse', 'selling'].includes(activeTab) ? 'edit' : 'detail')"
+                    v-if="hasSlabAction(row.status, ['warehouse', 'selling'].includes(row.status) ? 'edit' : 'detail')"
                     size="small"
                     :theme="buttonTheme('view')"
                     @click="handleRowAction('detail', row)"
@@ -544,7 +520,7 @@
                   />
                 </t-form-item>
               </div>
-              <t-form-item v-if="isProductFormPage" label="上架" required-mark>
+              <t-form-item v-if="isProductFormPage && canSetShelfStatus" label="上架" required-mark>
                 <t-radio-group v-model="publishTargetStatus">
                   <t-radio value="selling" :disabled="!canPublishToShelf">立刻上架</t-radio>
                   <t-radio value="warehouse" :disabled="productMode === 'edit' && editingSourceStatus === 'selling'"
@@ -957,10 +933,21 @@
       </t-table>
       <t-empty v-else description="暂无下架记录" />
     </AdminDialog>
+    <OperationsBatchShelfResult v-model:visible="allBatchResultVisible" :result="allBatchResult" />
   </div>
 </template>
 
 <script setup lang="ts">
+import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
+import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
+import type { BatchShelfResult } from '@/services/operationsBatchShelf';
+const allBatchResultVisible = ref(false);
+const allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
+import { useRoute } from 'vue-router';
+import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
+import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
+import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
+import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
@@ -968,13 +955,13 @@ import { preventZeroQuantity } from '@/utils/quantityInput';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
-import { stateActivityColumns } from '@/services/productStateActivity';
+import { stateActivitySortIcon, stateActivityColumns } from '@/services/productStateActivity';
 import { fillSlabProductForm, formatPrice, formatRatio, toNumber } from '../shared/slabPageMapping';
 import { buildSlabPriceRows, buildSlabSalesPriceRows } from '../shared/slabPriceRows';
 import { useSlabOperationLogPresentation } from '../shared/slabOperationLogPresentation';
 import { useSlabOperationLogs } from '../shared/useSlabOperationLogs';
 import { slabBatchButtons, slabRowButtons, type SlabBatchAction, type SlabRowAction } from '../shared/slabPageActions';
-import { filterSlabItems, latestOffShelfRecord, offShelfTimestamp } from '../shared/slabListFilter';
+import { filterSlabItems, offShelfTimestamp } from '../shared/slabListFilter';
 import { createSlabFormRules } from '../shared/slabFormRules';
 import {
   tabs,
@@ -1047,7 +1034,7 @@ import {
 } from '@/services/slabs';
 import { computed, nextTick, onMounted, reactive, ref, watch } from 'vue';
 type PublisherType = SlabPublisherType;
-type SlabTab = SlabStatus;
+type SlabTab = SlabStatus | 'all';
 type ProductMode = 'create' | 'edit' | 'view';
 type RowAction = SlabRowAction;
 type BatchAction = SlabBatchAction;
@@ -1065,19 +1052,24 @@ type UploadItemKey = 'main' | 'scan' | 'design' | 'video';
 type SalesNumberChangeContext = {
   type?: string;
 };
-const activeTab = ref<SlabTab>('warehouse');
+const activeTab = ref<SlabTab>(initialProductListTab(useRoute().query.tab));
+const { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {
+  currentPagination.value.current = 1;
+});
 const loginUser = computed(() => getLoginUser());
 const productPermissionPrefix = computed(() => `${'supply-chain'}.slab-management`);
 const sourceBlocked: (row: SlabItem) => boolean = () => false;
 const slabPermissionScope: Record<SlabTab, string> = {
+  all: 'all',
   warehouse: 'warehouse',
   selling: 'selling',
-  offShelf: 'off-shelf',
   soldOut: 'sold-out',
   recycle: 'recycle',
 };
 const slabPermission = (status: SlabTab, action: string) =>
-  `${productPermissionPrefix.value}.${slabPermissionScope[status]}.${action}`;
+  ['publish', 'batch-shelf'].includes(action)
+    ? `${productPermissionPrefix.value}.${action}`
+    : `${productPermissionPrefix.value}.${slabPermissionScope[status]}.${action}`;
 const hasSlabAction = (status: SlabTab, action: string) =>
   hasPermission(loginUser.value, slabPermission(status, action));
 const canViewOperationLogs = computed(() =>
@@ -1086,7 +1078,9 @@ const canViewOperationLogs = computed(() =>
 const { visibleTabs: slabTabs, showTabRail: showSlabTabRail } = usePermissionTabs({
   tabs,
   activeTab,
-  canAccess: (tab) => hasSlabAction(tab.value, 'view'),
+  canAccess: (tab) =>
+    hasSlabAction(tab.value, 'view') &&
+    (tab.value !== 'all' || hasSlabAction('warehouse', 'view') || hasSlabAction('selling', 'view')),
 });
 const loading = ref(false);
 const saving = ref(false);
@@ -1104,12 +1098,8 @@ const publishTargetStatus = ref<SlabPublishTargetStatus>('warehouse');
 const productTab = ref('images');
 const editingRowId = ref<number | null>(null);
 const editingSourceStatus = computed(() => tableData.value.find((row) => row.id === editingRowId.value)?.status);
-const canPublishToShelf = computed(
-  () =>
-    editingSourceStatus.value === 'selling' ||
-    hasSlabAction('warehouse', 'shelf') ||
-    (productMode.value === 'create' && hasSlabAction('selling', 'publish')),
-);
+const canSetShelfStatus = computed(() => hasSlabAction('warehouse', 'shelf'));
+const canPublishToShelf = computed(() => editingSourceStatus.value === 'selling' || canSetShelfStatus.value);
 const productFormRef = ref<FormInstanceFunctions>();
 const salesFormRef = ref<FormInstanceFunctions>();
 const priceDrawerRoot = ref<HTMLElement>();
@@ -1150,6 +1140,7 @@ const detailMediaItems = computed<DetailMediaItem[]>(() => {
 const confirmDialogVisible = ref(false);
 const reasonDialogVisible = ref(false);
 const offShelfHistoryVisible = ref(false);
+const offShelfHistoryTooltips = reactive<Record<number, boolean>>({});
 const offShelfHistoryRow = ref<SlabItem | null>(null);
 const offShelfHistoryRecords = computed(() =>
   [...(offShelfHistoryRow.value?.offShelfRecords ?? [])].sort((left, right) => {
@@ -1207,7 +1198,6 @@ const operationSourceLabel = (source: SlabOperationLogRecord['operationSource'])
 const operationStatusLabels: Record<string, string> = {
   warehouse: '仓库中',
   selling: '已上架',
-  offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',
   purged: '已彻底删除',
@@ -1271,16 +1261,16 @@ const supplierFilterOptions = computed(() =>
   publishOptions.suppliers.map((item) => ({ id: item.id, name: item.label })),
 );
 const filters = reactive<Record<SlabTab, FilterState>>({
+  all: makeFilterState(),
   warehouse: makeFilterState(),
   selling: makeFilterState(),
-  offShelf: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
 });
 const appliedFilters = reactive<Record<SlabTab, FilterState>>({
+  all: makeFilterState(),
   warehouse: makeFilterState(),
   selling: makeFilterState(),
-  offShelf: makeFilterState(),
   soldOut: makeFilterState(),
   recycle: makeFilterState(),
 });
@@ -1293,15 +1283,15 @@ const paginations = reactive<
     }
   >
 >({
+  all: { current: 1, pageSize: 10 },
   warehouse: { current: 1, pageSize: 10 },
   selling: { current: 1, pageSize: 10 },
-  offShelf: { current: 1, pageSize: 10 },
   soldOut: { current: 1, pageSize: 10 },
   recycle: { current: 1, pageSize: 10 },
 });
 const tableData = ref<SlabItem[]>([]);
 const normalizeStatus = (status?: string): SlabStatus => {
-  if (status === 'selling' || status === 'offShelf' || status === 'soldOut' || status === 'recycle') return status;
+  if (status === 'selling' || status === 'soldOut' || status === 'recycle') return status;
   return 'warehouse';
 };
 const normalizePublisherType = (publisherType?: string): PublisherType =>
@@ -1368,6 +1358,9 @@ const toSlabItem = (record: SlabRecord): SlabItem => {
     publisherType: normalizePublisherType(record.publisherType),
     stateOperatorName: record.stateOperatorName,
     stateOperatedAt: record.stateOperatedAt,
+    warehouseEntryType: record.warehouseEntryType,
+    warehouseEntryReason: record.warehouseEntryReason,
+    warehouseEntryDetail: record.warehouseEntryDetail,
     createdByName: record.createdByName?.trim() || '-',
     createdAt: record.createdAt || '',
     price: {
@@ -1520,43 +1513,32 @@ const { isValidMeasurement, isValidSalesNumber, salesRules, stockInputProps, pro
 );
 // Fixed pixel widths; update only when the tab action buttons change.
 const operationWidths = {
+  all: 208,
   warehouse: 184,
-  selling: 148,
-  offShelf: 176,
+  selling: 208,
   soldOut: 104,
   recycle: 204,
 };
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
-  if (activeTab.value === 'offShelf') {
-    return [
-      { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
-      { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
-      { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },
-      { colKey: 'variety', title: '品种', width: 140 },
-      { colKey: 'offShelfReason', title: '下架原因/详细说明', minWidth: 240 },
-      ...stateActivityColumns(activeTab.value),
-      {
-        colKey: 'operation',
-        title: '操作',
-        width: operationWidths[activeTab.value],
-        align: 'left',
-        fixed: 'right',
-      },
-    ];
-  }
   const baseColumns: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'select', title: 'selectTitle', width: 48, align: 'center' },
-    { colKey: 'image', title: '商品主图', width: 96, align: 'center' },
+    { colKey: 'image', title: '商品主图', width: 96 },
     { colKey: 'slab', title: '大板名称/ID/编号', minWidth: 220 },
     { colKey: 'variety', title: '品种', width: 140 },
     { colKey: 'origin', title: '产地', width: 110 },
     { colKey: 'texture', title: '纹理', width: 110 },
     { colKey: 'color', title: '色系', width: 110 },
-    { colKey: 'grade', title: '等级', width: 160, align: 'center' },
+    { colKey: 'grade', title: '等级', width: 160 },
     { colKey: 'size', title: '尺寸', width: 170 },
     { colKey: 'tenant', title: '供应商', width: 180 },
-    ...stateActivityColumns(activeTab.value),
   ];
+  if (activeTab.value === 'warehouse' || activeTab.value === 'all')
+    baseColumns.push({ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 240 });
+  baseColumns.push(
+    ...(activeTab.value === 'all'
+      ? productCreationColumns(toggleTimeSort)
+      : stateActivityColumns(activeTab.value, toggleTimeSort)),
+  );
   baseColumns.push({
     colKey: 'operation',
     title: '操作',
@@ -1564,7 +1546,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     align: 'left',
     fixed: 'right',
   });
-  return baseColumns;
+  return activeTab.value === 'all' && !hasSlabAction('warehouse', 'batch-shelf')
+    ? baseColumns.filter((col) => col.colKey !== 'select')
+    : baseColumns;
 });
 const currentFilter = computed(() => filters[activeTab.value]);
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
@@ -1581,14 +1565,21 @@ const pagePartiallySelected = computed(
   () => currentPageIds.value.some((id) => selectedKeySet.value.has(id)) && !pageAllSelected.value,
 );
 const priceDrawerReadonly = computed(
-  () => activeTab.value === 'soldOut' || activeTab.value === 'recycle' || activeTab.value === 'offShelf',
+  () => activeTab.value === 'soldOut' || activeTab.value === 'recycle' || activeTab.value === 'warehouse',
 );
 const productDialogTitle = computed(() => {
   if (productMode.value === 'create') return '发布商品';
   if (productMode.value === 'edit') return '编辑商品';
   return '查看商品';
 });
-const filteredData = computed(() => filterSlabItems(tableData.value, activeTab.value, currentAppliedFilter.value));
+const filteredData = computed(() =>
+  filterSlabItems(
+    activeTab.value === 'all' ? tableData.value.filter((row) => hasSlabAction(row.status, 'view')) : tableData.value,
+    activeTab.value,
+    currentAppliedFilter.value,
+    descending.value,
+  ),
+);
 const pageData = computed(() => {
   const start = (currentPagination.value.current - 1) * currentPagination.value.pageSize;
   return filteredData.value.slice(start, start + currentPagination.value.pageSize);
@@ -1596,12 +1587,27 @@ const pageData = computed(() => {
 const shelfErrors = reactive<Record<number, string>>({});
 const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
-const batchButtons = computed(() => slabBatchButtons(activeTab.value, hasSlabAction));
+const batchButtons = computed(() =>
+  activeTab.value === 'all'
+    ? [
+        ...(hasSlabAction('warehouse', 'publish')
+          ? [{ label: '发布商品', action: 'publish' as const, icon: 'add' }]
+          : []),
+        ...(hasSlabAction('warehouse', 'batch-shelf')
+          ? [{ label: '批量上架', action: 'batchShelf' as const, icon: 'upload' }]
+          : []),
+      ]
+    : slabBatchButtons(activeTab.value, hasSlabAction),
+);
 const tabLabel = (tab: { label: string; value: SlabTab }) => {
-  const count = tableData.value.filter((item) => item.status === tab.value).length;
-  return count ? `${tab.label} ${count}` : tab.label;
+  const count = tableData.value.filter((item) =>
+    tab.value === 'all'
+      ? isAllProductStatus(item.status) && hasSlabAction(item.status, 'view')
+      : item.status === tab.value,
+  ).length;
+  return `${tab.label}（${count}）`;
 };
-const rowActions = () => slabRowButtons(activeTab.value, hasSlabAction);
+const rowActions = (row: SlabItem) => slabRowButtons(row.status, hasSlabAction);
 const handleTabChange = () => {
   selectedKeys.value = [];
   ensureCurrentPage();
@@ -1758,7 +1764,9 @@ const openProductDialog = (mode: ProductMode, row?: SlabItem) => {
   }
   productMode.value = mode;
   publishTargetStatus.value =
-    mode === 'create' ? 'warehouse' : resolveSlabPublishTargetStatus(row?.status || activeTab.value);
+    mode === 'create'
+      ? 'warehouse'
+      : resolveSlabPublishTargetStatus(row?.status || (activeTab.value === 'all' ? 'warehouse' : activeTab.value));
   productTab.value = mode === 'view' ? 'sales' : 'images';
   editingRowId.value = row?.id ?? null;
   resetProductForm();
@@ -1979,7 +1987,7 @@ const handleProductSubmit = async () => {
       upsertSlabItem(await updateSlab(editingItem.id, payload));
     } else {
       upsertSlabItem(await createSlab(payload));
-      activeTab.value = publishTargetStatus.value;
+      if (activeTab.value !== 'all') activeTab.value = publishTargetStatus.value;
       paginations[publishTargetStatus.value].current = 1;
     }
     pendingUploadedMediaIds.clear();
@@ -2060,13 +2068,13 @@ const refreshSlabItems = async (ids: number[]) => {
   const records = await listSlabs();
   records.filter((record) => selected.has(record.id)).forEach(upsertSlabItem);
 };
-const updateSlabStatus = async (id: number, status: SlabStatus, reason?: string, detail?: string) => {
+const updateSlabStatus = async (id: number, status: SlabStatus | 'offShelf', reason?: string, detail?: string) => {
   const item = tableData.value.find((candidate) => candidate.id === id);
   if (!item) return;
   await updateSlabStatuses([id], status, reason, detail);
   await refreshSlabItems([id]);
 };
-const updateSelectedSlabStatuses = async (status: SlabStatus, reason?: string, detail?: string) => {
+const updateSelectedSlabStatuses = async (status: SlabStatus | 'offShelf', reason?: string, detail?: string) => {
   const selectedIds = [...selectedKeys.value];
   await updateSlabStatuses(selectedIds, status, reason, detail);
   await refreshSlabItems(selectedIds);
@@ -2220,6 +2228,15 @@ const handleConfirmSubmit = async () => {
     if (type === 'batchRestore') {
       await updateSelectedSlabStatuses('warehouse');
     }
+    if (type === 'batchShelf' && activeTab.value === 'all') {
+      allBatchResult.value = await shelfProductsFromAll('slabs', [...selectedKeys.value]);
+      selectedKeys.value = [];
+      closeConfirmDialog();
+      allBatchResultVisible.value = true;
+      await loadSlabs();
+      ensureCurrentPage();
+      return;
+    }
     if (type === 'batchShelf') {
       const ids = [...selectedKeys.value];
       const failed = new Map<number, string>();
@@ -2316,6 +2333,7 @@ const closeReasonDialog = () => {
   reasonFormRef.value?.clearValidate();
 };
 const openOffShelfHistory = (row: SlabItem) => {
+  offShelfHistoryTooltips[row.id] = false;
   offShelfHistoryRow.value = row;
   offShelfHistoryVisible.value = true;
 };

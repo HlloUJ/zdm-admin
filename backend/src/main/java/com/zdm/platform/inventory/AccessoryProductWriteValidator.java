@@ -12,7 +12,7 @@ import org.springframework.util.StringUtils;
 
 final class AccessoryProductWriteValidator {
   private static final Set<String> ALLOWED_STATUSES =
-      Set.of("warehouse", "selling", "offShelf", "soldOut", "recycle");
+      Set.of("warehouse", "selling", "soldOut", "recycle");
 
   private final JdbcTemplate jdbcTemplate;
   private final MediaAssetService mediaAssetService;

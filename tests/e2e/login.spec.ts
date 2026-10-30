@@ -1,9 +1,10 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks } from './admin-api-mocks';
 
 test('shows the login page', async ({ page }) => {
-  await page.goto('/login');
+  await page.goto(productWarehouseUrl('/login'));
   await expect(page.getByRole('heading', { name: '欢迎登录' })).toBeVisible();
   await expect(page.getByPlaceholder('请输入手机号')).toHaveValue('');
   await expect(page.getByPlaceholder('请输入验证码')).toHaveValue('');
@@ -34,7 +35,7 @@ test('stores and displays the logged-in user', async ({ page }) => {
     });
   });
 
-  await page.goto('/login');
+  await page.goto(productWarehouseUrl('/login'));
   await page.getByPlaceholder('请输入手机号').fill('15900000001');
   await page.getByPlaceholder('请输入验证码').fill('888888');
   await page.getByRole('button', { name: '登录' }).click();
@@ -61,7 +62,7 @@ test('logs out and clears the local account session', async ({ page }) => {
     );
   });
 
-  await page.goto('/dashboard');
+  await page.goto(productWarehouseUrl('/dashboard'));
   await page.getByRole('button', { name: /退出登录/ }).click();
 
   await expect(page).toHaveURL(/\/login$/);
@@ -118,7 +119,7 @@ test('built-in super admin switches to the supply-chain system with full scoped 
     }
   });
 
-  await page.goto('/dashboard');
+  await page.goto(productWarehouseUrl('/dashboard'));
   const identityNavigations: string[] = [];
   page.on('request', (request) => {
     if (request.isNavigationRequest() && request.frame() === page.mainFrame()) identityNavigations.push(request.url());
@@ -198,7 +199,7 @@ for (const storeCount of [1, 2]) {
       );
     });
 
-    await page.goto('/dashboard');
+    await page.goto(productWarehouseUrl('/dashboard'));
 
     await expect(page.locator('.top-actions .t-select')).toHaveCount(0);
     if (storeCount === 1) {
@@ -351,7 +352,7 @@ for (const platformIdentityType of ['platform_admin', 'employee']) {
       },
       { ...user, ...contexts[2] },
     );
-    await page.goto('/dashboard');
+    await page.goto(productWarehouseUrl('/dashboard'));
     for (const [label, type] of [
       ['运营管理平台', '运营端'],
       ['测试大板供应商', '门店端 · 大板供应商'],
@@ -400,7 +401,7 @@ test('submit validation uses one summary and both inline errors without sending 
     requests++;
     await route.fulfill({ json: { code: 400, message: '不应提交空表单' } });
   });
-  await page.goto('/login');
+  await page.goto(productWarehouseUrl('/login'));
   await page.getByRole('button', { name: '登录', exact: true }).click();
   await expect(page.locator('.zdm-admin-feedback')).toHaveText('表单校验未通过，请检查标红字段');
   for (const field of ['phone', 'verifyCode']) {
@@ -465,7 +466,7 @@ test('two-line identity selection retains the current identity and permissions a
     localStorage.setItem('zdm-admin-token', 'identity-layout-token');
     localStorage.setItem('zdm-admin-user', JSON.stringify(initial));
   }, user);
-  await page.goto('/dashboard');
+  await page.goto(productWarehouseUrl('/dashboard'));
   await page.locator('.brand-context-select').click();
   await page.locator('.t-select-option').filter({ hasText: '测试工厂' }).click();
   try {
@@ -516,7 +517,7 @@ for (const storeCount of [1, 2]) {
       localStorage.setItem('zdm-admin-user', JSON.stringify(initial));
     }, user);
     await page.setViewportSize({ width: 1000, height: 780 });
-    await page.goto('/dashboard');
+    await page.goto(productWarehouseUrl('/dashboard'));
     const title = page.locator('.identity-context .identity-name');
     await expect(title).toHaveAttribute('title', longName);
     await expect(title).toHaveCSS('text-overflow', 'ellipsis');

@@ -12,12 +12,12 @@ const product = {
   supplier: '供应商',
   stock: 2,
   publisherType: '平台发布',
-  status: 'offShelf',
+  status: 'selling',
   createdByName: '测试',
   image: '/image.png',
   detail: '<p>图文介绍</p><img src="/detail.png" onerror="alert(1)"><script>alert(1)</script>',
-  offShelfReason: '价格调整',
-  offShelfDetail: '等待供应商确认',
+  warehouseEntryReason: '价格调整',
+  warehouseEntryDetail: '等待供应商确认',
   attributes: [],
   variants: [],
 };
@@ -58,7 +58,7 @@ it('运营详情按 SKU ID 匹配价格，保留零成本值且不展示商家�
     operations: true,
     product: {
       ...product,
-      sourceStatus: 'offShelf',
+      sourceStatus: 'warehouse',
       sourceUnavailable: true,
       variants: [{ id: 11, variantLabel: '标准规格', stock: 2, costPrice: 0 }],
       guidePrices: [{ skuId: 11, costPrice: 99, priceCoefficient: 2, price: 198 }],
@@ -161,4 +161,14 @@ it('抽屉使用原生分区且保留资料与预览，整页编辑仍使用原�
     '图文描述',
     '基础信息',
   ]);
+});
+
+it('仓库商品不展示额外入库分区，仍保留原商品资料和预览', async () => {
+  const view = wrapper();
+  await view.setProps({ product: { ...product, status: 'warehouse' }, drawerLayout: true });
+  expect(view.findComponent({ name: 'WarehouseEntryInformation' }).exists()).toBe(false);
+  expect(view.findAllComponents(Card).map((card) => card.props('title'))).not.toContain('本次入库信息');
+  expect(view.text()).not.toContain('等待供应商确认');
+  expect(view.text()).toContain('图文介绍');
+  expect(view.find('button').exists()).toBe(true);
 });

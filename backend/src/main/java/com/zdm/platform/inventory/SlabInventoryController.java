@@ -49,11 +49,9 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     permissionGuard.requireAnyPermission(
         prefix() + ".create",
         prefix() + ".edit",
-        permission("warehouse", "publish"),
-        permission("selling", "publish"),
+        prefix() + ".publish",
         permission("warehouse", "edit"),
-        permission("selling", "edit"),
-        permission("off-shelf", "edit"));
+        permission("selling", "edit"));
     return ApiResponse.ok(mediaAssetService.upload(file, MediaStorageService.defaultImageSizeLimit()));
   }
 
@@ -63,11 +61,9 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
         prefix() + ".create",
         prefix() + ".edit",
         prefix() + ".delete",
-        permission("warehouse", "publish"),
-        permission("selling", "publish"),
+        prefix() + ".publish",
         permission("warehouse", "edit"),
-        permission("selling", "edit"),
-        permission("off-shelf", "edit"));
+        permission("selling", "edit"));
     return ApiResponse.ok(service.cleanupTemporaryMedia(mediaId));
   }
 
@@ -81,14 +77,17 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @GetMapping
   public ApiResponse<List<SlabInventory>> list() {
     permissionGuard.requireView(prefix());
-    return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()).stream().map(this::visiblePrices).toList());
+    return ApiResponse.ok(permissionGuard.filterData(service.listWithPrices()).stream()
+        .filter(item -> permissionGuard.hasPermission(prefix() + ".view")
+            || permissionGuard.hasPermission(permission(statusScope(isSupplyChain() ? item.getSourceStatus() : item.getStatus()), "view")))
+        .map(this::visiblePrices).toList());
   }
 
   @GetMapping("/{id}")
   public ApiResponse<SlabInventory> detail(@PathVariable Long id) {
     permissionGuard.requireView(prefix());
     permissionGuard.requireAnyPermission(permission("warehouse", "edit"), permission("selling", "edit"),
-        permission("off-shelf", "detail"), permission("sold-out", "detail"), permission("recycle", "detail"));
+        permission("sold-out", "detail"), permission("recycle", "detail"));
     permissionGuard.requireDataPermission();
     SlabInventory item = service.visibleDetail(id);
     if (item == null) { throw new IllegalArgumentException("大板不存在或不可访问"); }
@@ -117,8 +116,9 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   @Override
   @PostMapping
   public ApiResponse<SlabInventory> create(@Valid @RequestBody SlabInventory inventory) {
-    permissionGuard.requireAnyPermission(permission("warehouse","publish"),permission("selling","publish"));
-    if(isSupplyChain() && "selling".equals(inventory.getStatus()) && !"接口获取".equals(inventory.getPublisherType())) { permissionGuard.requireAnyPermission(permission("warehouse","shelf"),permission("selling","publish")); }
+    if (!isSupplyChain()) { throw new org.springframework.security.access.AccessDeniedException("此操作属于供应链协同系统"); }
+    permissionGuard.requirePermission(prefix() + ".publish");
+    if (isSupplyChain() && "selling".equals(inventory.getStatus())) { permissionGuard.requirePermission(permission("warehouse", "shelf")); }
     return ApiResponse.ok(visiblePrices(service.createWithPrices(inventory)));
   }
 
@@ -131,7 +131,13 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     String scope = statusScope(isSupplyChain()?existing.getSourceStatus():existing.getStatus());
     if (!List.of("warehouse","selling").contains(scope)) { throw new IllegalArgumentException("当前状态不能编辑"); }
     permissionGuard.requirePermission(permission(scope,"edit"));
-    if(isSupplyChain() && !Objects.equals(existing.getSourceStatus(),inventory.getStatus())) { requireStatusTransition(existing.getSourceStatus(),inventory.getStatus()); }
+    if (isSupplyChain() && !Objects.equals(existing.getSourceStatus(), inventory.getStatus())) {
+      if ("warehouse".equals(existing.getSourceStatus()) && "selling".equals(inventory.getStatus())) {
+        permissionGuard.requireAnyPermission(permission("warehouse", "shelf"), permission("warehouse", "batch-shelf"));
+      } else {
+        throw new org.springframework.security.access.AccessDeniedException("请使用对应状态操作修改商品状态");
+      }
+    }
     return ApiResponse.ok(visiblePrices(service.updateWithPrices(id, inventory)));
   }
 
@@ -186,7 +192,7 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
         case "shelf" -> requireStatusTransition(state, "selling");
         case "offShelf" -> requireStatusTransition(state, "offShelf");
         case "restore" -> requireStatusTransition(state, "warehouse");
-        case "delete" -> permissionGuard.requireAnyPermission(prefix() + ".delete", permission(statusScope(state), "delete"));
+        case "delete" -> requireDelete(statusScope(state));
         case "purge" -> permissionGuard.requireAnyPermission(prefix() + ".delete", permission("recycle", "purge"), permission("recycle", "batch-purge"), permission("recycle", "clear"));
         default -> throw new IllegalArgumentException("不支持的操作");
       }
@@ -201,8 +207,8 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
         .map(item -> isSupplyChain()?item.getSourceStatus():item.getStatus())
         .filter(Objects::nonNull)
         .distinct()
-        .forEach(status -> requireStatusTransition(status, request.status()));
-    service.updateStatuses(request.ids(), request.status(), request.reason(), request.detail());
+        .forEach(status -> requireStatusTransition(status, command(request)));
+    service.updateStatuses(request.ids(), command(request), request.reason(), request.detail());
     return ApiResponse.ok(true);
   }
 
@@ -243,25 +249,27 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
       throw new IllegalArgumentException("大板不存在或已被删除");
     }
     String scope = statusScope(isSupplyChain()?inventory.getSourceStatus():inventory.getStatus());
-    if (!"warehouse".equals(scope) && !"off-shelf".equals(scope)) {
-      throw new IllegalArgumentException("只有仓库中或已下架的大板可以删除");
+    if (!"warehouse".equals(scope) && !"selling".equals(scope)) {
+      throw new IllegalArgumentException("只有仓库中或已上架的大板可以删除");
     }
-    permissionGuard.requireAnyPermission(prefix() + ".delete", permission(scope, "delete"));
+    requireDelete(scope);
     return ApiResponse.ok(service.deleteFromManagement(
         id, request == null ? null : request.reason(), request == null ? null : request.detail()));
   }
 
+  private void requireDelete(String scope) {
+    if ("selling".equals(scope)) { permissionGuard.requirePermission(permission(scope, "delete")); }
+    else { permissionGuard.requireAnyPermission(prefix() + ".delete", permission(scope, "delete")); }
+  }
+
   private void requireStatusTransition(String sourceStatus, String targetStatus) {
+    if ("offShelf".equals(targetStatus) && !"selling".equals(sourceStatus)) { throw new IllegalArgumentException("只有已上架商品可以下架"); }
     if ("warehouse".equals(sourceStatus) && "selling".equals(targetStatus)) {
       requireEditOr(permission("warehouse", "shelf"), permission("warehouse", "batch-shelf"));
       return;
     }
     if ("selling".equals(sourceStatus) && "offShelf".equals(targetStatus)) {
       requireEditOr(permission("selling", "off-shelf"), permission("selling", "batch-off-shelf"));
-      return;
-    }
-    if ("warehouse".equals(targetStatus) && "offShelf".equals(sourceStatus)) {
-      requireEditOr(permission("off-shelf", "restore"), permission("off-shelf", "batch-restore"));
       return;
     }
     if ("warehouse".equals(targetStatus) && "recycle".equals(sourceStatus)) {
@@ -278,10 +286,16 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
     permissionGuard.requireAnyPermission(candidates);
   }
 
+  private String command(SlabInventoryBatchStatusRequest request) {
+    if ("offShelf".equals(request.status())) { throw new IllegalArgumentException("已下架状态已取消"); }
+    if (request.operation() == null) { return request.status(); }
+    if (!"offShelf".equals(request.operation()) || !"warehouse".equals(request.status())) { throw new IllegalArgumentException("商品操作不正确"); }
+    return "offShelf";
+  }
+
   private String statusScope(String status) {
     return switch (status == null ? "" : status) {
       case "warehouse", "selling", "recycle" -> status;
-      case "offShelf" -> "off-shelf";
       case "soldOut" -> "sold-out";
       default -> null;
     };
@@ -298,6 +312,10 @@ public class SlabInventoryController extends AdminCrudController<SlabInventory> 
   }
   private String prefix() { return (isSupplyChain()?"supply-chain.":"admin.")+"slab-management"; }
   private String permission(String scope, String action) {
+    if (isSupplyChain() && "warehouse".equals(scope) && "batch-shelf".equals(action)) {
+      return permissionGuard.hasPermission(prefix() + ".warehouse.batch-shelf")
+          ? prefix() + ".warehouse.batch-shelf" : prefix() + ".batch-shelf";
+    }
     return prefix() + "." + scope + "." + action;
   }
 }
