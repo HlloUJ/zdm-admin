@@ -111,12 +111,7 @@ export function productOperationTypeOptions(types: readonly string[]) {
 
 const commonActions = ['UPDATE', 'SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE', 'PURGE', 'SOLD_OUT'];
 const supplyEffects = ['SOURCE_SHELF', 'SOURCE_OFF_SHELF', 'SOURCE_DELETE_TO_RECYCLE', 'SOURCE_PURGE'];
-const operationsEffects = [
-  'OPERATIONS_SHELF',
-  'OPERATIONS_OFF_SHELF',
-  'OPERATIONS_DELETE_TO_RECYCLE',
-  'OPERATIONS_PURGE',
-];
+const operationsEffects = ['OPERATIONS_OFF_SHELF', 'OPERATIONS_DELETE_TO_RECYCLE', 'OPERATIONS_PURGE'];
 
 export function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'store', finished = false) {
   const upstreamActions = supplyEffects.flatMap((type) =>
@@ -127,7 +122,12 @@ export function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'stor
       ? ['CREATE', 'UPDATE', ...commonActions]
       : client === 'admin'
         ? [...commonActions, ...upstreamActions]
-        : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),
+        : [
+            'SELECT',
+            ...commonActions,
+            ...upstreamActions.filter((type) => type !== 'SOURCE_SHELF'),
+            ...operationsEffects,
+          ]),
   ]);
 }
 

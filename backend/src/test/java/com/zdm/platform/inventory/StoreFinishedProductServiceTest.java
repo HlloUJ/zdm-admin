@@ -140,6 +140,16 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     assertThat(products.list().getFirst().stateOperatedAt()).isEqualTo(sold.stateOperatedAt());
     stateActivities.storeStockChanged(99941L,0,0);
     assertThat(products.list().getFirst().stateOperatedAt()).isEqualTo(sold.stateOperatedAt());
+    var previousLogs=jdbc.queryForList("SELECT * FROM store_finished_operation_logs WHERE listing_id=? ORDER BY id",selected.id());
+    jdbc.update("UPDATE finished_products SET total_stock=2 WHERE id=99941");
+    stateActivities.storeStockChanged(99941L,0,2);
+    var recovered=products.list().getFirst();
+    assertThat(recovered.effectiveStatus()).isEqualTo("selling");
+    assertThat(recovered.stateOperatorName()).isEqualTo("系统");
+    assertThat(recovered.stateOperatedAt()).isNotNull();
+    assertThat(recovered.createdAt()).isEqualTo(created);
+    assertThat(jdbc.queryForObject("SELECT state FROM product_state_activity WHERE kind='store-finished' AND business_client_code='store' AND record_id=?",String.class,selected.id())).isEqualTo("selling");
+    assertThat(jdbc.queryForList("SELECT * FROM store_finished_operation_logs WHERE listing_id=? ORDER BY id",selected.id())).isEqualTo(previousLogs);
   }
 
   @Test

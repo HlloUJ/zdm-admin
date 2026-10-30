@@ -64,3 +64,19 @@ it('unifies legacy reentry labels and filters under source shelf', () => {
     '供应链已上架，商品进入运营管理平台仓库',
   );
 });
+
+it('removes only obsolete upstream shelf filters from store products', () => {
+  for (const finished of [true, false]) {
+    const store = productLogFilterOptions('store', finished).map((item) => item.value);
+    expect(store).not.toContain('SOURCE_SHELF');
+    expect(store).not.toContain('OPERATIONS_SHELF');
+    expect(store).toContain('SHELF');
+    expect(store).toContain('SOURCE_OFF_SHELF');
+    expect(store).toContain('OPERATIONS_OFF_SHELF');
+    expect(store).toContain('SOURCE_DELETE_TO_RECYCLE');
+    expect(store).toContain('SOURCE_PURGE');
+    expect(store).toContain('OPERATIONS_DELETE_TO_RECYCLE');
+    expect(store).toContain('OPERATIONS_PURGE');
+    expect(productLogFilterOptions('admin', finished).map((item) => item.value)).toContain('SOURCE_SHELF');
+  }
+});

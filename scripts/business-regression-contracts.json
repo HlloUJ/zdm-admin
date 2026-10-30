@@ -294,8 +294,8 @@
         "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
         "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "e5265270725687b3fbcce3a20d87f86f8d3e18582f4170e9551dc7492ef72c00",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "52e82e35ed16a3692e32570e86962855f3b2a8f38e3ea7d5891f7bc2a583e4de",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "e6ad11fb8318983152eed5602fc136bf895df05372f622596f9fa7fa789bd014",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "edc02a65b4b6fb2d5d364df54a1311e4d639246ffe6e6aa5b381b7790325be82",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
@@ -1484,6 +1484,30 @@
           "before": "23e669f87a0ef8aaf20aa4b35da5b2747343baa1860fbf1978f38f223cdb3fee",
           "after": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
           "reason": "用户确认运营三模块取消重新入仓类型，调整为供应链上架并覆盖历史只读映射筛选，保留真实触发日志快照断言、超时与零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "e5265270725687b3fbcce3a20d87f86f8d3e18582f4170e9551dc7492ef72c00",
+          "after": "e6ad11fb8318983152eed5602fc136bf895df05372f622596f9fa7fa789bd014",
+          "reason": "用户仅确认门店库存恢复不新增日志及移除两个上架筛选；补充恢复状态时间和历史日志不变断言，保留原全部断言、超时与零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "74b7b07dad5e8e7cfae7631328e60caa89ef7f01dc326fb29fa2fa96b6aded32",
+          "after": "e6ad11fb8318983152eed5602fc136bf895df05372f622596f9fa7fa789bd014",
+          "reason": "用户仅确认门店库存恢复不新增日志及移除两个上架筛选；补充恢复状态时间和历史日志不变断言，保留原全部断言、超时与零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "52e82e35ed16a3692e32570e86962855f3b2a8f38e3ea7d5891f7bc2a583e4de",
+          "after": "edc02a65b4b6fb2d5d364df54a1311e4d639246ffe6e6aa5b381b7790325be82",
+          "reason": "用户仅确认门店库存恢复不新增日志及移除两个上架筛选；补充恢复状态时间和历史日志不变断言，保留原全部断言、超时与零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "ebc342c2957c09b8a78e73ea6bb65cc10390ce6fd1773b0c4afffc3d36ff661b",
+          "after": "edc02a65b4b6fb2d5d364df54a1311e4d639246ffe6e6aa5b381b7790325be82",
+          "reason": "用户仅确认门店库存恢复不新增日志及移除两个上架筛选；补充恢复状态时间和历史日志不变断言，保留原全部断言、超时与零重试。"
         }
       ],
       "routes": [

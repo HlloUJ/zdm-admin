@@ -13090,6 +13090,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(\n    '供应链已上架，商品进入运营管理平台仓库',\n  );\n});\n",
+          "after": "  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(\n    '供应链已上架，商品进入运营管理平台仓库',\n  );\n});\n\nit('removes only obsolete upstream shelf filters from store products', () => {\n  for (const finished of [true, false]) {\n    const store = productLogFilterOptions('store', finished).map((item) => item.value);\n    expect(store).not.toContain('SOURCE_SHELF');\n    expect(store).not.toContain('OPERATIONS_SHELF');\n    expect(store).toContain('SHELF');\n    expect(store).toContain('SOURCE_OFF_SHELF');\n    expect(store).toContain('OPERATIONS_OFF_SHELF');\n    expect(store).toContain('SOURCE_DELETE_TO_RECYCLE');\n    expect(store).toContain('SOURCE_PURGE');\n    expect(store).toContain('OPERATIONS_DELETE_TO_RECYCLE');\n    expect(store).toContain('OPERATIONS_PURGE');\n    expect(productLogFilterOptions('admin', finished).map((item) => item.value)).toContain('SOURCE_SHELF');\n  }\n});\n",
+          "stage": "before-migrations",
+          "reason": "用户仅确认门店库存从0恢复不写日志、移除门店供应链上架及运营平台上架筛选；保留状态活动、售完日志、历史数据和其他端。"
+        },
+        {
           "before": "  expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n  expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n});\n\nit('offers reentry only in operations and keeps its real trigger summary', () => {\n  const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';\n  expect(productOperationTypeLabel('REENTRY')).toBe('重新入仓');\n  expect(productLogFilterOptions('admin')).toContainEqual({ value: 'REENTRY', label: '重新入仓' });\n  expect(productLogFilterOptions('supply-chain').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productLogFilterOptions('store').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(reason);\n});\n",
           "after": "  expect(productLogFilterOptions('supply-chain', true).some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n  expect(productLogFilterOptions('admin').some((option) => option.value === 'SOURCE_UPDATE')).toBe(false);\n});\n\nit('unifies legacy reentry labels and filters under source shelf', () => {\n  const reason = '运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓';\n  expect(productOperationTypeLabel('REENTRY')).toBe('供应链上架');\n  expect(productLogFilterOptions('admin')).toContainEqual({ value: 'SOURCE_SHELF', label: '供应链上架' });\n  expect(productLogFilterOptions('admin').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productLogFilterOptions('supply-chain').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productLogFilterOptions('store').some((item) => item.value === 'REENTRY')).toBe(false);\n  expect(productOperationSummary({ operationType: 'REENTRY', operationSummary: reason })).toBe(\n    '供应链已上架，商品进入运营管理平台仓库',\n  );\n});\n",
           "stage": "before-migrations",
@@ -13107,6 +13113,18 @@
       "content": "f5a658e633d771320bfca7429be4eb47de8a58827bf89547a7c717dccec5e2ec",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "}\n\nconst commonActions = ['UPDATE', 'SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE', 'PURGE', 'SOLD_OUT'];\nconst supplyEffects = ['SOURCE_SHELF', 'SOURCE_OFF_SHELF', 'SOURCE_DELETE_TO_RECYCLE', 'SOURCE_PURGE'];\nconst operationsEffects = [\n  'OPERATIONS_SHELF',\n  'OPERATIONS_OFF_SHELF',\n  'OPERATIONS_DELETE_TO_RECYCLE',\n  'OPERATIONS_PURGE',\n];\n\nexport function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'store', finished = false) {\n  const upstreamActions = supplyEffects.flatMap((type) =>\n    finished && type === 'SOURCE_OFF_SHELF' ? [type, 'SOURCE_UPDATE'] : [type],\n",
+          "after": "}\n\nconst commonActions = ['UPDATE', 'SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE', 'PURGE', 'SOLD_OUT'];\nconst supplyEffects = ['SOURCE_SHELF', 'SOURCE_OFF_SHELF', 'SOURCE_DELETE_TO_RECYCLE', 'SOURCE_PURGE'];\nconst operationsEffects = ['OPERATIONS_OFF_SHELF', 'OPERATIONS_DELETE_TO_RECYCLE', 'OPERATIONS_PURGE'];\n\nexport function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'store', finished = false) {\n  const upstreamActions = supplyEffects.flatMap((type) =>\n    finished && type === 'SOURCE_OFF_SHELF' ? [type, 'SOURCE_UPDATE'] : [type],\n",
+          "stage": "before-migrations",
+          "reason": "用户仅确认门店库存从0恢复不写日志、移除门店供应链上架及运营平台上架筛选；保留状态活动、售完日志、历史数据和其他端。"
+        },
+        {
+          "before": "    ...(client === 'supply-chain'\n      ? ['CREATE', 'UPDATE', ...commonActions]\n      : client === 'admin'\n        ? [...commonActions, ...upstreamActions]\n        : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),\n  ]);\n}\n\nexport function productLogTime(value?: string): string {\n",
+          "after": "    ...(client === 'supply-chain'\n      ? ['CREATE', 'UPDATE', ...commonActions]\n      : client === 'admin'\n        ? [...commonActions, ...upstreamActions]\n        : [\n            'SELECT',\n            ...commonActions,\n            ...upstreamActions.filter((type) => type !== 'SOURCE_SHELF'),\n            ...operationsEffects,\n          ]),\n  ]);\n}\n\nexport function productLogTime(value?: string): string {\n",
+          "stage": "before-migrations",
+          "reason": "用户仅确认门店库存从0恢复不写日志、移除门店供应链上架及运营平台上架筛选；保留状态活动、售完日志、历史数据和其他端。"
+        },
         {
           "before": "  PHYSICAL_DELETE: '物理删除',\n  PURGE: '彻底删除',\n  SOLD_OUT: '售完',\n  STATUS_UPDATE: '状态变更',\n  REENTRY: '重新入仓',\n  SOURCE_SHELF: '供应链上架',\n  SOURCE_OFF_SHELF: '供应链下架',\n  SOURCE_DELETE: '供应链彻底删除',\n  SOURCE_DELETE_TO_RECYCLE: '供应链删除至回收站',\n",
           "after": "  PHYSICAL_DELETE: '物理删除',\n  PURGE: '彻底删除',\n  SOLD_OUT: '售完',\n  STATUS_UPDATE: '状态变更',\n  SOURCE_SHELF: '供应链上架',\n  SOURCE_OFF_SHELF: '供应链下架',\n  SOURCE_DELETE: '供应链彻底删除',\n  SOURCE_DELETE_TO_RECYCLE: '供应链删除至回收站',\n",
