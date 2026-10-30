@@ -35,7 +35,8 @@
         "src/services/functionPermissionCompatibility.ts",
         "src/services/auth.ts",
         "src/services/operationsBatchShelf.ts",
-        "src/components/OperationsBatchShelfResult.vue"
+        "src/components/OperationsBatchShelfResult.vue",
+        "src/services/productAllBatchShelf.ts"
       ],
       "tables": [
         "product_state_activity",
@@ -98,6 +99,8 @@
         "backend/src/main/java/com/zdm/platform/inventory/FinishedSupplyEditAuditService.java",
         "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfController.java",
         "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductLifecycleService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductStateActivityService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabInvalidationSnapshotService.java",
@@ -233,6 +236,7 @@
         "src/services/functionPermissionCompatibility.ts",
         "src/services/operationsBatchShelf.ts",
         "src/services/orderPrototypePreview.ts",
+        "src/services/productAllBatchShelf.ts",
         "src/services/productAllView.ts",
         "src/services/productGlobalPermissions.ts",
         "src/services/productStateActivity.ts",
@@ -267,7 +271,8 @@
         "tests/e2e/pagination-responsive.spec.ts",
         "tests/e2e/store-order-prototype.spec.ts",
         "tests/e2e/product-all-view.spec.ts",
-        "tests/e2e/operations-batch-shelf.spec.ts"
+        "tests/e2e/operations-batch-shelf.spec.ts",
+        "tests/e2e/terminal-all-batch-shelf.spec.ts"
       ],
       "backendTests": [
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
@@ -292,7 +297,8 @@
         "backend/src/test/java/com/zdm/platform/security/EffectivePermissionResolverTest.java",
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java",
-        "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java"
+        "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java"
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
@@ -316,7 +322,7 @@
         "tests/e2e/login.spec.ts": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
         "tests/e2e/markup-configuration.spec.ts": "f6537e115a129a012269ec8318142c897fd9532454ff1c7aa160c97f81c8cea5",
         "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
-        "tests/e2e/permission-center.spec.ts": "a1b5d17473d83bc3c43d041ad01dcc9fb90350424691a22341ccaf6e06f41b0d",
+        "tests/e2e/permission-center.spec.ts": "0667262a2650c67c0aff2103cbc42df26e9a7b34bc635ed63e4a395795f7a516",
         "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
         "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
         "tests/e2e/slab-publish-layout.spec.ts": "1cccc4b0fd932b46bbaadbd95790c44b51b4ca0a666f30e672f0cd60ecec6927",
@@ -338,10 +344,10 @@
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "3bff54d544d2534e71d3c310996b5c1078fde6922879a8c19dadf1d4a8b46a2c",
+        "tests/e2e/product-all-view.spec.ts": "7be3c32dd695318871cb687e44150706d92b1bed8597de38afb1f9a1809d0ba5",
         "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
-        "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "e1b507b5cb26e8bb984a733d149dc2931369c7d2f5aab5702190ecf55ae3c0d3",
+        "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "b2479de668b905ee4615750c51a8384f6bc480eca564fda103d2b856d5825a6d",
         "backend/src/test/java/com/zdm/platform/security/EffectivePermissionResolverTest.java": "244db8e06b91f8ca411a8e91f55c4efafd2561a90b035528de6d75e8ddb37e0b",
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java": "9f3dee717ec95bff55c0351f718cdfe956e98324849bec98dd0e2da014836018",
         "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java": "b5c2589b50e90976401dba166539890aff278f434fcde20a62b2d5ffa7879f52",
@@ -349,7 +355,12 @@
         "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java": "120223be8f4f069949e4056a60029a173f73b9ea4c278d4fcf736d24e202084d",
         "src/services/operationsBatchShelf.test.ts": "538f45bbccd3fb65c5acba5207107b2846d2ae31d17e12a3c48beeb67f6c40b3",
         "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
-        "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7"
+        "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7",
+        "tests/e2e/terminal-all-batch-shelf.spec.ts": "81fb13981b2ab1db199f8eedecaf8327024d1c3281240e22316a2605b10b29b8",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "b35d9531eb1a0f69542e017db9c4b1cc9729234abb506256f2e051a55f2a7ef8",
+        "src/services/terminalAllBatchShelf.test.ts": "881bed04c4aee9012b955ef337bbebe759bde5e7e8a6435d22bd461070453113",
+        "src/services/productGlobalPermissions.test.ts": "e1ebf3f1474e2395d41ef84e2e232558955bf3f0680adc6fb6e5d4d560552860",
+        "src/services/functionCatalog.test.ts": "00b57bef779983c25d62af6586fc4b32a9ace41bc3b6e6a7fb91ae8073135ffd"
       },
       "testChanges": [
         {
@@ -1569,6 +1580,30 @@
           "before": "3ab23b4c807f89c55420477a5adf6353d24a6ec67a4bf280c4f0a3a95198152a",
           "after": "a1b5d17473d83bc3c43d041ad01dcc9fb90350424691a22341ccaf6e06f41b0d",
           "reason": "继承当前批次此前用户已批准测试变更；本次仅同步运营三模块全部/仓库批量上架及全局权限、结果弹窗，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/permission-center.spec.ts",
+          "before": "a1b5d17473d83bc3c43d041ad01dcc9fb90350424691a22341ccaf6e06f41b0d",
+          "after": "0667262a2650c67c0aff2103cbc42df26e9a7b34bc635ed63e4a395795f7a516",
+          "reason": "保留本批此前获准变化；本次仅用户确认的供应链三模块、门店成品/配件全部新增批量及页面全局权限：同步精确目录/选择列断言，原仓库用例不改，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/permission-center.spec.ts",
+          "before": "3ab23b4c807f89c55420477a5adf6353d24a6ec67a4bf280c4f0a3a95198152a",
+          "after": "0667262a2650c67c0aff2103cbc42df26e9a7b34bc635ed63e4a395795f7a516",
+          "reason": "保留本批此前获准变化；本次仅用户确认的供应链三模块、门店成品/配件全部新增批量及页面全局权限：同步精确目录/选择列断言，原仓库用例不改，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "3bff54d544d2534e71d3c310996b5c1078fde6922879a8c19dadf1d4a8b46a2c",
+          "after": "7be3c32dd695318871cb687e44150706d92b1bed8597de38afb1f9a1809d0ba5",
+          "reason": "保留本批此前获准变化；本次仅用户确认的供应链三模块、门店成品/配件全部新增批量及页面全局权限：同步精确目录/选择列断言，原仓库用例不改，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java",
+          "before": "e1b507b5cb26e8bb984a733d149dc2931369c7d2f5aab5702190ecf55ae3c0d3",
+          "after": "b2479de668b905ee4615750c51a8384f6bc480eca564fda103d2b856d5825a6d",
+          "reason": "保留本批此前获准变化；本次仅用户确认的供应链三模块、门店成品/配件全部新增批量及页面全局权限：同步精确目录/选择列断言，原仓库用例不改，保留其余断言、超时和零重试。"
         }
       ],
       "routes": [
@@ -1604,7 +1639,8 @@
         "tests/e2e/slab-publish-layout.spec.ts",
         "tests/e2e/store-accessory-management.spec.ts",
         "tests/e2e/store-finished-stock.spec.ts",
-        "tests/e2e/store-product-menu.spec.ts"
+        "tests/e2e/store-product-menu.spec.ts",
+        "tests/e2e/terminal-all-batch-shelf.spec.ts"
       ],
       "supportFiles": [
         "tests/e2e/admin-api-mocks.ts",
@@ -1614,7 +1650,10 @@
         "tests/e2e/product-test-navigation.ts",
         "src/services/operationsBatchShelf.test.ts",
         "src/components/OperationsBatchShelfResult.test.ts",
-        "src/components/foundation/actions/confirmation.test.ts"
+        "src/components/foundation/actions/confirmation.test.ts",
+        "src/services/terminalAllBatchShelf.test.ts",
+        "src/services/productGlobalPermissions.test.ts",
+        "src/services/functionCatalog.test.ts"
       ]
     }
   ]

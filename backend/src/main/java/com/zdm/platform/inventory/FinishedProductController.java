@@ -278,6 +278,10 @@ public class FinishedProductController extends AdminCrudController<FinishedProdu
   }
   private String prefix() { return (isSupplyChain()?"supply-chain.":"admin.")+"finished-stock-management"; }
   private String permission(String scope, String action) {
+    if (isSupplyChain() && "warehouse".equals(scope) && "batch-shelf".equals(action)) {
+      return permissionGuard.hasPermission(prefix() + ".warehouse.batch-shelf")
+          ? prefix() + ".warehouse.batch-shelf" : prefix() + ".batch-shelf";
+    }
     return prefix() + "." + scope + "." + action;
   }
 

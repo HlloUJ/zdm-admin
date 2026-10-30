@@ -26,6 +26,7 @@ describe('product global entry permissions', () => {
       const page = pages.find((p) => p.value === prefix)!;
       expect(page.actions).toEqual([
         { label, value: `${prefix}.${action}` },
+        { label: '批量上架', value: `${prefix}.batch-shelf` },
         { label: '操作日志', value: `${prefix}.operation-log.view` },
       ]);
       expect(page.tabs[0].actions).toEqual([{ label: '查看', value: `${prefix}.all.view` }]);

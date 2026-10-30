@@ -479,10 +479,16 @@
     >
       <img v-if="imagePreview" :src="imagePreview" alt="商品主图" style="max-width: 100%" />
     </AdminDialog>
+    <OperationsBatchShelfResult v-model:visible="allBatchResultVisible" :result="allBatchResult" />
   </div>
 </template>
 
 <script setup lang="ts">
+import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
+import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
+import type { BatchShelfResult } from '@/services/operationsBatchShelf';
+const allBatchResultVisible = ref(false);
+const allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
 import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import {
   initialProductListTab,
@@ -797,8 +803,11 @@ const batchActions: Record<string, { kind: ActionKind | 'off-shelf'; label: stri
   recycle: { kind: 'batch-restore', label: '批量放回到仓库', permission: 'batch-restore' },
 };
 const batchAction = computed(() => {
-  const action = batchActions[activeTab.value];
-  return action && can(activeScope.value, action.permission) ? action : null;
+  const action = batchActions[activeTab.value === 'all' ? 'warehouse' : activeTab.value];
+  return action &&
+    (action.kind === 'batch-shelf' ? canGlobal('batch-shelf') : can(activeScope.value, action.permission))
+    ? action
+    : null;
 });
 const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
   ...(['all', 'warehouse'].includes(activeTab.value) && canGlobal('select')
@@ -872,7 +881,9 @@ const operationWidths: Record<StoreFinishedTab, number> = {
   recycle: 208,
 };
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...baseColumns.filter((column) => activeTab.value !== 'all' || column.colKey !== 'select'),
+  ...baseColumns.filter(
+    (column) => activeTab.value !== 'all' || canGlobal('batch-shelf') || column.colKey !== 'select',
+  ),
   ...(['all', 'warehouse'].includes(activeTab.value)
     ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]
     : []),
@@ -1074,7 +1085,11 @@ async function prepareBatch() {
     adminFeedback.warning('请先选择商品');
     return;
   }
-  if (!(await refreshAvailability([...selected.value]))) return;
+  if (
+    !(activeTab.value === 'all' && action.kind === 'batch-shelf') &&
+    !(await refreshAvailability([...selected.value]))
+  )
+    return;
   if (action.kind === 'off-shelf') {
     pendingOffShelf.value = { ids: [...selected.value], batch: true };
     offShelf.reason = '';
@@ -1132,6 +1147,18 @@ async function runConfirmed() {
   confirming.value = true;
   const ids = action.ids ?? (action.product ? [action.product.id] : []);
   try {
+    if (activeTab.value === 'all' && action.kind === 'batch-shelf' && action.ids) {
+      allBatchResult.value = await shelfProductsFromAll(
+        commodity.scope === 'accessory' ? 'store-accessory-products' : 'store-finished-products',
+        [...action.ids],
+        Object.fromEntries(rows.value.map((row) => [row.id, row.productId])),
+      );
+      selected.value = [];
+      confirm.value = null;
+      allBatchResultVisible.value = true;
+      await load();
+      return;
+    }
     if (!['purge', 'batch-purge', 'clear'].includes(action.kind) && !(await refreshAvailability(ids))) {
       confirm.value = null;
       return;

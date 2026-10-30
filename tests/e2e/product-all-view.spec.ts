@@ -101,10 +101,8 @@ for (const surface of surfaces) {
     await expect(rows.last()).toContainText('汇总商品-warehouse');
     await expect(rows.first()).toContainText('真实创建人');
     await expect(rows.first()).not.toContainText('本次状态操作人');
-    await expect(main.locator('thead').getByRole('checkbox')).toHaveCount(surface.client === 'admin' ? 1 : 0);
-    await expect(main.getByRole('button', { name: '批量上架', exact: true })).toHaveCount(
-      surface.client === 'admin' ? 1 : 0,
-    );
+    await expect(main.locator('thead').getByRole('checkbox')).toHaveCount(1);
+    await expect(main.getByRole('button', { name: '批量上架', exact: true })).toHaveCount(1);
     await expect(main.getByRole('button', { name: '批量下架', exact: true })).toHaveCount(0);
     for (const [state, label, action] of [
       ['warehouse', '仓库中', '上架'],

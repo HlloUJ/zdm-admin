@@ -1101,10 +1101,16 @@
     >
       {{ confirmState.content }}
     </AdminConfirmDialog>
+    <OperationsBatchShelfResult v-model:visible="allBatchResultVisible" :result="allBatchResult" />
   </div>
 </template>
 
 <script setup lang="ts">
+import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
+import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
+import type { BatchShelfResult } from '@/services/operationsBatchShelf';
+const allBatchResultVisible = ref(false);
+const allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
 import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
@@ -1231,8 +1237,8 @@ const finishedScope: Record<StockTab, string> = {
 const hasFinishedAction = (action: string, status = activeTab.value) =>
   hasPermission(
     getLoginUser(),
-    action === 'publish'
-      ? `${productPermissionPrefix.value}.publish`
+    ['publish', 'batch-shelf'].includes(action)
+      ? `${productPermissionPrefix.value}.${action}`
       : `${productPermissionPrefix.value}.${finishedScope[status]}.${action}`,
   );
 const { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermissionTabs({
@@ -1893,7 +1899,12 @@ const pagePartiallySelected = computed(
 );
 const batchButtons = computed(() => {
   if (activeTab.value === 'all')
-    return hasFinishedAction('publish') ? [{ action: 'publish' as const, label: '发布商品', icon: 'add' }] : [];
+    return [
+      ...(hasFinishedAction('publish') ? [{ action: 'publish' as const, label: '发布商品', icon: 'add' }] : []),
+      ...(hasFinishedAction('batch-shelf')
+        ? [{ action: 'batchShelf' as const, label: '批量上架', icon: 'upload' }]
+        : []),
+    ];
   const map: Record<
     StockStatus,
     {
@@ -1953,11 +1964,11 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
       ? productCreationColumns(toggleTimeSort)
       : stateActivityColumns(activeTab.value, toggleTimeSort)),
   ];
-  if (!['all', 'soldOut'].includes(activeTab.value)) {
+  if (activeTab.value !== 'soldOut' && (activeTab.value !== 'all' || hasFinishedAction('batch-shelf'))) {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
   if (activeTab.value === 'warehouse' || activeTab.value === 'all') {
-    base.splice(activeTab.value === 'all' ? 3 : 4, 0, {
+    base.splice(base.findIndex((column) => column.colKey === 'supplier') + 1, 0, {
       colKey: 'warehouseEntry',
       title: '入库类型 / 详细说明',
       minWidth: 240,
@@ -2792,6 +2803,16 @@ const handleConfirm = async () => {
     } else if (type === 'purge' && product) {
       await deleteFinishedProduct(product.id);
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
+    } else if (type === 'batchShelf' && activeTab.value === 'all') {
+      allBatchResult.value = await shelfProductsFromAll(
+        commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
+        [...selectedKeys.value],
+      );
+      selectedKeys.value = [];
+      closeConfirmDialog();
+      allBatchResultVisible.value = true;
+      await loadInventoryData();
+      return;
     } else if (type === 'batchShelf') {
       {
         // Publishing rebuilds prices; finish each transaction before starting the next product.

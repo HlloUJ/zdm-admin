@@ -219,7 +219,9 @@ public class StoreAccessoryProductController {
       case "recycle" -> "delete";
       default -> throw new IllegalArgumentException("不支持的门店商品状态");
     };
-    guard.requirePermission(PREFIX + "." + current + "." + (batch ? "batch-" : "") + action);
+    if (batch && "warehouse".equals(current) && "selling".equals(target)) {
+      guard.requireAnyPermission(PREFIX + ".batch-shelf", PREFIX + ".warehouse.batch-shelf");
+    } else { guard.requirePermission(PREFIX + "." + current + "." + (batch ? "batch-" : "") + action); }
   }
 
   private static String command(String target, String operation) {

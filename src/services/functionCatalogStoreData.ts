@@ -107,6 +107,7 @@ const storeFinishedStock: FunctionModule = {
           value: 'store.finished-stock-management',
           actions: [
             { label: '商品中心', value: 'store.finished-stock-management.select' },
+            { label: '批量上架', value: 'store.finished-stock-management.batch-shelf' },
             { label: '操作日志', value: 'store.finished-stock-management.operation-log.view' },
           ],
           tabs: [
@@ -114,7 +115,6 @@ const storeFinishedStock: FunctionModule = {
               label: '仓库中',
               value: 'store.finished-stock-management.warehouse',
               actions: [
-                ['batch-shelf', '批量上架'],
                 ['shelf', '上架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],
@@ -172,6 +172,7 @@ const storeAccessoryStock: FunctionModule = {
           value: 'store.accessory-management',
           actions: [
             { label: '商品中心', value: 'store.accessory-management.select' },
+            { label: '批量上架', value: 'store.accessory-management.batch-shelf' },
             { label: '操作日志', value: 'store.accessory-management.operation-log.view' },
           ],
           tabs: [
@@ -179,7 +180,6 @@ const storeAccessoryStock: FunctionModule = {
               label: '仓库中',
               value: 'store.accessory-management.warehouse',
               actions: [
-                ['batch-shelf', '批量上架'],
                 ['shelf', '上架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],

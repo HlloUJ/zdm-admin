@@ -20,6 +20,7 @@ export const supplyChainProducts: FunctionModule = {
           audiences: ['supply-chain'],
           actions: [
             { label: '发布商品', value: `${prefix}.publish` },
+            { label: '批量上架', value: `${prefix}.batch-shelf` },
             { label: '操作日志', value: `${prefix}.operation-log.view` },
           ],
           tabs: [
@@ -27,7 +28,6 @@ export const supplyChainProducts: FunctionModule = {
               label: '仓库中',
               value: `${prefix}.warehouse`,
               actions: actions('warehouse', [
-                ['batch-shelf', '批量上架'],
                 ['shelf', '上架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],

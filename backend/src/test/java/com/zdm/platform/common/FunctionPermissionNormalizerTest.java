@@ -38,6 +38,17 @@ class FunctionPermissionNormalizerTest {
   }
 
   @Test
+  void terminalAllBatchGlobalGrantsAndLegacyAliasesDoNotGrantOtherActions() {
+    for (String prefix : List.of("supply-chain.finished-stock-management", "supply-chain.accessory-management",
+        "supply-chain.slab-management", "store.finished-stock-management", "store.accessory-management")) {
+      assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix+".batch-shelf"))).containsExactly(prefix+".batch-shelf");
+      assertThat(FunctionPermissionNormalizer.normalize(List.of(prefix+".warehouse.batch-shelf")))
+          .containsExactly(prefix+".warehouse.view",prefix+".warehouse.batch-shelf",prefix+".batch-shelf");
+    }
+    assertThat(FunctionPermissionNormalizer.isProductGlobalAction("store.slab-management.batch-shelf")).isFalse();
+  }
+
+  @Test
   void retiredStorePricePermissionsNeverExpandIntoNewGrants() {
     String retired = "store.price-configuration.view,store.price-configuration.create,"
         + "store.price-configuration.edit,store.price-configuration.toggle-status,store.price-configuration.delete";

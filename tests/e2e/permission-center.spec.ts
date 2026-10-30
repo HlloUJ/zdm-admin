@@ -1935,7 +1935,11 @@ for (const [terminal, action, client, modules] of [
       .filter({ has: page.locator('.permission-tab-cell').getByText('页面全局', { exact: true }) });
     await expect(globals).toHaveCount(modules.length);
     for (let i = 0; i < modules.length; i++) {
-      await expect(globals.nth(i).locator('.permission-action-grid .t-checkbox')).toHaveText([action, '操作日志']);
+      await expect(globals.nth(i).locator('.permission-action-grid .t-checkbox')).toHaveText([
+        action,
+        '批量上架',
+        '操作日志',
+      ]);
       await globals.nth(i).getByText(action, { exact: true }).click();
       await expect(globals.nth(i).getByRole('checkbox', { name: '操作日志', exact: true })).not.toBeChecked();
     }

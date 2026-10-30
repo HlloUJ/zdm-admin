@@ -933,10 +933,16 @@
       </t-table>
       <t-empty v-else description="暂无下架记录" />
     </AdminDialog>
+    <OperationsBatchShelfResult v-model:visible="allBatchResultVisible" :result="allBatchResult" />
   </div>
 </template>
 
 <script setup lang="ts">
+import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
+import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
+import type { BatchShelfResult } from '@/services/operationsBatchShelf';
+const allBatchResultVisible = ref(false);
+const allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
 import { useRoute } from 'vue-router';
 import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
@@ -1061,8 +1067,8 @@ const slabPermissionScope: Record<SlabTab, string> = {
   recycle: 'recycle',
 };
 const slabPermission = (status: SlabTab, action: string) =>
-  action === 'publish'
-    ? `${productPermissionPrefix.value}.publish`
+  ['publish', 'batch-shelf'].includes(action)
+    ? `${productPermissionPrefix.value}.${action}`
     : `${productPermissionPrefix.value}.${slabPermissionScope[status]}.${action}`;
 const hasSlabAction = (status: SlabTab, action: string) =>
   hasPermission(loginUser.value, slabPermission(status, action));
@@ -1540,7 +1546,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     align: 'left',
     fixed: 'right',
   });
-  return activeTab.value === 'all' ? baseColumns.filter((col) => col.colKey !== 'select') : baseColumns;
+  return activeTab.value === 'all' && !hasSlabAction('warehouse', 'batch-shelf')
+    ? baseColumns.filter((col) => col.colKey !== 'select')
+    : baseColumns;
 });
 const currentFilter = computed(() => filters[activeTab.value]);
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
@@ -1581,9 +1589,14 @@ const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
 const batchButtons = computed(() =>
   activeTab.value === 'all'
-    ? hasSlabAction('warehouse', 'publish')
-      ? [{ label: '发布商品', action: 'publish' as const, icon: 'add' }]
-      : []
+    ? [
+        ...(hasSlabAction('warehouse', 'publish')
+          ? [{ label: '发布商品', action: 'publish' as const, icon: 'add' }]
+          : []),
+        ...(hasSlabAction('warehouse', 'batch-shelf')
+          ? [{ label: '批量上架', action: 'batchShelf' as const, icon: 'upload' }]
+          : []),
+      ]
     : slabBatchButtons(activeTab.value, hasSlabAction),
 );
 const tabLabel = (tab: { label: string; value: SlabTab }) => {
@@ -2214,6 +2227,15 @@ const handleConfirmSubmit = async () => {
     }
     if (type === 'batchRestore') {
       await updateSelectedSlabStatuses('warehouse');
+    }
+    if (type === 'batchShelf' && activeTab.value === 'all') {
+      allBatchResult.value = await shelfProductsFromAll('slabs', [...selectedKeys.value]);
+      selectedKeys.value = [];
+      closeConfirmDialog();
+      allBatchResultVisible.value = true;
+      await loadSlabs();
+      ensureCurrentPage();
+      return;
     }
     if (type === 'batchShelf') {
       const ids = [...selectedKeys.value];
