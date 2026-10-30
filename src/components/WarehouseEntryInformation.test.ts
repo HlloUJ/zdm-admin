@@ -43,9 +43,21 @@ describe('current warehouse entry presentation', () => {
     expect(view.find('[data-full-text]').attributes('data-disabled')).toBe('true');
     expect(entry.warehouseEntryDetail).toBeNull();
   });
+  it('shows a hyphen based only on an empty entry type, without mutating the fields', () => {
+    for (const type of [null, '', '   ']) {
+      const entry = { warehouseEntryType: type, warehouseEntryReason: '残留原因', warehouseEntryDetail: '残留说明' };
+      const view = render(entry);
+      expect(view.text()).toBe('-');
+      expect(view.findAll('[data-test="tag"]')).toHaveLength(0);
+      expect(view.find('[data-full-text]').exists()).toBe(false);
+      expect(entry.warehouseEntryReason).toBe('残留原因');
+      expect(entry.warehouseEntryDetail).toBe('残留说明');
+    }
+    expect(render({}).text()).toBe('-');
+  });
   it('shows actual detail and never guesses first entry from missing provenance', () => {
     expect(render({ warehouseEntryType: 'offShelf', warehouseEntryDetail: '核对规格' }).text()).toContain('核对规格');
-    for (const type of [null, 'sourceReentry', 'editReturn', 'unknown']) {
+    for (const type of ['sourceReentry', 'editReturn', 'unknown']) {
       const view = render({ warehouseEntryType: type });
       expect(view.findAll('[data-test="tag"]')).toHaveLength(0);
       expect(view.text()).toBe('');

@@ -170,9 +170,7 @@
                   <template #stateOperatedAt="{ row }">{{
                     row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'
                   }}</template>
-                  <template #warehouseEntry="{ row }"
-                    ><WarehouseEntryInformation v-if="row.effectiveStatus === 'warehouse'" :entry="row"
-                  /></template>
+                  <template #warehouseEntry="{ row }"><WarehouseEntryInformation :entry="row" /></template>
                   <template #operation="{ row }">
                     <div class="table-actions">
                       <t-link

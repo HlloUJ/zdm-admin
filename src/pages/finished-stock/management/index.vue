@@ -215,9 +215,7 @@
                       </div>
                     </template>
                     <template #createdAt="{ row }">{{ formatDateTime(row.createdAt) }}</template>
-                    <template #warehouseEntry="{ row }"
-                      ><WarehouseEntryInformation v-if="row.status === 'warehouse'" :entry="row"
-                    /></template>
+                    <template #warehouseEntry="{ row }"><WarehouseEntryInformation :entry="row" /></template>
                     <template #stateOperatorName="{ row }"
                       ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
                     >

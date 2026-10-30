@@ -344,7 +344,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "7be3c32dd695318871cb687e44150706d92b1bed8597de38afb1f9a1809d0ba5",
+        "tests/e2e/product-all-view.spec.ts": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
         "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "b2479de668b905ee4615750c51a8384f6bc480eca564fda103d2b856d5825a6d",
@@ -360,7 +360,8 @@
         "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "b35d9531eb1a0f69542e017db9c4b1cc9729234abb506256f2e051a55f2a7ef8",
         "src/services/terminalAllBatchShelf.test.ts": "881bed04c4aee9012b955ef337bbebe759bde5e7e8a6435d22bd461070453113",
         "src/services/productGlobalPermissions.test.ts": "e1ebf3f1474e2395d41ef84e2e232558955bf3f0680adc6fb6e5d4d560552860",
-        "src/services/functionCatalog.test.ts": "00b57bef779983c25d62af6586fc4b32a9ace41bc3b6e6a7fb91ae8073135ffd"
+        "src/services/functionCatalog.test.ts": "00b57bef779983c25d62af6586fc4b32a9ace41bc3b6e6a7fb91ae8073135ffd",
+        "src/components/WarehouseEntryInformation.test.ts": "df107925fa93ed62ca3fe202b3706f32f246b41f7e0751516abe87decbdd99a3"
       },
       "testChanges": [
         {
@@ -1604,6 +1605,17 @@
           "before": "e1b507b5cb26e8bb984a733d149dc2931369c7d2f5aab5702190ecf55ae3c0d3",
           "after": "b2479de668b905ee4615750c51a8384f6bc480eca564fda103d2b856d5825a6d",
           "reason": "保留本批此前获准变化；本次仅用户确认的供应链三模块、门店成品/配件全部新增批量及页面全局权限：同步精确目录/选择列断言，原仓库用例不改，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "7be3c32dd695318871cb687e44150706d92b1bed8597de38afb1f9a1809d0ba5",
+          "after": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
+          "reason": "保留此前已获准的全部视图与批量用例变化；本次仅新增三端8个入口上架行空入库信息精确为“-”、仓库下架标签仍保留的断言，不移除其他断言或调整超时/重试。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "after": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
+          "reason": "保留此前已获准的全部视图与批量用例变化；本次仅新增三端8个入口上架行空入库信息精确为“-”、仓库下架标签仍保留的断言，不移除其他断言或调整超时/重试。"
         }
       ],
       "routes": [
@@ -1653,7 +1665,8 @@
         "src/components/foundation/actions/confirmation.test.ts",
         "src/services/terminalAllBatchShelf.test.ts",
         "src/services/productGlobalPermissions.test.ts",
-        "src/services/functionCatalog.test.ts"
+        "src/services/functionCatalog.test.ts",
+        "src/components/WarehouseEntryInformation.test.ts"
       ]
     }
   ]

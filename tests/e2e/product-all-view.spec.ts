@@ -120,6 +120,11 @@ for (const surface of surfaces) {
     }
     await expect(rows.last()).toContainText('价格调整');
     await expect(rows.first()).not.toContainText('下架入库');
+    const entryColumn = await main
+      .getByRole('columnheader', { name: '入库类型 / 详细说明', exact: true })
+      .evaluate((element) => (element as HTMLTableCellElement).cellIndex);
+    await expect(rows.first().locator('td').nth(entryColumn)).toHaveText('-');
+    await expect(rows.last().locator('td').nth(entryColumn)).toContainText('下架入库');
     if (surface.client === 'supply-chain')
       await expect(main.getByRole('button', { name: '发布商品', exact: true })).toBeVisible();
     if (surface.client === 'store')

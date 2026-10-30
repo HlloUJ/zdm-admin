@@ -1,5 +1,6 @@
 <template>
-  <t-space direction="vertical" size="small" align="start">
+  <span v-if="!entry.warehouseEntryType?.trim()">-</span>
+  <t-space v-else direction="vertical" size="small" align="start">
     <t-tag
       v-if="warehouseEntryLabel(entry.warehouseEntryType)"
       :theme="
