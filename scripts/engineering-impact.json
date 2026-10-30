@@ -687,7 +687,7 @@
     "scripts/task-timing.mjs": "1b2603f8c9502e2c00e591f20b9038c6250ad48dd5e809a2091178452515b30d",
     "scripts/task-timing.test.mjs": "b39b2cff24b759fe0678dbff0bed979eb3cf5fa0b97090fbe74740881e448677",
     "scripts/test-support/completion-preview-fixture.mjs": "105eb6830136372c99c99d8999d66625caddda423ed4e423f137c31f16b82e84",
-    "scripts/ui-template-policy.test.mjs": "9d2395a8233830ef5d5be7bb6208026e5e912d259eb7b93cea33618cb66159ed",
+    "scripts/ui-template-policy.test.mjs": "a13b071c2335ab914c731ee62e4f271fc815b299f19a68fe7b755d9355ce7868",
     "scripts/verification-early-checks.test.mjs": "0604b1fc782ec24728c531aa9814e43e9559e96a71814efaed16cfadf9ae5b3a",
     "scripts/verification-evidence.mjs": "2cb68ed446e5768f5f89afdbfc3acc5d5feca23431c9a639eb79348e88c1ebde",
     "scripts/verification-evidence.test.mjs": "2ce98b06c12d165a2def70c12e2eb46f6965f1d1b692beea7f61bafa804701bb",

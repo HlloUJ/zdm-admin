@@ -154,7 +154,7 @@
       "dynamicImports": 0
     },
     "scripts/business-regression-contracts.json": {
-      "digest": "8d56e7e232606a586265eba6c746cd38be33e49f89736ca4cbeb5966a571a279",
+      "digest": "3e36be673f521c38d5577e5316557e5a65fb081bc7dce38138e2d1539ae9fcdd",
       "imports": [],
       "dynamicImports": 0
     },
@@ -582,7 +582,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "1abc761e1623f2763055a8394f283e51f567099cd68680ed4e292b4326f8b0f4",
+      "digest": "9b20a4fe3c46b0354808e068024e3effb124e806a5e8538a61f945e4dd10e87f",
       "imports": [
         "scripts/absent.mjs",
         "scripts/affected-test-inputs.mjs",
@@ -1154,7 +1154,7 @@
       "dynamicImports": 0
     },
     "scripts/ui-template-policy.test.mjs": {
-      "digest": "9d2395a8233830ef5d5be7bb6208026e5e912d259eb7b93cea33618cb66159ed",
+      "digest": "a13b071c2335ab914c731ee62e4f271fc815b299f19a68fe7b755d9355ce7868",
       "imports": [
         "scripts/button-color-policy.mjs",
         "scripts/confirmation-policy.mjs",

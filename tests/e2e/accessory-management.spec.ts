@@ -399,9 +399,6 @@ test('edits an initially empty rich product description with real toolbar action
     await fileChooser
   ).setFiles({ name: 'detail.png', mimeType: 'image/png', buffer: Buffer.from('detail-image') });
   await expect(editable.locator('img')).toHaveAttribute('src', '/api/open/media/rich-photo');
-  await editable.press('ControlOrMeta+End');
-  await editable.press('ArrowRight');
-  await editable.press('Enter');
   await expect(rich.locator('.w-e-toolbar button[data-menu-key="uploadVideo"]')).not.toHaveClass(/disabled/);
   await page.route('**/api/admin/accessory-products/media', (route) =>
     route.fulfill({ json: { code: 0, data: { id: 301, mediaType: 'video', url: '/api/open/media/rich-video' } } }),
@@ -412,6 +409,63 @@ test('edits an initially empty rich product description with real toolbar action
     await videoChooser
   ).setFiles({ name: 'detail.webm', mimeType: 'video/webm', buffer: Buffer.from('detail-video') });
   await expect(editable.locator('video source')).toHaveAttribute('src', '/api/open/media/rich-video');
+  const mediaBlocks = () =>
+    editable.evaluate((element) =>
+      Array.from(element.children).map((block) =>
+        block.querySelector('img')
+          ? 'image'
+          : block.querySelector('video')
+            ? 'video'
+            : block.textContent?.trim()
+              ? 'text'
+              : 'blank',
+      ),
+    );
+  await expect.poll(mediaBlocks).toEqual(['text', 'text', 'image', 'video', 'blank']);
+  const uploadNext = async (type: 'image' | 'video', id: number) => {
+    const key = type === 'image' ? 'uploadImage' : 'uploadVideo';
+    const button = rich.locator(`.w-e-toolbar button[data-menu-key="${key}"]`);
+    await expect(button).not.toHaveClass(/disabled/);
+    await page.route('**/api/admin/accessory-products/media', (route) =>
+      route.fulfill({
+        json: { code: 0, data: { id, mediaType: type, url: `/api/open/media/rich-${id}` } },
+      }),
+    );
+    const chooser = page.waitForEvent('filechooser');
+    await button.click();
+    await (
+      await chooser
+    ).setFiles({
+      name: type === 'image' ? 'detail.png' : 'detail.webm',
+      mimeType: `${type}/${type === 'image' ? 'png' : 'webm'}`,
+      buffer: Buffer.from('media'),
+    });
+    await expect(
+      editable.locator(
+        type === 'image' ? `img[src="/api/open/media/rich-${id}"]` : `video source[src="/api/open/media/rich-${id}"]`,
+      ),
+    ).toHaveCount(1);
+  };
+  await uploadNext('video', 302);
+  await uploadNext('image', 303);
+  await uploadNext('image', 304);
+  await expect.poll(mediaBlocks).toEqual(['text', 'text', 'image', 'video', 'video', 'image', 'image', 'blank']);
+  // A user-entered blank line is preserved rather than consumed by the next video.
+  await editable.press('Enter');
+  await uploadNext('video', 305);
+  await expect
+    .poll(mediaBlocks)
+    .toEqual(['text', 'text', 'image', 'video', 'video', 'image', 'image', 'blank', 'video', 'blank']);
+  await editable.press('Enter');
+  const blocksBeforeFailure = await mediaBlocks();
+  await page.route('**/api/admin/accessory-products/media', (route) =>
+    route.fulfill({ status: 500, json: { code: 500, message: '媒体上传失败' } }),
+  );
+  const failedChooser = page.waitForEvent('filechooser');
+  await rich.locator('.w-e-toolbar button[data-menu-key="uploadImage"]').click();
+  await (await failedChooser).setFiles({ name: 'failed.png', mimeType: 'image/png', buffer: Buffer.from('failed') });
+  await expect(page.getByText('媒体上传失败', { exact: true })).toBeVisible();
+  expect(await mediaBlocks()).toEqual(blocksBeforeFailure);
 });
 
 test('shows every publish section and navigates anchors without losing form input', async ({ page }) => {
@@ -2682,6 +2736,9 @@ test('operations retains readonly specifications without creation or editing ent
   await expect(page.locator('.form-shell')).toBeVisible();
   await expect(page.getByRole('button', { name: '创建规格', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '编辑规格', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('product-rich-editor')).toHaveCount(0);
+  await expect(page.getByTestId('finished-category-picker')).toHaveCount(0);
+  await expect(page.locator('.readonly-product-fields')).toBeVisible();
 });
 
 test('long layered attribute errors grow wrapped rows without covering their footer', async ({ page }) => {

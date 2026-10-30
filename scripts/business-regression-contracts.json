@@ -302,8 +302,8 @@
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
-        "tests/e2e/finished-stock.spec.ts": "38ebaf05295f4cc743ab3778346d9b1b8a8a884a449f58a692ba6dc78343950a",
-        "tests/e2e/accessory-management.spec.ts": "64af88acb197b415b7f7c26a1b261940f57b9a03d66e4fc54d8e3e260547fe95",
+        "tests/e2e/finished-stock.spec.ts": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+        "tests/e2e/accessory-management.spec.ts": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
         "tests/e2e/slab-collaboration.spec.ts": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
         "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
         "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
@@ -1694,6 +1694,18 @@
           "before": "62101df16f1623f4f3fcc17c68364f6820d30ef5e54d08bd83018fc3bd5726cf",
           "after": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
           "reason": "2026-10-30用户逐项确认：同步已撤回筛选/历史入口及SOURCE_SHELF日志的旧测试预期；保留现存业务与全部其余覆盖、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "38ebaf05295f4cc743ab3778346d9b1b8a8a884a449f58a692ba6dc78343950a",
+          "after": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "reason": "用户确认仅本次两项：供应链成品现货/配件富文本连续上传无需回车，保留手动空行及上传失败内容；运营端同两模块清理无效创建残留。移除测试手动回车绕过，新增连续媒体/手动空行/失败不插入及只读编辑断言，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "64af88acb197b415b7f7c26a1b261940f57b9a03d66e4fc54d8e3e260547fe95",
+          "after": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "reason": "用户确认仅本次两项：供应链成品现货/配件富文本连续上传无需回车，保留手动空行及上传失败内容；运营端同两模块清理无效创建残留。移除测试手动回车绕过，新增连续媒体/手动空行/失败不插入及只读编辑断言，保留其余断言、超时和零重试。"
         }
       ],
       "routes": [
