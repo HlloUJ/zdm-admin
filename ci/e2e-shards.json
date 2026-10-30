@@ -228,6 +228,26 @@
       "file": "ui-template-reuse.spec.ts",
       "shard": 2,
       "estimatedMs": 10524
+    },
+    {
+      "file": "batch-shelf-result-layout.spec.ts",
+      "shard": 2,
+      "estimatedMs": 12089
+    },
+    {
+      "file": "operations-batch-shelf.spec.ts",
+      "shard": 1,
+      "estimatedMs": 16115
+    },
+    {
+      "file": "product-all-view.spec.ts",
+      "shard": 2,
+      "estimatedMs": 69231
+    },
+    {
+      "file": "terminal-all-batch-shelf.spec.ts",
+      "shard": 1,
+      "estimatedMs": 15042
     }
   ]
 }

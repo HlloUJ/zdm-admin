@@ -320,7 +320,7 @@ for (const [status, actions] of Object.entries({
   }
 }
 
-test('批量上架部分成功，失败横幅可关闭并在页面刷新后清空', async ({ page }) => {
+test('批量上架部分成功，结果弹框可确认且刷新后不重复显示', async ({ page }) => {
   await setup(page, 'warehouse');
   await page.addInitScript(() => {
     const user = JSON.parse(localStorage.getItem('zdm-admin-user')!);
@@ -337,56 +337,52 @@ test('批量上架部分成功，失败横幅可关闭并在页面刷新后清�
     sourceMessage: null as string | null,
   }));
   await page.route('**/api/admin/slabs', (route) => route.fulfill({ json: { code: 0, data: records } }));
-  const requests: number[] = [];
-  await page.route('**/api/admin/slabs/batch-status', (route) => {
-    const id = route.request().postDataJSON().ids[0];
-    requests.push(id);
-    if (id === 99601) {
-      records[0].status = 'selling';
-      return route.fulfill({ json: { code: 0, data: true } });
-    }
-    if (id === 99603) {
-      records[2].sourceStatus = 'warehouse';
-      records[2].sourceUnavailable = true;
-      records[2].sourceMessage = sourceBlockMessage('offShelf');
-    }
+  let requests = 0;
+  await page.route('**/api/admin/slabs/batch-shelf', (route) => {
+    requests++;
+    expect([...route.request().postDataJSON().ids].sort()).toEqual([99601, 99602, 99603]);
+    records[0].status = 'selling';
+    records[2].sourceStatus = 'warehouse';
+    records[2].sourceUnavailable = true;
+    records[2].sourceMessage = sourceBlockMessage('offShelf');
     return route.fulfill({
-      status: 400,
-      json: { code: 400, message: id === 99602 ? '4级合伙人价格未填写' : '来源商品已下架' },
+      json: {
+        code: 0,
+        data: {
+          total: 3,
+          successCount: 1,
+          failureCount: 2,
+          failures: [
+            { id: 99602, code: 'VALIDATION_FAILED', reason: '4级合伙人价格未填写' },
+            { id: 99603, code: 'SOURCE_UNAVAILABLE', reason: '来源商品已下架' },
+          ],
+        },
+      },
     });
   });
   await page.reload();
-  await page.getByRole('main').locator('thead .t-checkbox').first().click();
-  await page.getByRole('button', { name: '批量上架', exact: true }).click();
+  const main = page.getByRole('main');
+  await main.locator('thead .t-checkbox').first().click();
+  await main.getByRole('button', { name: '批量上架', exact: true }).click();
   await page.getByRole('button', { name: '确认批量上架', exact: true }).click();
-  await expect(page.getByText('已上架 1 个大板，未上架 2 个大板', { exact: true })).toBeVisible();
-  const warning = page.getByRole('main').locator('.t-alert');
-  await expect(warning).toHaveCount(1);
-  await expect(warning).toContainText('4级合伙人价格未填写');
-  await expect(page.getByRole('main').locator('tbody tr')).toHaveCount(2);
-  const failedRow = page.getByRole('main').locator('tr[data-shelf-error-id="99602"]');
-  const rowBounds = await failedRow.boundingBox();
-  const bannerBounds = await warning.boundingBox();
-  const actionBounds = await failedRow.locator('.t-table__cell--fixed-right').boundingBox();
-  expect(bannerBounds!.y).toBeGreaterThan(rowBounds!.y);
-  expect(bannerBounds!.y + bannerBounds!.height).toBeLessThan(rowBounds!.y + rowBounds!.height);
-  expect(bannerBounds!.x + bannerBounds!.width).toBeGreaterThan(actionBounds!.x);
-  expect(bannerBounds!.x + bannerBounds!.width).toBeLessThanOrEqual(actionBounds!.x + actionBounds!.width);
-  const actions = await failedRow.locator('.table-actions').boundingBox();
-  expect(bannerBounds!.y + bannerBounds!.height).toBeLessThan(actions!.y);
-  // Native TDesign Alert: 22px text line + 16px padding above and below.
-  expect(bannerBounds!.height).toBe(54);
-  await expect(page.getByRole('main').locator('.source-unavailable-overlay')).toHaveCount(1);
-  await expect(page.locator('.selection-info')).toContainText('已选 1 项');
-  expect([...requests].sort()).toEqual([99601, 99602, 99603]);
-  await warning.locator('.t-alert__close').click();
-  await expect(warning).toHaveCount(0);
-  await page.getByRole('button', { name: '批量上架', exact: true }).click();
-  await page.getByRole('button', { name: '确认批量上架', exact: true }).click();
-  await expect(warning).toContainText('4级合伙人价格未填写');
+  const result = page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' });
+  await expect(result).toContainText('成功上架1件，失败2件。');
+  await expect(result.getByRole('columnheader')).toHaveText(['商品ID', '失败原因']);
+  await expect(result.getByRole('row').filter({ hasText: '4级合伙人价格未填写' })).toContainText('99602');
+  await expect(result.getByRole('row').filter({ hasText: '来源商品已下架' })).toContainText('99603');
+  await result.getByRole('button', { name: '确认', exact: true }).click();
+  await expect(result).toBeHidden();
+  await expect(main.locator('tbody tr')).toHaveCount(2);
+  await expect(main.locator('.source-unavailable-overlay')).toHaveCount(1);
+  await expect(main.locator('.source-unavailable-overlay')).toContainText(sourceBlockMessage('offShelf'));
+  await expect(main.locator('.selection-info')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '批量上架', exact: true })).toBeDisabled();
+  expect(requests).toBe(1);
   await page.reload();
-  await expect(page.getByRole('main').getByText('大板99602', { exact: true })).toBeVisible();
-  await expect(warning).toHaveCount(0);
+  await expect(main.getByText('大板99602', { exact: true })).toBeVisible();
+  await expect(result).toBeHidden();
+  await expect(main.locator('.source-unavailable-overlay')).toHaveCount(1);
+  expect(requests).toBe(1);
 });
 
 test('彻底删除操作日志显示删除终态，与成品现货一致', async ({ page }) => {

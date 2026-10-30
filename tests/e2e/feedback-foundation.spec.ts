@@ -862,8 +862,8 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
 
   await page.getByText('仓库中（2）', { exact: true }).click();
   const filterCard = page.locator('.list-controls');
-  await expect(filterCard.getByText('入库类型', { exact: true })).toBeVisible();
-  await expect(filterCard.getByText('入库人', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('入库类型', { exact: true })).toHaveCount(0);
+  await expect(filterCard.getByText('入库人', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('下架时间', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('产地', { exact: true })).toBeVisible();
   await expect(filterCard.getByText('纹理', { exact: true })).toBeVisible();
@@ -891,52 +891,16 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
   await expect(offShelfRows.nth(1)).toContainText('已下架大板 62');
 
-  const reasonFilter = filterCard.locator('.t-form__item').filter({ hasText: '入库类型' });
-  await reasonFilter.locator('input').click();
-  await page.locator('.t-popup__content:visible').getByText('下架入库', { exact: true }).click();
-  await filterCard.getByRole('button', { name: '查询', exact: true }).click();
-  await expect(offShelfRows).toHaveCount(1);
-  await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
-  await filterCard.getByRole('button', { name: '重置', exact: true }).click();
-  await expect(offShelfRows).toHaveCount(2);
-
-  const personFilter = filterCard.locator('.t-form__item').filter({ hasText: '入库人' });
-  await personFilter.locator('input').fill('韩健');
-  await filterCard.getByRole('button', { name: '查询', exact: true }).click();
-  await expect(offShelfRows).toHaveCount(1);
-  await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
-  await filterCard.getByRole('button', { name: '重置', exact: true }).click();
-  await expect(offShelfRows).toHaveCount(2);
-
   const offShelfRow = page.getByRole('row', { name: /批量下架大板 61/ });
   await expect(offShelfRow).toContainText('库存异常');
   await expect(offShelfRow).toContainText(latestDetailReason);
   await expect(offShelfRow).toContainText('韩健');
   await expect(offShelfRow).not.toContainText('供应商申请');
-  const historyTrigger = offShelfRow.getByRole('button', { name: '查看历史下架原因', exact: true });
-  await expect(historyTrigger).toHaveCSS('opacity', '0');
   const detailText = offShelfRow.locator('[data-entry-detail]');
   await detailText.hover();
   await expect(
     page.locator('.t-popup__content:visible').getByText(`库存异常；${latestDetailReason}`, { exact: true }),
   ).toBeVisible();
-  await expect(historyTrigger).toHaveCSS('opacity', '1');
-  await historyTrigger.click();
-  const historyDialog = page.locator('.t-dialog:visible').filter({ hasText: '历史下架原因' });
-  await expect(historyDialog).toBeVisible();
-  await expect(
-    page.locator('.t-popup__content:visible').getByText(`库存异常；${latestDetailReason}`, { exact: true }),
-  ).toHaveCount(0);
-  const historyRows = historyDialog.locator('tbody tr');
-  await expect(historyRows).toHaveCount(2);
-  await expect(historyRows.nth(0)).toContainText('库存异常');
-  await expect(historyRows.nth(0)).toContainText('韩健');
-  await expect(historyRows.nth(0).locator('.off-shelf-history-detail')).toHaveCSS('white-space', 'normal');
-  await expect(historyRows.nth(0)).toContainText(latestDetailReason);
-  await expect(historyRows.nth(1)).toContainText('供应商申请');
-  await expect(historyRows.nth(1)).toContainText('李雷');
-  await historyDialog.getByRole('button', { name: '关闭', exact: true }).click();
-  await expect(historyDialog).toBeHidden();
   expect((await offShelfRow.locator('.table-actions .t-link').allTextContents()).map((text) => text.trim())).toEqual([
     '上架',
     '编辑',

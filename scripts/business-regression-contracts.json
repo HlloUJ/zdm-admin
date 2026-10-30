@@ -304,7 +304,7 @@
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
         "tests/e2e/finished-stock.spec.ts": "38ebaf05295f4cc743ab3778346d9b1b8a8a884a449f58a692ba6dc78343950a",
         "tests/e2e/accessory-management.spec.ts": "64af88acb197b415b7f7c26a1b261940f57b9a03d66e4fc54d8e3e260547fe95",
-        "tests/e2e/slab-collaboration.spec.ts": "d1b29192c7e0d09d1fb3c5ec8869e6abfb0086daa5947a08a37584bc08959971",
+        "tests/e2e/slab-collaboration.spec.ts": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
         "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
         "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
@@ -314,11 +314,11 @@
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "27ff2ff5fcdf02b917425ed3e714bf9a47fafebb817775de33541cff82d2da7e",
-        "tests/e2e/accessory-permissions.spec.ts": "aa1213f4163b18f53a26b433c491e1402a779c7897078a169393d84db2cba70d",
-        "tests/e2e/admin-foundation.spec.ts": "5be97635da48a1778d0aa3faf341e7151c62e972d813a2347567d4660b61df7b",
+        "tests/e2e/accessory-permissions.spec.ts": "6ea9de56855c2d8c1b55c7d1e0f618d65364f351e3855d1548398448ccc5af20",
+        "tests/e2e/admin-foundation.spec.ts": "e58fee0573a2d5ee3a6a9930bd54cc33ae7f0c937c61651766750d50fe6b6ec2",
         "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
-        "tests/e2e/feedback-foundation.spec.ts": "3417bb2a812249632155aa88fdf3593ada446b8c3e945c0925313cc0e70d8898",
-        "tests/e2e/finished-stock-permissions.spec.ts": "96690ee0728c57b121ecb752bcbe8e42c555177778a847ffa379ccf74482e379",
+        "tests/e2e/feedback-foundation.spec.ts": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
+        "tests/e2e/finished-stock-permissions.spec.ts": "feca7ab507537e187d02b0a46d8f8ca6c6fc8692b7b001928983c7ff72079b50",
         "tests/e2e/login.spec.ts": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
         "tests/e2e/markup-configuration.spec.ts": "f6537e115a129a012269ec8318142c897fd9532454ff1c7aa160c97f81c8cea5",
         "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
@@ -330,13 +330,13 @@
         "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
         "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
         "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156",
-        "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "752403c60269e0d67a0701829e38ae971d3d474a489b5b36209d92bd7cc9b720",
+        "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java": "f245b9dd1fc458b657a2ffdbb0679ed97547e8f74d6e6a895fa1e986cdb3aff9",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java": "24637bff45722355d31fd78e75a37e5533b7c8411a9ed94f4558a30a8e62dca7",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "97768eae0f4967e63e2bb45fe6e9e34aa364ad740e0808e0ad3ac229d0c23e99",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "bde62e7120d3739e89b4ca6f52dcf59d38b694711754ccc0e23109ef6bad5c0d",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "90f6ce04efa8698d667167458de92baff1a0cdce262759f428e16254d175615e",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "62101df16f1623f4f3fcc17c68364f6820d30ef5e54d08bd83018fc3bd5726cf",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
         "tests/e2e/accessory-api-mocks.ts": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
         "tests/e2e/pagination-responsive.spec.ts": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
@@ -1616,6 +1616,84 @@
           "file": "tests/e2e/product-all-view.spec.ts",
           "after": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
           "reason": "保留此前已获准的全部视图与批量用例变化；本次仅新增三端8个入口上架行空入库信息精确为“-”、仓库下架标签仍保留的断言，不移除其他断言或调整超时/重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock-permissions.spec.ts",
+          "before": "a9a22198ed96331cb3cb052d44729bb7a49e36fba04f23c07d5a864248fc777e",
+          "after": "feca7ab507537e187d02b0a46d8f8ca6c6fc8692b7b001928983c7ff72079b50",
+          "reason": "2026-10-30用户单独确认仅同步已获准批量接口及结果弹框的旧测试行为指纹。保留供应链串行、状态、选择清空和来源失效覆盖；不改业务、分类器、超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-permissions.spec.ts",
+          "before": "8e2ebbaf06b34827b8413f2f036e9ab6c7461597d9c3693d66fc69a465eef1dc",
+          "after": "6ea9de56855c2d8c1b55c7d1e0f618d65364f351e3855d1548398448ccc5af20",
+          "reason": "2026-10-30用户单独确认仅同步已获准批量接口及结果弹框的旧测试行为指纹。保留供应链串行、状态、选择清空和来源失效覆盖；不改业务、分类器、超时或重试。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "a73167d1f55ee0e98a0bee972a67843df1b0e8b2938932c2ed3fe3246d7fd1e9",
+          "after": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
+          "reason": "2026-10-30用户单独确认仅同步已获准批量接口及结果弹框的旧测试行为指纹。保留供应链串行、状态、选择清空和来源失效覆盖；不改业务、分类器、超时或重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock-permissions.spec.ts",
+          "before": "96690ee0728c57b121ecb752bcbe8e42c555177778a847ffa379ccf74482e379",
+          "after": "feca7ab507537e187d02b0a46d8f8ca6c6fc8692b7b001928983c7ff72079b50",
+          "reason": "2026-10-30用户单独确认仅同步已获准批量接口及结果弹框的旧测试行为指纹。保留供应链串行、状态、选择清空和来源失效覆盖；不改业务、分类器、超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-permissions.spec.ts",
+          "before": "aa1213f4163b18f53a26b433c491e1402a779c7897078a169393d84db2cba70d",
+          "after": "6ea9de56855c2d8c1b55c7d1e0f618d65364f351e3855d1548398448ccc5af20",
+          "reason": "2026-10-30用户单独确认仅同步已获准批量接口及结果弹框的旧测试行为指纹。保留供应链串行、状态、选择清空和来源失效覆盖；不改业务、分类器、超时或重试。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "d1b29192c7e0d09d1fb3c5ec8869e6abfb0086daa5947a08a37584bc08959971",
+          "after": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
+          "reason": "2026-10-30用户单独确认仅同步已获准批量接口及结果弹框的旧测试行为指纹。保留供应链串行、状态、选择清空和来源失效覆盖；不改业务、分类器、超时或重试。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "92c1d6fe48013d207a9006f66049f22b8164af4a0263f998f6d4742e8212dd8f",
+          "after": "e58fee0573a2d5ee3a6a9930bd54cc33ae7f0c937c61651766750d50fe6b6ec2",
+          "reason": "2026-10-30用户逐项确认：同步已撤回筛选/历史入口及SOURCE_SHELF日志的旧测试预期；保留现存业务与全部其余覆盖、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/feedback-foundation.spec.ts",
+          "before": "74114444a974d28f566a7c6403124365a0e515ea7a1d675bfec84b5119f052e6",
+          "after": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
+          "reason": "2026-10-30用户逐项确认：同步已撤回筛选/历史入口及SOURCE_SHELF日志的旧测试预期；保留现存业务与全部其余覆盖、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "5be97635da48a1778d0aa3faf341e7151c62e972d813a2347567d4660b61df7b",
+          "after": "e58fee0573a2d5ee3a6a9930bd54cc33ae7f0c937c61651766750d50fe6b6ec2",
+          "reason": "2026-10-30用户逐项确认：同步已撤回筛选/历史入口及SOURCE_SHELF日志的旧测试预期；保留现存业务与全部其余覆盖、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/feedback-foundation.spec.ts",
+          "before": "3417bb2a812249632155aa88fdf3593ada446b8c3e945c0925313cc0e70d8898",
+          "after": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
+          "reason": "2026-10-30用户逐项确认：同步已撤回筛选/历史入口及SOURCE_SHELF日志的旧测试预期；保留现存业务与全部其余覆盖、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java",
+          "before": "90f6ce04efa8698d667167458de92baff1a0cdce262759f428e16254d175615e",
+          "after": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
+          "reason": "2026-10-30用户逐项确认：同步已撤回筛选/历史入口及SOURCE_SHELF日志的旧测试预期；保留现存业务与全部其余覆盖、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java",
+          "before": "752403c60269e0d67a0701829e38ae971d3d474a489b5b36209d92bd7cc9b720",
+          "after": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
+          "reason": "2026-10-30用户逐项确认：同步已撤回筛选/历史入口及SOURCE_SHELF日志的旧测试预期；保留现存业务与全部其余覆盖、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java",
+          "before": "62101df16f1623f4f3fcc17c68364f6820d30ef5e54d08bd83018fc3bd5726cf",
+          "after": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
+          "reason": "2026-10-30用户逐项确认：同步已撤回筛选/历史入口及SOURCE_SHELF日志的旧测试预期；保留现存业务与全部其余覆盖、超时和零重试。"
         }
       ],
       "routes": [

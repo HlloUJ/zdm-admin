@@ -135,8 +135,6 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   await expect(page.locator('.filter-fields .t-form__label')).toHaveText([
     '大板：',
     '品种：',
-    '入库类型：',
-    '入库人：',
     '产地：',
     '纹理：',
     '色系：',
@@ -156,7 +154,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
     .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
   const firstRowPeer = await page
     .locator('.filter-fields .t-form__item')
-    .nth(8 % queryColumns)
+    .nth(6 % queryColumns)
     .boundingBox();
   expect(supplierBox.x).toBeCloseTo(firstRowPeer!.x, 0);
   expect(supplierBox.y).toBeGreaterThan(keywordBox.y);
@@ -202,7 +200,7 @@ for (const client of ['admin', 'supply-chain'] as const) {
           .click();
         const fields = page.locator('.filter-fields');
         const items = fields.locator('.t-form__item');
-        await expect(items).toHaveCount(tab === '仓库中' ? 9 : 7);
+        await expect(items).toHaveCount(7);
         const boxes = await items.evaluateAll((elements) =>
           elements.map((el) => {
             const { x, y, width } = el.getBoundingClientRect();
@@ -596,8 +594,6 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
       await expect(fields.locator('.t-form__label')).toHaveText([
         '大板：',
         '品种：',
-        '入库类型：',
-        '入库人：',
         '产地：',
         '纹理：',
         '色系：',

@@ -65,7 +65,7 @@ class FinishedPriceSourceApiTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT status FROM finished_products WHERE id=99408", String.class)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT operations_invalidated_reason FROM finished_products WHERE id=99408", String.class)).isNull();
     assertThat(jdbc.queryForObject("SELECT price FROM finished_product_guide_prices WHERE finished_product_id=99408", BigDecimal.class)).isEqualByComparingTo("60");
-    assertThat(jdbc.queryForList("SELECT operation_type FROM finished_operation_logs WHERE product_id=99408 AND business_client_code='admin' ORDER BY id", String.class)).containsExactly("PURGE", "REENTRY");
+    assertThat(jdbc.queryForList("SELECT operation_type FROM finished_operation_logs WHERE product_id=99408 AND business_client_code='admin' ORDER BY id", String.class)).containsExactly("PURGE", "SOURCE_SHELF");
   }
 
   @Test
