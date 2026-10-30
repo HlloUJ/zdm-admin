@@ -284,17 +284,7 @@
               <div class="form-title-row">
                 <div>
                   <h1>{{ formPageTitle }}</h1>
-                  <div class="selected-category">
-                    当前分类：{{ selectedCategoryPath }}
-                    <t-button
-                      v-if="formPageMode === 'create'"
-                      :theme="buttonTheme('switch-category')"
-                      size="small"
-                      variant="outline"
-                      @click="openCategoryDialog"
-                      >切换分类</t-button
-                    >
-                  </div>
+                  <div class="selected-category">当前分类：{{ selectedCategoryPath }}</div>
                 </div>
                 <t-button :theme="buttonTheme('back')" variant="base" @click="closeFormPage">
                   <template #icon><t-icon name="rollback" /></template>
@@ -303,7 +293,7 @@
               </div>
             </AdminSectionCard>
             <ProductDetail
-              v-if="isOperationsEdit && editingProduct"
+              v-if="editingProduct"
               class="readonly-product-fields"
               :product="editingProduct"
               :attribute-names="detailAttributeNames"
@@ -312,148 +302,6 @@
               editor-layout
               @preview="openProductMediaPreview"
             />
-            <AdminSectionCard
-              v-if="!isOperationsEdit"
-              id="finished-product-description"
-              class="form-section"
-              aria-label="图文描述"
-            >
-              <h2 class="form-section-title">图文描述</h2>
-              <t-form :data="productForm" label-width="100px" colon>
-                <t-form-item label="商品主图" required-mark>
-                  <t-space size="small" break-line align="start">
-                    <AdminMediaUpload
-                      v-for="index in mainImageUploadIndexes"
-                      :key="index"
-                      v-model="mainImageSlots[index]"
-                      :title="index === 0 ? '封面图' : `商品主图${index + 1}`"
-                      :show-title="true"
-                      accept="image/*"
-                      :error-message="submitAttempted && !mainImageMedia && index === 0 ? '请上传图片' : ''"
-                      :upload="(file) => uploadProductMedia(file, 'image')"
-                      @preview="openProductMediaPreview($event, 'image')"
-                      @removed="releasePendingProductMedia"
-                    />
-                  </t-space>
-                </t-form-item>
-                <t-form-item label="商品视频" required-mark>
-                  <AdminMediaUpload
-                    v-model="videoMedia"
-                    title="商品视频"
-                    :show-title="false"
-                    accept="video/*"
-                    media-type="video"
-                    :error-message="submitAttempted && !videoMedia ? '请上传视频' : ''"
-                    :upload="(file) => uploadProductMedia(file, 'video')"
-                    @preview="openProductMediaPreview($event, 'video')"
-                    @removed="releasePendingProductMedia"
-                  />
-                </t-form-item>
-                <t-form-item
-                  label="宝贝详情"
-                  required-mark
-                  v-bind="requiredFieldFeedback(productForm.detail, '宝贝详情', submitAttempted)"
-                >
-                  <ProductRichEditor
-                    v-model="productForm.detail"
-                    :class="{ 'required-content-error': requiredFieldStatus(productForm.detail) }"
-                    :aria-invalid="Boolean(requiredFieldStatus(productForm.detail))"
-                    :upload="uploadProductMedia"
-                    :release="releasePendingProductMedia"
-                    @uploading="detailMediaUploading = $event"
-                  />
-                </t-form-item>
-              </t-form>
-            </AdminSectionCard>
-
-            <AdminSectionCard
-              v-if="!isOperationsEdit"
-              id="finished-product-base"
-              class="form-section"
-              aria-label="基础信息"
-            >
-              <h2 class="form-section-title">基础信息</h2>
-              <t-form :data="productForm" label-width="100px" colon>
-                <t-form-item label="商品名称" required-mark>
-                  <t-input
-                    v-model="productForm.name"
-                    v-bind="requiredFieldFeedback(productForm.name, '商品名称', submitAttempted)"
-                    clearable
-                    placeholder="请输入商品名称"
-                    :maxlength="60"
-                  />
-                </t-form-item>
-              </t-form>
-              <section class="product-attributes" aria-labelledby="product-attributes-title">
-                <h3 id="product-attributes-title" class="product-attributes-title">
-                  <span
-                    v-if="attributeFields.some((field) => field.required)"
-                    class="product-attributes-required"
-                    aria-label="必填"
-                    >*</span
-                  >
-                  商品属性：
-                </h3>
-                <div class="product-attributes-panel">
-                  <t-form :data="productForm" label-align="top" :colon="false">
-                    <div class="product-attributes-grid">
-                      <t-form-item
-                        v-for="field in attributeFields"
-                        :key="field.key"
-                        :label="field.label"
-                        :required-mark="field.required"
-                      >
-                        <template #label
-                          ><span class="product-attribute-label">{{ field.label }}</span></template
-                        >
-                        <t-select
-                          v-if="field.type === 'select'"
-                          v-model="productForm[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(
-                              productForm[field.key],
-                              field.label,
-                              submitAttempted && field.required,
-                              field.type === 'select',
-                            )
-                          "
-                          clearable
-                          :placeholder="controlPlaceholder(field.label, 'select')"
-                        >
-                          <t-option v-for="item in field.options" :key="item" :label="item" :value="item" />
-                        </t-select>
-                        <t-input
-                          v-else
-                          v-model="productForm[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(
-                              productForm[field.key],
-                              field.label,
-                              submitAttempted && field.required,
-                              false,
-                            )
-                          "
-                          clearable
-                          :placeholder="controlPlaceholder(field.label, 'input')"
-                        />
-                      </t-form-item>
-                    </div>
-                  </t-form>
-                </div>
-              </section>
-              <t-form class="supplier-form" :data="productForm" label-width="100px" colon>
-                <t-form-item label="供应商" required-mark>
-                  <t-select
-                    v-bind="requiredFieldFeedback(productForm.supplier, '供应商', submitAttempted, true)"
-                    v-model="productForm.supplier"
-                    clearable
-                    placeholder="请选择供应商"
-                  >
-                    <t-option v-for="item in supplierOptions" :key="item" :label="item" :value="item" />
-                  </t-select>
-                </t-form-item>
-              </t-form>
-            </AdminSectionCard>
 
             <AdminSectionCard id="finished-product-sales" class="form-section" aria-label="销售信息">
               <h2 class="form-section-title">销售信息</h2>
@@ -471,15 +319,6 @@
                         ])
                   "
                 >
-                  <t-button
-                    v-if="!specRows.length && !isOperationsEdit"
-                    :theme="buttonTheme('create')"
-                    variant="outline"
-                    @click="openSpecDialog"
-                  >
-                    <template #icon><t-icon name="add" /></template>
-                    创建规格
-                  </t-button>
                   <div v-if="specRows.length" class="spec-table-block">
                     <t-table
                       row-key="id"
@@ -497,51 +336,10 @@
                         </div>
                       </template>
                       <template v-for="field in salesAttributeFields" :key="field.key" #[field.key]="{ row }">
-                        <span
-                          v-if="confirmedSpecMode === 'layered' && confirmedLayeredFields.includes(field.key)"
-                          :class="{ 'readonly-spec-value': isOperationsEdit }"
-                        >
-                          {{ row[field.key] || '-' }}
-                        </span>
-                        <span v-else-if="isOperationsEdit" class="readonly-spec-value">{{
-                          row[field.key] || '-'
-                        }}</span>
-                        <t-select
-                          v-else-if="field.type === 'select'"
-                          v-model="row[field.key]"
-                          clearable
-                          v-bind="
-                            requiredFieldFeedback(
-                              row[field.key],
-                              field.label,
-                              submitAttempted && field.required,
-                              field.type === 'select',
-                            )
-                          "
-                          :placeholder="controlPlaceholder(field.label, 'select')"
-                        >
-                          <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
-                        </t-select>
-                        <t-input
-                          v-else
-                          v-model="row[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(row[field.key], field.label, submitAttempted && field.required, false)
-                          "
-                          :placeholder="controlPlaceholder(field.label, 'input')"
-                        />
+                        <span class="readonly-spec-value">{{ row[field.key] || '-' }}</span>
                       </template>
                       <template #cost="{ row }">
-                        <span v-if="isOperationsEdit">{{ formatReadonlyPrice(row.cost) }}</span>
-                        <SpecPriceInput
-                          v-else
-                          v-model="row.cost"
-                          class="decimal-input"
-                          placeholder="请输入价格"
-                          label="价格"
-                          :submitted="submitAttempted"
-                          @change="handleSpecCostChange(row, $event)"
-                        />
+                        <span>{{ formatReadonlyPrice(row.cost) }}</span>
                       </template>
                       <template
                         v-for="configuration in productPriceLevels"
@@ -643,24 +441,7 @@
                         </div>
                       </template>
                       <template #quantity="{ row }">
-                        <span v-if="isOperationsEdit">{{ row.quantity ?? '-' }}</span>
-                        <div v-else class="quantity-editor">
-                          <t-input-number
-                            v-model="row.quantity"
-                            theme="normal"
-                            :min="0"
-                            :status="submitAttempted && !isValidSpecQuantity(row.quantity) ? 'error' : undefined"
-                            :tips="
-                              submitAttempted && !isValidSpecQuantity(row.quantity) ? '请输入大于 0 的数量' : undefined
-                            "
-                            placeholder="请输入数量"
-                          />
-                        </div>
-                      </template>
-                      <template v-if="!isOperationsEdit" #operation="{ row }">
-                        <div class="table-actions">
-                          <t-link :theme="buttonTheme('delete')" hover="color" @click="deleteSpec(row.id)">删除</t-link>
-                        </div>
+                        <span>{{ row.quantity ?? '-' }}</span>
                       </template>
                     </t-table>
                     <div class="spec-table-actions">
@@ -668,31 +449,11 @@
                         <template #icon><t-icon name="edit" /></template>
                         批量填写
                       </t-button>
-                      <t-button
-                        v-if="!isOperationsEdit"
-                        :theme="buttonTheme('edit')"
-                        variant="outline"
-                        @click="openSpecDialog(true)"
-                      >
-                        <template #icon><t-icon name="setting" /></template>
-                        编辑规格
-                      </t-button>
                     </div>
                   </div>
                 </t-form-item>
                 <t-form-item label="总库存">
                   <t-input-number :model-value="totalStock" theme="normal" :min="0" disabled />
-                </t-form-item>
-                <t-form-item
-                  v-if="!isOperationsEdit"
-                  label="上架"
-                  v-bind="requiredFieldFeedback(productForm.shelfNow, '上架方式', submitAttempted, true)"
-                  required-mark
-                >
-                  <t-radio-group v-model="productForm.shelfNow">
-                    <t-radio value="now" :disabled="!canChooseShelfNow">立刻上架</t-radio>
-                    <t-radio value="later" :disabled="!canChooseShelfLater">暂不上架</t-radio>
-                  </t-radio-group>
                 </t-form-item>
               </t-form>
             </AdminSectionCard>
@@ -700,7 +461,7 @@
             <AdminSectionCard class="form-submit-bar">
               <t-button :theme="buttonTheme('submit')" :loading="saving" @click="submitProductForm">
                 <template #icon><t-icon name="check" /></template>
-                {{ formConfirmationText(formPageMode === 'edit' ? 'edit' : 'create') }}
+                {{ formConfirmationText('edit') }}
               </t-button>
               <t-button :theme="buttonTheme('cancel')" variant="base" @click="closeFormPage">取消</t-button>
             </AdminSectionCard>
@@ -708,228 +469,7 @@
         </template>
       </main>
     </div>
-    <AdminDialog
-      v-model:visible="categorySwitchWarningVisible"
-      :confirmation="operationConfirmation('切换分类')"
-      confirm-function="switch-category"
-      header="切换分类"
-      cancel-btn="取消"
-      @confirm="confirmCategorySwitchWarning"
-    >
-      切换分类后，表单填写的内容将清空
-    </AdminDialog>
-    <AdminDialog
-      v-model:visible="categoryDialogVisible"
-      :confirmation="{ kind: 'navigation', action: 'select-category' }"
-      confirm-function="switch-category"
-      header="选择商品分类"
-      width="920px"
-      cancel-btn="取消"
-      @confirm="confirmCategory"
-      @cancel="closeCategoryDialog"
-      @close="closeCategoryDialog"
-    >
-      <div class="category-picker" data-testid="finished-category-picker">
-        <div v-for="(column, columnIndex) in categoryPickerColumns" :key="columnIndex" class="category-column">
-          <div class="category-column-title">第{{ columnIndex + 1 }}级分类</div>
-          <div class="category-option-list">
-            <button
-              v-for="item in column"
-              :key="item.id"
-              type="button"
-              :class="['category-option', categoryPickerSelection[columnIndex] === item.id && 'active']"
-              @click="selectCategory(columnIndex, item.id)"
-            >
-              <span>{{ item.name }}</span>
-              <t-icon v-if="hasCategoryChildren(item.id)" name="chevron-right" />
-            </button>
-            <t-empty v-if="column.length === 0" description="请先选择上级分类" />
-          </div>
-        </div>
-      </div>
-      <div v-if="categoryPickerPath" class="category-picker-path">已选择：{{ categoryPickerPath }}</div>
-    </AdminDialog>
-    <AdminDialog
-      v-model:visible="specDialogVisible"
-      :confirmation="{ kind: 'none' }"
-      confirm-function="close"
-      header="创建规格"
-      width="920px"
-      :footer="false"
-      @close="closeSpecDialog"
-    >
-      <div ref="specFormRoot" class="spec-dialog">
-        <t-radio-group :value="specMode" @change="requestSpecModeChange">
-          <t-radio value="single">单层展示：自定义填写规格</t-radio>
-          <t-radio value="layered">分层展示：选择标准属性构建规格</t-radio>
-        </t-radio-group>
 
-        <t-alert v-if="specDraftError" data-form-error="true" theme="error" :message="specDraftError" />
-        <div v-if="specMode === 'single'" class="single-spec-editor">
-          <div class="spec-section-title">商品规格</div>
-          <div class="single-spec-list">
-            <div v-for="(item, index) in singleSpecs" :key="item.id" class="single-spec-row">
-              <t-input
-                v-model="item.text"
-                v-bind="
-                  fieldFeedback(
-                    isDuplicateSingleSpec(item) || specDraftFieldStatus(item.text, item.id),
-                    isDuplicateSingleSpec(item) ? '规格名称重复' : '请输入商品规格',
-                    '请输入规格文本，如 1500*800*750mm',
-                  )
-                "
-                placeholder="请输入商品规格"
-              />
-              <t-button shape="square" variant="text" :theme="buttonTheme('delete')" @click="removeSingleSpec(index)">
-                <t-icon name="delete" />
-              </t-button>
-              <t-button
-                :class="{ 'spec-add-hidden': index !== singleSpecs.length - 1 }"
-                shape="square"
-                :theme="buttonTheme('create')"
-                variant="outline"
-                title="新增规格项"
-                aria-label="新增规格项"
-                @click="addSingleSpec"
-              >
-                <t-icon name="add" />
-              </t-button>
-            </div>
-          </div>
-        </div>
-
-        <div v-else class="layered-spec-editor">
-          <div class="selected-tags">
-            <button
-              v-for="group in specGroups"
-              :key="group.field"
-              type="button"
-              :draggable="!isSpecGroupDisabled(group)"
-              :disabled="isSpecGroupDisabled(group)"
-              :title="isSpecGroupDisabled(group) ? '最多选择 3 个销售属性' : '拖拽调整属性顺序，点击选择属性'"
-              :class="['spec-attr-tag', { active: group.selected, disabled: isSpecGroupDisabled(group) }]"
-              @dragstart="startSpecGroupDrag($event, group.field)"
-              @dragover.prevent
-              @drop.prevent="dropSpecGroup(group.field)"
-              @dragend="draggedSpecField = null"
-              @click="toggleSpecGroup(group)"
-            >
-              <t-icon name="move" />
-              {{ group.name }}
-            </button>
-          </div>
-          <div v-if="!specGroups.length" class="layered-empty">当前分类暂无已发布的属性模板</div>
-          <div v-else-if="!selectedSpecGroups.length" class="layered-empty">请选择销售属性标签</div>
-          <div
-            v-for="group in selectedSpecGroups"
-            :key="group.field"
-            class="spec-group"
-            @dragover.prevent
-            @drop.prevent="dropSpecGroup(group.field)"
-          >
-            <div
-              class="spec-group-head"
-              draggable="true"
-              title="拖拽调整属性顺序"
-              @dragstart="startSpecGroupDrag($event, group.field)"
-              @dragend="draggedSpecField = null"
-            >
-              <div class="spec-group-title">
-                <t-icon name="move" />
-                <span v-if="salesAttributeByKey(group.field)?.required" style="color: var(--td-error-color)">* </span
-                >{{ group.name }}
-              </div>
-            </div>
-            <div class="layered-values">
-              <div
-                v-for="(value, index) in group.values"
-                :key="value.id"
-                class="layered-value-row"
-                @dragover.prevent
-                @drop.prevent="dropSpecValue($event, group, value.id)"
-              >
-                <span
-                  class="spec-value-drag-handle"
-                  draggable="true"
-                  title="拖拽调整属性值顺序"
-                  aria-label="拖拽调整属性值顺序"
-                  @dragstart.stop="startSpecValueDrag($event, group.field, value.id)"
-                  @dragend.stop="draggedSpecValue = null"
-                >
-                  <t-icon name="move" />
-                </span>
-                <t-select
-                  v-if="salesAttributeByKey(group.field)?.type === 'select'"
-                  :value="value.value"
-                  v-bind="fieldFeedback(specDraftFieldStatus(value.value, value.id), `请选择${group.name}`)"
-                  clearable
-                  :placeholder="controlPlaceholder(group.name, 'select')"
-                  @change="value.value = String($event ?? '')"
-                >
-                  <t-option
-                    v-for="item in salesAttributeByKey(group.field)?.options"
-                    :key="item"
-                    :label="item"
-                    :value="item"
-                    :disabled="isSpecOptionSelected(group, value.id, item)"
-                  />
-                </t-select>
-                <t-input
-                  v-else
-                  v-model="value.value"
-                  v-bind="
-                    fieldFeedback(
-                      isDuplicateSpecValue(group, value) || specDraftFieldStatus(value.value, value.id),
-                      isDuplicateSpecValue(group, value) ? '属性值重复' : `请输入${group.name}`,
-                    )
-                  "
-                  :placeholder="controlPlaceholder(group.name, 'input')"
-                />
-                <t-button
-                  shape="square"
-                  variant="text"
-                  :theme="buttonTheme('delete')"
-                  @click="removeSpecValue(group.name, index)"
-                >
-                  <t-icon name="delete" />
-                </t-button>
-                <t-button
-                  :theme="buttonTheme('create')"
-                  :class="{ 'spec-add-hidden': index !== group.values.length - 1 || !canAddSpecValue(group) }"
-                  shape="square"
-                  variant="outline"
-                  aria-label="新增属性值"
-                  title="新增属性值"
-                  @click="addSpecValue(group.name)"
-                >
-                  <t-icon name="add" />
-                </t-button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="spec-dialog-footer">
-          <t-button :theme="buttonTheme('reset')" variant="text" @click="resetSpecDialog">重置</t-button>
-          <t-button data-form-submit :theme="buttonTheme('create')" @click="confirmCreateSpec">{{
-            formConfirmationText(specFormMode)
-          }}</t-button>
-          <t-button :theme="buttonTheme('cancel')" variant="base" @click="closeSpecDialog">取消</t-button>
-        </div>
-      </div>
-    </AdminDialog>
-    <AdminDialog
-      v-model:visible="specModeConfirmVisible"
-      :confirmation="operationConfirmation('切换展示模式')"
-      confirm-function="edit"
-      header="切换展示模式"
-      cancel-btn="取消"
-      @confirm="confirmSpecModeChange"
-      @cancel="specModeConfirmVisible = false"
-      @close="specModeConfirmVisible = false"
-    >
-      {{ specModeConfirmMessage }}
-    </AdminDialog>
     <t-drawer
       v-model:visible="priceDrawerVisible"
       header="批量填写"
@@ -981,17 +521,6 @@
             ><t-typography-text theme="secondary">留空的字段不会覆盖原规格数据</t-typography-text></template
           >
           <div class="batch-field-grid">
-            <t-form-item v-if="!isOperationsEdit" label="成本价">
-              <SpecPriceInput
-                v-model="batchFillForm.cost"
-                form-layout
-                placeholder="请输入价格"
-                label="价格"
-                optional
-                :submitted="batchFillSubmitted"
-                @change="handleBatchCostChange"
-              />
-            </t-form-item>
             <t-form-item label="指导价">
               <div class="price-pair wide">
                 <SpecPriceInput
@@ -1039,29 +568,6 @@
                   @change="handleBatchMarkupChange(configuration.id, 'price', $event)"
                 />
               </div>
-            </t-form-item>
-            <t-form-item v-if="!isOperationsEdit" label="数量">
-              <t-input-number v-model="batchFillForm.quantity" placeholder="请输入数量" theme="normal" :min="0" />
-            </t-form-item>
-            <t-form-item
-              v-for="field in isOperationsEdit ? [] : batchEditableSalesFields"
-              :key="field.key"
-              :label="field.label"
-            >
-              <t-select
-                v-if="field.type === 'select'"
-                v-model="batchSalesAttributes[field.key]"
-                clearable
-                :placeholder="controlPlaceholder(field.label, 'select')"
-              >
-                <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
-              </t-select>
-              <t-input
-                v-else
-                v-model="batchSalesAttributes[field.key]"
-                clearable
-                :placeholder="controlPlaceholder(field.label, 'input')"
-              />
             </t-form-item>
           </div>
         </t-card>
@@ -1179,17 +685,15 @@ import { formConfirmationText } from '@/components/foundation/actions/confirmati
 import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
-import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
+import { fieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
-import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { stateActivitySortIcon, stateActivityColumns } from '@/services/productStateActivity';
 import { filterFinishedStockItems } from '../shared/finishedStockListFilter';
-import { finishedStockFormIssues, isValidSpecQuantity } from '../shared/finishedStockFormValidation';
-import { useFinishedStockSpecDialog } from '../shared/useFinishedStockSpecDialog';
+import { finishedStockFormIssues } from '../shared/finishedStockFormValidation';
 import { buildFinishedStockTemplateFields } from '../shared/finishedStockTemplateFields';
 import { useFinishedStockPriceEditor } from '../shared/finishedStockPriceEditor';
 import { useFinishedStockSpecRows } from '../shared/finishedStockSpecRows';
-import { buildFinishedProductPayload, buildFinishedOperationsPricePayload } from '../shared/finishedStockPayload';
+import { buildFinishedOperationsPricePayload } from '../shared/finishedStockPayload';
 import type {
   FinishedStockToolbarAction,
   FinishedStockRowAction,
@@ -1203,18 +707,13 @@ import type {
   LayeredSpecField,
   BatchFilterField,
   ConfirmType,
-  ProductFormMode,
   TabConfig,
   FilterState,
   PaginationState,
   StockItem,
   ProductForm,
   SpecRow,
-  PriceRow,
   BatchFillForm,
-  SingleSpecItem,
-  SpecValue,
-  SpecGroup,
   CategoryCascaderOption,
 } from '../shared/finishedStockPageModel';
 import { formatProductDateTime as formatDateTime } from '@/utils/formatProductDateTime';
@@ -1222,7 +721,7 @@ import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import { finishedStockActions } from '../shared/finishedStockActions';
-import ProductRichEditor from '@/components/ProductRichEditor.vue';
+
 import PriceSourceToggle from './components/PriceSourceToggle.vue';
 import SpecPriceInput from './components/SpecPriceInput.vue';
 import FinishedOperationLogs from './components/FinishedOperationLogs.vue';
@@ -1236,7 +735,6 @@ import {
   adminFeedback,
   AdminConfirmDialog,
   AdminDialog,
-  AdminMediaUpload,
   AdminSectionCard,
   getSafeErrorMessage,
   type AdminMediaValue,
@@ -1250,16 +748,14 @@ import {
   type FinishedProductRecord,
 } from '@/services/finishedProducts';
 const {
-  createFinishedProduct,
   checkFinishedProductShelf,
   listFinishedProductPriceLevelOptions,
   deleteFinishedProduct,
   listFinishedProducts,
   getFinishedProductDetail,
   listFinishedProductFormOptions,
-  releaseTemporaryFinishedProductMedia,
+
   updateFinishedProduct,
-  uploadFinishedProductMedia,
 } = commodity.products;
 import { type ProductCategoryRecord } from '@/services/productCategories';
 import { type FinishedProductTemplateAttribute } from '@/services/finishedProducts';
@@ -1304,7 +800,6 @@ const { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermi
     (tab.value !== 'all' || hasFinishedAction('view', 'warehouse') || hasFinishedAction('view', 'selling')),
 });
 const finishedActionCodes: Record<string, string> = {
-  publish: 'publish',
   batchShelf: 'batch-shelf',
   batchOffShelf: 'batch-off-shelf',
   batchRestore: 'batch-restore',
@@ -1322,15 +817,13 @@ const finishedActionCodes: Record<string, string> = {
 const route = useRoute();
 const router = useRouter();
 const productFormRoot = ref<HTMLElement>();
-const specFormRoot = ref<HTMLElement>();
+
 const priceFormRoot = ref<HTMLElement>();
 const reasonFormRoot = ref();
 const loading = ref(false);
 const saving = ref(false);
 const selectedKeys = ref<number[]>([]);
 const formPageVisible = ref(false);
-const formPageMode = ref<ProductFormMode>('create');
-const isOperationsEdit = computed(() => formPageMode.value === 'edit');
 const activeFormSection = ref<FormSectionKey>('description');
 const formAnchorNav = ref<HTMLElement>();
 const formAnchorSlot = ref<HTMLElement>();
@@ -1369,7 +862,7 @@ const formSections: { key: FormSectionKey; label: string }[] = [
 ];
 const scrollToFormSection = (key: FormSectionKey) => {
   const section =
-    isOperationsEdit.value && key !== 'sales'
+    key !== 'sales'
       ? document.querySelectorAll('.readonly-product-fields .zdm-admin-section-card')[key === 'description' ? 0 : 1]
       : document.getElementById(`finished-product-${key}`);
   if (!section) return;
@@ -1381,13 +874,7 @@ const scrollToFormSection = (key: FormSectionKey) => {
     behavior: 'smooth',
   });
 };
-const categoryDialogVisible = ref(false);
-const categorySwitchWarningVisible = ref(false);
-const productMediaUploading = ref(0);
-const specDialogVisible = ref(false);
-const validatedSpecDraftIds = ref(new Set<number>());
-const specDraftFieldStatus = (value: string, id: number) =>
-  validatedSpecDraftIds.value.has(id) && !value?.trim() ? 'error' : undefined;
+
 const priceDrawerVisible = ref(false);
 const reasonDialogVisible = ref(false);
 const reasonFeedback = useFormFeedback(reasonDialogVisible);
@@ -1401,14 +888,11 @@ const imagePreviewTitle = ref('商品主图');
 const productPreviewType = ref<'image' | 'video'>('image');
 const selectedCategoryId = ref<number>();
 const selectedCategoryPath = ref('');
-const categoryPickerSelection = ref<number[]>([]);
-const specMode = ref<SpecMode>('single');
+
 const confirmedSpecMode = ref<SpecMode>('single');
 const confirmedLayeredFields = ref<LayeredSpecField[]>([]);
 const confirmedSpecDimensions = ref<FinishedSpecDimension[]>([]);
-const confirmedImageField = ref<LayeredSpecField | null>(null);
-const singleSpecs = ref<SingleSpecItem[]>([{ id: Date.now(), text: '', imageUploaded: false }]);
-const priceRows = ref<PriceRow[]>([]);
+
 const specRows = ref<SpecRow[]>([]);
 const batchFillFilters = reactive<Record<BatchFilterField, string[]>>({
   specText: [],
@@ -1419,14 +903,7 @@ const batchFillFilters = reactive<Record<BatchFilterField, string[]>>({
 });
 const submitAttempted = ref(false);
 const salesSpecificationFeedback = useFormFeedback(formPageVisible);
-const requiredFieldStatus = (value: unknown) =>
-  submitAttempted.value && !String(value ?? '').trim() ? 'error' : undefined;
-const mainImageSlots = ref<(AdminMediaValue | undefined)[]>(Array.from({ length: 5 }));
-const mainImages = computed(() => mainImageSlots.value.filter((item): item is AdminMediaValue => Boolean(item)));
-const mainImageUploadIndexes = [0, 1, 2, 3, 4];
-const mainImageMedia = computed(() => mainImageSlots.value[0]);
-const videoMedia = ref<AdminMediaValue>();
-const pendingUploadedMediaIds = new Set<number>();
+
 const productCategories = ref<ProductCategoryRecord[]>([]);
 const productAttributes = ref<ProductAttributeRecord[]>([]);
 const categoryAttributeBindings = ref<FinishedProductTemplateAttribute[]>([]);
@@ -1489,9 +966,6 @@ const refreshPriceConfigurations = () => {
             const id = Number(key);
             if (!row.markupPrices[id]) {
               row.markupPrices[id] = editor;
-              const cost = decimalNumber(row.cost);
-              if (formPageMode.value === 'create' && cost !== null && editor.coefficient)
-                editor.price = (cost * Number(editor.coefficient)).toFixed(2);
             }
           }
         }
@@ -1526,55 +1000,7 @@ const categoryCascaderOptions = computed<CategoryCascaderOption[]>(() => {
       });
   return build(undefined);
 });
-const enabledFinishedCategories = computed(() =>
-  productCategories.value
-    .filter((category) => category.scope === commodity.scope && category.status !== 'disabled')
-    .sort((first, second) => (first.sortOrder ?? 0) - (second.sortOrder ?? 0) || first.id - second.id),
-);
-const categoryChildrenByParent = computed(() => {
-  const children = new Map<number | undefined, ProductCategoryRecord[]>();
-  enabledFinishedCategories.value.forEach((category) => {
-    const parentId = category.parentId ?? undefined;
-    const siblings = children.get(parentId) ?? [];
-    siblings.push(category);
-    children.set(parentId, siblings);
-  });
-  return children;
-});
-const categoryPickerColumns = computed(() => {
-  const columns: ProductCategoryRecord[][] = [categoryChildrenByParent.value.get(undefined) ?? []];
-  for (let level = 1; level < 3; level += 1) {
-    const parentId = categoryPickerSelection.value[level - 1];
-    columns.push(parentId == null ? [] : (categoryChildrenByParent.value.get(parentId) ?? []));
-  }
-  for (let level = 3; ; level += 1) {
-    const parentId = categoryPickerSelection.value[level - 1];
-    if (parentId == null) break;
-    const children = categoryChildrenByParent.value.get(parentId) ?? [];
-    if (!children.length) break;
-    columns.push(children);
-  }
-  return columns;
-});
-const categoryPickerPath = computed(() => {
-  const categoryById = new Map(enabledFinishedCategories.value.map((category) => [category.id, category]));
-  return categoryPickerSelection.value
-    .map((categoryId) => categoryById.get(categoryId)?.name)
-    .filter(Boolean)
-    .join(' > ');
-});
-const hasCategoryChildren = (categoryId: number) => Boolean(categoryChildrenByParent.value.get(categoryId)?.length);
-const categoryPathIds = (categoryId?: number) => {
-  if (categoryId == null) return [];
-  const categoryById = new Map(enabledFinishedCategories.value.map((category) => [category.id, category]));
-  const path: number[] = [];
-  let current = categoryById.get(categoryId);
-  while (current) {
-    path.unshift(current.id);
-    current = current.parentId == null ? undefined : categoryById.get(current.parentId);
-  }
-  return path;
-};
+
 const defaultFilter = (): FilterState => ({
   keyword: '',
   category: '',
@@ -1674,38 +1100,7 @@ const skuAttributeFields = computed(() =>
       ),
   ),
 );
-const specGroups = reactive<SpecGroup[]>([]);
-watch(
-  skuAttributeFields,
-  (fields) => {
-    const existing = new Map(specGroups.map((group) => [group.field, group]));
-    specGroups.splice(
-      0,
-      specGroups.length,
-      ...[...fields]
-        .sort((a, b) => {
-          const order = [...existing.keys()];
-          const rank = (key: LayeredSpecField) => (order.includes(key) ? order.indexOf(key) : order.length);
-          return rank(a.key) - rank(b.key);
-        })
-        .map((field) =>
-          existing.has(field.key)
-            ? { ...existing.get(field.key)!, name: field.label }
-            : {
-                field: field.key,
-                name: field.label,
-                selected: false,
-                withImage: false,
-                values: [{ id: Date.now() + field.attributeId, value: '', imageUploaded: false }],
-              },
-        ),
-    );
-    fields.forEach((field) => {
-      batchFillFilters[field.key] ??= [];
-    });
-  },
-  { immediate: true },
-);
+
 const salesAttributeByKey = (key: LayeredSpecField) => salesAttributeFields.value.find((field) => field.key === key);
 const reasonState = reactive<{
   product: StockItem | null;
@@ -1772,11 +1167,7 @@ const categoryPathById = (categoryId?: number) => {
 };
 const supplierNameById = (supplierId?: number) =>
   productSuppliers.value.find((supplier) => supplier.id === supplierId)?.name ?? '平台自营';
-const supplierIdByName = (name: string) =>
-  productSuppliers.value.find((supplier) => supplier.name === name && supplier.status !== 'disabled')?.id ??
-  productSuppliers.value.find(
-    (supplier) => supplier.supplyTypes.some(isFinishedSupplyType) && supplier.status !== 'disabled',
-  )?.id;
+
 const formatPriceRange = (guidePrice?: number) => {
   const value = Number(guidePrice ?? 0);
   return value > 0 ? `￥${value.toFixed(2)}` : '-';
@@ -1887,21 +1278,10 @@ watch(activeTab, (tab) => {
   paginations[tab].current = 1;
 });
 const selectedKeySet = computed(() => new Set(selectedKeys.value));
-const formPageTitle = computed(() => (formPageMode.value === 'create' ? '发布商品' : '编辑商品'));
-const hasLegacyEditPermission = () => hasPermission(getLoginUser(), `${productPermissionPrefix.value}.edit`);
-const canChooseShelfNow = computed(
-  () =>
-    (!editingProduct.value && (hasFinishedAction('shelf', 'warehouse') || hasFinishedAction('publish', 'selling'))) ||
-    editingProduct.value?.status === 'selling' ||
-    hasLegacyEditPermission() ||
-    hasFinishedAction('shelf', editingProduct.value?.status || 'warehouse') ||
-    hasFinishedAction('batch-shelf', editingProduct.value?.status || 'warehouse'),
-);
-const canChooseShelfLater = computed(
-  () => !editingProduct.value || editingProduct.value.status === 'warehouse' || hasLegacyEditPermission(),
-);
+const formPageTitle = '编辑商品';
+
 const totalStock = computed(() => specRows.value.reduce((sum, row) => sum + Number(row.quantity || 0), 0));
-const detailMediaUploading = ref(false);
+
 const productListPath = computed(() => `/${commodity.moduleKey}`);
 const handleMenuReselect = (event: Event) => {
   const detail = (
@@ -1967,14 +1347,8 @@ const batchButtons = computed(() => {
       className?: string;
     }[]
   > = {
-    warehouse: [
-      { action: 'publish', label: '发布商品', icon: 'add' },
-      { action: 'batchShelf', label: '批量上架', icon: 'upload' },
-    ],
-    selling: [
-      { action: 'publish', label: '发布商品', icon: 'add' },
-      { action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' },
-    ],
+    warehouse: [{ action: 'batchShelf', label: '批量上架', icon: 'upload' }],
+    selling: [{ action: 'batchOffShelf', label: '批量下架', icon: 'download', className: 'brown-button' }],
     soldOut: [],
     recycle: [
       { action: 'batchRestore', label: '批量放回到仓库', icon: 'rollback' },
@@ -1999,7 +1373,7 @@ const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
 
     icon: button.icon,
     className: button.className,
-    disabled: !['publish', 'clearRecycle'].includes(button.action) && !selectedKeys.value.length,
+    disabled: button.action !== 'clearRecycle' && !selectedKeys.value.length,
   })),
 );
 // Fixed pixel widths; update only when the tab action buttons change.
@@ -2056,9 +1430,6 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     })),
     { colKey: 'quantity', title: requiredColumnTitle('数量'), minWidth: 80 },
   ];
-  const tailColumns: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'operation', title: '操作', width: 76, align: 'left', fixed: 'right' },
-  ];
   const createSalesColumn = (field: (typeof salesAttributeFields.value)[number]): PrimaryTableCol<TableRowData> => ({
     colKey: field.key,
     title: field.required ? requiredColumnTitle(field.label) : field.label,
@@ -2073,12 +1444,7 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const remainingSalesColumns = salesAttributeFields.value
     .filter((field) => confirmedSpecMode.value === 'single' || !confirmedLayeredFields.value.includes(field.key))
     .map(createSalesColumn);
-  return [
-    ...orderedSpecColumns,
-    ...priceColumnsBase,
-    ...remainingSalesColumns,
-    ...(!isOperationsEdit.value ? tailColumns : []),
-  ];
+  return [...orderedSpecColumns, ...priceColumnsBase, ...remainingSalesColumns];
 });
 const specRowspanAndColspan = ({
   rowIndex,
@@ -2171,10 +1537,6 @@ const toggleCurrentPage = (checked: boolean) => {
   }
 };
 const handleBatchAction = (action: BatchAction) => {
-  if (action === 'publish') {
-    openCategoryDialog();
-    return;
-  }
   if (action !== 'clearRecycle' && selectedKeys.value.length === 0) {
     adminFeedback.warning('请先选择商品');
     return;
@@ -2242,110 +1604,28 @@ const handleRowAction = async (action: RowAction, row: StockItem) => {
   }
   openConfirm('purge', row, `是否彻底删除商品“${row.name}”？`);
 };
-const hasProductFormContent = () => {
-  const defaults = createEmptyProductForm();
-  return (
-    Object.entries(productForm).some(
-      ([key, value]) => String(value ?? '').trim() !== String(defaults[key] ?? '').trim(),
-    ) ||
-    mainImages.value.length > 0 ||
-    Boolean(videoMedia.value) ||
-    specRows.value.length > 0 ||
-    singleSpecs.value.some((item) => item.text.trim() || item.imageUploaded) ||
-    specGroups.some((group) => group.selected || group.values.some((item) => (item.value ?? '').trim()))
-  );
-};
-const showCategoryPicker = () => {
-  categoryPickerSelection.value = categoryPathIds(selectedCategoryId.value);
-  categoryDialogVisible.value = true;
-};
-const confirmCategorySwitchWarning = () => {
-  categorySwitchWarningVisible.value = false;
-  showCategoryPicker();
-};
-const openCategoryDialog = () => {
-  if (formPageVisible.value && formPageMode.value === 'edit') return;
-  if (productMediaUploading.value || detailMediaUploading.value) {
-    adminFeedback.warning('请等待媒体上传完成后切换分类');
-    return;
-  }
-  if (formPageVisible.value && hasProductFormContent()) {
-    categorySwitchWarningVisible.value = true;
-    return;
-  }
-  if (!formPageVisible.value) {
-    selectedCategoryId.value = undefined;
-    selectedCategoryPath.value = '';
-  }
-  showCategoryPicker();
-};
-const closeCategoryDialog = () => {
-  categoryDialogVisible.value = false;
-};
-const selectCategory = (columnIndex: number, categoryId: number) => {
-  categoryPickerSelection.value = [...categoryPickerSelection.value.slice(0, columnIndex), categoryId];
-};
-const confirmCategory = () => {
-  if (formPageVisible.value && formPageMode.value === 'edit') return;
-  const categoryId = categoryPickerSelection.value.at(-1);
-  if (categoryId == null) {
-    adminFeedback.warning(`请选择${commodity.label}分类`);
-    return;
-  }
-  if (hasCategoryChildren(categoryId)) {
-    adminFeedback.warning('请继续选择下级分类');
-    return;
-  }
-  if (formPageVisible.value && categoryId !== selectedCategoryId.value) {
-    const editingTarget = editingProduct.value;
-    const pendingIds = [...pendingUploadedMediaIds];
-    pendingUploadedMediaIds.clear();
-    openFormPage(formPageMode.value);
-    editingProduct.value = editingTarget;
-    clearSpecDraft();
-    Object.assign(batchFillForm, createEmptyBatchFillForm());
-    pendingIds.forEach((mediaId) => void releaseTemporaryFinishedProductMedia(mediaId).catch(() => undefined));
-  }
-  selectedCategoryId.value = categoryId;
-  selectedCategoryPath.value = categoryPickerPath.value;
-  closeCategoryDialog();
-  if (!formPageVisible.value) openFormPage('create');
-};
+
 const createDraftId = () => Date.now() + Math.floor(Math.random() * 100000);
-const createSingleSpecItem = (text = '', imageUploaded = false): SingleSpecItem => ({
-  id: createDraftId(),
-  text,
-  imageUploaded,
-});
-const createSpecValue = (value = '', imageUploaded = false): SpecValue => ({
-  id: createDraftId(),
-  value,
-  imageUploaded,
-});
-const { createMarkupEditors, createBaseSpecRow, createEditSpecRows } = useFinishedStockSpecRows(
+
+const { createMarkupEditors, createEditSpecRows } = useFinishedStockSpecRows(
   createDraftId,
   () => confirmedSpecMode.value,
   () => guidePriceSettingCoefficient.value,
   () => productPriceLevels.value,
 );
-const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
-  formPageMode.value = mode;
+const openFormPage = (row: StockItem) => {
   formPageVisible.value = true;
   editingProduct.value = row || null;
-  if (route.query.form !== mode) {
-    router.replace({ path: productListPath.value, query: { form: mode } });
+  if (route.query.form !== 'edit') {
+    router.replace({ path: productListPath.value, query: { form: 'edit' } });
   }
   activeFormSection.value = 'description';
   submitAttempted.value = false;
   resetProductForm(productForm, createEmptyProductForm());
   specRows.value = [];
-  priceRows.value = [];
   confirmedSpecMode.value = 'single';
   confirmedLayeredFields.value = [];
   confirmedSpecDimensions.value = [];
-  confirmedImageField.value = null;
-  mainImageSlots.value = Array.from({ length: 5 });
-  videoMedia.value = undefined;
   if (row) {
     productForm.name = row.name;
     productForm.merchantCode = row.code;
@@ -2374,59 +1654,20 @@ const openFormPage = (mode: ProductFormMode, row?: StockItem) => {
     if (confirmedSpecMode.value === 'layered' && !row.specDimensions?.length) {
       adminFeedback.warning('此商品缺少历史规格顺序，请在编辑规格中核对后保存');
     }
-    confirmedImageField.value = null;
-    priceRows.value = specRows.value.map(specToPriceRow);
-    const imageIds = row.mainImageMediaIds ?? (row.mainImageMediaId ? [row.mainImageMediaId] : []);
-    mainImageSlots.value = Array.from({ length: 5 }, (_, index) =>
-      imageIds[index]
-        ? {
-            name: `${row.name}-主图${index + 1}`,
-            mediaId: imageIds[index],
-            url: row.mainImageUrls?.[index] ?? row.image,
-          }
-        : undefined,
-    );
-    videoMedia.value = row.videoMediaId
-      ? { name: `${row.name}-视频`, mediaId: row.videoMediaId, url: row.videoUrl }
-      : undefined;
   }
 };
 const closeFormPage = () => {
-  if (pendingUploadedMediaIds.size) {
-    const pendingIds = [...pendingUploadedMediaIds];
-    pendingUploadedMediaIds.clear();
-    pendingIds.forEach((mediaId) => void releaseTemporaryFinishedProductMedia(mediaId));
-  }
   formPageVisible.value = false;
   editingProduct.value = null;
   if (route.path === productListPath.value && Object.keys(route.query).length) {
     router.replace({ path: productListPath.value });
   }
 };
-const uploadProductMedia = async (file: File, expectedType: 'image' | 'video'): Promise<AdminMediaValue> => {
-  productMediaUploading.value += 1;
-  try {
-    const uploaded = await uploadFinishedProductMedia(file);
-    if (uploaded.mediaType !== expectedType) {
-      await releaseTemporaryFinishedProductMedia(uploaded.id);
-      throw new Error(expectedType === 'image' ? '请选择图片文件' : '请选择视频文件');
-    }
-    pendingUploadedMediaIds.add(uploaded.id);
-    return { name: file.name, mediaId: uploaded.id, url: uploaded.url };
-  } finally {
-    productMediaUploading.value -= 1;
-  }
-};
-const releasePendingProductMedia = (media: AdminMediaValue) => {
-  const mediaId = media.mediaId;
-  if (!mediaId || !pendingUploadedMediaIds.has(mediaId)) return;
-  pendingUploadedMediaIds.delete(mediaId);
-  void releaseTemporaryFinishedProductMedia(mediaId);
-};
+
 const {
   formatDecimalValue,
   decimalNumber,
-  handleSpecCostChange,
+
   handleSpecCoefficientChange,
   handleSpecPriceChange,
   toggleSpecPriceSource,
@@ -2434,60 +1675,11 @@ const {
   handleMarkupCoefficientChange,
   handleMarkupPriceChange,
   handleBatchMarkupChange,
-  handleBatchCostChange,
+
   handleBatchCoefficientChange,
   handleBatchPriceChange,
 } = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);
-const {
-  specFormMode,
-  openSpecDialog,
-  closeSpecDialog,
-  specDraftError,
-  specModeConfirmVisible,
-  specModeConfirmMessage,
-  requestSpecModeChange,
-  confirmSpecModeChange,
-  clearSpecDraft,
-  draggedSpecValue,
-  startSpecValueDrag,
-  dropSpecValue,
-  draggedSpecField,
-  startSpecGroupDrag,
-  dropSpecGroup,
-  selectedSpecGroups,
-  addSingleSpec,
-  removeSingleSpec,
-  isDuplicateSingleSpec,
-  isDuplicateSpecValue,
-  isSpecOptionSelected,
-  canAddSpecValue,
-  addSpecValue,
-  removeSpecValue,
-  isSpecGroupDisabled,
-  toggleSpecGroup,
-  resetSpecDialog,
-  confirmCreateSpec,
-  specToPriceRow,
-} = useFinishedStockSpecDialog({
-  onValidationFailed: () => rejectFormSubmission(specFormRoot.value),
-  validatedSpecDraftIds,
-  specRows,
-  specMode,
-  singleSpecs,
-  specGroups,
-  specDialogVisible,
-  confirmedSpecMode,
-  confirmedLayeredFields,
-  confirmedSpecDimensions,
-  confirmedImageField,
-  priceRows,
-  salesAttributeFields,
-  refreshPriceConfigurations,
-  createSingleSpecItem,
-  createSpecValue,
-  createBaseSpecRow,
-  salesAttributeByKey,
-});
+
 const operationLogsVisible = ref(false);
 const canViewOperationLogs = computed(() =>
   hasPermission(getLoginUser(), `${productPermissionPrefix.value}.operation-log.view`),
@@ -2593,19 +1785,16 @@ const savePriceDrawer = () => {
           }
         : row;
     });
-    priceRows.value = specRows.value.map(specToPriceRow);
     adminFeedback.success(`已批量填充 ${matchedIds.size} 条规格`);
   }
   closePriceDrawer();
 };
-const deleteSpec = (id: number) => {
-  specRows.value = specRows.value.filter((item) => item.id !== id);
-};
+
 const validateProductForm = () => {
   const issues = finishedStockFormIssues({
     commodityLabel: commodity.shortLabel,
     client: 'admin',
-    operationsEdit: isOperationsEdit.value,
+    operationsEdit: true,
     specMode: confirmedSpecMode.value,
     specDimensionsCount: confirmedSpecDimensions.value.length,
     layeredFields: confirmedLayeredFields.value,
@@ -2614,8 +1803,6 @@ const validateProductForm = () => {
     form: productForm,
     attributeFields: attributeFields.value,
     salesAttributeFields: salesAttributeFields.value,
-    mainImageMediaId: mainImageMedia.value?.mediaId,
-    videoMediaId: videoMedia.value?.mediaId,
     categoryId: selectedCategoryId.value,
     editingProduct: editingProduct.value != null,
     guidePriceSettingCoefficient: guidePriceSettingCoefficient.value,
@@ -2643,22 +1830,7 @@ const specVariantLabel = (row: SpecRow) =>
     .filter(Boolean)
     .join(' / ') ||
   '未命名规格';
-const buildProductPayloadFromForm = (): FinishedProductPayload =>
-  buildFinishedProductPayload({
-    totalStock: totalStock.value,
-    form: productForm,
-    specRows: specRows.value,
-    categoryId: selectedCategoryId.value,
-    supplierId: supplierIdByName(productForm.supplier),
-    mainImageMediaId: mainImageMedia.value!.mediaId!,
-    mainImageMediaIds: mainImages.value.map((image) => image.mediaId!),
-    videoMediaId: videoMedia.value!.mediaId!,
-    attributeFields: attributeFields.value,
-    salesAttributeFields: salesAttributeFields.value,
-    specMode: confirmedSpecMode.value,
-    specDimensions: confirmedSpecDimensions.value,
-    variantLabel: specVariantLabel,
-  });
+
 const buildOperationsPricePayload = (): Pick<
   FinishedProductPayload,
   'name' | 'status' | 'guidePrices' | 'markupPrices'
@@ -2690,57 +1862,17 @@ const rejectProductForm = (issues: ReturnType<typeof finishedStockFormIssues>) =
   });
 };
 const submitProductForm = async () => {
+  if (!editingProduct.value) return;
   submitAttempted.value = true;
-  if (isOperationsEdit.value && editingProduct.value) {
-    const issues = validateProductForm();
-    if (issues.length) return rejectProductForm(issues);
-    saving.value = true;
-    try {
-      upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));
-      formPageVisible.value = false;
-      adminFeedback.actionSuccess({ action: '修改' });
-    } catch (error) {
-      adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));
-    } finally {
-      saving.value = false;
-    }
-    return;
-  }
-  if (detailMediaUploading.value) {
-    adminFeedback.warning('请等待详情媒体上传完成');
-    return;
-  }
-  try {
-    await refreshCategoryAttributeBindings();
-  } catch {
-    adminFeedback.error('商品属性模板刷新失败，请重试');
-    return;
-  }
   const issues = validateProductForm();
   if (issues.length) return rejectProductForm(issues);
-  const isCreate = formPageMode.value !== 'edit' || !editingProduct.value;
   saving.value = true;
   try {
-    const payload = buildProductPayloadFromForm();
-    if (formPageMode.value === 'edit' && editingProduct.value) {
-      const updated = await updateFinishedProduct(editingProduct.value.id, payload);
-      upsertStockItem(updated);
-    } else {
-      const created = await createFinishedProduct(payload);
-      upsertStockItem(created);
-    }
-    pendingUploadedMediaIds.forEach((mediaId) => {
-      void releaseTemporaryFinishedProductMedia(mediaId).catch(() => undefined);
-    });
-    pendingUploadedMediaIds.clear();
+    upsertStockItem(await updateFinishedProduct(editingProduct.value.id, buildOperationsPricePayload()));
     formPageVisible.value = false;
-    if (isCreate) {
-      adminFeedback.created(payload.name);
-    } else {
-      adminFeedback.actionSuccess({ action: '修改' });
-    }
+    adminFeedback.actionSuccess({ action: '修改' });
   } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '商品提交失败');
+    adminFeedback.error(getSafeErrorMessage(error, '商品价格保存失败'));
   } finally {
     saving.value = false;
   }
@@ -2801,7 +1933,7 @@ const openProductEditor = async (row: StockItem) => {
       adminFeedback.error('商品不存在，请刷新列表');
       return;
     }
-    openFormPage('edit', toStockItem(latest));
+    openFormPage(toStockItem(latest));
   } catch (error) {
     adminFeedback.error(getSafeErrorMessage(error, '商品资料加载失败'));
   }
