@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -34,7 +35,7 @@ test.beforeEach(async ({ page }) => {
       }),
     );
   });
-  await page.goto('/dashboard');
+  await page.goto(productWarehouseUrl('/dashboard'));
   await expect(page.locator('.side-nav > .t-default-menu')).toHaveClass(/t-is-collapsed/);
 });
 
@@ -112,7 +113,7 @@ test('store permission popup remains usable when the active page is a product su
       }),
     );
   });
-  await page.goto('/store/finished-stock-management');
+  await page.goto(productWarehouseUrl('/store/finished-stock-management'));
   await page.addStyleTag({ content: '.t-menu__spacer::before { pointer-events: none !important; }' });
   const trigger = page.locator('.side-nav .menu-level-one').filter({ hasText: '权限管理' });
   const panel = page.locator('.t-menu__popup:visible').filter({ hasText: '员工管理' });
@@ -154,7 +155,7 @@ test('supply-chain multi-level menus keep the hover corridor and original naviga
       }),
     );
   });
-  await page.goto('/supply-chain/finished-stock-management');
+  await page.goto(productWarehouseUrl('/supply-chain/finished-stock-management'));
   await page.addStyleTag({ content: '.t-menu__spacer::before { pointer-events: none !important; }' });
   const trigger = page.locator('.side-nav .menu-level-one').filter({ hasText: '商品管理' });
   const panel = page
@@ -167,7 +168,7 @@ test('supply-chain multi-level menus keep the hover corridor and original naviga
 
 test('expanded sidebars retain normal inline menus without hover bridge hit targets', async ({ page }) => {
   await page.setViewportSize({ width: 1200, height: 858 });
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
   await expect(page.locator('.side-nav .zdm-menu-hover-bridge:visible')).toHaveCount(0);
   await page.locator('.side-nav').getByText('商品分类管理', { exact: true }).click();
   await expect(page).toHaveURL(/\/product-category$/);

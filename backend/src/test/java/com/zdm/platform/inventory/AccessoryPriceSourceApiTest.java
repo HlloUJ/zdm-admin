@@ -122,7 +122,7 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
     assertThat(jdbc.queryForObject("SELECT status FROM accessory_products WHERE id=99408", String.class)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT operations_invalidated_reason FROM accessory_products WHERE id=99408", String.class)).isNull();
     assertThat(jdbc.queryForObject("SELECT price FROM accessory_product_guide_prices WHERE accessory_product_id=99408", BigDecimal.class)).isEqualByComparingTo("60");
-    assertThat(jdbc.queryForList("SELECT operation_type FROM accessory_operation_logs WHERE product_id=99408 AND business_client_code='admin' ORDER BY id", String.class)).containsExactly("PURGE", "REENTRY");
+    assertThat(jdbc.queryForList("SELECT operation_type FROM accessory_operation_logs WHERE product_id=99408 AND business_client_code='admin' ORDER BY id", String.class)).containsExactly("PURGE", "SOURCE_SHELF");
   }
 
   @Test
@@ -241,7 +241,6 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
     jdbc.update("UPDATE accessory_product_guide_prices SET price=123 WHERE accessory_product_id=99202");
     lifecycle.sourceTransition(AccessoryLifecycleService.Kind.ACCESSORY,99202L,"offShelf","调整",null);
     assertThat(AccessoryLifecycleService.sourceBlockMessage("offShelf", null)).isEqualTo("该商品已被供应链下架");
-    lifecycle.sourceTransition(AccessoryLifecycleService.Kind.ACCESSORY,99202L,"warehouse");
     assertThat(jdbc.queryForObject("SELECT source_block_reason FROM accessory_products WHERE id=99202",String.class))
         .isEqualTo("OFF_SHELF");
     assertThat(AccessoryLifecycleService.sourceBlockMessage("warehouse", "OFF_SHELF"))
@@ -269,12 +268,12 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
     assertThat(logs.listPage("上架日志商品",null,null,null,null,1,20).total()).isEqualTo(2);
     assertThat(logs.listPage("上架日志商品","SOURCE_OFF_SHELF",null,null,null,1,20).records())
         .singleElement().satisfies(log -> assertThat(log.getOperationSummary()).isEqualTo("供应链已下架该商品"));
-    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM accessory_operation_logs WHERE product_id=99202 AND business_client_code='supply-chain' AND operation_type='RESTORE'",Long.class)).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM accessory_operation_logs WHERE product_id=99202 AND business_client_code='supply-chain' AND operation_type='RESTORE'",Long.class)).isZero();
     assertThat(jdbc.queryForObject("SELECT operation_type FROM accessory_operation_logs WHERE id=?",String.class,firstId)).isEqualTo("SOURCE_SYNC");
     org.springframework.security.core.context.SecurityContextHolder.getContext().setAuthentication(
         new org.springframework.security.authentication.UsernamePasswordAuthenticationToken(identity,null,List.of()));
     long expectedOperationsLogs = 2;
-    for (String target : List.of("offShelf", "recycle", "warehouse", "selling", "offShelf", "recycle", "purged")) {
+    for (String target : List.of("offShelf", "recycle", "warehouse", "selling", "recycle", "purged")) {
       lifecycle.sourceTransition(AccessoryLifecycleService.Kind.ACCESSORY,99202L,target,"调整",null);
       if (List.of("offShelf", "recycle", "purged").contains(target)) { expectedOperationsLogs++; }
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM accessory_operation_logs WHERE product_id=99202 AND business_client_code='admin'",Long.class))
@@ -283,7 +282,7 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
       assertThat(jdbc.queryForObject("SELECT price FROM accessory_product_guide_prices WHERE accessory_product_id=99202",BigDecimal.class)).isEqualByComparingTo("123");
     }
     assertThat(jdbc.queryForList("SELECT operation_type FROM accessory_operation_logs WHERE product_id=99202 AND business_client_code='supply-chain' ORDER BY id",String.class))
-        .containsExactly("SHELF", "OFF_SHELF", "RESTORE", "SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE", "RESTORE", "SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE", "PURGE");
+        .containsExactly("SHELF", "OFF_SHELF", "SHELF", "OFF_SHELF", "DELETE_TO_RECYCLE", "RESTORE", "SHELF", "DELETE_TO_RECYCLE", "PURGE");
     assertThat(jdbc.queryForObject("SELECT operation_type FROM accessory_operation_logs WHERE product_id=99202 AND business_client_code='admin' ORDER BY id DESC LIMIT 1",String.class)).isEqualTo("SOURCE_PURGE");
   }
 
@@ -293,7 +292,7 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
       jdbc.update("""
           INSERT INTO accessory_operation_logs
             (product_id,product_name,business_client_code,operation_type,operation_summary,operator_name,operated_at,change_details)
-          VALUES (99302,'旧供应链日志','admin','SOURCE_SYNC','旧笼统文案','测试人员',NOW(),JSON_OBJECT('来源状态',JSON_OBJECT('before','offShelf','after',?)))
+          VALUES (99302,'旧供应链日志','admin','SOURCE_SYNC','旧笼统文案','测试人员',NOW(),JSON_OBJECT('来源状态',JSON_OBJECT('before','warehouse','after',?)))
           """, target);
     }
     authenticateDirectService();
@@ -320,7 +319,7 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
       jdbc.update("""
           INSERT INTO accessory_operation_logs
             (product_id,product_name,business_client_code,operation_type,operation_summary,operator_name,operated_at,change_details)
-          VALUES (99303,'删除日志边界','admin','SOURCE_DELETE','供应链已删除该商品','测试人员',NOW(),JSON_OBJECT('来源状态',JSON_OBJECT('before','offShelf','after',?)))
+          VALUES (99303,'删除日志边界','admin','SOURCE_DELETE','供应链已删除该商品','测试人员',NOW(),JSON_OBJECT('来源状态',JSON_OBJECT('before','warehouse','after',?)))
           """, target);
     }
     for (String client : List.of("admin", "supply-chain")) {
@@ -349,7 +348,7 @@ class AccessoryPriceSourceApiTest extends SpringContainerTestSupport {
     assertThat(logs.detail(source.records().getFirst().getId()).getOperationType()).isEqualTo("DELETE_TO_RECYCLE");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM accessory_operation_logs WHERE product_id=99303",Long.class)).isEqualTo(4);
     // Slab source recycle is visible as its own downstream action too.
-    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,source_status,status,operations_deleted) VALUES (99303,'大板日志边界','slab-log-boundary','offShelf','selling',FALSE)");
+    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,source_status,status,operations_deleted) VALUES (99303,'大板日志边界','slab-log-boundary','warehouse','selling',FALSE)");
     lifecycle.sourceTransition(AccessoryLifecycleService.Kind.SLAB,99303L,"recycle");
     assertThat(jdbc.queryForObject("SELECT operation_type FROM slab_operation_logs WHERE slab_id=99303 AND business_client_code='admin'",String.class)).isEqualTo("SOURCE_DELETE_TO_RECYCLE");
     assertThat(AccessoryLifecycleService.sourceBlockMessage("recycle", null))

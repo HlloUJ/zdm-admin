@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
@@ -94,7 +95,7 @@ async function submitSlabProduct(page: Page) {
 }
 
 test('uses the same action-specific confirmation foundation across modules', async ({ page }) => {
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
   const attributeRow = page.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
   await attributeRow.getByText('删除', { exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
@@ -105,7 +106,7 @@ test('uses the same action-specific confirmation foundation across modules', asy
   await page.getByRole('button', { name: '取消', exact: true }).click();
 
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supplier-management');
+  await page.goto(productWarehouseUrl('/supplier-management'));
   const supplierRow = page.locator('tbody tr').filter({ hasText: '装点猫大板供应商' });
   await supplierRow.getByText('停用', { exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
@@ -121,7 +122,7 @@ test('uses the same action-specific confirmation foundation across modules', asy
     });
   });
   await setMockBusinessClient(page, 'admin');
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   const slabRow = page.getByRole('row', { name: /雪花白大板 06/ });
   await slabRow.getByText('删除', { exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
@@ -149,7 +150,7 @@ test('shows the product attribute deletion mode returned by the server', async (
     });
   });
 
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
   const row = page.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
   await row.getByText('删除', { exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
@@ -180,7 +181,7 @@ test('does not open a deletion dialog when an unfinished product still uses the 
     });
   });
 
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
   const row = page.locator('tbody tr').filter({ hasText: 'E2E 共享属性' });
   await row.getByText('删除', { exact: true }).click();
   await expect(page.getByText(message, { exact: true })).toBeVisible();
@@ -231,7 +232,7 @@ test('warns immediately instead of opening confirmation when a slab is not ready
     });
   });
 
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   const row = page.getByRole('row', { name: /接口新建-雅士白大板-待维护销售信息/ });
   await row.getByText('上架', { exact: true }).click();
 
@@ -400,7 +401,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   });
 
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supply-chain/slab-management');
+  await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
   const row = page.getByRole('row', { name: /外部系统大板 09/ });
   await row.getByText('删除', { exact: true }).click();
   await expectUnifiedConfirmDialog(page, {
@@ -413,7 +414,7 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
   await expect(page.locator('.zdm-admin-confirm-dialog:visible')).toHaveCount(0);
   await expect(page.getByText('已删除“外部系统大板 09”', { exact: true })).toBeVisible();
   await expect(row).toHaveCount(0);
-  await page.getByText('回收站 1', { exact: true }).click();
+  await page.getByText('回收站（1）', { exact: true }).click();
   await expect(row).toBeVisible();
   await expect(row).toContainText('韩健');
   await expect(row).toContainText('2026/08/23 10:00');
@@ -499,8 +500,8 @@ test('moves an imported supply chain slab to recycle and exposes an immutable op
 });
 
 test('permanently deletes one or multiple slabs from the recycle tab after confirmation', async ({ page }) => {
-  await page.goto('/slab-management');
-  await page.getByText('回收站 2', { exact: true }).click();
+  await page.goto(productWarehouseUrl('/slab-management'));
+  await page.getByText('回收站（2）', { exact: true }).click();
 
   const singleRow = page.getByRole('row', { name: /回收站大板 07/ });
   await singleRow.getByText('彻底删除', { exact: true }).click();
@@ -541,8 +542,8 @@ test('shows recycled slab prices without allowing edits', async ({ page }) => {
       body: JSON.stringify({ code: 0, message: 'ok', data: [] }),
     });
   });
-  await page.goto('/slab-management');
-  await page.getByText('回收站 2', { exact: true }).click();
+  await page.goto(productWarehouseUrl('/slab-management'));
+  await page.getByText('回收站（2）', { exact: true }).click();
 
   const recycleRow = page.getByRole('row', { name: /回收站大板 07/ });
   await recycleRow.getByText('详情', { exact: true }).click();
@@ -621,7 +622,7 @@ test('restores the guide price coefficient from the slab independent price', asy
     }),
   );
 
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   const slabRow = page.getByRole('row', { name: /宝格丽黑大板/ });
   await slabRow.getByText('编辑', { exact: true }).click();
 
@@ -652,7 +653,7 @@ test('shows only assigned slab tabs and operations', async ({ page }) => {
     });
   });
 
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   await expect(page.locator('.status-tabs')).toHaveCount(0);
   await expect(page.getByRole('row', { name: /回收站大板 07/ })).toBeVisible();
   await expect(page.getByRole('row', { name: /雪花白大板 06/ })).toHaveCount(0);
@@ -662,8 +663,8 @@ test('shows only assigned slab tabs and operations', async ({ page }) => {
 });
 
 test('places clear recycle after batch purge and permanently deletes every recycled slab', async ({ page }) => {
-  await page.goto('/slab-management');
-  await page.getByText('回收站 2', { exact: true }).click();
+  await page.goto(productWarehouseUrl('/slab-management'));
+  await page.getByText('回收站（2）', { exact: true }).click();
 
   expect((await page.locator('.toolbar-buttons button').allTextContents()).map((text) => text.trim())).toEqual([
     '批量放回到仓库',
@@ -729,6 +730,9 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             costPrice: 6800,
             guidePrice: 9800,
             status: slabStatus,
+            warehouseEntryType: slabStatus === 'warehouse' ? 'offShelf' : null,
+            warehouseEntryReason: slabStatus === 'warehouse' ? offShelfRecords[0]!.standardReason : null,
+            warehouseEntryDetail: slabStatus === 'warehouse' ? offShelfRecords[0]!.detailReason : null,
             stateOperatorName: offShelfRecords[0]!.offShelvedByName,
             stateOperatedAt: `${offShelfRecords[0]!.offShelvedAt}Z`,
             offShelfRecords,
@@ -746,7 +750,10 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
             widthMm: 1600,
             thicknessMm: 18,
             areaSquareMeter: 4.8,
-            status: 'offShelf',
+            status: 'warehouse',
+            warehouseEntryType: 'recycleRestore',
+            warehouseEntryReason: null,
+            warehouseEntryDetail: null,
             stateOperatorName: '王芳',
             stateOperatedAt: '2026-08-22T10:00:00Z',
             offShelfRecords: [
@@ -796,7 +803,7 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   let statusPayload: unknown;
   await page.route('**/api/admin/slabs/batch-status', async (route) => {
     statusPayload = route.request().postDataJSON();
-    slabStatus = 'offShelf';
+    slabStatus = 'warehouse';
     offShelfRecords.unshift({
       id: 2,
       slabId: 61,
@@ -812,8 +819,8 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
     });
   });
 
-  await page.goto('/slab-management');
-  await page.getByText('已上架 1', { exact: true }).click();
+  await page.goto(productWarehouseUrl('/slab-management'));
+  await page.getByText('已上架（1）', { exact: true }).click();
   const row = page.getByRole('row', { name: /批量下架大板 61/ });
   await row.locator('.t-checkbox').click();
   await page.getByRole('button', { name: '批量下架', exact: true }).click();
@@ -845,31 +852,38 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
     .poll(() => statusPayload)
     .toEqual({
       ids: [61],
-      status: 'offShelf',
+      status: 'warehouse',
+      operation: 'offShelf',
       reason: '库存异常',
       detail: latestDetailReason,
     });
   await expect(dialog).toBeHidden();
   await expect(page.getByText('已批量下架“1 个大板”', { exact: true })).toBeVisible();
 
-  await page.getByText('已下架 2', { exact: true }).click();
+  await page.getByText('仓库中（2）', { exact: true }).click();
   const filterCard = page.locator('.list-controls');
-  await expect(filterCard.getByText('下架原因', { exact: true })).toBeVisible();
-  await expect(filterCard.getByText('下架人', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('入库类型', { exact: true })).toHaveCount(0);
+  await expect(filterCard.getByText('入库人', { exact: true })).toHaveCount(0);
   await expect(filterCard.getByText('下架时间', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('产地', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('纹理', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('色系', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('等级', { exact: true })).toHaveCount(0);
-  await expect(filterCard.getByText('供应商', { exact: true })).toHaveCount(0);
+  await expect(filterCard.getByText('产地', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('纹理', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('色系', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('等级', { exact: true })).toBeVisible();
+  await expect(filterCard.getByText('供应商', { exact: true })).toBeVisible();
   expect((await page.locator('.slab-list-layout thead th').allTextContents()).map((text) => text.trim())).toEqual([
     '',
     '商品主图',
     '大板名称/ID/编号',
     '品种',
-    '下架原因/详细说明',
-    '下架人',
-    '下架时间',
+    '产地',
+    '纹理',
+    '色系',
+    '等级',
+    '尺寸',
+    '供应商',
+    '入库类型 / 详细说明',
+    '入库人',
+    '入库时间',
     '操作',
   ]);
   const offShelfRows = page.locator('.slab-list-layout tbody tr');
@@ -877,52 +891,25 @@ test('requires an off-shelf reason before batch off-shelving slabs', async ({ pa
   await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
   await expect(offShelfRows.nth(1)).toContainText('已下架大板 62');
 
-  const reasonFilter = filterCard.locator('.t-form__item').filter({ hasText: '下架原因' });
-  await reasonFilter.locator('input').click();
-  await page.locator('.t-popup__content:visible').getByText('价格调整', { exact: true }).click();
-  await filterCard.getByRole('button', { name: '查询', exact: true }).click();
-  await expect(offShelfRows).toHaveCount(1);
-  await expect(offShelfRows.nth(0)).toContainText('已下架大板 62');
-  await filterCard.getByRole('button', { name: '重置', exact: true }).click();
-  await expect(offShelfRows).toHaveCount(2);
-
-  const personFilter = filterCard.locator('.t-form__item').filter({ hasText: '下架人' });
-  await personFilter.locator('input').fill('韩健');
-  await filterCard.getByRole('button', { name: '查询', exact: true }).click();
-  await expect(offShelfRows).toHaveCount(1);
-  await expect(offShelfRows.nth(0)).toContainText('批量下架大板 61');
-  await filterCard.getByRole('button', { name: '重置', exact: true }).click();
-  await expect(offShelfRows).toHaveCount(2);
-
   const offShelfRow = page.getByRole('row', { name: /批量下架大板 61/ });
   await expect(offShelfRow).toContainText('库存异常');
   await expect(offShelfRow).toContainText(latestDetailReason);
   await expect(offShelfRow).toContainText('韩健');
   await expect(offShelfRow).not.toContainText('供应商申请');
-  const historyTrigger = offShelfRow.getByRole('button', { name: '查看历史下架原因', exact: true });
-  await expect(historyTrigger).toHaveCSS('opacity', '0');
-  const detailText = offShelfRow.locator('.off-shelf-reason-secondary');
+  const detailText = offShelfRow.locator('[data-entry-detail]');
   await detailText.hover();
-  await expect(page.locator('.t-popup__content:visible').getByText(latestDetailReason, { exact: true })).toBeVisible();
-  await expect(historyTrigger).toHaveCSS('opacity', '1');
-  await historyTrigger.click();
-  const historyDialog = page.locator('.t-dialog:visible').filter({ hasText: '历史下架原因' });
-  await expect(historyDialog).toBeVisible();
-  const historyRows = historyDialog.locator('tbody tr');
-  await expect(historyRows).toHaveCount(2);
-  await expect(historyRows.nth(0)).toContainText('库存异常');
-  await expect(historyRows.nth(0)).toContainText('韩健');
-  await expect(historyRows.nth(0).locator('.off-shelf-history-detail')).toHaveCSS('white-space', 'normal');
-  await expect(historyRows.nth(0)).toContainText(latestDetailReason);
-  await expect(historyRows.nth(1)).toContainText('供应商申请');
-  await expect(historyRows.nth(1)).toContainText('李雷');
-  await historyDialog.getByRole('button', { name: '关闭', exact: true }).click();
-  await expect(historyDialog).toBeHidden();
+  await expect(
+    page.locator('.t-popup__content:visible').getByText(`库存异常；${latestDetailReason}`, { exact: true }),
+  ).toBeVisible();
   expect((await offShelfRow.locator('.table-actions .t-link').allTextContents()).map((text) => text.trim())).toEqual([
-    '详情',
-    '放回仓库',
+    '上架',
+    '编辑',
     '删除',
   ]);
+  // Read-only detail remains covered from the retained recycle entry.
+  slabStatus = 'recycle';
+  await page.reload();
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '回收站' }).click();
   await offShelfRow.getByText('详情', { exact: true }).click();
   const detailDrawer = page.locator('.t-drawer').filter({ hasText: '大板详情' });
   await expect(detailDrawer).toBeVisible();
@@ -957,7 +944,7 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
     });
   });
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supply-chain/slab-management');
+  await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
 
   const chooserPromise = page.waitForEvent('filechooser');
@@ -993,8 +980,8 @@ test('opens the file chooser directly, shows a thumbnail, and previews the uploa
 });
 
 for (const scenario of [
-  { tab: '仓库中 1', expectedStatus: 'warehouse', expectedTab: /仓库中/ },
-  { tab: '已上架', expectedStatus: 'selling', expectedTab: /已上架/ },
+  { tab: '仓库中（1）', expectedStatus: 'warehouse', expectedTab: /仓库中/ },
+  { tab: '已上架（0）', expectedStatus: 'selling', expectedTab: /已上架/ },
 ] as const) {
   test(`publishes a slab into ${scenario.expectedStatus} from its current tab`, async ({ page }) => {
     await page.route('**/api/admin/slabs/form-options', async (route) => {
@@ -1064,7 +1051,7 @@ for (const scenario of [
     });
 
     await setMockBusinessClient(page, 'supply-chain');
-    await page.goto('/supply-chain/slab-management');
+    await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
     await page.getByText(scenario.tab, { exact: true }).click();
     await page.getByRole('button', { name: '发布商品', exact: true }).click();
     await expect(page.getByRole('radio', { name: '暂不上架', exact: true })).toBeChecked();
@@ -1091,7 +1078,7 @@ test('leaves SKU blank for supply chain staff when publishing a product', async 
     });
   });
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supply-chain/slab-management');
+  await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const productDialog = page.locator('.slab-publish-page');
   await productDialog.getByRole('link', { name: '销售信息', exact: true }).click();
@@ -1108,7 +1095,7 @@ test('limits supply chain publishing to cost without requiring operations markup
     });
   });
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supply-chain/slab-management');
+  await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const productDialog = page.locator('.slab-publish-page');
   await productDialog.getByRole('link', { name: '销售信息', exact: true }).click();
@@ -1125,7 +1112,7 @@ test('limits supply chain publishing to cost without requiring operations markup
 
 test('filters slab varieties and origins by search text when publishing a product', async ({ page }) => {
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supply-chain/slab-management');
+  await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   await page.getByRole('link', { name: '基础信息', exact: true }).click();
 
@@ -1149,7 +1136,7 @@ test('shows the same object-specific success copy for category, store category, 
   page,
 }) => {
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supplier-management');
+  await page.goto(productWarehouseUrl('/supplier-management'));
   const supplierRow = page.getByRole('row', { name: /装点猫大板供应商/ });
   await supplierRow.getByText('停用', { exact: true }).click();
   await page.getByRole('button', { name: '确认停用', exact: true }).click();
@@ -1159,7 +1146,7 @@ test('shows the same object-specific success copy for category, store category, 
   await expect(page.getByText('已启用“装点猫大板供应商”', { exact: true })).toBeVisible();
 
   await setMockBusinessClient(page, 'admin');
-  await page.goto('/product-category');
+  await page.goto(productWarehouseUrl('/product-category'));
   const productCategoryRow = page.getByRole('row', { name: /成品现货 一级分类/ });
   await productCategoryRow.getByText('停用', { exact: true }).click();
   await page.getByRole('button', { name: '确认停用', exact: true }).click();
@@ -1180,7 +1167,7 @@ test('shows the same object-specific success copy for category, store category, 
       }),
     );
   });
-  await page.goto('/store-category-management');
+  await page.goto(productWarehouseUrl('/store-category-management'));
   await page
     .getByRole('row', { name: /石材 1级分类/ })
     .getByRole('button', { name: '展开下级分类' })
@@ -1190,7 +1177,7 @@ test('shows the same object-specific success copy for category, store category, 
   await page.getByRole('button', { name: '确认停用', exact: true }).click();
   await expect(page.getByText('已停用“大理石”', { exact: true })).toBeVisible();
 
-  await page.goto('/employee-management');
+  await page.goto(productWarehouseUrl('/employee-management'));
   const employeeRow = page.getByRole('row', { name: /测试员工/ });
   await employeeRow.getByText('停用', { exact: true }).click();
   await page.getByRole('button', { name: '确认停用', exact: true }).click();
@@ -1208,7 +1195,7 @@ test('shows object-specific success copy in craft, slab variety, attribute, and 
   ];
 
   for (const item of cases) {
-    await page.goto(item.path);
+    await page.goto(productWarehouseUrl(item.path));
     const row = page.locator('tbody tr').filter({ hasText: item.target });
     await row.getByText('停用', { exact: true }).click();
     await page.getByRole('button', { name: '确认停用', exact: true }).click();
@@ -1217,7 +1204,7 @@ test('shows object-specific success copy in craft, slab variety, attribute, and 
 });
 
 test('shows 已新增加名称 after creating an item', async ({ page }) => {
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
   await page.getByRole('main').getByRole('button', { name: '新增', exact: true }).click();
 
   await page.locator('.t-dialog:visible').getByPlaceholder('请输入属性名称').fill('E2E 新增属性');
@@ -1243,7 +1230,7 @@ const deletionCases = [
 ];
 
 test('archives an operating store and warns before permanently deleting an archived store', async ({ page }) => {
-  await page.goto('/tenant-store-management');
+  await page.goto(productWarehouseUrl('/tenant-store-management'));
   const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
   await row.getByText('归档', { exact: true }).click();
   await expect(page.getByText('归档后，该门店的全部员工将无法登录或切换到该门店。', { exact: true })).toBeVisible();
@@ -1270,7 +1257,7 @@ test('shows the duplicate store name error on the edit form', async ({ page }) =
     });
   });
 
-  await page.goto('/tenant-store-management');
+  await page.goto(productWarehouseUrl('/tenant-store-management'));
   const row = page.locator('tbody tr').filter({ hasText: '杭州体验门店' });
   await row.getByText('编辑', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '编辑' });
@@ -1294,7 +1281,7 @@ test('shows the duplicate store name error on the edit form', async ({ page }) =
 for (const item of deletionCases) {
   test(`shows 已删除加名称 after deleting ${item.target}`, async ({ page }) => {
     if (item.path === '/supplier-management') await setMockBusinessClient(page, 'supply-chain');
-    await page.goto(item.path);
+    await page.goto(productWarehouseUrl(item.path));
     const row = page.locator('tbody tr').filter({ hasText: item.targetPattern ?? item.target });
     const targetName = item.targetPattern ? await row.locator('td').first().innerText() : item.target;
     await row.getByText('删除', { exact: true }).click();

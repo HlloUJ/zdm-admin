@@ -181,9 +181,9 @@ const canDeleteVariety = computed(() => hasPermission(loginUser.value, `${variet
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 88, align: 'left' },
   { colKey: 'name', title: '品种名称', minWidth: 220, align: 'left' },
-  { colKey: 'status', title: '状态', width: 120, align: 'center' },
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
+  { colKey: 'status', title: '状态', width: 120 },
+  { colKey: 'createdByName', title: '创建人', width: 120 },
+  { colKey: 'createdAt', title: '创建时间', width: 180 },
   {
     colKey: 'operation',
     title: '操作',

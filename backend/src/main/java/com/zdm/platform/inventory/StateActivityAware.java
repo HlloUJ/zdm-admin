@@ -8,4 +8,7 @@ public interface StateActivityAware {
  String getSourceStatus();
  void setStateOperatedAt(LocalDateTime value);
  void setStateOperatorName(String value);
+ void setWarehouseEntryType(String value);
+ void setWarehouseEntryReason(String value);
+ void setWarehouseEntryDetail(String value);
 }

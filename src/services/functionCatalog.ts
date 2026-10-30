@@ -1,3 +1,5 @@
+import { isProductGlobalAction } from './productGlobalPermissions';
+import { productAllViewPages } from './productAllView';
 import { storeOrderPrototype } from '@/pages/order/prototype/resources';
 import { isFunctionAllowedForAudience } from './functionAudience';
 import { verifiedFunctionCatalog } from './functionCatalogAdminData';
@@ -87,6 +89,14 @@ const withDefaultViewAction = (scope: string, actions: FunctionAction[]) => [
   ...actions.filter((action) => !isViewPermission(action.value) && !isLegacyReadAction(action)),
 ];
 
+// All aggregates existing product states; action grants remain with their owning states.
+
+const productTabsWithAll = (page: FunctionPage): FunctionTab[] => {
+  if (!productAllViewPages.has(page.value)) return page.tabs;
+  const original = page.tabs.filter((tab) => tab.value !== `${page.value}.all`);
+  return [{ label: '全部', value: `${page.value}.all`, actions: [] }, ...original];
+};
+
 export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionModule[] =>
   modules.map((module) => ({
     ...module,
@@ -97,7 +107,7 @@ export const withDefaultViewPermissions = (modules: FunctionModule[]): FunctionM
         actions: page.tabs.length
           ? page.actions.filter((action) => !isLegacyReadAction(action))
           : withDefaultViewAction(page.value, page.actions),
-        tabs: page.tabs.map((tab) => ({
+        tabs: productTabsWithAll(page).map((tab) => ({
           ...tab,
           actions: withDefaultViewAction(tab.value, tab.actions),
         })),
@@ -134,14 +144,16 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
               label: '成品现货管理页',
               value: 'admin.finished-stock-management',
               audiences: ['admin'],
-              actions: [{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }],
+              actions: [
+                { label: '批量上架', value: 'admin.finished-stock-management.batch-shelf' },
+                { label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' },
+              ],
               tabs: [
                 {
                   label: '仓库中',
                   value: 'admin.finished-stock-management.warehouse',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.warehouse.view' },
-                    { label: '批量上架', value: 'admin.finished-stock-management.warehouse.batch-shelf' },
                     { label: '上架', value: 'admin.finished-stock-management.warehouse.shelf' },
                     { label: '编辑', value: 'admin.finished-stock-management.warehouse.edit' },
                     { label: '删除', value: 'admin.finished-stock-management.warehouse.delete' },
@@ -155,17 +167,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                     { label: '批量下架', value: 'admin.finished-stock-management.selling.batch-off-shelf' },
                     { label: '下架', value: 'admin.finished-stock-management.selling.off-shelf' },
                     { label: '编辑', value: 'admin.finished-stock-management.selling.edit' },
-                  ],
-                },
-                {
-                  label: '已下架',
-                  value: 'admin.finished-stock-management.off-shelf',
-                  actions: [
-                    { label: '查看', value: 'admin.finished-stock-management.off-shelf.view' },
-                    { label: '批量放回到仓库', value: 'admin.finished-stock-management.off-shelf.batch-restore' },
-                    { label: '详情', value: 'admin.finished-stock-management.off-shelf.detail' },
-                    { label: '放回仓库', value: 'admin.finished-stock-management.off-shelf.restore' },
-                    { label: '删除', value: 'admin.finished-stock-management.off-shelf.delete' },
+                    { label: '删除', value: 'admin.finished-stock-management.selling.delete' },
                   ],
                 },
                 {
@@ -202,14 +204,16 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
               label: '配件管理页',
               value: 'admin.accessory-management',
               audiences: ['admin'],
-              actions: [{ label: '操作日志', value: 'admin.accessory-management.operation-log.view' }],
+              actions: [
+                { label: '批量上架', value: 'admin.accessory-management.batch-shelf' },
+                { label: '操作日志', value: 'admin.accessory-management.operation-log.view' },
+              ],
               tabs: [
                 {
                   label: '仓库中',
                   value: 'admin.accessory-management.warehouse',
                   actions: [
                     { label: '查看', value: 'admin.accessory-management.warehouse.view' },
-                    { label: '批量上架', value: 'admin.accessory-management.warehouse.batch-shelf' },
                     { label: '上架', value: 'admin.accessory-management.warehouse.shelf' },
                     { label: '编辑', value: 'admin.accessory-management.warehouse.edit' },
                     { label: '删除', value: 'admin.accessory-management.warehouse.delete' },
@@ -223,17 +227,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                     { label: '批量下架', value: 'admin.accessory-management.selling.batch-off-shelf' },
                     { label: '下架', value: 'admin.accessory-management.selling.off-shelf' },
                     { label: '编辑', value: 'admin.accessory-management.selling.edit' },
-                  ],
-                },
-                {
-                  label: '已下架',
-                  value: 'admin.accessory-management.off-shelf',
-                  actions: [
-                    { label: '查看', value: 'admin.accessory-management.off-shelf.view' },
-                    { label: '批量放回到仓库', value: 'admin.accessory-management.off-shelf.batch-restore' },
-                    { label: '详情', value: 'admin.accessory-management.off-shelf.detail' },
-                    { label: '放回仓库', value: 'admin.accessory-management.off-shelf.restore' },
-                    { label: '删除', value: 'admin.accessory-management.off-shelf.delete' },
+                    { label: '删除', value: 'admin.accessory-management.selling.delete' },
                   ],
                 },
                 {
@@ -343,19 +337,21 @@ const withAdministrationTabs = (modules: FunctionModule[]): FunctionModule[] =>
     })),
   }));
 
-export const fullFunctionCatalog = applyConfirmedNavigationStructure(
-  orderModulesByNavigation(
-    withDefaultViewPermissions(
-      withAdministrationTabs([
-        storeLevelModule,
-        storeProducts,
-        storeCustomerManagement,
-        storeOrderPrototype,
-        storePriceConfiguration,
-        ...verifiedFunctionCatalog,
-        supplyChainProducts,
-        supplyTypeModule,
-      ]),
+export const fullFunctionCatalog = withDefaultViewPermissions(
+  applyConfirmedNavigationStructure(
+    orderModulesByNavigation(
+      withDefaultViewPermissions(
+        withAdministrationTabs([
+          storeLevelModule,
+          storeProducts,
+          storeCustomerManagement,
+          storeOrderPrototype,
+          storePriceConfiguration,
+          ...verifiedFunctionCatalog,
+          supplyChainProducts,
+          supplyTypeModule,
+        ]),
+      ),
     ),
   ),
 );
@@ -416,7 +412,16 @@ export const getFunctionModulePermissionValues = (module?: FunctionModule) =>
       module?.menus.flatMap((menu) =>
         menu.pages.flatMap((page) => [
           ...page.actions.map((action) => action.value),
-          ...page.tabs.flatMap((tab) => tab.actions.map((action) => action.value)),
+          ...page.tabs.flatMap((tab) =>
+            tab.actions
+              .filter(
+                (action) =>
+                  !productAllViewPages.has(page.value) ||
+                  tab.value !== `${page.value}.all` ||
+                  action.value.startsWith(`${tab.value}.`),
+              )
+              .map((action) => action.value),
+          ),
         ]),
       ) ?? [],
     ),
@@ -499,7 +504,9 @@ const toCanonicalPermission = (permission: string) => {
 };
 
 export const getRowViewPermissionValue = (row: FunctionCatalogRow) =>
-  row.actions.find((action) => isViewPermission(action.value))?.value;
+  row.tabLabels.includes('页面全局') && row.actions.some((action) => isProductGlobalAction(action.value))
+    ? undefined
+    : row.actions.find((action) => isViewPermission(action.value))?.value;
 
 export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], permissions: string[]) => {
   if (permissions.includes('all')) return ['all'];
@@ -517,6 +524,7 @@ export const normalizeFunctionCatalogPermissions = (modules: FunctionModule[], p
     const viewPermission = getRowViewPermissionValue(row);
     if (
       viewPermission &&
+      !(viewPermission.endsWith('.all.view') && productAllViewPages.has(viewPermission.slice(0, -9))) &&
       row.actions.some((action) => !isViewPermission(action.value) && selectedValues.has(action.value))
     ) {
       selectedValues.add(viewPermission);

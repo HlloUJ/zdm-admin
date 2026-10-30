@@ -22,6 +22,22 @@ public class SlabInventory extends BaseEntity implements com.zdm.platform.securi
   public void setStateOperatedAt(java.time.LocalDateTime value) { stateOperatedAt=value; }
   public String getStateOperatorName() { return stateOperatorName; }
   public void setStateOperatorName(String value) { stateOperatorName=value; }
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String warehouseEntryType;
+  public String getWarehouseEntryType() { return warehouseEntryType; }
+  public void setWarehouseEntryType(String value) { warehouseEntryType=value; }
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String warehouseEntryReason;
+  public String getWarehouseEntryReason() { return warehouseEntryReason; }
+  public void setWarehouseEntryReason(String value) { warehouseEntryReason=value; }
+  @TableField(exist = false)
+  @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)
+  private String warehouseEntryDetail;
+  public String getWarehouseEntryDetail() { return warehouseEntryDetail; }
+  public void setWarehouseEntryDetail(String value) { warehouseEntryDetail=value; }
+
   private Long supplierId;
   private Long varietyId;
   private Long originId;

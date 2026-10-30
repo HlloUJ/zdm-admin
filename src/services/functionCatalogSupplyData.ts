@@ -18,14 +18,16 @@ export const supplyChainProducts: FunctionModule = {
             key === 'slab-management' ? '大板管理页' : key === 'accessory-management' ? '配件管理页' : '成品现货管理页',
           value: prefix,
           audiences: ['supply-chain'],
-          actions: [{ label: '操作日志', value: `${prefix}.operation-log.view` }],
+          actions: [
+            { label: '发布商品', value: `${prefix}.publish` },
+            { label: '批量上架', value: `${prefix}.batch-shelf` },
+            { label: '操作日志', value: `${prefix}.operation-log.view` },
+          ],
           tabs: [
             {
               label: '仓库中',
               value: `${prefix}.warehouse`,
               actions: actions('warehouse', [
-                ['publish', '发布商品'],
-                ['batch-shelf', '批量上架'],
                 ['shelf', '上架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],
@@ -35,19 +37,9 @@ export const supplyChainProducts: FunctionModule = {
               label: '已上架',
               value: `${prefix}.selling`,
               actions: actions('selling', [
-                ['publish', '发布商品'],
                 ['batch-off-shelf', '批量下架'],
                 ['off-shelf', '下架'],
                 ['edit', '编辑'],
-              ]),
-            },
-            {
-              label: '已下架',
-              value: `${prefix}.off-shelf`,
-              actions: actions('off-shelf', [
-                ['batch-restore', '批量放回到仓库'],
-                ['detail', '详情'],
-                ['restore', '放回仓库'],
                 ['delete', '删除'],
               ]),
             },

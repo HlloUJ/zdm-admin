@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test } from '@playwright/test';
 
 import { installAdminApiMocks, setMockBusinessClient } from './admin-api-mocks';
@@ -22,7 +23,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('keeps foundation pagination spacing consistent inside list layouts', async ({ page }) => {
-  await page.goto('/product-attribute');
+  await page.goto(productWarehouseUrl('/product-attribute'));
 
   const styles = await page.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
     const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination');
@@ -66,7 +67,7 @@ test('uses the official TDesign pagination controls on routed list pages', async
 
   for (const route of routes) {
     await setMockBusinessClient(page, route === '/supplier-management' ? 'supply-chain' : 'admin');
-    await page.goto(route);
+    await page.goto(productWarehouseUrl(route));
     const pagination = page.locator('.zdm-admin-pagination:visible .t-pagination');
     await expect(pagination).toBeVisible();
     await expect(page.locator('.custom-pagination')).toHaveCount(0);
@@ -81,12 +82,12 @@ test('uses the official TDesign pagination controls on routed list pages', async
 test('matches the independent official filter grid and native pagination padding', async ({ page, context }) => {
   await page.setViewportSize({ width: 1366, height: 900 });
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supplier-management');
+  await page.goto(productWarehouseUrl('/supplier-management'));
   const form = page.locator('.zdm-admin-filter-form');
   await expect(form).toBeVisible();
   const formWidth = (await form.boundingBox())!.width;
   const reference = await context.newPage();
-  await reference.goto('/tests/fixtures/official-ui/reference.html');
+  await reference.goto(productWarehouseUrl('/tests/fixtures/official-ui/reference.html'));
   await reference.locator('.list-common-table').evaluate((host, width) => {
     (host as HTMLElement).style.width = `${width + 64}px`;
     (host as HTMLElement).style.boxSizing = 'border-box';
@@ -128,7 +129,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
       body: JSON.stringify({ code: 0, message: 'ok', data: [] }),
     });
   });
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   const keywordInput = page.locator('.slab-keyword-filter').getByPlaceholder('请输入大板名称/ID/编号', { exact: true });
   expect((await page.locator('.slab-keyword-filter').boundingBox())!.width).toBeGreaterThan(200);
   await expect(page.locator('.filter-fields .t-form__label')).toHaveText([
@@ -148,24 +149,32 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
   const keywordBox = (await page.locator('.slab-keyword-filter').boundingBox())!;
   const supplierBox = (await page.locator('.supplier-filter').boundingBox())!;
   const searchBox = (await page.getByRole('button', { name: '查询', exact: true }).boundingBox())!;
-  expect(supplierBox.x).toBeCloseTo(keywordBox.x, 0);
+  const queryColumns = await page
+    .locator('.filter-fields')
+    .evaluate((el) => getComputedStyle(el).gridTemplateColumns.split(' ').length);
+  const firstRowPeer = await page
+    .locator('.filter-fields .t-form__item')
+    .nth(6 % queryColumns)
+    .boundingBox();
+  expect(supplierBox.x).toBeCloseTo(firstRowPeer!.x, 0);
   expect(supplierBox.y).toBeGreaterThan(keywordBox.y);
   expect(searchBox.y).toBeCloseTo(keywordBox.y, 0);
-  expect(searchBox.x).toBeGreaterThan(supplierBox.x + supplierBox.width);
+  const supplierControl = (await page.locator('.supplier-filter .t-input').boundingBox())!;
+  expect(searchBox.x).toBeGreaterThan(supplierControl.x + supplierControl.width);
 
-  for (const tabLabel of ['仓库中 1', '已上架', '已下架', '已售完', '回收站 2']) {
+  for (const tabLabel of ['仓库中（1）', '已上架（0）', '已售完（0）', '回收站（2）']) {
     await page.getByText(tabLabel, { exact: true }).click();
     await expect(keywordInput).toBeVisible();
   }
 
-  await page.getByText('仓库中 1', { exact: true }).click();
+  await page.getByText('仓库中（1）', { exact: true }).click();
   for (const keyword of ['雪花白大板', '6', 'SLAB-E2E-006']) {
     await keywordInput.fill(keyword);
     await page.getByRole('button', { name: '查询', exact: true }).click();
     await expect(page.getByRole('row', { name: /雪花白大板 06/ })).toBeVisible();
   }
 
-  await page.getByText('回收站 2', { exact: true }).click();
+  await page.getByText('回收站（2）', { exact: true }).click();
   await keywordInput.fill('SLAB-E2E-008');
   await page.getByRole('button', { name: '查询', exact: true }).click();
   await expect(page.getByRole('row', { name: /回收站大板 08/ })).toBeVisible();
@@ -175,7 +184,7 @@ test('searches slabs by name, id, or SKU with the shared filter on every status 
 for (const client of ['admin', 'supply-chain'] as const) {
   test(`${client} slab filters follow their configured grid and right-hand actions`, async ({ page }) => {
     await setMockBusinessClient(page, client);
-    await page.goto(client === 'admin' ? '/slab-management' : '/supply-chain/slab-management');
+    await page.goto(productWarehouseUrl(client === 'admin' ? '/slab-management' : '/supply-chain/slab-management'));
     const sizes = [
       [1920, 4],
       [1689, 4],
@@ -184,14 +193,14 @@ for (const client of ['admin', 'supply-chain'] as const) {
     ];
     for (const [width, columns] of sizes) {
       await page.setViewportSize({ width, height: 1080 });
-      for (const tab of ['仓库中', '已下架']) {
+      for (const tab of ['仓库中', '已上架']) {
         await page
           .locator('.status-tabs')
-          .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))
+          .getByText(new RegExp(`^${tab}（[0-9]+）$`))
           .click();
         const fields = page.locator('.filter-fields');
         const items = fields.locator('.t-form__item');
-        await expect(items).toHaveCount(tab === '已下架' ? 4 : 7);
+        await expect(items).toHaveCount(7);
         const boxes = await items.evaluateAll((elements) =>
           elements.map((el) => {
             const { x, y, width } = el.getBoundingClientRect();
@@ -241,7 +250,7 @@ for (const client of ['admin', 'supply-chain'] as const) {
           .locator('.t-form__controls')
           .boundingBox())!;
         expect(search.x).toBeGreaterThan(lastControl.x + lastControl.width);
-        if (tab === '已下架') {
+        if (tab === '仓库中') {
           await expect(fields.locator('.off-shelf-date-filter')).toHaveCount(0);
           for (const input of await fields.locator('.t-form__controls').all()) {
             expect((await input.boundingBox())!.width).toBeGreaterThanOrEqual(134);
@@ -341,13 +350,13 @@ test('orders the requested management lists by creation time descending', async 
       }),
     );
 
-    await page.goto(item.path);
+    await page.goto(productWarehouseUrl(item.path));
     await expect(page.getByRole('main').locator('tbody tr').first()).toContainText(item.newerName);
   }
 });
 
 test('opens tenant create, business and edit dialogs', async ({ page }) => {
-  await page.goto('/tenant-management');
+  await page.goto(productWarehouseUrl('/tenant-management'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.page-header')).toHaveCount(0);
@@ -382,7 +391,7 @@ test('opens tenant create, business and edit dialogs', async ({ page }) => {
 });
 
 test('gates tenant actions by status and requires the exact name before permanent deletion', async ({ page }) => {
-  await page.goto('/tenant-management');
+  await page.goto(productWarehouseUrl('/tenant-management'));
 
   const enabledRow = page.locator('tbody tr').filter({ hasText: '装点猫直营租户' });
   await expect(enabledRow.getByText('业务开通', { exact: true })).toBeVisible();
@@ -414,7 +423,7 @@ test('gates tenant actions by status and requires the exact name before permanen
 });
 
 test('opens store create, level and edit dialogs', async ({ page }) => {
-  await page.goto('/tenant-store-management');
+  await page.goto(productWarehouseUrl('/tenant-store-management'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.page-header')).toHaveCount(0);
@@ -453,7 +462,7 @@ test('opens store create, level and edit dialogs', async ({ page }) => {
 
 test('opens supplier create and edit dialogs', async ({ page }) => {
   await setMockBusinessClient(page, 'supply-chain');
-  await page.goto('/supplier-management');
+  await page.goto(productWarehouseUrl('/supplier-management'));
   const main = page.getByRole('main');
 
   await expect(main.locator('.page-header')).toHaveCount(0);
@@ -501,7 +510,7 @@ for (const route of [
   test(`uses consistent label and condition spacing across list filters: ${route}`, async ({ page }) => {
     await page.setViewportSize({ width: 1393, height: 868 });
     await setMockBusinessClient(page, route === '/supplier-management' ? 'supply-chain' : 'admin');
-    await page.goto(route);
+    await page.goto(productWarehouseUrl(route));
     const fields = page
       .locator('.zdm-admin-filter-form .filter-fields, .zdm-admin-filter-form .supply-type-filter-fields')
       .first();
@@ -537,7 +546,7 @@ test('resets category browsing and keeps the four-level filter popup stable', as
     route.fulfill({ json: { code: 0, data: [] } }),
   );
   await page.setViewportSize({ width: 1393, height: 868 });
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   const category = page.locator('.filter-fields .t-form__item').nth(1);
   await category.locator('.t-input').click();
   const panel = page.locator('.t-cascader__panel:visible');
@@ -566,11 +575,11 @@ test('resets category browsing and keeps the four-level filter popup stable', as
 
 test('keeps slab filters inside the card across status tabs', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
-  await page.goto('/slab-management');
-  for (const tab of ['已下架', '仓库中', '已上架', '已售完', '回收站']) {
+  await page.goto(productWarehouseUrl('/slab-management'));
+  for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
     await page
       .locator('.status-tabs')
-      .getByText(new RegExp(`^${tab}(?: [0-9]+)?$`))
+      .getByText(new RegExp(`^${tab}（[0-9]+）$`))
       .click();
     const fields = page.locator('.filter-fields');
     const overflow = await fields.evaluate((host) => {
@@ -581,8 +590,16 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
     });
     expect(overflow, tab).toBe(false);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), tab).toBe(true);
-    if (tab === '已下架') {
-      await expect(fields.locator('.t-form__label')).toHaveText(['大板：', '品种：', '下架原因：', '下架人：']);
+    if (tab === '仓库中') {
+      await expect(fields.locator('.t-form__label')).toHaveText([
+        '大板：',
+        '品种：',
+        '产地：',
+        '纹理：',
+        '色系：',
+        '等级：',
+        '供应商：',
+      ]);
     } else {
       await expect(fields.locator('.t-form__label')).toHaveText([
         '大板：',
@@ -597,7 +614,7 @@ test('keeps slab filters inside the card across status tabs', async ({ page }) =
   }
 });
 
-test('shows off-shelf actor and reason before time instead of creator metadata', async ({ page }) => {
+test('shows warehouse actor and retained down-shelf reason instead of creator metadata', async ({ page }) => {
   await page.route('**/api/admin/finished-products/attribute-template-options', (route) =>
     route.fulfill({ json: { code: 0, data: [] } }),
   );
@@ -610,27 +627,26 @@ test('shows off-shelf actor and reason before time instead of creator metadata',
             id: 71,
             name: '下架展示测试商品',
             sku: 'OFF-71',
-            status: 'offShelf',
+            status: 'warehouse',
             createdByName: '商品创建者',
             createdAt: '2026-07-01T01:00:00',
-            offShelfByName: '实际下架人',
-            offShelfAt: '2026-09-17T02:00:00',
             stateOperatorName: '实际下架人',
             stateOperatedAt: '2026-09-17T02:00:00Z',
-            offShelfReason: '商品信息有误',
-            offShelfDetail: '待核对尺寸',
+            warehouseEntryType: 'offShelf',
+            warehouseEntryReason: '商品信息有误',
+            warehouseEntryDetail: '待核对尺寸',
           },
         ],
       },
     }),
   );
-  await page.goto('/finished-stock-management');
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
   await page
     .locator('.status-tabs')
-    .getByText(/^已下架(?: [0-9]+)?$/)
+    .getByText(/^仓库中（[0-9]+）$/)
     .click();
   const headers = await page.locator('thead th').allTextContents();
-  expect(headers.join('|')).toContain('下架原因/详细说明|下架人|下架时间');
+  expect(headers.join('|')).toContain('入库类型 / 详细说明|入库人|入库时间');
   expect(headers.join('|')).not.toContain('创建人');
   expect(headers.join('|')).not.toContain('创建时间');
   const row = page.locator('tbody tr').filter({ hasText: '下架展示测试商品' });
@@ -642,9 +658,9 @@ test('shows off-shelf actor and reason before time instead of creator metadata',
 test('does not add empty-cell padding to the finished stock horizontal scroll width', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: [] } }));
-  await page.goto('/finished-stock-management');
-  for (const tab of ['仓库中', '已上架', '已下架', '已售完', '回收站']) {
-    await page.locator('.status-tabs').getByText(tab, { exact: true }).click();
+  await page.goto(productWarehouseUrl('/finished-stock-management'));
+  for (const tab of ['仓库中', '已上架', '已售完', '回收站']) {
+    await page.locator('.status-tabs').getByText(`${tab}（0）`, { exact: true }).click();
     const table = page.locator('.finished-stock-table');
     await expect(table.getByText('暂无数据')).toBeVisible();
     const sizes = await table.evaluate((root) => {
@@ -660,7 +676,7 @@ test('does not add empty-cell padding to the finished stock horizontal scroll wi
     });
     expect(sizes.scrollWidth, tab).toBeLessThanOrEqual(sizes.expectedWidth + 1);
     expect(sizes.emptyLeft, tab).toBeCloseTo(sizes.contentLeft, 0);
-    if (tab === '已下架') {
+    if (tab === '仓库中') {
       const operation = table.locator('thead th').last();
       await expect
         .poll(async () => {
@@ -678,5 +694,24 @@ test('does not add empty-cell padding to the finished stock horizontal scroll wi
         .toBeGreaterThan(0);
       expect((await operation.boundingBox())!.x).toBeCloseTo(before!.x, 0);
     }
+  }
+});
+
+for (const path of ['/product-category', '/product-attribute', '/product-attribute-value']) {
+  test(`${path} source description uses secondary typography without shrinking native controls`, async ({ page }) => {
+    await page.goto(path);
+    const main = page.getByRole('main');
+    await expect(main.locator('.source-caption')).toHaveCSS('font-size', '12px');
+    await expect(main.locator('.source-caption')).toHaveCSS('line-height', '20px');
+    await expect(main.getByRole('button', { name: '查询', exact: true })).toHaveCSS('font-size', '14px');
+  });
+}
+test('dashboard metric explanations use canonical secondary typography', async ({ page }) => {
+  await page.goto('/dashboard');
+  const hints = page.getByRole('main').locator('.metric-card small');
+  await expect(hints).toHaveCount(4);
+  for (const hint of await hints.all()) {
+    await expect(hint).toHaveCSS('font-size', '12px');
+    await expect(hint).toHaveCSS('line-height', '20px');
   }
 });

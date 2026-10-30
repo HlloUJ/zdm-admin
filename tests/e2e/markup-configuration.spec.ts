@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { checkDecimalEditing } from './decimal-editing';
 import { expect, test } from '@playwright/test';
 
@@ -164,7 +165,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
 test('价格配置引用统一门店级别并仅配置系数', async ({ page }) => {
   await seedLogin(page, ['all'], ['SUPER_ADMIN']);
   await mockMarkupConfigurations(page);
-  await page.goto('/markup-configuration');
+  await page.goto(productWarehouseUrl('/markup-configuration'));
 
   await expect(page.getByRole('main').locator('.page-header')).toHaveCount(0);
   await expect(page.getByText('指导价设置', { exact: true })).toBeVisible();
@@ -275,7 +276,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
   await seedLogin(page, ['admin.product-data-center.markup-configuration.finished.view']);
   await mockMarkupConfigurations(page);
-  await page.goto('/markup-configuration');
+  await page.goto(productWarehouseUrl('/markup-configuration'));
 
   await expect(page.locator('.t-tabs')).toHaveCount(0);
   await expect(page.getByText('指导价设置', { exact: true })).toBeVisible();
@@ -294,7 +295,7 @@ test('价格配置无排序和停启权限时隐藏对应操作', async ({ page 
     ['MARKUP_OPERATOR'],
   );
   await mockMarkupConfigurations(page);
-  await page.goto('/markup-configuration');
+  await page.goto(productWarehouseUrl('/markup-configuration'));
 
   const row = page.getByRole('row').filter({ hasText: '城市中心店' });
   await expect(row.getByText('编辑', { exact: true })).toBeVisible();
@@ -359,7 +360,7 @@ test('大板隐藏停用级别历史价格，启用级别缺失价格不预计�
     });
   });
 
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   const row = page.getByRole('row', { name: /独立价格大板/ });
   await row.getByText('编辑', { exact: true }).click();
   const drawer = page.locator('.slab-publish-page');
@@ -462,7 +463,7 @@ test('大板缺少中间级别价格时仍按门店级别顺序展示', async ({
     });
   });
 
-  await page.goto('/slab-management');
+  await page.goto(productWarehouseUrl('/slab-management'));
   await page
     .getByRole('row', { name: /缺失中间级别价格大板/ })
     .getByText('编辑', { exact: true })
@@ -505,7 +506,7 @@ for (const scope of ['finished', 'accessory', 'slab'] as const) {
         },
       });
     });
-    await page.goto('/markup-configuration');
+    await page.goto(productWarehouseUrl('/markup-configuration'));
     if (scope !== 'finished')
       await page.getByText(scope === 'slab' ? '大板价格配置' : '配件价格配置', { exact: true }).click();
     await page.getByRole('button', { name: '新增', exact: true }).click();

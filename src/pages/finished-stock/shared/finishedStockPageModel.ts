@@ -1,3 +1,4 @@
+import type { WarehouseEntryInformation } from '@/services/warehouseEntry';
 import type { TableRowData } from 'tdesign-vue-next';
 import type {
   FinishedProductAttributeEntry,
@@ -20,7 +21,8 @@ export interface FinishedStockRowAction {
   id: string;
   label: string;
 }
-export type StockStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type StockTab = StockStatus | 'all';
+export type StockStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';
 export type PublisherType = '平台发布' | '接口获取';
 export type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
 export type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
@@ -42,7 +44,7 @@ export type ConfirmType =
   'shelf' | 'delete' | 'restore' | 'purge' | 'batchShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 export type ProductFormMode = 'create' | 'edit';
 export interface TabConfig {
-  value: StockStatus;
+  value: StockTab;
   label: string;
   count?: number;
 }
@@ -55,7 +57,7 @@ export interface PaginationState {
   current: number;
   pageSize: number;
 }
-export interface StockItem {
+export interface StockItem extends WarehouseEntryInformation {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
@@ -64,7 +66,6 @@ export interface StockItem {
   sourceMessage?: string;
   id: number;
   createdByName: string;
-  offShelfByName?: string;
   createdAt?: string;
   code: string;
   image: string;
@@ -79,9 +80,7 @@ export interface StockItem {
   guidePrice?: number;
   priceRange: string;
   status: StockStatus;
-  offShelfReason?: string;
-  offShelfAt?: string;
-  offShelfDetail?: string;
+  operation?: 'offShelf';
   markupPrices?: FinishedProductPrice[];
   guidePrices?: FinishedProductGuidePrice[];
   mainImageMediaId?: number;

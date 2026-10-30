@@ -324,10 +324,10 @@ const canDeleteTenant = computed(() => hasTenantAction('archived', 'delete'));
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'index', title: '序号', width: 80, align: 'left' },
   { colKey: 'tenantName', title: '租户姓名', minWidth: 150, align: 'left' },
-  { colKey: 'phone', title: '联系方式', width: 150, align: 'center' },
+  { colKey: 'phone', title: '联系方式', width: 150 },
   { colKey: 'businesses', title: '开通业务', minWidth: 260, align: 'left' },
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },
+  { colKey: 'createdByName', title: '创建人', width: 120 },
+  { colKey: 'createdAt', title: '创建时间', width: 180 },
   {
     colKey: 'operation',
     title: '操作',

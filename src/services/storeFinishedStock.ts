@@ -1,7 +1,8 @@
+import type { WarehouseEntryInformation } from './warehouseEntry';
 import { request } from './http';
 import type { FinishedProductAttributeEntry, FinishedSpecDimension } from './finishedProducts';
 
-export type StoreFinishedStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type StoreFinishedStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';
 
 export interface StoreSkuPrice {
   skuId: number;
@@ -20,7 +21,7 @@ export interface StoreSkuPrice {
   sizeValue?: string;
 }
 
-export interface StoreFinishedProduct {
+export interface StoreFinishedProduct extends WarehouseEntryInformation {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
@@ -50,9 +51,6 @@ export interface StoreFinishedProduct {
   skus: StoreSkuPrice[];
   createdByName?: string;
   createdAt?: string;
-  offShelfReason?: string;
-  offShelfDetail?: string;
-  offShelfAt?: string;
 }
 
 export interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePrice' | 'priceMode' | 'saleCoefficient'> {
@@ -123,11 +121,25 @@ export const listStoreFinishedPool = () => request<StorePoolProduct[]>(`${base}/
 export const selectStoreFinishedProducts = (productIds: number[]) =>
   request<StoreFinishedProduct[]>(`${base}/select`, { method: 'POST', body: json({ productIds }) });
 export const changeStoreFinishedStatus = (id: number, target: string, reason?: string, detail?: string) =>
-  request<StoreFinishedProduct>(`${base}/${id}/status`, { method: 'PUT', body: json({ target, reason, detail }) });
+  request<StoreFinishedProduct>(`${base}/${id}/status`, {
+    method: 'PUT',
+    body: json({
+      target: target === 'offShelf' ? 'warehouse' : target,
+      operation: target === 'offShelf' ? 'offShelf' : undefined,
+      reason,
+      detail,
+    }),
+  });
 export const changeStoreFinishedStatusBatch = (ids: number[], target: string, reason?: string, detail?: string) =>
   request<StoreFinishedProduct[]>(`${base}/status/batch`, {
     method: 'PUT',
-    body: json({ ids, target, reason, detail }),
+    body: json({
+      ids,
+      target: target === 'offShelf' ? 'warehouse' : target,
+      operation: target === 'offShelf' ? 'offShelf' : undefined,
+      reason,
+      detail,
+    }),
   });
 export const purgeStoreFinishedProduct = (id: number) => request<boolean>(`${base}/${id}`, { method: 'DELETE' });
 export const purgeStoreFinishedProducts = (productIds: number[]) =>

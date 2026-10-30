@@ -131,3 +131,13 @@ describe('global execution button naming', () => {
     expect(hidden.findComponent(Dialog).props('confirmBtn')).toBeNull();
   });
 });
+
+it('registers only the product batch shelf result acknowledgement as a read-only confirmation', () => {
+  expect(confirmationText({ kind: 'acknowledgement', action: 'productBatchShelfResult' })).toBe('确认');
+  expect(dialogButtonProps('close', { kind: 'acknowledgement', action: 'productBatchShelfResult' })?.content).toBe(
+    '确认',
+  );
+  expect(() => confirmationText({ kind: 'acknowledgement', action: 'unknown' } as unknown as Confirmation)).toThrow();
+  expect(confirmationText({ kind: 'close', text: '关闭' })).toBe('关闭');
+  expect(confirmationText({ kind: 'close', text: '我知道了' })).toBe('我知道了');
+});

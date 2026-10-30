@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import {
   expectEditableDrawer,
   expectDrawerWithinViewport,
@@ -95,7 +96,7 @@ test('shows finished stock actions without inventory movements', async ({ page }
       },
     }),
   );
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   const categoryFilter = page.locator('.list-controls .t-form__item').filter({ hasText: '商品分类' });
   await categoryFilter.locator('input').click();
   await expect(page.locator('.t-cascader__panel:visible').getByText('有效商品分类', { exact: true })).toBeVisible();
@@ -143,10 +144,10 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
 
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
 
-  await expect(page.getByText('仓库中 1', { exact: true })).toBeVisible();
-  await expect(page.getByText('已上架', { exact: true })).toBeVisible();
+  await expect(page.getByText('仓库中（1）', { exact: true })).toBeVisible();
+  await expect(page.getByText('已上架（0）', { exact: true })).toBeVisible();
   await expect(page.getByText('已上架 0', { exact: true })).toHaveCount(0);
 
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
@@ -342,7 +343,7 @@ test('edits an initially empty rich product description with real toolbar action
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
 
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌']) {
@@ -420,7 +421,7 @@ test('shows every publish section and navigates anchors without losing form inpu
     route.fulfill({ json: { code: 0, message: 'ok', data: [] } }),
   );
 
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌']) {
@@ -517,7 +518,7 @@ test('confirms category changes and replaces the cleared form attributes', async
       },
     }),
   );
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '分类甲']) await picker.getByRole('button', { name, exact: true }).click();
@@ -549,7 +550,7 @@ test('confirms category changes and replaces the cleared form attributes', async
 test('source specification editor exposes cost and stock without operations prices', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌'])
@@ -641,7 +642,7 @@ test('uses only template-bound role attributes and builds dynamic sales specific
       ]),
     ),
   );
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌'])
@@ -747,7 +748,7 @@ test('uses published bindings for new products and keeps unpublished historical 
       ]),
     ),
   );
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌'])
@@ -832,7 +833,7 @@ test('edits prices in a specification table and preserves product details on sav
     product = { ...product, ...payload };
     await route.fulfill({ json: { code: 0, data: product } });
   });
-  await page.goto('/accessory-management');
+  await page.goto(productWarehouseUrl('/accessory-management'));
   await page.getByText('编辑', { exact: true }).click();
   const editor = page.locator('.form-shell');
   const navigation = page.getByRole('navigation', { name: '商品信息分区导航' });
@@ -988,9 +989,10 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
     });
   });
 
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByText('编辑', { exact: true }).click();
   const editor = page.locator('.form-shell');
+  await expect(editor.getByText('本次入库信息', { exact: true })).toHaveCount(0);
   await expect(page.locator('main.page--form > header.page-header')).toHaveCount(0);
   await page.setViewportSize({ width: 1280, height: 500 });
   for (const [name, selector] of [
@@ -1053,7 +1055,7 @@ test('supply-chain edit can select temporarily not shelved for a selling product
   await page.route('**/api/admin/accessory-products/74', (route) =>
     route.fulfill({ json: { code: 0, data: product } }),
   );
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
   await page.getByText('编辑', { exact: true }).click();
   const later = page.getByRole('radio', { name: '暂不上架' });
@@ -1109,7 +1111,7 @@ test('supply-chain layered product edit exposes cost for each specification', as
     route.fulfill({ json: { code: 0, data: product } }),
   );
 
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByText('编辑', { exact: true }).click();
   const editor = page.locator('.form-shell');
   await expect(editor.locator('.spec-table-block thead th')).toContainText([
@@ -1144,11 +1146,11 @@ test('supply-chain layered product edit exposes cost for each specification', as
   await expectPriceTableStable(table, geometry);
 });
 
-test('restores the initial horizontal layout after visiting the off-shelf tab', async ({ page }) => {
+test('restores the initial horizontal layout after visiting the recycle tab', async ({ page }) => {
   await page.setViewportSize({ width: 1393, height: 868 });
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await expect(page.locator('tbody tr').filter({ hasText: 'ID：' }).first()).toBeVisible();
   const content = page.locator('main .t-table__content');
   const dimensions = () =>
@@ -1156,7 +1158,7 @@ test('restores the initial horizontal layout after visiting the off-shelf tab', 
   const warehouse = await dimensions();
   await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
   const selling = await dimensions();
-  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已下架' }).click();
+  await page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '回收站' }).click();
   await expect
     .poll(async () => {
       const size = await dimensions();
@@ -1202,7 +1204,7 @@ for (const client of ['admin', 'supply-chain']) {
       const id = Number(route.request().url().split('/').pop());
       return route.fulfill({ json: { code: 0, data: records.find((record) => record.id === id) } });
     });
-    await page.goto(path);
+    await page.goto(productWarehouseUrl(path));
     await expect(page.getByRole('main')).not.toContainText('商家编码');
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
     await expect(page.locator('.t-drawer--open .operation-log-keyword-filter input')).toHaveAttribute(
@@ -1227,7 +1229,7 @@ for (const client of ['admin', 'supply-chain']) {
       await detail.getByRole('button', { name: '关闭', exact: true }).click();
     }
     if (client !== 'supply-chain') return;
-    await page.goto(path);
+    await page.goto(productWarehouseUrl(path));
     await page.getByRole('button', { name: '发布商品', exact: true }).click();
     const picker = page.getByTestId('finished-category-picker');
     for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌']) await picker.getByRole('button', { name }).click();
@@ -1298,7 +1300,7 @@ for (const pricesConfigured of [true, false]) {
     await page.route('**/api/admin/accessory-products/operation-logs/601', (route) =>
       route.fulfill({ json: { code: 0, data: record } }),
     );
-    await page.goto('/accessory-management');
+    await page.goto(productWarehouseUrl('/accessory-management'));
     await page.getByRole('main').getByText('操作日志', { exact: true }).click();
     await page.getByRole('row').filter({ hasText: '入仓历史商品' }).getByText('详情', { exact: true }).click();
     const dialog = page.locator('.t-dialog:visible').filter({ hasText: '操作详情' });
@@ -1364,7 +1366,7 @@ test('shows initial warehouse prices without comparison and stacks later prices 
       json: { code: 0, data: records.find((row) => row.id === Number(route.request().url().split('/').pop())) },
     }),
   );
-  await page.goto('/accessory-management');
+  await page.goto(productWarehouseUrl('/accessory-management'));
   await page.getByRole('main').getByText('操作日志', { exact: true }).click();
   await page.getByRole('row').filter({ hasText: '首次入仓商品' }).getByText('详情', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '操作详情' });
@@ -1432,7 +1434,7 @@ for (const animationDuration of [200, 1000]) {
     await page.route('**/api/admin/accessory-products/operation-logs/501', (route) =>
       route.fulfill({ json: { code: 0, data: record } }),
     );
-    await page.goto('/supply-chain/accessory-management');
+    await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
     // A longer native animation reliably exposes widths cached during scaling.
     await page.addStyleTag({
       content: `.t-dialog-zoom__vue-enter-active .t-dialog { animation-duration: ${animationDuration}ms !important; }`,
@@ -1557,7 +1559,7 @@ for (const coefficient of [1.8, 0, undefined]) {
       saves.push(payload);
       return route.fulfill({ json: { code: 0, data: { ...product, ...payload } } });
     });
-    await page.goto('/accessory-management');
+    await page.goto(productWarehouseUrl('/accessory-management'));
     await page.getByText('编辑', { exact: true }).click();
     const editor = page.locator('.form-shell');
     await expect(editor.locator('.spec-table-block thead')).not.toContainText('4级合伙人');
@@ -1672,7 +1674,7 @@ test('switches empty and cleared select attributes to single mode without errors
       },
     }),
   );
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌'])
@@ -1735,7 +1737,7 @@ test('clears unsaved specification drafts on mode changes and preserves confirma
       },
     }),
   );
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌'])
@@ -1875,7 +1877,7 @@ async function openSpecConversionFixture(
       },
     }),
   );
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByText('编辑', { exact: true }).first().click();
   await page.getByRole('button', { name: '编辑规格', exact: true }).click();
   return page.locator('.spec-dialog');
@@ -2243,7 +2245,8 @@ for (const failSecond of [false, true]) {
       active += 1;
       maxActive = Math.max(maxActive, active);
       expect(route.request().postDataJSON()).toMatchObject({
-        status: 'offShelf',
+        status: 'warehouse',
+        operation: 'offShelf',
         offShelfReason: '价格调整',
         offShelfDetail: '批量调整',
       });
@@ -2251,13 +2254,13 @@ for (const failSecond of [false, true]) {
       active -= 1;
       if (failSecond && id === 72)
         return route.fulfill({ status: 400, json: { code: 400, message: '商品状态已变化', data: null } });
-      product.status = 'offShelf';
-      product.sourceStatus = 'offShelf';
+      product.status = 'warehouse';
+      product.sourceStatus = 'warehouse';
       product.stateOperatorName = `下架操作员${id}`;
       product.stateOperatedAt = '2026-10-27T06:01:27.644508Z';
       return route.fulfill({ json: { code: 0, data: product } });
     });
-    await page.goto('/supply-chain/accessory-management');
+    await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
     const main = page.getByRole('main');
     await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
     await main.locator('thead .t-checkbox').click();
@@ -2282,7 +2285,7 @@ for (const failSecond of [false, true]) {
       await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(0);
       await expect(main.getByText('批量下架商品73', { exact: true })).toHaveCount(0);
     }
-    await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已下架' }).click();
+    await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '仓库中' }).click();
     for (const id of failSecond ? [73] : [73, 72, 71]) {
       const row = main.locator('tbody tr').filter({ hasText: `批量下架商品${id}` });
       await expect(row).toContainText(`下架操作员${id}`);
@@ -2331,7 +2334,7 @@ test('empty publish reports every existing field once and locates the cover; edi
     if (route.request().method() === 'POST') submissions++;
     await route.fallback();
   });
-  await page.goto('/supply-chain/accessory-management');
+  await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const picker = page.getByTestId('finished-category-picker');
   for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌']) {
@@ -2417,7 +2420,7 @@ for (const submittedBeforeCreation of [false, true]) {
         },
       }),
     );
-    await page.goto('/supply-chain/accessory-management');
+    await page.goto(productWarehouseUrl('/supply-chain/accessory-management'));
     await page.getByRole('button', { name: '发布商品', exact: true }).click();
     const picker = page.getByTestId('finished-category-picker');
     for (const name of ['配件', '餐桌', '石材餐桌', '奢石餐桌'])
@@ -2508,7 +2511,9 @@ for (const client of ['supply-chain']) {
   test(`${client} supplier title has a native required prefix without marking the query supplier`, async ({ page }) => {
     await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
     await installFinishedMocks(page, client);
-    await page.goto(client === 'admin' ? '/accessory-management' : '/supply-chain/accessory-management');
+    await page.goto(
+      productWarehouseUrl(client === 'admin' ? '/accessory-management' : '/supply-chain/accessory-management'),
+    );
     const queryLabel = page.locator('.zdm-admin-filter-form .t-form__label').filter({ hasText: '供应商' });
     await expect(queryLabel).not.toHaveClass(/t-form__label--required/);
     await page.getByRole('button', { name: '发布商品', exact: true }).click();
@@ -2549,7 +2554,7 @@ test('operations batch drawer uses native footer and cancel keeps specification 
   };
   await page.route('**/api/admin/accessory-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
   await page.route('**/api/admin/accessory-products/1', (route) => route.fulfill({ json: { code: 0, data: product } }));
-  await page.goto('/accessory-management');
+  await page.goto(productWarehouseUrl('/accessory-management'));
   await page.getByText('编辑', { exact: true }).first().click();
   await page.getByRole('button', { name: '批量填写', exact: true }).click();
   const inputs = page.locator('.spec-table-block tbody input');
@@ -2671,7 +2676,7 @@ test('operations retains readonly specifications without creation or editing ent
   );
   await page.route('**/api/admin/accessory-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
   await page.route('**/api/admin/accessory-products/1', (route) => route.fulfill({ json: { code: 0, data: product } }));
-  await page.goto('/accessory-management');
+  await page.goto(productWarehouseUrl('/accessory-management'));
   await expect(page.getByRole('button', { name: '发布商品', exact: true })).toHaveCount(0);
   await page.getByText('编辑', { exact: true }).first().click();
   await expect(page.locator('.form-shell')).toBeVisible();

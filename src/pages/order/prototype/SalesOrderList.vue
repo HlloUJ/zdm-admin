@@ -84,10 +84,10 @@
               <div>
                 <span class="meta-label">负责人</span><span>{{ order.ownerName }}</span>
               </div>
-              <div>
+              <div class="meta-secondary">
                 <span class="meta-label">创建人</span><span>{{ order.creator }}</span>
               </div>
-              <div>
+              <div class="meta-secondary">
                 <span class="meta-label">创建时间</span><span>{{ dateTime(order.createdAt) }}</span>
               </div>
             </div>
@@ -531,7 +531,11 @@ const goodsColumns = [
 }
 .meta-label,
 .meta-phone {
+  font: var(--td-font-body-small);
   color: var(--td-text-color-secondary);
+}
+.meta-secondary {
+  font: var(--td-font-body-small);
 }
 .customer-name {
   font: var(--td-font-mark-medium);

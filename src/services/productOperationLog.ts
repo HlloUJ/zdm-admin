@@ -32,7 +32,6 @@ export const productOperationTypes: Record<string, string> = {
   PURGE: '彻底删除',
   SOLD_OUT: '售完',
   STATUS_UPDATE: '状态变更',
-  REENTRY: '重新入仓',
   SOURCE_SHELF: '供应链上架',
   SOURCE_OFF_SHELF: '供应链下架',
   SOURCE_DELETE: '供应链彻底删除',
@@ -86,10 +85,11 @@ export function finishedProductOperationSummary(
 }
 
 export function productOperationTypeLabel(type: string): string {
-  return productOperationTypes[type] || type;
+  return productOperationTypes[canonicalProductOperationType(type)] || type;
 }
 
 export function canonicalProductOperationType(type: string): string {
+  if (type === 'REENTRY') return 'SOURCE_SHELF';
   if (type === 'PRICE_UPDATE') return 'UPDATE';
   return ['RESTORE_WAREHOUSE', 'RESTORE_RECYCLE'].includes(type) ? 'RESTORE' : type;
 }
@@ -97,6 +97,7 @@ export function canonicalProductOperationType(type: string): string {
 export function productOperationSummary(
   row: Pick<ProductOperationLogRow, 'operationType' | 'operationSummary'>,
 ): string {
+  if (row.operationType === 'REENTRY') return '供应链已上架，商品进入运营管理平台仓库';
   if (row.operationType === 'UPDATE' && /^该商品.*已被修改$/.test(row.operationSummary)) return row.operationSummary;
   return fixedSummaries[row.operationType] || row.operationSummary;
 }
@@ -110,12 +111,7 @@ export function productOperationTypeOptions(types: readonly string[]) {
 
 const commonActions = ['UPDATE', 'SHELF', 'OFF_SHELF', 'RESTORE', 'DELETE_TO_RECYCLE', 'PURGE', 'SOLD_OUT'];
 const supplyEffects = ['SOURCE_SHELF', 'SOURCE_OFF_SHELF', 'SOURCE_DELETE_TO_RECYCLE', 'SOURCE_PURGE'];
-const operationsEffects = [
-  'OPERATIONS_SHELF',
-  'OPERATIONS_OFF_SHELF',
-  'OPERATIONS_DELETE_TO_RECYCLE',
-  'OPERATIONS_PURGE',
-];
+const operationsEffects = ['OPERATIONS_OFF_SHELF', 'OPERATIONS_DELETE_TO_RECYCLE', 'OPERATIONS_PURGE'];
 
 export function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'store', finished = false) {
   const upstreamActions = supplyEffects.flatMap((type) =>
@@ -125,8 +121,13 @@ export function productLogFilterOptions(client: 'supply-chain' | 'admin' | 'stor
     ...(client === 'supply-chain'
       ? ['CREATE', 'UPDATE', ...commonActions]
       : client === 'admin'
-        ? [...commonActions, 'REENTRY', ...upstreamActions]
-        : ['SELECT', ...commonActions, ...upstreamActions, ...operationsEffects]),
+        ? [...commonActions, ...upstreamActions]
+        : [
+            'SELECT',
+            ...commonActions,
+            ...upstreamActions.filter((type) => type !== 'SOURCE_SHELF'),
+            ...operationsEffects,
+          ]),
   ]);
 }
 

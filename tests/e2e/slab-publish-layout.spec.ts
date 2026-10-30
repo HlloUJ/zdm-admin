@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { expectStandardImagePreviewAndDismiss } from './image-preview-assertions';
 import { checkDecimalEditing } from './decimal-editing';
 import { expect, test } from '@playwright/test';
@@ -19,7 +20,7 @@ test.beforeEach(async ({ page }) => {
       }),
     );
   });
-  await page.goto('/supply-chain/slab-management');
+  await page.goto(productWarehouseUrl('/supply-chain/slab-management'));
 });
 
 test('发布直接进入三段整页表单，导航固定且返回保留列表状态', async ({ page }) => {
@@ -121,6 +122,7 @@ test('供应链编辑复用发布页三段表单并回填数据', async ({ page 
     .click();
   const dialog = page.locator('.slab-publish-page');
   await expect(dialog).toBeVisible();
+  await expect(page.getByText('本次入库信息', { exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('heading', { level: 2 })).toHaveText(['图文描述', '基础信息', '销售信息']);
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await dialog.getByRole('link', { name: '销售信息', exact: true }).click();

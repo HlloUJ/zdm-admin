@@ -1,3 +1,4 @@
+import { productWarehouseUrl } from './product-test-navigation';
 import { checkDecimalEditing } from './decimal-editing';
 import { expect, test } from '@playwright/test';
 
@@ -169,7 +170,7 @@ const mockMarkupConfigurations = async (page: import('@playwright/test').Page) =
 test('价格配置引用统一门店级别并仅配置系数', async ({ page }) => {
   await seedLogin(page, ['all'], ['SUPER_ADMIN']);
   await mockMarkupConfigurations(page);
-  await page.goto('/markup-configuration');
+  await page.goto(productWarehouseUrl('/markup-configuration'));
   await page.locator('.configuration-tabs').getByText('配件价格配置', { exact: true }).click();
 
   await expect(page.getByRole('main').locator('.page-header')).toHaveCount(0);
@@ -281,7 +282,7 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
 test('只有一个 Tab 权限时隐藏 Tab 栏', async ({ page }) => {
   await seedLogin(page, ['admin.product-data-center.markup-configuration.accessory.view']);
   await mockMarkupConfigurations(page);
-  await page.goto('/markup-configuration');
+  await page.goto(productWarehouseUrl('/markup-configuration'));
 
   await expect(page.locator('.t-tabs')).toHaveCount(0);
   await expect(page.getByText('指导价设置', { exact: true })).toBeVisible();
@@ -300,7 +301,7 @@ test('价格配置无排序和停启权限时隐藏对应操作', async ({ page 
     ['MARKUP_OPERATOR'],
   );
   await mockMarkupConfigurations(page);
-  await page.goto('/markup-configuration');
+  await page.goto(productWarehouseUrl('/markup-configuration'));
 
   const row = page.getByRole('row').filter({ hasText: '城市中心店' });
   await expect(row.getByText('编辑', { exact: true })).toBeVisible();

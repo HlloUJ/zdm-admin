@@ -124,9 +124,8 @@ public class StoreAccessorySalePriceService {
     boolean offShelf = missing && "selling".equals(status) && snapshot.path("总库存").asInt() > 0 && snapshot.path("销售规格").size() > 0;
     jdbc.update("UPDATE store_accessory_products SET sale_price_attention=? WHERE id=?", missing, listingId);
     if (offShelf) {
-      jdbc.update("UPDATE store_accessory_products SET status='offShelf',off_shelf_reason=?,off_shelf_detail=NULL,off_shelf_at=? WHERE id=?",
-          ATTENTION, time, listingId);
-      return "offShelf";
+      jdbc.update("UPDATE store_accessory_products SET status='warehouse' WHERE id=?", listingId);
+      return "warehouse";
     }
     return status;
   }

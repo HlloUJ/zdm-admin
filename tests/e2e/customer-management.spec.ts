@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Page, type TestInfo } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 import { expectOfficialLayout } from './filter-layout-assertions';
@@ -351,6 +352,12 @@ test('a delayed old detail response never replaces the newly opened customer', a
 test('customer list follows standard spacing with bounded horizontal scrolling at the review viewport', async ({
   page,
 }, testInfo) => {
+  await page.context().route('https://tdesign.gtimg.com/icon/0.4.2/fonts/index.js', (route) =>
+    route.fulfill({
+      path: fileURLToPath(new URL('../fixtures/official-ui/vendor/tdesign-icons-0.4.2.js.txt', import.meta.url)),
+      contentType: 'application/javascript',
+    }),
+  );
   await page.setViewportSize({ width: 1366, height: 858 });
   await setup(page, [...daily, ...archived]);
   await page.goto('/store/customer-management');

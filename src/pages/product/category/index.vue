@@ -316,11 +316,11 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   ...(canSortCategory.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28 }] : []),
   { colKey: 'name', title: '分类名称', minWidth: 240, align: 'left' },
   { colKey: 'level', title: '分类级别', width: 120, align: 'left' },
-  { colKey: 'productCount', title: '关联商品', width: 120, align: 'center' },
-  { colKey: 'status', title: '状态', width: 100, align: 'center' },
-  { colKey: 'sort', title: '排序', width: 100, align: 'center' },
-  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },
-  { colKey: 'createdAt', title: '创建时间', width: 200, align: 'center' },
+  { colKey: 'productCount', title: '关联商品', width: 120 },
+  { colKey: 'status', title: '状态', width: 100 },
+  { colKey: 'sort', title: '排序', width: 100 },
+  { colKey: 'createdByName', title: '创建人', width: 120 },
+  { colKey: 'createdAt', title: '创建时间', width: 200 },
   {
     colKey: 'operation',
     title: '操作',
@@ -764,7 +764,7 @@ onMounted(loadCategories);
 .source-caption {
   margin-top: var(--td-comp-margin-s);
   color: var(--td-text-color-secondary);
-  font-size: var(--td-font-size-body-medium);
+  font: var(--td-font-body-small);
 }
 :deep(.zdm-admin-list-layout__toolbar) {
   display: block;

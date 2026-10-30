@@ -16,11 +16,11 @@
           <template #toolbar>
             <div class="list-controls">
               <t-tabs
-                v-if="true"
+                v-if="tabs.length > 1"
                 :value="activeTab"
                 class="status-tabs"
                 @change="
-                  activeTab = String($event) as StoreFinishedStatus;
+                  activeTab = String($event) as StoreFinishedTab;
                   resetSelection();
                 "
               >
@@ -119,6 +119,8 @@
                   row-key="id"
                   :data="pageRows"
                   :columns="columns"
+                  :sort="tableSort"
+                  :sort-icon="stateActivitySortIcon"
                   :loading="loading"
                   :row-attributes="
                     ({ row }: { row: StoreFinishedProduct }) =>
@@ -130,6 +132,7 @@
                   "
                   hover
                   table-layout="fixed"
+                  @sort-change="onTimeSortChange"
                 >
                   <template #selectTitle
                     ><t-checkbox :checked="pageAllSelected" :indeterminate="pagePartlySelected" @change="togglePage"
@@ -143,9 +146,11 @@
                   <template #product="{ row }"
                     ><div class="product-meta">
                       <div class="product-name">{{ row.name }}</div>
-                      <div class="product-code">ID：{{ row.productId }}</div>
-                    </div></template
-                  >
+                      <div class="product-code">
+                        ID：{{ row.productId }}
+                        <ProductListStatusTag v-if="activeTab === 'all'" :status="row.effectiveStatus" />
+                      </div></div
+                  ></template>
                   <template #imageUrl="{ row }">
                     <button
                       class="product-image preview-trigger"
@@ -158,20 +163,18 @@
                     </button>
                   </template>
                   <template #totalStock="{ row }">{{ row.totalStock ?? 0 }}</template>
+                  <template #createdAt="{ row }">{{ time(row.createdAt) }}</template>
                   <template #stateOperatorName="{ row }"
                     ><span>{{ row.stateOperatorName || '历史记录未记录' }}</span></template
                   >
                   <template #stateOperatedAt="{ row }">{{
                     row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'
                   }}</template>
-                  <template #offShelfReason="{ row }">
-                    <t-tooltip :content="row.offShelfDetail || '—'">{{ row.offShelfReason || '—' }}</t-tooltip>
-                  </template>
-                  <template #offShelfAt="{ row }">{{ time(row.offShelfAt) }}</template>
+                  <template #warehouseEntry="{ row }"><WarehouseEntryInformation :entry="row" /></template>
                   <template #operation="{ row }">
                     <div class="table-actions">
                       <t-link
-                        v-for="action in storeRowButtons"
+                        v-for="action in storeRowButtons(row)"
                         :key="action.id"
                         :theme="buttonTheme(buttonFunctionFor('stock', action.id))"
                         hover="color"
@@ -474,10 +477,25 @@
     >
       <img v-if="imagePreview" :src="imagePreview" alt="商品主图" style="max-width: 100%" />
     </AdminDialog>
+    <OperationsBatchShelfResult v-model:visible="allBatchResultVisible" :result="allBatchResult" />
   </div>
 </template>
 
 <script setup lang="ts">
+import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
+import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
+import type { BatchShelfResult } from '@/services/operationsBatchShelf';
+const allBatchResultVisible = ref(false);
+const allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
+import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
+import {
+  initialProductListTab,
+  isAllProductStatus,
+  productCreationColumns,
+  sortProductsByCreation,
+} from '@/services/productAllView';
+import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
+import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { useCommodityModule } from '@/composables/useCommodityModule';
 const commodity = useCommodityModule();
 
@@ -487,7 +505,7 @@ import { rejectFormSubmission } from '@/utils/submitValidation';
 import { useFormFeedback } from '@/utils/formValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { formatProductDateTime } from '@/utils/formatProductDateTime';
-import { stateActivityColumns, sortByStateActivity } from '@/services/productStateActivity';
+import { stateActivitySortIcon, stateActivityColumns, sortByStateActivity } from '@/services/productStateActivity';
 import FinishedCreationSnapshot from '../management/components/FinishedCreationSnapshot.vue';
 import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';
@@ -539,26 +557,32 @@ const prefix = `store.${commodity.moduleKey}`;
 const can = (tab: string, action: string) => hasPermission(user, `${prefix}.${tab}.${action}`);
 const canGlobal = (action: string) => hasPermission(user, `${prefix}.${action}`);
 const statusLabels: Record<string, string> = {
+  all: '全部',
   warehouse: '仓库中',
   selling: '已上架',
-  offShelf: '已下架',
   soldOut: '已售完',
   recycle: '回收站',
   purged: '已彻底删除',
 };
-const tabOrder: StoreFinishedStatus[] = ['warehouse', 'selling', 'offShelf', 'soldOut', 'recycle'];
+const tabOrder: StoreFinishedStatus[] = ['warehouse', 'selling', 'soldOut', 'recycle'];
 const tabs = computed(() =>
-  tabOrder
-    .filter((tab) => can(tab === 'offShelf' ? 'off-shelf' : tab === 'soldOut' ? 'sold-out' : tab, 'view'))
+  (['all', ...tabOrder] as StoreFinishedTab[])
+    .filter(
+      (tab) =>
+        can(tab === 'soldOut' ? 'sold-out' : tab, 'view') &&
+        (tab !== 'all' || can('warehouse', 'view') || can('selling', 'view')),
+    )
     .map((value) => ({
       value,
-      label: `${statusLabels[value]}（${rows.value.filter((item) => item.effectiveStatus === value).length}）`,
+      label: `${statusLabels[value]}（${rows.value.filter((item) => (value === 'all' ? isAllProductStatus(item.effectiveStatus) && can(item.effectiveStatus, 'view') : item.effectiveStatus === value)).length}）`,
     })),
 );
-const activeTab = ref<StoreFinishedStatus>('warehouse');
-const activeScope = computed(() =>
-  activeTab.value === 'offShelf' ? 'off-shelf' : activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value,
-);
+type StoreFinishedTab = StoreFinishedStatus | 'all';
+const activeTab = ref<StoreFinishedTab>(initialProductListTab(route.query.tab));
+const { descending, tableSort, toggleTimeSort, onTimeSortChange } = useStateActivitySort(activeTab, () => {
+  page.value = 1;
+});
+const activeScope = computed(() => (activeTab.value === 'soldOut' ? 'sold-out' : activeTab.value));
 const rows = ref<StoreFinishedProduct[]>([]);
 const loading = ref(false);
 const page = ref(1);
@@ -625,15 +649,26 @@ const batchConfirmDescriptions: Partial<Record<ActionKind, string>> = {
 };
 const submittingOffShelf = ref(false);
 const filteredRows = computed(() =>
-  sortByStateActivity(rows.value).filter(
+  (activeTab.value === 'all'
+    ? sortProductsByCreation(rows.value, descending.value)
+    : sortByStateActivity(rows.value, descending.value)
+  ).filter(
     (row) =>
-      row.effectiveStatus === activeTab.value &&
+      (activeTab.value === 'all'
+        ? isAllProductStatus(row.effectiveStatus) && can(row.effectiveStatus, 'view')
+        : row.effectiveStatus === activeTab.value) &&
       (!appliedFilter.keyword || `${row.name} ${row.productId}`.includes(appliedFilter.keyword)) &&
       matchesListCategory(row.categoryId),
   ),
 );
 const pageRows = computed(() =>
   filteredRows.value.slice((page.value - 1) * pageSize.value, page.value * pageSize.value),
+);
+watch(
+  () => filteredRows.value.length,
+  (total) => {
+    if (activeTab.value === 'all') page.value = Math.min(page.value, Math.max(1, Math.ceil(total / pageSize.value)));
+  },
 );
 const selectablePageIds = computed(() => pageRows.value.filter((row) => !row.sourceUnavailable).map((row) => row.id));
 const pageAllSelected = computed(
@@ -763,15 +798,17 @@ const {
 const batchActions: Record<string, { kind: ActionKind | 'off-shelf'; label: string; permission: string }> = {
   warehouse: { kind: 'batch-shelf', label: '批量上架', permission: 'batch-shelf' },
   selling: { kind: 'off-shelf', label: '批量下架', permission: 'batch-off-shelf' },
-  offShelf: { kind: 'batch-restore', label: '批量放回到仓库', permission: 'batch-restore' },
   recycle: { kind: 'batch-restore', label: '批量放回到仓库', permission: 'batch-restore' },
 };
 const batchAction = computed(() => {
-  const action = batchActions[activeTab.value];
-  return action && can(activeScope.value, action.permission) ? action : null;
+  const action = batchActions[activeTab.value === 'all' ? 'warehouse' : activeTab.value];
+  return action &&
+    (action.kind === 'batch-shelf' ? canGlobal('batch-shelf') : can(activeScope.value, action.permission))
+    ? action
+    : null;
 });
 const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
-  ...(activeTab.value === 'warehouse' && can('warehouse', 'select')
+  ...(['all', 'warehouse'].includes(activeTab.value) && canGlobal('select')
     ? [{ id: 'select', label: '商品中心', icon: 'add' }]
     : []),
   ...(batchAction.value
@@ -808,11 +845,10 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
     ? [{ id: 'clear', label: '清空回收站', variant: 'base' as const, icon: 'clear' }]
     : []),
 ]);
-const storeRowButtons = computed<FinishedStockRowAction[]>(() => [
-  ...finishedStockActions[activeTab.value]
-    .filter((action) => can(activeScope.value, action.permission))
-    .map((action) => ({ id: action.id, label: action.label })),
-]);
+const storeRowButtons = (row: StoreFinishedProduct): FinishedStockRowAction[] =>
+  finishedStockActions[row.effectiveStatus]
+    .filter((action) => can(row.effectiveStatus === 'soldOut' ? 'sold-out' : row.effectiveStatus, action.permission))
+    .map((action) => ({ id: action.id, label: action.label }));
 const handleStoreToolbarAction = (action: string) => {
   if (action === 'select') void openPool();
   else if (action === 'batch') prepareBatch();
@@ -835,17 +871,23 @@ const baseColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'imageUrl', title: '商品主图', width: 96 },
   { colKey: 'product', title: '商品名称/ID', minWidth: 220 },
 ];
-const operationWidths: Record<StoreFinishedStatus, number> = {
+const operationWidths: Record<StoreFinishedTab, number> = {
+  all: 208,
   warehouse: 190,
-  selling: 152,
-  offShelf: 180,
+  selling: 208,
   soldOut: 104,
   recycle: 208,
 };
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...baseColumns,
-  ...stateActivityColumns(activeTab.value),
-  ...(activeTab.value === 'offShelf' ? [{ colKey: 'offShelfReason', title: '下架原因', minWidth: 140 }] : []),
+  ...baseColumns.filter(
+    (column) => activeTab.value !== 'all' || canGlobal('batch-shelf') || column.colKey !== 'select',
+  ),
+  ...(['all', 'warehouse'].includes(activeTab.value)
+    ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]
+    : []),
+  ...(activeTab.value === 'all'
+    ? productCreationColumns(toggleTimeSort)
+    : stateActivityColumns(activeTab.value, toggleTimeSort)),
   { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },
 ]);
 const poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
@@ -1041,7 +1083,11 @@ async function prepareBatch() {
     adminFeedback.warning('请先选择商品');
     return;
   }
-  if (!(await refreshAvailability([...selected.value]))) return;
+  if (
+    !(activeTab.value === 'all' && action.kind === 'batch-shelf') &&
+    !(await refreshAvailability([...selected.value]))
+  )
+    return;
   if (action.kind === 'off-shelf') {
     pendingOffShelf.value = { ids: [...selected.value], batch: true };
     offShelf.reason = '';
@@ -1099,6 +1145,18 @@ async function runConfirmed() {
   confirming.value = true;
   const ids = action.ids ?? (action.product ? [action.product.id] : []);
   try {
+    if (activeTab.value === 'all' && action.kind === 'batch-shelf' && action.ids) {
+      allBatchResult.value = await shelfProductsFromAll(
+        commodity.scope === 'accessory' ? 'store-accessory-products' : 'store-finished-products',
+        [...action.ids],
+        Object.fromEntries(rows.value.map((row) => [row.id, row.productId])),
+      );
+      selected.value = [];
+      confirm.value = null;
+      allBatchResultVisible.value = true;
+      await load();
+      return;
+    }
     if (!['purge', 'batch-purge', 'clear'].includes(action.kind) && !(await refreshAvailability(ids))) {
       confirm.value = null;
       return;

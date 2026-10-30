@@ -15,7 +15,6 @@ import org.springframework.jdbc.core.RowCallbackHandler;
 
 /** Loads the data required by the finished-stock list in batches, preserving detail response fields. */
 final class FinishedProductListDetails {
-  private final ProductLifecycleService lifecycle;
   private final FinishedProductPriceService priceService;
   private final FinishedProductGuidePriceService guidePriceService;
   private final FinishedProductVariantMapper variantMapper;
@@ -24,11 +23,10 @@ final class FinishedProductListDetails {
   private final MediaAssetService mediaAssetService;
   private final FinishedProductDetailContent detailContent;
 
-  FinishedProductListDetails(ProductLifecycleService lifecycle, FinishedProductPriceService priceService,
+  FinishedProductListDetails(FinishedProductPriceService priceService,
       FinishedProductGuidePriceService guidePriceService, FinishedProductVariantMapper variantMapper,
       FinishedProductAttributeEntryMapper attributeEntryMapper, JdbcTemplate jdbcTemplate,
       MediaAssetService mediaAssetService) {
-    this.lifecycle = lifecycle;
     this.priceService = priceService;
     this.guidePriceService = guidePriceService;
     this.variantMapper = variantMapper;
@@ -54,7 +52,6 @@ final class FinishedProductListDetails {
             .computeIfAbsent(row.getLong("business_id"), ignored -> new ArrayList<>())
             .add(row.getLong("media_id")), productIds.toArray());
 
-    Map<Long, String> offShelfOperators = listOffShelfOperators(products);
     Map<Long, List<FinishedProductPrice>> markupPrices = priceService.listPricesByProductIds(productIds);
     Map<Long, List<FinishedProductGuidePrice>> guidePrices = guidePriceService.listPricesByProductIds(productIds);
     Map<Long, List<FinishedProductVariant>> variants = variantMapper.selectList(
@@ -84,7 +81,6 @@ final class FinishedProductListDetails {
     Map<Long, String> mediaUrls = mediaAssetService.publicUrls(mediaIds);
 
     products.forEach(product -> {
-      product.setOffShelfByName(offShelfOperators.get(product.getId()));
       List<Long> imageIds = imageIdsByProduct.getOrDefault(product.getId(), List.of());
       if (imageIds.isEmpty() && product.getMainImageMediaId() != null) {
         imageIds = List.of(product.getMainImageMediaId());
@@ -102,32 +98,6 @@ final class FinishedProductListDetails {
       product.setAttributes(attributes.getOrDefault(product.getId(), List.of()));
     });
     return products;
-  }
-
-  private Map<Long, String> listOffShelfOperators(List<FinishedProduct> products) {
-    List<Long> offShelfIds = products.stream()
-        .filter(product -> "offShelf".equals(lifecycle.isSupplyChain()
-            ? product.getSourceStatus() : product.getStatus()))
-        .map(FinishedProduct::getId).toList();
-    if (offShelfIds.isEmpty()) {
-      return Map.of();
-    }
-    Object[] parameters = new Object[offShelfIds.size() + 1];
-    parameters[0] = lifecycle.isSupplyChain() ? "supply-chain" : "admin";
-    for (int index = 0; index < offShelfIds.size(); index++) {
-      parameters[index + 1] = offShelfIds.get(index);
-    }
-    Map<Long, String> operators = new HashMap<>();
-    jdbcTemplate.query("""
-        SELECT product_id, operator_name FROM (
-          SELECT product_id, operator_name,
-            ROW_NUMBER() OVER (PARTITION BY product_id ORDER BY operated_at DESC, id DESC) AS sequence_number
-          FROM finished_operation_logs
-          WHERE business_client_code = ? AND operation_type = 'OFF_SHELF' AND product_id IN (%s)
-        ) latest WHERE sequence_number = 1
-        """.replace("%s", String.join(",", Collections.nCopies(offShelfIds.size(), "?"))),
-        (RowCallbackHandler) row -> operators.put(row.getLong("product_id"), row.getString("operator_name")), parameters);
-    return operators;
   }
 
 }

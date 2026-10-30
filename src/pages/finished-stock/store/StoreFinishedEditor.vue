@@ -195,7 +195,7 @@ function scrollToFormSection(key: string) {
   const section =
     key === 'sales'
       ? document.getElementById('store-finished-product-sales')
-      : readonlyFields.value?.querySelectorAll('.zdm-admin-section-card')[key === 'description' ? 0 : 1];
+      : readonlyFields.value?.querySelector(`[data-product-section="${key}"]`);
   if (!section) return;
   activeFormSection.value = key;
   updateFormAnchorPosition();

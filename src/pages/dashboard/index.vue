@@ -109,6 +109,10 @@ const permissionActions = [
   color: var(--td-text-color-secondary);
 }
 
+.metric-card small {
+  font: var(--td-font-body-small);
+}
+
 .metric-card strong {
   font: var(--td-font-headline-medium);
 }

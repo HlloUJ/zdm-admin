@@ -1,3 +1,5 @@
+import { expandLegacyProductGlobalPermission } from './productGlobalPermissions';
+
 const legacyScopedPermissionPrefixes = [
   'admin.product-data-center.attribute',
   'admin.product-data-center.attribute-value',
@@ -22,6 +24,8 @@ const legacyAttributeActionMap: Record<string, string> = {
 };
 
 export const expandLegacyScopedPermission = (permission: string) => {
+  const productGlobal = expandLegacyProductGlobalPermission(permission);
+  if (productGlobal) return productGlobal;
   const categorySortPrefix = ['finished', 'accessory']
     .map((scope) => `admin.product-data-center.category.${scope}`)
     .find((prefix) => permission === `${prefix}.move-up` || permission === `${prefix}.move-down`);

@@ -1,3 +1,4 @@
+import type { WarehouseEntryInformation } from './warehouseEntry';
 import { request } from './http';
 import type { ProductCategoryRecord } from './productCategories';
 import type { ProductAttributeRecord } from './productAttributes';
@@ -13,7 +14,7 @@ export function listFinishedProductFormOptions() {
 
 import { releaseTemporaryMedia, uploadMedia, type MediaResource } from './media';
 
-export type FinishedProductStatus = 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle';
+export type FinishedProductStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';
 
 export interface FinishedProductPrice {
   priceSource?: 'auto' | 'manual';
@@ -60,16 +61,13 @@ export interface FinishedProductVariant {
   stock: number;
 }
 
-export interface FinishedProductRecord {
+export interface FinishedProductRecord extends WarehouseEntryInformation {
   stateOperatorName?: string;
   stateOperatedAt?: string;
 
-  sourceStatus?: 'warehouse' | 'selling' | 'offShelf' | 'soldOut' | 'recycle' | 'purged';
+  sourceStatus?: 'warehouse' | 'selling' | 'soldOut' | 'recycle' | 'purged';
   sourceUnavailable?: boolean;
   sourceMessage?: string;
-  sourceOffShelfReason?: string;
-  sourceOffShelfDetail?: string;
-  sourceOffShelfAt?: string;
   operationsDeleted?: boolean;
   id: number;
   categoryId?: number;
@@ -93,10 +91,6 @@ export interface FinishedProductRecord {
   variants?: FinishedProductVariant[];
   specDimensions?: FinishedSpecDimension[];
   attributeDisplayOrder?: { product: string[]; sales: string[] };
-  offShelfReason?: string;
-  offShelfAt?: string;
-  offShelfDetail?: string;
-  offShelfByName?: string;
   createdByName?: string;
   createdByAccountId?: number;
   status?: FinishedProductStatus;
@@ -122,9 +116,9 @@ export interface FinishedProductPayload {
   specDimensions?: FinishedSpecDimension[];
   attributeDisplayOrder?: { product: string[]; sales: string[] };
   offShelfReason?: string;
-  offShelfAt?: string;
   offShelfDetail?: string;
   status: FinishedProductStatus;
+  operation?: 'offShelf';
 }
 
 export function listFinishedProducts() {

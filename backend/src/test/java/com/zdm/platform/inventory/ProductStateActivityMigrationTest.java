@@ -24,6 +24,8 @@ class ProductStateActivityMigrationTest {
    configuration.target("157").load().migrate();
    assertThat(value(statement,"SELECT operator_client_code FROM product_state_activity WHERE kind='store-finished' AND record_id=99741")).isEqualTo("supply-chain");
    assertThat(value(statement,"SELECT occurred_at FROM product_state_activity WHERE kind='store-finished' AND record_id=99741")).startsWith("2020-01-02 12:00:00");
+   // Preserve the V157 migration assertions above, then use current application code only on the current schema.
+   configuration.target(org.flywaydb.core.api.MigrationVersion.LATEST).load().migrate();
    var activity=new ProductStateActivityService(new org.springframework.jdbc.core.JdbcTemplate(new org.springframework.jdbc.datasource.DriverManagerDataSource(MYSQL.getJdbcUrl(),MYSQL.getUsername(),MYSQL.getPassword())));
    assertThat(value(statement,"SELECT occurred_at FROM product_state_activity WHERE kind='finished' AND business_client_code='admin' AND record_id=99701")).startsWith("2020-01-02");
    statement.executeUpdate("UPDATE finished_products SET name='普通编辑' WHERE id=99701");

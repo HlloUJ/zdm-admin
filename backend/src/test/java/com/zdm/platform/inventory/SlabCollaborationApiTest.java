@@ -60,7 +60,8 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   }
   @AfterEach void clear() { SecurityContextHolder.clearContext(); }
   private void fixture(String status, String source, boolean deleted, long creator) {
-    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99601,'协同大板','SLAB-COLLAB',?,?,?,?,2,10)", status, source, deleted, creator);
+    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99601,'协同大板','SLAB-COLLAB',?,?,?,?,2,10)", "offShelf".equals(status) ? "warehouse" : status, "offShelf".equals(source) ? "warehouse" : source, deleted, creator);
+    if ("offShelf".equals(source)) jdbc.update("UPDATE slab_inventory SET source_block_reason='OFF_SHELF' WHERE id=99601");
   }
   @Test void listKeepsClientVisibilityAndCreatorScopeAfterSqlFiltering() {
     fixture("warehouse", "warehouse", false, 1L);
@@ -145,9 +146,9 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
       assertThat(jdbc.queryForObject("SELECT name FROM slab_inventory WHERE id=99601", String.class)).isEqualTo("协同大板");
       assertThat(jdbc.queryForObject("SELECT source_status FROM slab_inventory WHERE id=99601", String.class)).isEqualTo(state[0]);
     }
-    jdbc.update("UPDATE slab_inventory SET source_status='offShelf' WHERE id=99601");
+    jdbc.update("UPDATE slab_inventory SET source_status='recycle' WHERE id=99601");
     sqlSession.clearCache();
-    identity("supply-chain", "all", "supply-chain.slab-management.off-shelf.edit");
+    identity("supply-chain", "all", "supply-chain.slab-management.recycle.edit");
     mvc.perform(put("/api/admin/slabs/99601/source-cost").contentType("application/json")
         .content("{\"costPrice\":22}"))
         .andExpect(status().isBadRequest());
@@ -195,7 +196,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"warehouse", "selling", "offShelf", "recycle"})
+  @ValueSource(strings = {"warehouse", "selling", "recycle"})
   void operationsPurgeRecordsTerminalStatusAndReadsLegacyLogs(String beforeStatus) {
     fixture(beforeStatus, "offShelf", false, 1L);
     identity("admin", "all", "all");
@@ -348,15 +349,15 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   }
 
   @Test void batchOperationsKeepIndividualLogsWithoutBatchNumber() throws Exception {
-    fixture("offShelf", "selling", false, 1L);
-    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99602,'协同大板2','SLAB-COLLAB-2','offShelf','selling',false,1,2,10)");
+    fixture("recycle", "selling", false, 1L);
+    jdbc.update("INSERT INTO slab_inventory (id,name,serial_no,status,source_status,operations_deleted,created_by_account_id,stock,cost_price) VALUES (99602,'协同大板2','SLAB-COLLAB-2','recycle','selling',false,1,2,10)");
     identity("admin", "all", "all");
     slabs.updateStatuses(List.of(99601L,99602L), "warehouse", null, null);
     var records = logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records();
     assertThat(records).hasSize(2);
     var mapper = new com.fasterxml.jackson.databind.ObjectMapper().findAndRegisterModules();
     for (var record : records) {
-      assertThat(record.getOperationType()).isEqualTo("RESTORE_WAREHOUSE");
+      assertThat(record.getOperationType()).isEqualTo("RESTORE_RECYCLE");
       assertThat(record.getStandardReason()).isNull();
       assertThat(record.getDetailReason()).isNull();
       assertThat(mapper.valueToTree(record).has("batchNo")).isFalse();
@@ -403,7 +404,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   }
 
   @ParameterizedTest
-  @ValueSource(strings = {"warehouse", "selling", "offShelf", "soldOut", "recycle"})
+  @ValueSource(strings = {"warehouse", "selling", "soldOut", "recycle"})
   void detailRequiresTheActualTabPermission(String state) throws Exception {
     fixture(state, "selling", false, 1L);
     String prefix = "admin.slab-management." + permissionScope(state);
@@ -437,7 +438,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
       assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=99601 AND business_client_code=?", Integer.class, client)).isEqualTo(3);
     }
     assertThat(jdbc.queryForList("SELECT JSON_UNQUOTE(JSON_EXTRACT(change_details,'$.\"来源状态\".after')) FROM slab_operation_logs WHERE slab_id=99601 AND business_client_code='admin' ORDER BY id", String.class))
-        .containsExactly("offShelf", "recycle", "purged");
+        .containsExactly("warehouse", "recycle", "purged");
     assertThat(jdbc.queryForObject("SELECT standard_reason FROM slab_operation_logs WHERE slab_id=99601 AND business_client_code='admin' ORDER BY id LIMIT 1", String.class)).isNull();
     assertThat(jdbc.queryForObject("SELECT detail_reason FROM slab_operation_logs WHERE slab_id=99601 AND business_client_code='admin' ORDER BY id LIMIT 1", String.class)).isNull();
     assertThat(jdbc.queryForObject("SELECT standard_reason FROM slab_operation_logs WHERE slab_id=99601 AND business_client_code='supply-chain' AND operation_type='OFF_SHELF'", String.class)).isEqualTo("库存异常");
@@ -454,7 +455,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
       assertThat(new com.fasterxml.jackson.databind.ObjectMapper().readTree(log.getChangeDetails()).size()).isEqualTo(1);
       assertThat(log.getChangeDetails()).contains("来源状态").doesNotContain("下架原因", "详细说明");
     }
-    jdbc.update("UPDATE slab_operation_logs SET operation_type='SOURCE_SYNC' WHERE slab_id=99601 AND business_client_code='admin'");
+    // New down-shelf events keep their explicit type even though the resulting source state is warehouse.
     assertThat(logs.listPage("SLAB-COLLAB", "SOURCE_OFF_SHELF", null, null, null, 1, 10).total()).isEqualTo(1);
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).records())
         .extracting(SlabOperationLog::getOperationType).containsExactly("SOURCE_PURGE", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_OFF_SHELF");
@@ -465,7 +466,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
         .andExpect(jsonPath("$.data.status").value("selling"))
         .andExpect(jsonPath("$.data.sourceOffShelfRecords[0].standardReason").value("库存异常"));
     mvc.perform(put("/api/admin/slabs/batch-status").contentType("application/json")
-        .content("{\"ids\":[99601],\"status\":\"offShelf\",\"reason\":\"库存异常\"}"))
+        .content("{\"ids\":[99601],\"status\":\"warehouse\",\"operation\":\"offShelf\",\"reason\":\"库存异常\"}"))
         .andExpect(status().isBadRequest());
     slabs.removeById(99601L);
     mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isBadRequest());
@@ -523,7 +524,7 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
           .andExpect(jsonPath("$.message").value("该商品已被供应链删除至回收站"));
       assertThat(logs.listPage("SLAB-COLLAB", "SOURCE_SHELF", null, null, null, 1, 10).total()).isZero();
       mvc.perform(put("/api/admin/slabs/batch-status").contentType("application/json")
-          .content("{\"ids\":[99601],\"status\":\"offShelf\",\"reason\":\"库存异常\"}"))
+          .content("{\"ids\":[99601],\"status\":\"warehouse\",\"operation\":\"offShelf\",\"reason\":\"库存异常\"}"))
           .andExpect(status().isBadRequest());
       assertThatThrownBy(() -> slabs.checkAction(List.of(99601L), "shelf"))
           .isInstanceOf(IllegalArgumentException.class);
@@ -537,9 +538,8 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
     assertThat(fresh.getName()).isEqualTo("新的来源名称");
     assertThat(fresh.getStatus()).isEqualTo("warehouse");
     assertThat(fresh.getMarkupPrices().stream().filter(price -> price.getStoreLevelId().equals(99609L)).findFirst().orElseThrow().getPrice()).isEqualByComparingTo(BigDecimal.valueOf(newCost).multiply(new BigDecimal("1.4")));
-    String arrivalType = purgeBeforeSourceRestore ? "SOURCE_SHELF" : "REENTRY";
-    assertThat(logs.listPage("SLAB-COLLAB", arrivalType, null, null, null, 1, 10).total()).isEqualTo(1);
-    assertThat(logs.listPage("SLAB-COLLAB", purgeBeforeSourceRestore ? "REENTRY" : "SOURCE_SHELF", null, null, null, 1, 10).total()).isZero();
+    assertThat(logs.listPage("SLAB-COLLAB", "SOURCE_SHELF", null, null, null, 1, 10).total()).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=99601 AND business_client_code='admin' AND operation_type='REENTRY'", Long.class)).isZero();
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 20).records())
         .extracting(SlabOperationLog::getOperationType).contains("PURGE", "SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM media_references WHERE business_domain='SLAB_OPERATIONS_INVALIDATION' AND business_id=99601", Integer.class)).isZero();
@@ -586,12 +586,11 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
   @Test void restoreToSourceWarehouseKeepsOperationsBlockedAndStateUnchanged() throws Exception {
     fixture("offShelf", "offShelf", false, 1L);
     identity("supply-chain", "all", "all");
-    lifecycle.sourceTransition(ProductLifecycleService.Kind.SLAB, 99601L, "warehouse");
     identity("admin", "all", "all");
     assertThat(logs.listPage("SLAB-COLLAB", null, null, null, null, 1, 10).total()).isZero();
     mvc.perform(get("/api/admin/slabs/99601")).andExpect(status().isOk())
         .andExpect(jsonPath("$.data.sourceUnavailable").value(true))
-        .andExpect(jsonPath("$.data.status").value("offShelf"));
+        .andExpect(jsonPath("$.data.status").value("warehouse"));
   }
 
   @Test void sourceDeletionKeepsSubmittedReasonInBothLogs() {
@@ -643,10 +642,30 @@ class SlabCollaborationApiTest extends SpringContainerTestSupport {
         .andExpect(status().isOk());
     assertThat(jdbc.queryForObject("SELECT status FROM slab_inventory WHERE id=99601", String.class)).isEqualTo("selling");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=99601", Integer.class)).isZero();
-    jdbc.update("UPDATE slab_inventory SET source_status='offShelf' WHERE id=99601");
+    jdbc.update("UPDATE slab_inventory SET source_status='recycle' WHERE id=99601");
     sqlSession.clearCache();
     mvc.perform(post("/api/admin/slabs/action-check").contentType("application/json").content(body))
         .andExpect(status().isBadRequest());
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"admin", "supply-chain"})
+  void sellingDeletionRequiresItsNewPermissionAndDoesNotInheritLegacyDelete(String client) throws Exception {
+    fixture("selling", "selling", false, 1L);
+    String module = ("supply-chain".equals(client) ? "supply-chain." : "admin.") + "slab-management";
+    for (String old : List.of(module + ".delete", module + ".off-shelf.delete")) {
+      identity(client, "all", module + ".selling.view", old);
+      mvc.perform(post("/api/admin/slabs/action-check").contentType("application/json").content("{\"ids\":[99601],\"action\":\"delete\"}"))
+          .andExpect(status().isForbidden());
+      mvc.perform(post("/api/admin/slabs/99601/delete").contentType("application/json").content("{}"))
+          .andExpect(status().isForbidden());
+    }
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=99601", Integer.class)).isZero();
+    identity(client, "all", module + ".selling.view", module + ".selling.delete");
+    mvc.perform(post("/api/admin/slabs/99601/delete").contentType("application/json").content("{}"))
+        .andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=99601 AND business_client_code=? AND operation_type='DELETE_TO_RECYCLE' AND before_status='selling' AND after_status='recycle'", Integer.class, client)).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM slab_operation_logs WHERE slab_id=99601 AND operation_type='OFF_SHELF'", Integer.class)).isZero();
   }
 
 }
