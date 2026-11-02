@@ -68,19 +68,19 @@
   max-width: 100%;
 }
 
-/* Supply-chain batch forms align the label with the first small-tag line only.
+/* Scoped batch forms align the label with the first small-tag line only.
    Later lines retain the existing native-token row gap. */
-.batch-fill-panel--source .batch-filter-label {
+:is(.batch-fill-panel--source, .batch-fill-panel--store) .batch-filter-label {
   margin: 0;
 }
 
-.batch-fill-panel--source .batch-filter-values {
+:is(.batch-fill-panel--source, .batch-fill-panel--store) .batch-filter-values {
   padding-block: calc((var(--td-line-height-body-medium) - var(--td-comp-size-xxs)) / 2);
 }
 
 /* Own one feedback line so the shared negative tip margin cannot consume
    the native Card body padding; additional error lines grow naturally. */
-.batch-fill-panel--source .batch-field-grid > .t-form__item {
+:is(.batch-fill-panel--source, .batch-fill-panel--store) .batch-field-grid > .t-form__item {
   padding-bottom: var(--td-line-height-body-small);
 }
 

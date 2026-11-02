@@ -1,3 +1,4 @@
+import { registerStoreBatchSalePriceTests } from './store-batch-sale-price-cases';
 import { productWarehouseUrl } from './product-test-navigation';
 import { priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
 import { checkDecimalEditing } from './decimal-editing';
@@ -1450,3 +1451,5 @@ test('single off shelf marks the existing required reason and keeps details opti
   await expect(dialog).toHaveCount(0);
   expect(payload).toEqual({ target: 'warehouse', operation: 'offShelf', reason: '商品暂停售卖', detail: '' });
 });
+
+registerStoreBatchSalePriceTests('accessory-management', storeLogin, product());
