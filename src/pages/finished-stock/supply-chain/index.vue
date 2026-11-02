@@ -1633,7 +1633,8 @@ const attributeMessage = (field: TemplateAttributeField, value: unknown, row?: S
   });
 };
 const attributeFeedback = (field: TemplateAttributeField, value: unknown, submitted: boolean, row?: SpecRow) => {
-  const message = submitted ? attributeMessage(field, value, row) : '';
+  const showNumericError = Boolean(row) && field.valueType === 'number' && Boolean(String(value ?? '').trim());
+  const message = submitted || showNumericError ? attributeMessage(field, value, row) : '';
   return fieldFeedback(Boolean(message), message);
 };
 const formatAttributeInput = (field: TemplateAttributeField, value: unknown) =>
@@ -1644,9 +1645,10 @@ const normalizeAttribute = (field: TemplateAttributeField, value: unknown, row?:
   return attributeMessage(field, value, row) ? String(value ?? '') : formatAttributeInput(field, value);
 };
 const batchAttributeFeedback = (field: TemplateAttributeField) => {
-  const message = batchFillSubmitted.value
-    ? templateAttributeError(field, batchSalesAttributes.value[field.key], { optional: true })
-    : '';
+  const value = batchSalesAttributes.value[field.key];
+  const showNumericError = field.valueType === 'number' && Boolean(String(value ?? '').trim());
+  const message =
+    batchFillSubmitted.value || showNumericError ? templateAttributeError(field, value, { optional: true }) : '';
   return fieldFeedback(Boolean(message), message);
 };
 const normalizeBatchAttribute = (field: TemplateAttributeField) => {

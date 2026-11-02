@@ -377,7 +377,7 @@
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
         "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
         "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "7b3130c619c25ea04771b598fa2d34e63738a5517d11ae4d4e5f9b4c96a77d8c",
-        "tests/e2e/product-attribute-feedback-cases.ts": "4986c99b57ac8eaa80886a956d57c3b51ba8a217f25e17aa6b9e38659309a67f"
+        "tests/e2e/product-attribute-feedback-cases.ts": "1fe276899cc7f1deddc42ec1eb355632a7b63a1a375fb34890c110eadb587bde"
       },
       "testChanges": [
         {
@@ -1926,6 +1926,12 @@
           "before": "c6baa58a29191827cf94c96966adaa875d0c6a0cf36bee5036cb27e2a7a19e8b",
           "after": "4986c99b57ac8eaa80886a956d57c3b51ba8a217f25e17aa6b9e38659309a67f",
           "reason": "用户确认仅修正供应链成品现货/配件四入口三类错误提示文案；精确匹配简短新文案，长字段名场景仍检查提示完整、底栏边界及控件尺寸，保留其他业务断言和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "4986c99b57ac8eaa80886a956d57c3b51ba8a217f25e17aa6b9e38659309a67f",
+          "after": "1fe276899cc7f1deddc42ec1eb355632a7b63a1a375fb34890c110eadb587bde",
+          "reason": "用户确认两处数字属性实时字段反馈；仅新增首次提交前错误可见、即时清除、留空不提前报必填、无汇总Toast及无写入断言，保留原有提交校验、原子应用及布局断言。"
         }
       ],
       "routes": [

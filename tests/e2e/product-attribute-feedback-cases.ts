@@ -135,6 +135,18 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     await productInput.fill('文字');
     await numbers.nth(0).fill('1.234');
     await numbers.nth(1).fill('错误');
+    await expect(table.getByText('最多输入两位小数', { exact: true })).toBeVisible();
+    await expect(table.getByText('请输入数字', { exact: true })).toBeVisible();
+    await expectNativeError(numbers.nth(0));
+    await expectNativeError(numbers.nth(1));
+    await expect(page.locator('.product-attributes-panel').getByText('请输入数字', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(0);
+    await numbers.nth(1).fill('4');
+    await expect(table.getByText('请输入数字', { exact: true })).toHaveCount(0);
+    await numbers.nth(1).fill('');
+    await expect(table.getByText('请输入销售数字属性', { exact: true })).toHaveCount(0);
+    await numbers.nth(1).fill('错误');
+    expect(writes).toHaveLength(0);
     await page
       .locator('.form-submit-bar')
       .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
@@ -199,7 +211,21 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     await page.getByRole('button', { name: '批量填写', exact: true }).click();
     const drawer = page.locator('.t-drawer--open').filter({ hasText: '批量填写' });
     const number = drawer.getByPlaceholder('请输入销售数字属性', { exact: true });
+    await number.fill('文字');
+    await expect(drawer.getByText('请输入数字', { exact: true })).toBeVisible();
+    await expectNativeError(number);
+    await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(0);
+    await number.fill('7.5');
+    await expect(drawer.getByText('请输入数字', { exact: true })).toHaveCount(0);
+    await number.fill('');
+    await expect(drawer.locator('.t-input__tips.t-is-error')).toHaveCount(0);
     await number.fill('7.555');
+    await expect(drawer.getByText('最多输入两位小数', { exact: true })).toBeVisible();
+    await expectNativeError(number);
+    await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(0);
+    await expect(numbers.nth(0)).toHaveValue('1.00');
+    await expect(numbers.nth(1)).toHaveValue('2.00');
+    expect(writes).toHaveLength(0);
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
     await expect(drawer).toBeVisible();
     await expect(drawer.getByText('最多输入两位小数', { exact: true })).toBeVisible();
