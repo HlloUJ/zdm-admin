@@ -68,6 +68,22 @@
   max-width: 100%;
 }
 
+/* Supply-chain batch forms align the label with the first small-tag line only.
+   Later lines retain the existing native-token row gap. */
+.batch-fill-panel--source .batch-filter-label {
+  margin: 0;
+}
+
+.batch-fill-panel--source .batch-filter-values {
+  padding-block: calc((var(--td-line-height-body-medium) - var(--td-comp-size-xxs)) / 2);
+}
+
+/* Own one feedback line so the shared negative tip margin cannot consume
+   the native Card body padding; additional error lines grow naturally. */
+.batch-fill-panel--source .batch-field-grid > .t-form__item {
+  padding-bottom: var(--td-line-height-body-small);
+}
+
 /* Ordinary single-column create/edit dialogs use native 480px Dialog and 100px labels. */
 .zdm-admin-single-form .t-form {
   width: 100%;

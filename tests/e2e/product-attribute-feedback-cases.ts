@@ -8,6 +8,7 @@ async function openEditor(
   install: (page: Page) => Promise<void>,
   layered = false,
   numberLabel = '销售数字属性',
+  variantCount = 2,
 ) {
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await install(page);
@@ -65,7 +66,7 @@ async function openEditor(
           { key: 'attribute_3', name: '销售选项属性', values: ['选项1', '选项2'] },
         ]
       : [],
-    variants: [0, 1].map((index) => ({
+    variants: Array.from({ length: variantCount }, (_, index) => ({
       id: 951 + index,
       variantLabel: `规格${index + 1}`,
       displayMode: layered ? 'layered' : 'single',
@@ -320,8 +321,42 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
         };
       }),
     ).toEqual({ wrapped: false, complete: true, aboveFooter: true });
+    const cardSpacing = await tip.evaluate((element) => {
+      const body = element.closest('.t-card__body')!;
+      return {
+        gap: body.getBoundingClientRect().bottom - element.getBoundingClientRect().bottom,
+        padding: parseFloat(getComputedStyle(body).paddingBottom),
+      };
+    });
+    expect(cardSpacing.padding).toBeGreaterThan(0);
+    expect(cardSpacing.gap).toBeGreaterThanOrEqual(cardSpacing.padding - 1);
     const after = await input.boundingBox();
     expect(after?.width).toBe(before?.width);
     expect(after?.height).toBe(before?.height);
+  });
+  test('batch range title stays centered on the first tag line after options wrap', async ({ page }) => {
+    await openEditor(page, resource, install, false, '销售数字属性', 60);
+    await page.getByRole('button', { name: '批量填写', exact: true }).click();
+    const drawer = page.locator('.t-drawer--open').filter({ hasText: '批量填写' });
+    const row = drawer.locator('.batch-filter-row').first();
+    const geometry = await row.evaluate((element) => {
+      const label = element.querySelector('.batch-filter-label')!.getBoundingClientRect();
+      const values = element.querySelector('.batch-filter-values')!;
+      const tags = Array.from(values.querySelectorAll('.t-tag')).map((tag) => tag.getBoundingClientRect());
+      const first = tags[0]!;
+      const lines = [...new Set(tags.map((tag) => Math.round(tag.top)))].sort((a, b) => a - b);
+      return {
+        labelCenter: label.top + label.height / 2,
+        firstCenter: first.top + first.height / 2,
+        lineGaps: lines.slice(1).map((top, index) => top - lines[index]! - first.height),
+        expectedGap: parseFloat(getComputedStyle(values).rowGap),
+        lines: lines.length,
+      };
+    });
+    expect(geometry.lines).toBeGreaterThanOrEqual(3);
+    expect(Math.abs(geometry.labelCenter - geometry.firstCenter)).toBeLessThanOrEqual(1);
+    for (const gap of geometry.lineGaps) expect(Math.abs(gap - geometry.expectedGap)).toBeLessThanOrEqual(1);
+    await expect(row.locator('.t-tag').first()).toHaveText('全部');
+    await expect(row.locator('.t-tag')).toHaveCount(61);
   });
 }

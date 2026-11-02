@@ -6695,6 +6695,12 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "class=\"batch-fill-panel\"",
+          "after": "class=\"batch-fill-panel batch-fill-panel--source\"",
+          "stage": "before-migrations",
+          "reason": "用户确认仅供应链成品/配件批量填写布局：标题对齐首行选项，选项自然换行并保留标准行距，错误提示保留原生Card底部内边距；专用样式作用范围，不改运营端或业务。"
+        },
+        {
           "before": "  });\n};\nconst attributeFeedback = (field: TemplateAttributeField, value: unknown, submitted: boolean, row?: SpecRow) => {\n  const message = submitted ? attributeMessage(field, value, row) : '';\n  return fieldFeedback(Boolean(message), message);\n};\nconst formatAttributeInput = (field: TemplateAttributeField, value: unknown) =>\n",
           "after": "  });\n};\nconst attributeFeedback = (field: TemplateAttributeField, value: unknown, submitted: boolean, row?: SpecRow) => {\n  const showNumericError = Boolean(row) && field.valueType === 'number' && Boolean(String(value ?? '').trim());\n  const message = submitted || showNumericError ? attributeMessage(field, value, row) : '';\n  return fieldFeedback(Boolean(message), message);\n};\nconst formatAttributeInput = (field: TemplateAttributeField, value: unknown) =>\n",
           "stage": "before-migrations",

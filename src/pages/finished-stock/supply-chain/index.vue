@@ -883,7 +883,7 @@
       destroy-on-close
       @close="closePriceDrawer"
     >
-      <div ref="priceFormRoot" class="batch-fill-panel">
+      <div ref="priceFormRoot" class="batch-fill-panel batch-fill-panel--source">
         <t-card class="batch-section" title="选择批量范围">
           <template #actions
             ><t-typography-text theme="secondary">未选择属性值时默认填充全部规格</t-typography-text></template
