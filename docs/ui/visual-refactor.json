@@ -2771,6 +2771,24 @@
       "template": "e1c3c75dd26a35f84d110982fa0f5eab7a7eaaf827f6c2a5ad9af8753399af06",
       "approvedBusinessPatches": [
         {
+          "before": "  salePrice?: number;\n  priceMode?: string;\n};\nconst variantIdentity = (row: { skuId?: number; id?: number; variantKey?: string }) =>\n  row.skuId ?? row.variantKey ?? row.id;\nconst isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');\nfunction list<T>(field: string): T[] {\n  return Array.isArray(props.snapshot[field]) ? (props.snapshot[field] as T[]) : [];\n}\nfunction otherList<T>(field: string): T[] {\n  return Array.isArray(props.other[field]) ? (props.other[field] as T[]) : [];\n}\n",
+          "after": "  salePrice?: number;\n  priceMode?: string;\n};\nconst variantIdentity = (row: { skuId?: number; id?: number; variantKey?: string }) =>\n  row.skuId ?? row.variantKey ?? row.id;\nconst isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');\nconst showGuidePriceSource = computed(() => !props.storeMode && getLoginUser().clientCode === 'admin');\nfunction list<T>(field: string): T[] {\n  return Array.isArray(props.snapshot[field]) ? (props.snapshot[field] as T[]) : [];\n}\nfunction otherList<T>(field: string): T[] {\n  return Array.isArray(props.other[field]) ? (props.other[field] as T[]) : [];\n}\n",
+          "reason": "用户确认仅运营成品现货/配件日志显示指导价历史快照中的只读跟/手标识，将模式纳入变化对比；不推断旧模式、不写历史数据，其他端不变。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "      ]),\n  { colKey: 'cost', title: '成本价', minWidth: 100, cell: (_h, { row }) => money(row.cost) },\n  {\n    colKey: 'guide',\n    title: '指导价',\n    minWidth: 150,\n    cell: (_h, { row }) => priceCell(row.guide?.priceCoefficient, row.guide?.price),\n  },\n  ...levels.value.map(([id, name]) => ({\n    colKey: `level_${id}`,\n    title: props.storeMode ? `${name}价` : name,\n    minWidth: 170,\n    cell: (_h: unknown, { row }: { row: TableRowData }) =>\n",
+          "after": "      ]),\n  { colKey: 'cost', title: '成本价', minWidth: 100, cell: (_h, { row }) => money(row.cost) },\n  {\n    colKey: 'guide',\n    title: '指导价',\n    minWidth: 150,\n    cell: (_h, { row }) =>\n      priceCell(\n        row.guide?.priceCoefficient,\n        row.guide?.price,\n        showGuidePriceSource.value ? row.guide?.priceSource : undefined,\n      ),\n  },\n  ...levels.value.map(([id, name]) => ({\n    colKey: `level_${id}`,\n    title: props.storeMode ? `${name}价` : name,\n    minWidth: 170,\n    cell: (_h: unknown, { row }: { row: TableRowData }) =>\n",
+          "reason": "用户确认仅运营成品现货/配件日志显示指导价历史快照中的只读跟/手标识，将模式纳入变化对比；不推断旧模式、不写历史数据，其他端不变。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    return (\n      (props.storeMode ? undefined : variant.costPrice) ??\n      guide?.costPrice ??\n      partners.find((item) => variantIdentity(item) === variantIdentity(variant))?.costPrice\n    );\n  }\n  if (key === 'guide') return [guide?.priceCoefficient, guide?.price];\n  if (key.startsWith('level_')) {\n    const price = partners.find(\n      (item) => variantIdentity(item) === variantIdentity(variant) && String(item.storeLevelId) === key.slice(6),\n    );\n    return [price?.priceCoefficient, price?.price, price?.priceSource];\n  }\n",
+          "after": "    return (\n      (props.storeMode ? undefined : variant.costPrice) ??\n      guide?.costPrice ??\n      partners.find((item) => variantIdentity(item) === variantIdentity(variant))?.costPrice\n    );\n  }\n  if (key === 'guide')\n    return showGuidePriceSource.value\n      ? [guide?.priceCoefficient, guide?.price, guide?.priceSource]\n      : [guide?.priceCoefficient, guide?.price];\n  if (key.startsWith('level_')) {\n    const price = partners.find(\n      (item) => variantIdentity(item) === variantIdentity(variant) && String(item.storeLevelId) === key.slice(6),\n    );\n    return [price?.priceCoefficient, price?.price, price?.priceSource];\n  }\n",
+          "reason": "用户确认仅运营成品现货/配件日志显示指导价历史快照中的只读跟/手标识，将模式纳入变化对比；不推断旧模式、不写历史数据，其他端不变。",
+          "stage": "before-migrations"
+        },
+        {
           "before": "\n.sales-log-table :deep(.historical-sku-id) {\n  margin-top: var(--td-comp-margin-xs);\n  color: var(--td-text-color-secondary);\n  font-size: var(--td-font-size-body-small);\n}\n\n.sales-log-table :deep(.sales-value-added) {\n  color: var(--td-brand-color-active);\n",
           "after": "\n.sales-log-table :deep(.historical-sku-id) {\n  margin-top: var(--td-comp-margin-xs);\n  color: var(--td-text-color-secondary);\n  font: var(--td-font-body-small);\n}\n\n.sales-log-table :deep(.sales-value-added) {\n  color: var(--td-brand-color-active);\n",
           "stage": "before-migrations",

@@ -69,6 +69,7 @@ type LoggedVariant = Partial<FinishedProductVariant> & {
 const variantIdentity = (row: { skuId?: number; id?: number; variantKey?: string }) =>
   row.skuId ?? row.variantKey ?? row.id;
 const isSupplyChain = computed(() => getLoginUser().clientCode === 'supply-chain');
+const showGuidePriceSource = computed(() => !props.storeMode && getLoginUser().clientCode === 'admin');
 function list<T>(field: string): T[] {
   return Array.isArray(props.snapshot[field]) ? (props.snapshot[field] as T[]) : [];
 }
@@ -247,7 +248,12 @@ const baseColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
     colKey: 'guide',
     title: '指导价',
     minWidth: 150,
-    cell: (_h, { row }) => priceCell(row.guide?.priceCoefficient, row.guide?.price),
+    cell: (_h, { row }) =>
+      priceCell(
+        row.guide?.priceCoefficient,
+        row.guide?.price,
+        showGuidePriceSource.value ? row.guide?.priceSource : undefined,
+      ),
   },
   ...levels.value.map(([id, name]) => ({
     colKey: `level_${id}`,
@@ -313,7 +319,10 @@ function comparableCell(snapshot: Record<string, unknown>, variant: LoggedVarian
       partners.find((item) => variantIdentity(item) === variantIdentity(variant))?.costPrice
     );
   }
-  if (key === 'guide') return [guide?.priceCoefficient, guide?.price];
+  if (key === 'guide')
+    return showGuidePriceSource.value
+      ? [guide?.priceCoefficient, guide?.price, guide?.priceSource]
+      : [guide?.priceCoefficient, guide?.price];
   if (key.startsWith('level_')) {
     const price = partners.find(
       (item) => variantIdentity(item) === variantIdentity(variant) && String(item.storeLevelId) === key.slice(6),
