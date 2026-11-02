@@ -167,7 +167,7 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
         """);
     payload.put("mainImageMediaId", image).put("videoMediaId", video);
     payload.put("detail", "<p>原始详情</p><img src=\"media:" + image + "\"><video src=\"media:" + video + "\" controls></video>");
-    JsonNode created = data(mvc.perform(post("/api/admin/accessory-products").contentType("application/json").content(json.writeValueAsBytes(payload))));
+    JsonNode created = data(mvc.perform(post("/api/admin/accessory-products").contentType("application/json").content(json.writeValueAsBytes(com.zdm.platform.support.ProductAttributeVersionFixtures.bind(jdbc,json,payload)))));
     long id = created.path("id").asLong();
     JsonNode singleDetails = json.valueToTree(products.withDetails(products.getById(id)));
     JsonNode listDetails = json.valueToTree(products.listWithDetails().stream()
@@ -223,9 +223,9 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
   }
 
   @Test void attributeEditPersistsOnlyDifferencesAndNoOpDoesNotAddLog() throws Exception {
-    ObjectNode product = sourceFixture("平台发布", "warehouse");
-    long id = product.path("id").asLong();
     jdbc.update("INSERT INTO product_attributes (id,name,scope,value_type,created_by_account_id) VALUES (99021,'材质','accessory','text',1),(99022,'颜色','accessory','text',1),(99023,'尺寸','accessory','text',1),(99024,'纹理','accessory','text',1)");
+    ObjectNode product = sourceFixture("平台发布", "warehouse", true, false, List.of(99021L,99022L,99023L,99024L));
+    long id = product.path("id").asLong();
     product.set("attributes", json.readTree("""
         [{"attributeId":99021,"attributeName":"材质","value":"石材"},
          {"attributeId":99022,"attributeName":"颜色","value":"白"},
@@ -405,10 +405,13 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
 
   @Test
   void persistsFormOrderWithoutCreatingOrderOnlyLogsAndFreezesItOnEdit() throws Exception {
-    long id = sourceFixture("平台发布", "warehouse").path("id").asLong();
+    for (long fieldId : List.of(99031L,99032L,99033L,99034L)) {
+      jdbc.update("INSERT INTO product_attributes(id,name,scope,attribute_role,value_type,created_by_account_id) VALUES(?,?,?,?,'text',1)",fieldId,"排序属性"+fieldId,"accessory",fieldId<99033?"product":"sales");
+    }
+    long id = sourceFixture("平台发布", "warehouse", true, false, List.of(99031L,99032L,99033L,99034L)).path("id").asLong();
     String originalLog = jdbc.queryForObject("SELECT change_details FROM accessory_operation_logs WHERE product_id=?", String.class, id);
     ObjectNode request = sourceRecord(id);
-    request.set("attributeDisplayOrder", json.readTree("{\"product\":[\"12\",\"2\"],\"sales\":[\"attribute_12\",\"attribute_2\"]}"));
+    request.set("attributeDisplayOrder", json.readTree("{\"product\":[\"99032\",\"99031\"],\"sales\":[\"attribute_99034\",\"attribute_99033\"]}"));
     data(mvc.perform(put("/api/admin/accessory-products/{id}", id).contentType("application/json").content(json.writeValueAsBytes(request))));
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM accessory_operation_logs WHERE product_id=?", Long.class, id)).isEqualTo(1);
     ObjectNode persisted = sourceRecord(id);
@@ -596,6 +599,9 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     return sourceFixture(publisher, status, configureGuide, false);
   }
   private ObjectNode sourceFixture(String publisher,String status,boolean configureGuide,boolean missingTier) throws Exception {
+    return sourceFixture(publisher,status,configureGuide,missingTier,List.of());
+  }
+  private ObjectNode sourceFixture(String publisher,String status,boolean configureGuide,boolean missingTier,List<Long> templateFields) throws Exception {
     jdbc.update("INSERT INTO product_categories (id,name,scope,created_by_account_id) VALUES (99010,'跨端测试分类','accessory',1)");
     jdbc.update("INSERT INTO suppliers (id,name,owner_scope,owner_id,created_by_account_id) VALUES (99010,'跨端测试供应商','platform',0,1)");
     jdbc.update("INSERT INTO supplier_supply_type_links (supplier_id,supply_type_id) VALUES (99010,3)");
@@ -616,7 +622,7 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
         """);
     payload.put("mainImageMediaId",upload("image/png","source.png")).put("videoMediaId",upload("video/webm","source.webm"));
     payload.put("publisherType",publisher).put("status",status);
-    return (ObjectNode)data(mvc.perform(post("/api/admin/accessory-products").contentType("application/json").content(json.writeValueAsBytes(payload))));
+    return (ObjectNode)data(mvc.perform(post("/api/admin/accessory-products").contentType("application/json").content(json.writeValueAsBytes(com.zdm.platform.support.ProductAttributeVersionFixtures.bind(jdbc,json,payload,templateFields)))));
   }
   private ObjectNode sourceRecord(long id) throws Exception {
     fullIdentity("supply-chain");

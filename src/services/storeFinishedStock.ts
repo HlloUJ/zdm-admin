@@ -26,6 +26,7 @@ export interface StoreFinishedProduct extends WarehouseEntryInformation {
   stateOperatedAt?: string;
 
   attributeNames?: Record<string, string>;
+  attributeDisplayOrder?: { product: string[]; sales: string[] };
   storeLevelName?: string | null;
   storeCategoryId: number | null;
   storeCategoryName: string;
@@ -60,6 +61,7 @@ export interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePri
 export interface StorePoolDetail {
   storeLevelName?: string | null;
   attributeNames: Record<string, string>;
+  attributeDisplayOrder?: { product: string[]; sales: string[] };
   id: number;
   name: string;
   merchantCode: string;

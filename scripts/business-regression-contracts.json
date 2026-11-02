@@ -36,7 +36,8 @@
         "src/services/auth.ts",
         "src/services/operationsBatchShelf.ts",
         "src/components/OperationsBatchShelfResult.vue",
-        "src/services/productAllBatchShelf.ts"
+        "src/services/productAllBatchShelf.ts",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAttributeVersionService.java"
       ],
       "tables": [
         "product_state_activity",
@@ -101,6 +102,7 @@
         "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfController.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAttributeVersionService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductLifecycleService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductStateActivityService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabInvalidationSnapshotService.java",
@@ -298,20 +300,23 @@
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java"
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java"
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
-        "tests/e2e/finished-stock.spec.ts": "29d6fcdb09cc0f73a438608131beabb628c3d73f29d89c9e305325a71c796509",
-        "tests/e2e/accessory-management.spec.ts": "76a82f25160b60095a0e260e6558229951bc7c3976d0452c365be1ea8d554089",
+        "tests/e2e/finished-stock.spec.ts": "462af55fb6e4c5b68108bc161940281a9502dbb25953ade708ce57c80c5e04b9",
+        "tests/e2e/accessory-management.spec.ts": "a60c118de98896e0552f19f4c5ddd9fc912a082e42fb41a065f17ae00b5f3466",
         "tests/e2e/slab-collaboration.spec.ts": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
         "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
         "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "e6ad11fb8318983152eed5602fc136bf895df05372f622596f9fa7fa789bd014",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "edc02a65b4b6fb2d5d364df54a1311e4d639246ffe6e6aa5b381b7790325be82",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "f30e0fcac5182b16a15af8af9e3811352d8b9b551625c2f559e329e6d31a4276",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "4039e8369af0719300c4538dba93c641d1d36ce322e6e9fb35b9a164f45abbd9",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "ff7d0c0c5b0e8a22bf70015616ac24663bc36403b1e1b9e844ab9a9c4c8ed975",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "97b81f4823ba5ea5cfbf797e24f39cabb829ede9bf0ebe9760bc1bc152ac0a54",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "27ff2ff5fcdf02b917425ed3e714bf9a47fafebb817775de33541cff82d2da7e",
         "tests/e2e/accessory-permissions.spec.ts": "6ea9de56855c2d8c1b55c7d1e0f618d65364f351e3855d1548398448ccc5af20",
@@ -333,8 +338,8 @@
         "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java": "f245b9dd1fc458b657a2ffdbb0679ed97547e8f74d6e6a895fa1e986cdb3aff9",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java": "24637bff45722355d31fd78e75a37e5533b7c8411a9ed94f4558a30a8e62dca7",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "97768eae0f4967e63e2bb45fe6e9e34aa364ad740e0808e0ad3ac229d0c23e99",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "bde62e7120d3739e89b4ca6f52dcf59d38b694711754ccc0e23109ef6bad5c0d",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "c144f45995267956d54ff58068be134a793807b1f0e5c28ca244a4ebe337f861",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "e80adada95be2e20996dad23b7d6508b0c262e94968b9a7f00709c61db445b1f",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
@@ -344,7 +349,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
+        "tests/e2e/product-all-view.spec.ts": "8f9a3694189b65e6250f49f97ce662e5a78e97f4d033de20e54b231575d6574e",
         "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "b2479de668b905ee4615750c51a8384f6bc480eca564fda103d2b856d5825a6d",
@@ -352,16 +357,23 @@
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java": "9f3dee717ec95bff55c0351f718cdfe956e98324849bec98dd0e2da014836018",
         "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java": "b5c2589b50e90976401dba166539890aff278f434fcde20a62b2d5ffa7879f52",
         "tests/e2e/operations-batch-shelf.spec.ts": "74533ffdc10b350e969cd17581c19acdc313946aefb236785b6422d512f7248d",
-        "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java": "120223be8f4f069949e4056a60029a173f73b9ea4c278d4fcf736d24e202084d",
+        "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java": "1b77d7854c90ab8dc50e56d7be18dfb697e2d63975f9bd2144e48e1674b8c98c",
         "src/services/operationsBatchShelf.test.ts": "538f45bbccd3fb65c5acba5207107b2846d2ae31d17e12a3c48beeb67f6c40b3",
         "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
         "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7",
         "tests/e2e/terminal-all-batch-shelf.spec.ts": "81fb13981b2ab1db199f8eedecaf8327024d1c3281240e22316a2605b10b29b8",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "b35d9531eb1a0f69542e017db9c4b1cc9729234abb506256f2e051a55f2a7ef8",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "cae634ab8cfcbc7aebaa6ea74e55b5226dff9d966b43bfd755ddbefcf3930ed7",
         "src/services/terminalAllBatchShelf.test.ts": "881bed04c4aee9012b955ef337bbebe759bde5e7e8a6435d22bd461070453113",
         "src/services/productGlobalPermissions.test.ts": "e1ebf3f1474e2395d41ef84e2e232558955bf3f0680adc6fb6e5d4d560552860",
         "src/services/functionCatalog.test.ts": "00b57bef779983c25d62af6586fc4b32a9ace41bc3b6e6a7fb91ae8073135ffd",
-        "src/components/WarehouseEntryInformation.test.ts": "df107925fa93ed62ca3fe202b3706f32f246b41f7e0751516abe87decbdd99a3"
+        "src/components/WarehouseEntryInformation.test.ts": "df107925fa93ed62ca3fe202b3706f32f246b41f7e0751516abe87decbdd99a3",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java": "5bbc92076a1af78c31cbf37ce0d894c27c4e25d1edaadae0409a0a69d813402b",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java": "6294ad41434f57c895c4d822098f4880eedae441c748c40c54b97be0fd614a07",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java": "14f84fbce6075e6b7ae87d86da56d5247d7a9a05c79184ce383aab561641d6a0",
+        "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java": "c6ae4a64986bfffa142ea231f8641ebd178bbbbb13a43624902c0b7922326478",
+        "tests/e2e/product-attribute-version-fixture.ts": "e0712713a226d51ed9e9e818ea891f2be494a6c09e103b7745b58ea13068d913",
+        "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "43b19fb4bd5a2ceb78e9f5306c02853b1a401028e05290b51c621a7a3280e109",
+        "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "a961ddb074d8cbc1f528c367641976b12b86eea00080d536c1601a3155ec7eab"
       },
       "testChanges": [
         {
@@ -1718,6 +1730,114 @@
           "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
           "after": "76a82f25160b60095a0e260e6558229951bc7c3976d0452c365be1ea8d554089",
           "reason": "用户确认供应链两模块销售规格表格宽度修复：仅扩充原成本/数量用例的宽屏表头/内容边缘对齐、窄屏溢出滚动及操作列固定断言；用长规格构造真实溢出，原字段、抽屉、取消保留值断言、超时及零重试不变。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
+          "after": "f0ef35e2462a46c058a5f161c3d415639a23f713ceca93ea5734f6a7076b7827",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
+          "after": "7a6267b43a674e7899c577f48340e74fdcabc0dac0c5fd1fab8c0db7c49a90ce",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java",
+          "before": "97768eae0f4967e63e2bb45fe6e9e34aa364ad740e0808e0ad3ac229d0c23e99",
+          "after": "c144f45995267956d54ff58068be134a793807b1f0e5c28ca244a4ebe337f861",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java",
+          "before": "bde62e7120d3739e89b4ca6f52dcf59d38b694711754ccc0e23109ef6bad5c0d",
+          "after": "e80adada95be2e20996dad23b7d6508b0c262e94968b9a7f00709c61db445b1f",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "e6ad11fb8318983152eed5602fc136bf895df05372f622596f9fa7fa789bd014",
+          "after": "f30e0fcac5182b16a15af8af9e3811352d8b9b551625c2f559e329e6d31a4276",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "edc02a65b4b6fb2d5d364df54a1311e4d639246ffe6e6aa5b381b7790325be82",
+          "after": "4039e8369af0719300c4538dba93c641d1d36ce322e6e9fb35b9a164f45abbd9",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java",
+          "before": "b35d9531eb1a0f69542e017db9c4b1cc9729234abb506256f2e051a55f2a7ef8",
+          "after": "cae634ab8cfcbc7aebaa6ea74e55b5226dff9d966b43bfd755ddbefcf3930ed7",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "29d6fcdb09cc0f73a438608131beabb628c3d73f29d89c9e305325a71c796509",
+          "after": "462af55fb6e4c5b68108bc161940281a9502dbb25953ade708ce57c80c5e04b9",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "462af55fb6e4c5b68108bc161940281a9502dbb25953ade708ce57c80c5e04b9",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "76a82f25160b60095a0e260e6558229951bc7c3976d0452c365be1ea8d554089",
+          "after": "a60c118de98896e0552f19f4c5ddd9fc912a082e42fb41a065f17ae00b5f3466",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "a60c118de98896e0552f19f4c5ddd9fc912a082e42fb41a065f17ae00b5f3466",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "f0ef35e2462a46c058a5f161c3d415639a23f713ceca93ea5734f6a7076b7827",
+          "after": "ff7d0c0c5b0e8a22bf70015616ac24663bc36403b1e1b9e844ab9a9c4c8ed975",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
+          "after": "ff7d0c0c5b0e8a22bf70015616ac24663bc36403b1e1b9e844ab9a9c4c8ed975",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "7a6267b43a674e7899c577f48340e74fdcabc0dac0c5fd1fab8c0db7c49a90ce",
+          "after": "97b81f4823ba5ea5cfbf797e24f39cabb829ede9bf0ebe9760bc1bc152ac0a54",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
+          "after": "97b81f4823ba5ea5cfbf797e24f39cabb829ede9bf0ebe9760bc1bc152ac0a54",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java",
+          "before": "120223be8f4f069949e4056a60029a173f73b9ea4c278d4fcf736d24e202084d",
+          "after": "1b77d7854c90ab8dc50e56d7be18dfb697e2d63975f9bd2144e48e1674b8c98c",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java",
+          "before": "599d91187cd9719e65431f190fd6fce67a752db63469c8c5a9b56a283cd4110e",
+          "after": "c6ae4a64986bfffa142ea231f8641ebd178bbbbb13a43624902c0b7922326478",
+          "reason": "本次新增版本测试夹具按已声明商品/销售角色构造绑定定义，保留旧测试全部业务断言。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
+          "after": "8f9a3694189b65e6250f49f97ce662e5a78e97f4d033de20e54b231575d6574e",
+          "reason": "用户单独确认：仅运营成品现货创建时间排序测试先等初始form-options响应完成再刷新，保留全部断言、超时和零重试，不改业务。"
         }
       ],
       "routes": [
@@ -1768,7 +1888,11 @@
         "src/services/terminalAllBatchShelf.test.ts",
         "src/services/productGlobalPermissions.test.ts",
         "src/services/functionCatalog.test.ts",
-        "src/components/WarehouseEntryInformation.test.ts"
+        "src/components/WarehouseEntryInformation.test.ts",
+        "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java",
+        "tests/e2e/product-attribute-version-fixture.ts",
+        "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts",
+        "src/pages/finished-stock/shared/finishedStockPayload.test.ts"
       ]
     }
   ]

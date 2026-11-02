@@ -261,7 +261,14 @@ for (const surface of surfaces) {
   test(`${surface.path} creation time title and native triangles sort the full list before pagination`, async ({
     page,
   }) => {
+    const initialFormOptions =
+      surface.path === '/finished-stock-management'
+        ? page
+            .waitForResponse((response) => response.url().endsWith('/api/admin/finished-products/form-options'))
+            .then((response) => response.finished())
+        : Promise.resolve();
     const records = await setup(page, surface);
+    await initialFormOptions;
     const base = records[0];
     records.splice(
       0,

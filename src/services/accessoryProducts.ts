@@ -91,6 +91,9 @@ export interface FinishedProductRecord extends WarehouseEntryInformation {
   variants?: FinishedProductVariant[];
   specDimensions?: FinishedSpecDimension[];
   attributeDisplayOrder?: { product: string[]; sales: string[] };
+  templateVersionId?: number;
+  templateRevision?: number;
+  attributeTemplateSnapshot?: FinishedProductTemplateAttribute[];
   createdByName?: string;
   createdByAccountId?: number;
   status?: FinishedProductStatus;
@@ -99,6 +102,8 @@ export interface FinishedProductRecord extends WarehouseEntryInformation {
 }
 
 export interface FinishedProductPayload {
+  templateVersionId?: number;
+  templateRevision?: number;
   categoryId?: number;
   supplierId?: number;
   name: string;
@@ -180,6 +185,8 @@ export const listFinishedProductPriceLevelOptions = () =>
 
 export interface FinishedProductTemplateAttribute {
   categoryId: number;
+  templateVersionId?: number;
+  templateRevision?: number;
   attributeId: number;
   name: string;
   valueType: string;
@@ -191,10 +198,20 @@ export interface FinishedProductTemplateAttribute {
 }
 export async function listFinishedProductTemplateAttributes(): Promise<FinishedProductTemplateAttribute[]> {
   const templates = await request<
-    { categoryId: number; content: Omit<FinishedProductTemplateAttribute, 'categoryId'>[] }[]
+    {
+      categoryId: number;
+      versionId: number;
+      revision: number;
+      content: Omit<FinishedProductTemplateAttribute, 'categoryId'>[];
+    }[]
   >('/admin/accessory-products/attribute-template-options');
   return templates.flatMap((template) =>
-    template.content.map((attribute) => ({ ...attribute, categoryId: template.categoryId })),
+    template.content.map((attribute) => ({
+      ...attribute,
+      categoryId: template.categoryId,
+      templateVersionId: template.versionId,
+      templateRevision: template.revision,
+    })),
   );
 }
 

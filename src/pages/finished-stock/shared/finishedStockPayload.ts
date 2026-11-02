@@ -1,5 +1,5 @@
 import type { FinishedProductPayload, FinishedSpecDimension } from '@/services/finishedProducts';
-import type { ProductForm, SpecMode, SpecRow } from './finishedStockPageModel';
+import type { ProductForm, SpecMode, SpecRow, StockItem } from './finishedStockPageModel';
 
 interface AttributeField {
   key: string;
@@ -8,6 +8,7 @@ interface AttributeField {
 }
 
 interface ProductPayloadContext {
+  previousProduct?: StockItem;
   totalStock: number;
   form: ProductForm;
   specRows: SpecRow[];
@@ -46,16 +47,41 @@ export const buildFinishedProductPayload = (context: ProductPayloadContext): Fin
       .map((field) => ({
         attributeId: field.attributeId,
         attributeName: field.label,
-        value: String(context.form[field.key] ?? '').trim(),
+        value:
+          context.previousProduct?.attributes.find((entry) => entry.attributeId === field.attributeId)?.value ===
+          String(context.form[field.key] ?? '')
+            ? String(context.form[field.key] ?? '')
+            : String(context.form[field.key] ?? '').trim(),
       }))
-      .filter((attribute) => attribute.value),
+      .filter(
+        (attribute) =>
+          attribute.value ||
+          context.previousProduct?.attributes.some((entry) => entry.attributeId === attribute.attributeId),
+      ),
     specDimensions: context.specMode === 'layered' ? context.specDimensions : [],
     variants: context.specRows.map((row) => ({
       id: row.skuId,
       variantLabel: context.variantLabel(row),
       displayMode: row.mode,
       salesAttributes: Object.fromEntries(
-        context.salesAttributeFields.map((field) => [field.key, String(row[field.key] ?? '').trim()]),
+        context.salesAttributeFields
+          .map((field) => [
+            field.key,
+            context.previousProduct?.variants.find((variant) => variant.id === row.skuId)?.salesAttributes?.[
+              field.key
+            ] === String(row[field.key] ?? '')
+              ? String(row[field.key] ?? '')
+              : String(row[field.key] ?? '').trim(),
+          ])
+          .filter(
+            ([key, value]) =>
+              value ||
+              !context.previousProduct?.variants.some((variant) => variant.id === row.skuId) ||
+              Object.hasOwn(
+                context.previousProduct.variants.find((variant) => variant.id === row.skuId)?.salesAttributes ?? {},
+                key!,
+              ),
+          ),
       ),
       material: row.material || undefined,
       lengthValue: row.length || undefined,

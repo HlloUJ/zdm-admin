@@ -77,7 +77,7 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     values.put("创建时间", product.getCreatedAt());
     values.put("规格维度", product.getSpecDimensions());
     values.put("销售规格", cleanRows(product.getVariants()));
-    values.put("销售属性名称", salesAttributeNames(json.valueToTree(product.getVariants())));
+    values.put("销售属性名称", product.getAttributeTemplateSnapshot() == null ? salesAttributeNames(json.valueToTree(product.getVariants())) : ProductAttributeVersionService.usedNames(product.getAttributeTemplateSnapshot(), json.valueToTree(product.getVariants())));
     values.put("指导价", cleanRows(product.getGuidePrices()));
     values.put("层级价格", cleanRows(product.getMarkupPrices()));
     // Retain the normalized rich text and media IDs, never transient response URLs.

@@ -15,7 +15,7 @@ public class AccessoryProductAttributeEntry extends BaseEntity {
   @NotBlank
   private String attributeName;
 
-  @NotBlank
+  @NotNull
   private String value;
 
   public Long getAccessoryProductId() { return accessoryProductId; }

@@ -9,8 +9,10 @@ export const buildFinishedStockTemplateFields = (
   product: StockItem | null,
   productAttributes: ProductAttributeRecord[],
 ) => {
-  const fields = bindings
-    .filter((attribute) => attribute.categoryId === categoryId)
+  const boundProduct = product && product.categoryId === categoryId ? product : null;
+  const definitions = boundProduct ? (boundProduct.attributeTemplateSnapshot ?? []) : bindings;
+  const fields = definitions
+    .filter((attribute) => Boolean(boundProduct) || attribute.categoryId === categoryId)
     .slice()
     .sort((a, b) => a.sortOrder - b.sortOrder)
     .map((attribute) => ({
@@ -22,7 +24,7 @@ export const buildFinishedStockTemplateFields = (
       type: attribute.valueType === 'select' ? ('select' as const) : ('input' as const),
       options: attribute.options.map((option) => option.value),
     }));
-  for (const dimension of dimensions) {
+  for (const dimension of boundProduct?.attributeTemplateSnapshot ? [] : dimensions) {
     const existing = fields.find((field) => field.key === dimension.key);
     if (existing) existing.label = dimension.name;
     else if (/^attribute_\d+$/.test(dimension.key))
@@ -36,7 +38,7 @@ export const buildFinishedStockTemplateFields = (
         options: [],
       });
   }
-  if (product && product.categoryId === categoryId) {
+  if (product && product.categoryId === categoryId && !product.attributeTemplateSnapshot) {
     for (const entry of product.attributes) {
       if (!fields.some((field) => field.attributeId === entry.attributeId)) {
         fields.push({
@@ -68,6 +70,18 @@ export const buildFinishedStockTemplateFields = (
         }
       }
     }
+  }
+  const order = boundProduct?.attributeDisplayOrder;
+  if (order) {
+    fields.sort((a, b) => {
+      if (a.role !== b.role) return a.role === 'product' ? -1 : 1;
+      const keys = order[a.role === 'product' ? 'product' : 'sales'];
+      const index = (field: (typeof fields)[number]) => {
+        const n = keys.indexOf(field.role === 'product' ? String(field.attributeId) : field.key);
+        return n < 0 ? Number.MAX_SAFE_INTEGER : n;
+      };
+      return index(a) - index(b);
+    });
   }
   return fields;
 };

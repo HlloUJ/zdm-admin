@@ -1190,6 +1190,10 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     createdAt: record.createdAt,
     image: record.mainImageUrl || '',
     name: record.name,
+    templateVersionId: record.templateVersionId,
+    templateRevision: record.templateRevision,
+    attributeTemplateSnapshot: record.attributeTemplateSnapshot,
+    attributeDisplayOrder: record.attributeDisplayOrder,
     categoryId: record.categoryId,
     supplierId: record.supplierId,
     category: categoryPathById(record.categoryId),
@@ -1219,6 +1223,8 @@ const toProductPayload = (
 ): FinishedProductPayload => {
   const nextItem = { ...item, ...patch };
   return {
+    templateVersionId: nextItem.templateVersionId,
+    templateRevision: nextItem.templateRevision,
     categoryId: nextItem.categoryId,
     supplierId: nextItem.supplierId,
     name: nextItem.name,
@@ -1922,9 +1928,14 @@ const openConfirm = (type: ConfirmType, product: StockItem | null, content: stri
 const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
 };
-const detailAttributeNames = computed(() =>
-  Object.fromEntries(productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name])),
-);
+const detailAttributeNames = computed(() => {
+  const product = formPageVisible.value ? editingProduct.value : detailProduct.value;
+  return Object.fromEntries(
+    product?.attributeTemplateSnapshot
+      ? product.attributeTemplateSnapshot.map((attribute) => [`attribute_${attribute.attributeId}`, attribute.name])
+      : productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name]),
+  );
+});
 const openProductEditor = async (row: StockItem) => {
   try {
     await refreshPriceConfigurations();

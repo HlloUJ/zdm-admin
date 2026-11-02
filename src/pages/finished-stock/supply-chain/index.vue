@@ -1385,6 +1385,16 @@ const pendingUploadedMediaIds = new Set<number>();
 const productCategories = ref<ProductCategoryRecord[]>([]);
 const productAttributes = ref<ProductAttributeRecord[]>([]);
 const categoryAttributeBindings = ref<FinishedProductTemplateAttribute[]>([]);
+const newProductBindings = ref<FinishedProductTemplateAttribute[]>([]);
+let capturedTemplateCategory: number | undefined;
+let templateCapture = 0;
+watch(formPageVisible, (visible) => {
+  if (!visible) {
+    capturedTemplateCategory = undefined;
+    newProductBindings.value = [];
+    templateCapture++;
+  }
+});
 let templateRefresh: Promise<void> | undefined;
 const refreshCategoryAttributeBindings = () => {
   if (!templateRefresh) {
@@ -1400,9 +1410,25 @@ const refreshCategoryAttributeBindings = () => {
 };
 const refreshVisibleProductTemplate = () => {
   if (!formPageVisible.value || document.visibilityState === 'hidden') return;
-  void Promise.all([refreshCategoryAttributeBindings(), refreshPriceConfigurations()]).catch(() => {
-    adminFeedback.error('发布配置刷新失败，请重试');
-  });
+  const category = selectedCategoryId.value;
+  const capture = !editingProduct.value && category != null && capturedTemplateCategory !== category;
+  const token = capture ? ++templateCapture : templateCapture;
+  void Promise.all([capture ? refreshCategoryAttributeBindings() : Promise.resolve(), refreshPriceConfigurations()])
+    .then(() => {
+      if (
+        capture &&
+        token === templateCapture &&
+        formPageVisible.value &&
+        !editingProduct.value &&
+        selectedCategoryId.value === category
+      ) {
+        newProductBindings.value = categoryAttributeBindings.value.filter((binding) => binding.categoryId === category);
+        capturedTemplateCategory = category;
+      }
+    })
+    .catch(() => {
+      adminFeedback.error('发布配置刷新失败，请重试');
+    });
 };
 watch([formPageVisible, selectedCategoryId], refreshVisibleProductTemplate, { flush: 'post' });
 const productSuppliers = ref<SupplierRecord[]>([]);
@@ -1599,7 +1625,7 @@ const batchMarkupPrices = ref<
 const templateAttributeFields = computed(() =>
   buildFinishedStockTemplateFields(
     selectedCategoryId.value,
-    categoryAttributeBindings.value,
+    newProductBindings.value,
     confirmedSpecDimensions.value,
     editingProduct.value,
     productAttributes.value,
@@ -1749,6 +1775,10 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     createdAt: record.createdAt,
     image: record.mainImageUrl || '',
     name: record.name,
+    templateVersionId: record.templateVersionId,
+    templateRevision: record.templateRevision,
+    attributeTemplateSnapshot: record.attributeTemplateSnapshot,
+    attributeDisplayOrder: record.attributeDisplayOrder,
     categoryId: record.categoryId,
     supplierId: record.supplierId,
     category: categoryPathById(record.categoryId),
@@ -1778,6 +1808,8 @@ const toProductPayload = (
 ): FinishedProductPayload => {
   const nextItem = { ...item, ...patch };
   return {
+    templateVersionId: nextItem.templateVersionId,
+    templateRevision: nextItem.templateRevision,
     categoryId: nextItem.categoryId,
     supplierId: nextItem.supplierId,
     name: nextItem.name,
@@ -2573,6 +2605,20 @@ const deleteSpec = (id: number) => {
   specRows.value = specRows.value.filter((item) => item.id !== id);
 };
 const validateProductForm = () => {
+  if (
+    !isOperationsEdit.value &&
+    (editingProduct.value
+      ? !editingProduct.value.attributeTemplateSnapshot
+      : !newProductBindings.value[0]?.templateVersionId)
+  ) {
+    return [
+      {
+        kind: 'error' as const,
+        message: editingProduct.value ? '商品属性版本尚未绑定，请核对后重试' : '该类目尚无已发布属性模板，请先发布模板',
+        tab: 'base' as const,
+      },
+    ];
+  }
   const issues = finishedStockFormIssues({
     commodityLabel: commodity.shortLabel,
     client: 'supply-chain',
@@ -2589,6 +2635,7 @@ const validateProductForm = () => {
     videoMediaId: videoMedia.value?.mediaId,
     categoryId: selectedCategoryId.value,
     editingProduct: editingProduct.value != null,
+    previousProduct: editingProduct.value ?? undefined,
     guidePriceSettingCoefficient: guidePriceSettingCoefficient.value,
   });
   salesSpecificationFeedback.clear();
@@ -2614,8 +2661,10 @@ const specVariantLabel = (row: SpecRow) =>
     .filter(Boolean)
     .join(' / ') ||
   '未命名规格';
-const buildProductPayloadFromForm = (): FinishedProductPayload =>
-  buildFinishedProductPayload({
+const buildProductPayloadFromForm = (): FinishedProductPayload => ({
+  templateVersionId: editingProduct.value?.templateVersionId ?? newProductBindings.value[0]?.templateVersionId,
+  templateRevision: editingProduct.value?.templateRevision ?? newProductBindings.value[0]?.templateRevision,
+  ...buildFinishedProductPayload({
     totalStock: totalStock.value,
     form: productForm,
     specRows: specRows.value,
@@ -2629,7 +2678,9 @@ const buildProductPayloadFromForm = (): FinishedProductPayload =>
     specMode: confirmedSpecMode.value,
     specDimensions: confirmedSpecDimensions.value,
     variantLabel: specVariantLabel,
-  });
+    previousProduct: editingProduct.value ?? undefined,
+  }),
+});
 const buildOperationsPricePayload = (): Pick<
   FinishedProductPayload,
   'name' | 'status' | 'guidePrices' | 'markupPrices'
@@ -2761,9 +2812,14 @@ const openConfirm = (type: ConfirmType, product: StockItem | null, content: stri
 const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
 };
-const detailAttributeNames = computed(() =>
-  Object.fromEntries(productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name])),
-);
+const detailAttributeNames = computed(() => {
+  const product = formPageVisible.value ? editingProduct.value : detailProduct.value;
+  return Object.fromEntries(
+    product?.attributeTemplateSnapshot
+      ? product.attributeTemplateSnapshot.map((attribute) => [`attribute_${attribute.attributeId}`, attribute.name])
+      : productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name]),
+  );
+});
 const openProductEditor = async (row: StockItem) => {
   try {
     await refreshPriceConfigurations();

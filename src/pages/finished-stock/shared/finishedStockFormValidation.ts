@@ -1,6 +1,13 @@
 import { isPositiveIntegerQuantity } from '@/utils/quantityInput';
 import { isValidSpecPriceNumber } from '../management/priceValidation';
-import type { FormSectionKey, LayeredSpecField, ProductForm, SpecMode, SpecRow } from './finishedStockPageModel';
+import type {
+  FormSectionKey,
+  LayeredSpecField,
+  ProductForm,
+  SpecMode,
+  SpecRow,
+  StockItem,
+} from './finishedStockPageModel';
 
 type FormField = { key: string; label: string; required: boolean };
 type FormIssue = { kind: 'error' | 'warning'; message: string; tab?: FormSectionKey; operation?: true };
@@ -21,6 +28,7 @@ export interface FinishedStockValidationInput {
   videoMediaId?: number;
   categoryId?: number;
   editingProduct: boolean;
+  previousProduct?: StockItem;
   guidePriceSettingCoefficient?: number;
 }
 
@@ -60,10 +68,29 @@ export function finishedStockFormIssues(input: FinishedStockValidationInput): Fo
       priceLevelsComplete(row),
   );
   const missingAttribute = input.attributeFields.find(
-    (field) => field.required && !String(input.form[field.key] ?? '').trim(),
+    (field) =>
+      field.required &&
+      !String(input.form[field.key] ?? '').trim() &&
+      !(
+        input.previousProduct &&
+        !String(
+          input.previousProduct.attributes.find((entry) => `attribute_${entry.attributeId}` === field.key)?.value ?? '',
+        ).trim()
+      ),
   );
   const missingSalesAttribute = input.salesAttributeFields.find(
-    (field) => field.required && specRows.some((row) => !String(row[field.key] ?? '').trim()),
+    (field) =>
+      field.required &&
+      specRows.some(
+        (row) =>
+          !String(row[field.key] ?? '').trim() &&
+          !(
+            row.skuId != null &&
+            input.previousProduct?.variants.some(
+              (variant) => variant.id === row.skuId && !String(variant.salesAttributes?.[field.key] ?? '').trim(),
+            )
+          ),
+      ),
   );
   const checks: { valid: boolean; tab: FormSectionKey; message: string; operation?: true }[] = [
     { valid: Boolean(input.mainImageMediaId), tab: 'description', message: '请上传商品主图' },

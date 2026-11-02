@@ -109,7 +109,7 @@ class AccessoryProductRichTextApiTest extends SpringContainerTestSupport {
     payload.put("createdAt", "2000-01-01T00:00:00");
     LocalDateTime beforeCreate = LocalDateTime.now().minusSeconds(1);
     JsonNode created = data(mvc.perform(post("/api/admin/accessory-products").header("Authorization", token)
-        .contentType("application/json").content(json.writeValueAsBytes(payload))));
+        .contentType("application/json").content(json.writeValueAsBytes(com.zdm.platform.support.ProductAttributeVersionFixtures.bind(jdbc,json,payload)))));
     long id = created.path("id").asLong();
     assertThat(created.path("warehouseEntryType").asText()).isEqualTo("firstEntry");
     assertThat(created.path("warehouseEntryReason").isNull()).isTrue();
@@ -149,7 +149,7 @@ class AccessoryProductRichTextApiTest extends SpringContainerTestSupport {
     assertThat(created.path("sku").isNull()).isTrue();
     payload.withArray("variants").forEach(row -> ((ObjectNode)row).remove("id"));
     JsonNode second = data(mvc.perform(post("/api/admin/accessory-products").header("Authorization", token)
-        .contentType("application/json").content(json.writeValueAsBytes(payload))));
+        .contentType("application/json").content(json.writeValueAsBytes(com.zdm.platform.support.ProductAttributeVersionFixtures.bind(jdbc,json,payload)))));
     assertThat(second.path("sku").isNull()).isTrue();
     long secondId = second.path("id").asLong();
     payload.set("variants", second.path("variants").deepCopy());
@@ -269,7 +269,7 @@ class AccessoryProductRichTextApiTest extends SpringContainerTestSupport {
       }
     }
     JsonNode created = data(mvc.perform(post("/api/admin/accessory-products").header("Authorization", token)
-        .contentType("application/json").content(json.writeValueAsBytes(payload))));
+        .contentType("application/json").content(json.writeValueAsBytes(com.zdm.platform.support.ProductAttributeVersionFixtures.bind(jdbc,json,payload)))));
     long id = created.path("id").asLong();
     payload.set("variants", created.path("variants").deepCopy());
     assertThat(created.path("specDimensions")).isEqualTo(payload.path("specDimensions"));
