@@ -28,6 +28,7 @@ export interface FinishedProductPrice {
   variantLabel?: string;
 }
 export interface FinishedProductGuidePrice {
+  priceSource?: 'auto' | 'manual';
   priceCoefficient: number;
   costPrice: number;
   price: number;

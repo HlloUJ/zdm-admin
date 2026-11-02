@@ -119,6 +119,7 @@ export const buildFinishedOperationsPricePayload = (
     costPrice: Number(row.cost),
     priceCoefficient: Number(row.guideCoefficient),
     price: Number(row.guide),
+    priceSource: row.guidePriceSource ?? 'manual',
   })),
   markupPrices: context.specRows.flatMap((row) =>
     context.priceLevels.map((level) => {

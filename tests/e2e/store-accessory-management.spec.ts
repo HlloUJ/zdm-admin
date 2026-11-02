@@ -248,6 +248,7 @@ for (const displayMode of ['single', 'layered'] as const) {
     await expect(page.locator('.t-dialog:visible')).toHaveCount(1);
     const selectButton = dialog.getByRole('button', { name: '批量选择', exact: true });
     await expect(selectButton).toBeDisabled();
+    await expect(dialog.getByText(/已选 \d+ 项/)).toHaveCount(0);
     expect(writes).toBe(0);
     expect((await dialog.boundingBox())!.width).toBeGreaterThan(1100);
     expect(
@@ -255,6 +256,7 @@ for (const displayMode of ['single', 'layered'] as const) {
     ).toBeGreaterThan(400);
     await dialog.locator('thead .t-checkbox').click();
     await expect(selectButton).toBeEnabled();
+    await expect(dialog.getByText('已选 1 项', { exact: true })).toBeVisible();
     await dialog.getByText('详情', { exact: true }).click();
     const drawer = page.locator('.t-drawer:visible');
     await expect(drawer.getByText('商品中心只读详情')).toBeVisible();

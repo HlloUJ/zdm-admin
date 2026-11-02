@@ -139,6 +139,7 @@ export interface SpecRow extends TableRowData {
   cost: string;
   guideCoefficient: string;
   guide: string;
+  guidePriceSource?: 'auto' | 'manual';
   level1Coefficient: string;
   level1: string;
   level2Coefficient: string;

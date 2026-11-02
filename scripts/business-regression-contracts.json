@@ -43,7 +43,14 @@
         "src/utils/numericInput.ts",
         "src/utils/numericInputValidation.ts",
         "backend/src/main/java/com/zdm/platform/craft/Craft.java",
-        "src/pages/finished-stock/shared/useSpecTableLayout.ts"
+        "src/pages/finished-stock/shared/useSpecTableLayout.ts",
+        "backend/src/main/java/com/zdm/platform/inventory/GuidePriceConfigurationSyncService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePrice.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePrice.java"
       ],
       "tables": [
         "product_state_activity",
@@ -79,6 +86,8 @@
         "backend/src/main/java/com/zdm/platform/employee/OpenEmployeeInviteController.java",
         "backend/src/main/java/com/zdm/platform/employee/SupplyChainAdminController.java",
         "backend/src/main/java/com/zdm/platform/employee/SupplyChainAdminService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryInvalidationMedia.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryLifecycleService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryMarkupConfigurationController.java",
@@ -88,6 +97,9 @@
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProduct.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductArrivalLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePrice.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePriceMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePriceService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductListDetails.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductMapper.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductService.java",
@@ -95,6 +107,8 @@
         "backend/src/main/java/com/zdm/platform/inventory/AccessorySpecValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryStateActivityService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessorySupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedInvalidationMedia.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedMarkupConfigurationController.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedMarkupConfigurationService.java",
@@ -103,12 +117,16 @@
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProduct.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductArrivalLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePrice.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePriceMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePriceService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductListDetails.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductMapper.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductWriteValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedSpecValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedSupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/GuidePriceConfigurationSyncService.java",
         "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfController.java",
         "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfController.java",
@@ -324,20 +342,22 @@
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java",
-        "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java"
+        "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java"
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
         "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
         "tests/e2e/slab-collaboration.spec.ts": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
-        "tests/e2e/store-finished-stock.spec.ts": "4f75f180b7d86d3967f01e367989788ac975798b955816b82fc5b7c254bb397f",
-        "tests/e2e/store-accessory-management.spec.ts": "80b9738c977b9be6bded25b9f6a854f7b50bed6d1229d8c734e8c99c81b598b9",
+        "tests/e2e/store-finished-stock.spec.ts": "49ecdf64ee80f2af34c4c24b110b32abec8b8900527f9cf421156dbc4cb3aa1d",
+        "tests/e2e/store-accessory-management.spec.ts": "7e77cbe7e8533ed41d1c3009b91532fb50bb8d6e605a7beff9d230ca42b5a1df",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
         "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "f30e0fcac5182b16a15af8af9e3811352d8b9b551625c2f559e329e6d31a4276",
         "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "4039e8369af0719300c4538dba93c641d1d36ce322e6e9fb35b9a164f45abbd9",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "ff7d0c0c5b0e8a22bf70015616ac24663bc36403b1e1b9e844ab9a9c4c8ed975",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "97b81f4823ba5ea5cfbf797e24f39cabb829ede9bf0ebe9760bc1bc152ac0a54",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
         "tests/e2e/accessory-permissions.spec.ts": "6ea9de56855c2d8c1b55c7d1e0f618d65364f351e3855d1548398448ccc5af20",
@@ -396,7 +416,7 @@
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
         "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
         "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "c68b320b55c02156cb5104344627d1c32f64cf012981f7aaee191b91b62bc3ba",
-        "tests/e2e/product-attribute-feedback-cases.ts": "90a7eb5bf7ff969047eb90e5c499cd2e359f383b14f832a8521cd07bf7bf7d02",
+        "tests/e2e/product-attribute-feedback-cases.ts": "a235030fa07ecbdc4f418ce2428b727a6c1dcbd41dacbd6f96ff35b8b464f91b",
         "tests/e2e/store-batch-sale-price-cases.ts": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
         "src/components/DecimalInput.test.ts": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
         "src/utils/numericInput.test.ts": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
@@ -404,7 +424,10 @@
         "src/utils/numericInputValidation.test.ts": "3b7a3a3dcd4fcb8f06923dbe341e0e870e9e2791c772d8496ef8e11cbea66a26",
         "tests/e2e/store-price-rules.spec.ts": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
         "tests/e2e/decimal-editing.ts": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73",
-        "tests/e2e/price-table-feedback.ts": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7"
+        "tests/e2e/price-table-feedback.ts": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
+        "src/pages/finished-stock/shared/guidePriceSource.test.ts": "78b7b219cb169c86b10590cef5faaf1394ec3c00e27101c4b784001e224f2fad",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java": "8f4a40ce5c9d7b76b6c2b11a5afaea0554d45a4907cafd6f19c31412a97effff",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java": "a2ea4de0623f1b0338db2d0cf2bd9c9b27c64bce5c64fdbceeb5c6df393ee1f9"
       },
       "testChanges": [
         {
@@ -2259,6 +2282,60 @@
           "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
           "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
           "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "90a7eb5bf7ff969047eb90e5c499cd2e359f383b14f832a8521cd07bf7bf7d02",
+          "after": "a235030fa07ecbdc4f418ce2428b727a6c1dcbd41dacbd6f96ff35b8b464f91b",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "4f75f180b7d86d3967f01e367989788ac975798b955816b82fc5b7c254bb397f",
+          "after": "49ecdf64ee80f2af34c4c24b110b32abec8b8900527f9cf421156dbc4cb3aa1d",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
+          "after": "49ecdf64ee80f2af34c4c24b110b32abec8b8900527f9cf421156dbc4cb3aa1d",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "80b9738c977b9be6bded25b9f6a854f7b50bed6d1229d8c734e8c99c81b598b9",
+          "after": "7e77cbe7e8533ed41d1c3009b91532fb50bb8d6e605a7beff9d230ca42b5a1df",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
+          "after": "7e77cbe7e8533ed41d1c3009b91532fb50bb8d6e605a7beff9d230ca42b5a1df",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "ff7d0c0c5b0e8a22bf70015616ac24663bc36403b1e1b9e844ab9a9c4c8ed975",
+          "after": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
+          "reason": "用户已确认指导价手动改价切换手动。旧权限测试仅将手动改价请求标为manual，增加持久模式断言；原防夹带、权限、状态、日志及金额断言全部保留，未改超时和重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
+          "after": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
+          "reason": "用户已确认指导价手动改价切换手动。旧权限测试仅将手动改价请求标为manual，增加持久模式断言；原防夹带、权限、状态、日志及金额断言全部保留，未改超时和重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "97b81f4823ba5ea5cfbf797e24f39cabb829ede9bf0ebe9760bc1bc152ac0a54",
+          "after": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
+          "reason": "用户已确认指导价手动改价切换手动。旧权限测试仅将手动改价请求标为manual，增加持久模式断言；原防夹带、权限、状态、日志及金额断言全部保留，未改超时和重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
+          "after": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
+          "reason": "用户已确认指导价手动改价切换手动。旧权限测试仅将手动改价请求标为manual，增加持久模式断言；原防夹带、权限、状态、日志及金额断言全部保留，未改超时和重试。"
         }
       ],
       "routes": [
@@ -2320,7 +2397,8 @@
         "src/components/DecimalInput.test.ts",
         "src/utils/numericInput.test.ts",
         "src/utils/numericInputValidation.test.ts",
-        "tests/e2e/price-table-feedback.ts"
+        "tests/e2e/price-table-feedback.ts",
+        "src/pages/finished-stock/shared/guidePriceSource.test.ts"
       ]
     }
   ]

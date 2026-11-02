@@ -12,6 +12,7 @@ async function openEditor(
   numberLabel = '销售数字属性',
   variantCount = 2,
   client = 'supply-chain',
+  guideFixture?: { coefficient: number | null },
 ) {
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await install(page);
@@ -67,6 +68,18 @@ async function openEditor(
     videoMediaId: 2,
     detail: '<p>保留详情</p>',
     totalStock: 5,
+    ...(guideFixture
+      ? {
+          guidePrices: Array.from({ length: variantCount }, (_, index) => ({
+            skuId: 951 + index,
+            variantLabel: `规格${index + 1}`,
+            costPrice: (index + 1) * 10,
+            priceCoefficient: index === 0 ? 2 : 3,
+            price: (index + 1) * 10 * (index === 0 ? 2 : 3),
+            priceSource: index === 0 && guideFixture.coefficient != null ? 'auto' : 'manual',
+          })),
+        }
+      : {}),
     attributes: [{ attributeId: 1, attributeName: '商品数字属性', value: '12.00' }],
     specDimensions: layered
       ? [
@@ -99,6 +112,17 @@ async function openEditor(
   await page.route(`**/api/admin/${resource}/attribute-template-options`, (route) =>
     route.fulfill({ json: { code: 0, data: [{ versionId: 2, revision: 0, categoryId: 5, content: [] }] } }),
   );
+  if (guideFixture) {
+    const setting = resource === 'finished-products' ? 'finished-guide-price-setting' : 'accessory-guide-price-setting';
+    await page.route(`**/api/admin/${setting}`, (route) =>
+      route.fulfill({
+        json: {
+          code: 0,
+          data: guideFixture.coefficient == null ? null : { priceCoefficient: guideFixture.coefficient },
+        },
+      }),
+    );
+  }
   const module = resource === 'finished-products' ? 'finished-stock-management' : 'accessory-management';
   await page.goto(productWarehouseUrl(client === 'admin' ? `/${module}` : `/supply-chain/${module}`));
   await page.getByText('编辑', { exact: true }).first().click();
@@ -130,6 +154,54 @@ async function switchToLayered(page: Page) {
 }
 
 export function registerAttributeFeedbackTests(resource: Resource, install: (page: Page) => Promise<void>) {
+  test('guide source preserves formatting, supports confirmed switching and batch manual prices per SKU', async ({
+    page,
+  }) => {
+    const { table, writes } = await openEditor(page, resource, install, false, '销售数字属性', 2, 'admin', {
+      coefficient: 2,
+    });
+    const guides = table.locator('tbody .price-pair.with-source');
+    const followed = guides.nth(0);
+    const manual = guides.nth(1);
+    const coefficient = followed.getByPlaceholder('请输入系数');
+    await expect(followed.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true })).toBeVisible();
+    await coefficient.fill('2.0');
+    await coefficient.blur();
+    await expect(followed.getByRole('button', { name: '跟随配置，点击切换手工价格', exact: true })).toBeVisible();
+    await coefficient.fill('4');
+    await coefficient.blur();
+    await expect(followed.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true })).toBeVisible();
+    await expect(followed.getByPlaceholder('请输入价格')).toHaveValue('40.00');
+    await followed.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
+    await page.locator('.t-dialog:visible .t-dialog__cancel').click();
+    await expect(coefficient).toHaveValue('4.00');
+    await followed.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
+    await page.getByRole('button', { name: '确认更改价格浮动方式', exact: true }).click();
+    await expect(followed.getByPlaceholder('请输入价格')).toHaveValue('20.00');
+    await expect(manual.getByPlaceholder('请输入价格')).toHaveValue('60.00');
+    await page.getByRole('button', { name: '批量填写', exact: true }).click();
+    const drawer = page.locator('.t-drawer:visible');
+    await drawer.getByPlaceholder('请输入价格', { exact: true }).first().fill('50');
+    await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
+    await expect(table.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true })).toHaveCount(2);
+    await page.locator('.form-submit-bar').getByRole('button', { name: '确认保存', exact: true }).click();
+    await expect.poll(() => writes.length).toBe(1);
+    expect(writes[0]!.guidePrices).toEqual([
+      expect.objectContaining({ skuId: 951, priceCoefficient: 5, price: 50, priceSource: 'manual' }),
+      expect.objectContaining({ skuId: 952, priceCoefficient: 2.5, price: 50, priceSource: 'manual' }),
+    ]);
+  });
+  test('guide without configuration keeps manual values and blocks following', async ({ page }) => {
+    const { table, writes } = await openEditor(page, resource, install, false, '销售数字属性', 2, 'admin', {
+      coefficient: null,
+    });
+    const guide = table.locator('tbody .price-pair.with-source').first();
+    await guide.getByRole('button', { name: '手工价格，点击切换跟随配置', exact: true }).click();
+    await expect(page.getByText('暂无有效价格配置，无法切换为跟随配置', { exact: true })).toBeVisible();
+    await expect(guide.getByPlaceholder('请输入价格')).toHaveValue('20.00');
+    expect(writes).toHaveLength(0);
+  });
+
   for (const client of ['supply-chain', 'admin']) {
     for (const layered of [false, true]) {
       test(`${client} specification columns fill the editor and required marks follow editability, layered=${layered}`, async ({

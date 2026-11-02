@@ -179,12 +179,13 @@ class AccessoryProductPermissionApiTest extends SpringContainerTestSupport {
     ObjectNode request = (ObjectNode) operationRecord(id);
     request.put("name", "夹带名称").put("detail", "<p>夹带详情</p>").put("totalStock", 999);
     ((ObjectNode) request.path("variants").get(0)).put("stock", 999);
-    ((ObjectNode) request.path("guidePrices").get(0)).put("priceCoefficient", 3).put("price", 30);
+    ((ObjectNode) request.path("guidePrices").get(0)).put("priceCoefficient", 3).put("price", 30).put("priceSource", "manual");
     identity("all", "warehouse.view", "warehouse.edit");
     JsonNode priced = data(mvc.perform(put("/api/admin/accessory-products/{id}", id).contentType("application/json").content(json.writeValueAsBytes(request))));
     assertThat(priced.path("name").asText()).isEqualTo("原始商品");
     assertThat(priced.path("totalStock").asInt()).isEqualTo(5);
     assertThat(priced.path("guidePrices").get(0).path("price").asInt()).isEqualTo(30);
+    assertThat(priced.path("guidePrices").get(0).path("priceSource").asText()).isEqualTo("manual");
     assertThat(jdbc.queryForObject("SELECT detail FROM accessory_products WHERE id=?", String.class, id)).isEqualTo(storedDetail);
     String priceLog = jdbc.queryForObject("SELECT change_details FROM accessory_operation_logs WHERE product_id=? ORDER BY id DESC LIMIT 1", String.class, id);
     assertThat(priceLog).contains("指导价").doesNotContain("夹带名称");

@@ -375,13 +375,14 @@
                         </div>
                       </template>
                       <template #guide="{ row }">
-                        <div class="price-pair">
+                        <div class="price-pair with-source">
                           <SpecPriceInput
                             v-model="row.guideCoefficient"
                             placeholder="请输入系数"
                             label="系数"
                             :submitted="submitAttempted"
                             @change="handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)"
+                            @commit="markGuidePriceManual(row)"
                           />
                           <SpecPriceInput
                             v-model="row.guide"
@@ -389,6 +390,12 @@
                             label="价格"
                             :submitted="submitAttempted"
                             @change="handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)"
+                            @commit="markGuidePriceManual(row)"
+                          />
+                          <PriceSourceToggle
+                            :source="row.guidePriceSource"
+                            :available="guidePriceSettingCoefficient != null"
+                            @toggle="toggleGuidePriceSource(row)"
                           />
                         </div>
                       </template>
@@ -1429,7 +1436,7 @@ const requiredColumnTitle = (label: string) => () =>
 const baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'cost', title: '成本价', minWidth: 80 },
-    { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 148 },
+    { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 176 },
     ...productPriceLevels.value.map((item) => ({
       colKey: `markup-${item.id}`,
       title: requiredColumnTitle(item.name),
@@ -1679,6 +1686,8 @@ const {
 
   handleSpecCoefficientChange,
   handleSpecPriceChange,
+  toggleGuidePriceSource,
+  markGuidePriceManual,
   toggleSpecPriceSource,
   markSpecPriceManual,
   handleMarkupCoefficientChange,
@@ -1687,7 +1696,12 @@ const {
 
   handleBatchCoefficientChange,
   handleBatchPriceChange,
-} = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);
+} = useFinishedStockPriceEditor(
+  () => productPriceLevels.value,
+  batchFillForm,
+  batchMarkupPrices,
+  () => guidePriceSettingCoefficient.value,
+);
 
 const operationLogsVisible = ref(false);
 const canViewOperationLogs = computed(() =>
@@ -1769,6 +1783,7 @@ const savePriceDrawer = () => {
               }),
             ),
             cost: batchFillForm.cost || row.cost,
+            guidePriceSource: batchFillForm.guideCoefficient || batchFillForm.guide ? 'manual' : row.guidePriceSource,
             guideCoefficient:
               batchFillForm.guideCoefficient ||
               (batchFillForm.guide && Number(batchFillForm.cost || row.cost) > 0

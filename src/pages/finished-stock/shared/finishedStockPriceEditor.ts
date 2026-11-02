@@ -18,6 +18,7 @@ export const useFinishedStockPriceEditor = (
   getPriceLevels: () => PriceLevel[],
   batchFillForm: BatchFillForm,
   batchMarkupPrices: Ref<Record<number, BatchMarkupPrice>>,
+  getGuideCoefficient: () => number | null | undefined = () => undefined,
 ) => {
   const formatDecimalValue = (row: SpecRow | PriceRow | BatchFillForm, field: DecimalField) => {
     const rawValue = String(row[field] ?? '').trim();
@@ -93,6 +94,21 @@ export const useFinishedStockPriceEditor = (
     row[priceField] = String(value ?? '');
     if (!isValidSpecPriceNumber(row[priceField])) return;
     syncSpecCoefficientByPrice(row, priceField, coefficientField);
+  };
+  const markGuidePriceManual = (row: SpecRow) => {
+    if (isValidSpecPriceNumber(row.guideCoefficient) && isValidSpecPriceNumber(row.guide))
+      row.guidePriceSource = 'manual';
+  };
+  const toggleGuidePriceSource = (row: SpecRow) => {
+    if (row.guidePriceSource === 'auto') {
+      row.guidePriceSource = 'manual';
+      return;
+    }
+    const coefficient = getGuideCoefficient();
+    if (coefficient == null) return;
+    row.guideCoefficient = String(coefficient);
+    row.guidePriceSource = 'auto';
+    if (isValidSpecPriceNumber(row.cost)) row.guide = (Number(row.cost) * coefficient).toFixed(2);
   };
   const toggleSpecPriceSource = (row: SpecRow, levelId: number) => {
     const editor = row.markupPrices[levelId];
@@ -190,6 +206,8 @@ export const useFinishedStockPriceEditor = (
     handleSpecCostChange,
     handleSpecCoefficientChange,
     handleSpecPriceChange,
+    toggleGuidePriceSource,
+    markGuidePriceManual,
     toggleSpecPriceSource,
     markSpecPriceManual,
     handleMarkupCoefficientChange,

@@ -55,6 +55,7 @@ export const useFinishedStockSpecRows = (
     cost: '',
     guideCoefficient: defaultGuideCoefficient(),
     guide: '',
+    guidePriceSource: getGuideCoefficient() == null ? 'manual' : 'auto',
     level1Coefficient: '',
     level1: '',
     level2Coefficient: '',
@@ -83,6 +84,11 @@ export const useFinishedStockSpecRows = (
           cost: String(variant.costPrice ?? guidePrice?.costPrice ?? markupPrices[0]?.costPrice ?? ''),
           guideCoefficient: guidePrice == null ? '' : String(Number(guidePrice.priceCoefficient)),
           guide: guidePrice == null ? '' : String(guidePrice.price),
+          guidePriceSource: guidePrice
+            ? (guidePrice.priceSource ?? 'manual')
+            : getGuideCoefficient() == null
+              ? 'manual'
+              : 'auto',
           quantity: variant.stock,
           skuId: variant.id,
           markupPrices: createMarkupEditors(markupPrices),

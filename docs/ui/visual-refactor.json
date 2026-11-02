@@ -3508,6 +3508,30 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "                              @toggle=\"toggleSpecPriceSource(row, configuration.id)\"\n                            />\n                          </div>\n                        </div>\n                      </template>\n                      <template #guide=\"{ row }\">\n                        <div class=\"price-pair\">\n                          <SpecPriceInput\n                            v-model=\"row.guideCoefficient\"\n                            placeholder=\"请输入系数\"\n                            label=\"系数\"\n                            :submitted=\"submitAttempted\"\n                            @change=\"handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)\"\n                          />\n                          <SpecPriceInput\n                            v-model=\"row.guide\"\n                            placeholder=\"请输入价格\"\n                            label=\"价格\"\n                            :submitted=\"submitAttempted\"\n                            @change=\"handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)\"\n                          />\n                        </div>\n                      </template>\n                      <template #level1=\"{ row }\">\n                        <div class=\"price-pair\">\n                          <t-input\n",
+          "after": "                              @toggle=\"toggleSpecPriceSource(row, configuration.id)\"\n                            />\n                          </div>\n                        </div>\n                      </template>\n                      <template #guide=\"{ row }\">\n                        <div class=\"price-pair with-source\">\n                          <SpecPriceInput\n                            v-model=\"row.guideCoefficient\"\n                            placeholder=\"请输入系数\"\n                            label=\"系数\"\n                            :submitted=\"submitAttempted\"\n                            @change=\"handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)\"\n                            @commit=\"markGuidePriceManual(row)\"\n                          />\n                          <SpecPriceInput\n                            v-model=\"row.guide\"\n                            placeholder=\"请输入价格\"\n                            label=\"价格\"\n                            :submitted=\"submitAttempted\"\n                            @change=\"handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)\"\n                            @commit=\"markGuidePriceManual(row)\"\n                          />\n                          <PriceSourceToggle\n                            :source=\"row.guidePriceSource\"\n                            :available=\"guidePriceSettingCoefficient != null\"\n                            @toggle=\"toggleGuidePriceSource(row)\"\n                          />\n                        </div>\n                      </template>\n                      <template #level1=\"{ row }\">\n                        <div class=\"price-pair\">\n                          <t-input\n",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);\nconst requiredColumnTitle = (label: string) => () =>\n  h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);\nconst baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'cost', title: '成本价', minWidth: 80 },\n    { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 148 },\n    ...productPriceLevels.value.map((item) => ({\n      colKey: `markup-${item.id}`,\n      title: requiredColumnTitle(item.name),\n      minWidth: 176,\n    })),\n    { colKey: 'quantity', title: '数量', minWidth: 80 },\n",
+          "after": "  value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);\nconst requiredColumnTitle = (label: string) => () =>\n  h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);\nconst baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {\n  const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [\n    { colKey: 'cost', title: '成本价', minWidth: 80 },\n    { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 176 },\n    ...productPriceLevels.value.map((item) => ({\n      colKey: `markup-${item.id}`,\n      title: requiredColumnTitle(item.name),\n      minWidth: 176,\n    })),\n    { colKey: 'quantity', title: '数量', minWidth: 80 },\n",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "const {\n  formatDecimalValue,\n  decimalNumber,\n\n  handleSpecCoefficientChange,\n  handleSpecPriceChange,\n  toggleSpecPriceSource,\n  markSpecPriceManual,\n  handleMarkupCoefficientChange,\n  handleMarkupPriceChange,\n  handleBatchMarkupChange,\n\n  handleBatchCoefficientChange,\n  handleBatchPriceChange,\n} = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);\n\nconst operationLogsVisible = ref(false);\nconst canViewOperationLogs = computed(() =>\n  hasPermission(getLoginUser(), `${productPermissionPrefix.value}.operation-log.view`),\n);\nconst openPriceDrawer = () => {\n",
+          "after": "const {\n  formatDecimalValue,\n  decimalNumber,\n\n  handleSpecCoefficientChange,\n  handleSpecPriceChange,\n  toggleGuidePriceSource,\n  markGuidePriceManual,\n  toggleSpecPriceSource,\n  markSpecPriceManual,\n  handleMarkupCoefficientChange,\n  handleMarkupPriceChange,\n  handleBatchMarkupChange,\n\n  handleBatchCoefficientChange,\n  handleBatchPriceChange,\n} = useFinishedStockPriceEditor(\n  () => productPriceLevels.value,\n  batchFillForm,\n  batchMarkupPrices,\n  () => guidePriceSettingCoefficient.value,\n);\n\nconst operationLogsVisible = ref(false);\nconst canViewOperationLogs = computed(() =>\n  hasPermission(getLoginUser(), `${productPermissionPrefix.value}.operation-log.view`),\n);\nconst openPriceDrawer = () => {\n",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "                  editor.price = (cost * Number(editor.coefficient)).toFixed(2);\n                }\n                return [level.id, editor];\n              }),\n            ),\n            cost: batchFillForm.cost || row.cost,\n            guideCoefficient:\n              batchFillForm.guideCoefficient ||\n              (batchFillForm.guide && Number(batchFillForm.cost || row.cost) > 0\n                ? (Number(batchFillForm.guide) / Number(batchFillForm.cost || row.cost)).toFixed(2)\n                : row.guideCoefficient),\n            guide:\n",
+          "after": "                  editor.price = (cost * Number(editor.coefficient)).toFixed(2);\n                }\n                return [level.id, editor];\n              }),\n            ),\n            cost: batchFillForm.cost || row.cost,\n            guidePriceSource: batchFillForm.guideCoefficient || batchFillForm.guide ? 'manual' : row.guidePriceSource,\n            guideCoefficient:\n              batchFillForm.guideCoefficient ||\n              (batchFillForm.guide && Number(batchFillForm.cost || row.cost) > 0\n                ? (Number(batchFillForm.guide) / Number(batchFillForm.cost || row.cost)).toFixed(2)\n                : row.guideCoefficient),\n            guide:\n",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。",
+          "stage": "before-migrations"
+        },
+        {
           "before": "                          confirmedSpecMode,\n                          confirmedSpecDimensions,\n                          specRows,\n                        ])\n                  \"\n                >\n                  <div v-if=\"specRows.length\" class=\"spec-table-block\">\n                    <t-table\n                      row-key=\"id\"\n                      :data=\"specRows\"\n                      :columns=\"specColumns\"\n                      :rowspan-and-colspan=\"specRowspanAndColspan\"\n                      table-content-width=\"max-content\"\n                      bordered\n                      hover\n                      table-layout=\"auto\"\n                    >\n                      <template #specText=\"{ row }\">\n                        <div class=\"spec-name-cell\">\n",
           "after": "                          confirmedSpecMode,\n                          confirmedSpecDimensions,\n                          specRows,\n                        ])\n                  \"\n                >\n                  <div v-if=\"specRows.length\" ref=\"specTableElement\" class=\"spec-table-block\">\n                    <t-table\n                      row-key=\"id\"\n                      :data=\"specRows\"\n                      :columns=\"specColumns\"\n                      :rowspan-and-colspan=\"specRowspanAndColspan\"\n                      :table-content-width=\"specTableContentWidth\"\n                      bordered\n                      hover\n                      table-layout=\"auto\"\n                    >\n                      <template #specText=\"{ row }\">\n                        <div class=\"spec-name-cell\">\n",
           "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。",
@@ -4842,6 +4866,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  size: string;\n  sizeImage: boolean;\n  costCoefficient: string;\n  cost: string;\n  guideCoefficient: string;\n  guide: string;\n  level1Coefficient: string;\n  level1: string;\n  level2Coefficient: string;\n  level2: string;\n  level3Coefficient: string;\n  level3: string;\n",
+          "after": "  size: string;\n  sizeImage: boolean;\n  costCoefficient: string;\n  cost: string;\n  guideCoefficient: string;\n  guide: string;\n  guidePriceSource?: 'auto' | 'manual';\n  level1Coefficient: string;\n  level1: string;\n  level2Coefficient: string;\n  level2: string;\n  level3Coefficient: string;\n  level3: string;\n",
+          "reason": "用户确认运营成品现货/配件指导价跟随或手动；仅登记对应模式字段、保存与编辑辅助逻辑，保留其他业务。",
+          "stage": "before-migrations"
+        },
+        {
           "before": "import type { WarehouseEntryInformation } from '@/services/warehouseEntry';\nimport type { TableRowData } from 'tdesign-vue-next';\nimport type {\n  FinishedProductAttributeEntry,\n  FinishedProductGuidePrice,\n  FinishedProductPrice,\n  FinishedProductVariant,\n  FinishedSpecDimension,\n} from '@/services/finishedProducts';\n\n",
           "after": "import type { WarehouseEntryInformation } from '@/services/warehouseEntry';\nimport type { TableRowData } from 'tdesign-vue-next';\nimport type {\n  FinishedProductAttributeEntry,\n  FinishedProductTemplateAttribute,\n  FinishedProductGuidePrice,\n  FinishedProductPrice,\n  FinishedProductVariant,\n  FinishedSpecDimension,\n} from '@/services/finishedProducts';\n\n",
           "stage": "before-migrations",
@@ -4920,6 +4950,12 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "  guidePrices: context.specRows.map((row) => ({\n    skuId: row.skuId!,\n    variantLabel: context.variantLabel(row),\n    costPrice: Number(row.cost),\n    priceCoefficient: Number(row.guideCoefficient),\n    price: Number(row.guide),\n  })),\n  markupPrices: context.specRows.flatMap((row) =>\n    context.priceLevels.map((level) => {\n      const price = row.markupPrices[level.id];\n      return {\n        skuId: row.skuId!,\n",
+          "after": "  guidePrices: context.specRows.map((row) => ({\n    skuId: row.skuId!,\n    variantLabel: context.variantLabel(row),\n    costPrice: Number(row.cost),\n    priceCoefficient: Number(row.guideCoefficient),\n    price: Number(row.guide),\n    priceSource: row.guidePriceSource ?? 'manual',\n  })),\n  markupPrices: context.specRows.flatMap((row) =>\n    context.priceLevels.map((level) => {\n      const price = row.markupPrices[level.id];\n      return {\n        skuId: row.skuId!,\n",
+          "reason": "用户确认运营成品现货/配件指导价跟随或手动；仅登记对应模式字段、保存与编辑辅助逻辑，保留其他业务。",
+          "stage": "before-migrations"
+        },
+        {
           "before": "import type { FinishedProductPayload, FinishedSpecDimension } from '@/services/finishedProducts';\nimport type { ProductForm, SpecMode, SpecRow, StockItem } from './finishedStockPageModel';\n\ninterface AttributeField {\n  key: string;\n  attributeId: number;\n  label: string;\n}\n\ninterface ProductPayloadContext {\n  previousProduct?: StockItem;\n",
           "after": "import { templateAttributeValue } from './finishedStockAttributeValidation';\nimport type { FinishedProductPayload, FinishedSpecDimension } from '@/services/finishedProducts';\nimport type { ProductForm, SpecMode, SpecRow, StockItem } from './finishedStockPageModel';\n\ninterface AttributeField {\n  key: string;\n  attributeId: number;\n  label: string;\n  valueType?: string;\n}\n\ninterface ProductPayloadContext {\n  previousProduct?: StockItem;\n",
           "stage": "before-migrations",
@@ -4968,6 +5004,24 @@
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
         {
+          "before": "}\n\nexport const useFinishedStockPriceEditor = (\n  getPriceLevels: () => PriceLevel[],\n  batchFillForm: BatchFillForm,\n  batchMarkupPrices: Ref<Record<number, BatchMarkupPrice>>,\n) => {\n  const formatDecimalValue = (row: SpecRow | PriceRow | BatchFillForm, field: DecimalField) => {\n    const rawValue = String(row[field] ?? '').trim();\n    if (!rawValue) {\n      row[field] = '';\n      return;\n",
+          "after": "}\n\nexport const useFinishedStockPriceEditor = (\n  getPriceLevels: () => PriceLevel[],\n  batchFillForm: BatchFillForm,\n  batchMarkupPrices: Ref<Record<number, BatchMarkupPrice>>,\n  getGuideCoefficient: () => number | null | undefined = () => undefined,\n) => {\n  const formatDecimalValue = (row: SpecRow | PriceRow | BatchFillForm, field: DecimalField) => {\n    const rawValue = String(row[field] ?? '').trim();\n    if (!rawValue) {\n      row[field] = '';\n      return;\n",
+          "reason": "用户确认运营成品现货/配件指导价跟随或手动；仅登记对应模式字段、保存与编辑辅助逻辑，保留其他业务。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "    value: unknown,\n  ) => {\n    row[priceField] = String(value ?? '');\n    if (!isValidSpecPriceNumber(row[priceField])) return;\n    syncSpecCoefficientByPrice(row, priceField, coefficientField);\n  };\n  const toggleSpecPriceSource = (row: SpecRow, levelId: number) => {\n    const editor = row.markupPrices[levelId];\n    if (editor.priceSource === 'auto') {\n      editor.priceSource = 'manual';\n      editor.sourceConfigurationId = undefined;\n    } else restoreSpecAutoPrice(row, levelId);\n",
+          "after": "    value: unknown,\n  ) => {\n    row[priceField] = String(value ?? '');\n    if (!isValidSpecPriceNumber(row[priceField])) return;\n    syncSpecCoefficientByPrice(row, priceField, coefficientField);\n  };\n  const markGuidePriceManual = (row: SpecRow) => {\n    if (isValidSpecPriceNumber(row.guideCoefficient) && isValidSpecPriceNumber(row.guide))\n      row.guidePriceSource = 'manual';\n  };\n  const toggleGuidePriceSource = (row: SpecRow) => {\n    if (row.guidePriceSource === 'auto') {\n      row.guidePriceSource = 'manual';\n      return;\n    }\n    const coefficient = getGuideCoefficient();\n    if (coefficient == null) return;\n    row.guideCoefficient = String(coefficient);\n    row.guidePriceSource = 'auto';\n    if (isValidSpecPriceNumber(row.cost)) row.guide = (Number(row.cost) * coefficient).toFixed(2);\n  };\n  const toggleSpecPriceSource = (row: SpecRow, levelId: number) => {\n    const editor = row.markupPrices[levelId];\n    if (editor.priceSource === 'auto') {\n      editor.priceSource = 'manual';\n      editor.sourceConfigurationId = undefined;\n    } else restoreSpecAutoPrice(row, levelId);\n",
+          "reason": "用户确认运营成品现货/配件指导价跟随或手动；仅登记对应模式字段、保存与编辑辅助逻辑，保留其他业务。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "  return {\n    formatDecimalValue,\n    decimalNumber,\n    handleSpecCostChange,\n    handleSpecCoefficientChange,\n    handleSpecPriceChange,\n    toggleSpecPriceSource,\n    markSpecPriceManual,\n    handleMarkupCoefficientChange,\n    handleMarkupPriceChange,\n    handleBatchMarkupChange,\n    handleBatchCostChange,\n",
+          "after": "  return {\n    formatDecimalValue,\n    decimalNumber,\n    handleSpecCostChange,\n    handleSpecCoefficientChange,\n    handleSpecPriceChange,\n    toggleGuidePriceSource,\n    markGuidePriceManual,\n    toggleSpecPriceSource,\n    markSpecPriceManual,\n    handleMarkupCoefficientChange,\n    handleMarkupPriceChange,\n    handleBatchMarkupChange,\n    handleBatchCostChange,\n",
+          "reason": "用户确认运营成品现货/配件指导价跟随或手动；仅登记对应模式字段、保存与编辑辅助逻辑，保留其他业务。",
+          "stage": "before-migrations"
+        },
+        {
           "stage": "before-migrations",
           "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
           "before": "import type { Ref } from 'vue';\nimport { isValidSpecPriceNumber } from '../management/priceValidation';\nimport type { BatchFillForm, DecimalField, PriceRow, SpecRow } from './finishedStockPageModel';\n",
@@ -4983,7 +5037,21 @@
     },
     "src/pages/finished-stock/shared/finishedStockSpecRows.ts": {
       "content": "c6fec52618fe8a7f4d090409d3cda0144f11c2e17642a177e50eb29b860efcb3",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "before": "    size: '',\n    sizeImage: false,\n    costCoefficient: '',\n    cost: '',\n    guideCoefficient: defaultGuideCoefficient(),\n    guide: '',\n    level1Coefficient: '',\n    level1: '',\n    level2Coefficient: '',\n    level2: '',\n    level3Coefficient: '',\n    level3: '',\n",
+          "after": "    size: '',\n    sizeImage: false,\n    costCoefficient: '',\n    cost: '',\n    guideCoefficient: defaultGuideCoefficient(),\n    guide: '',\n    guidePriceSource: getGuideCoefficient() == null ? 'manual' : 'auto',\n    level1Coefficient: '',\n    level1: '',\n    level2Coefficient: '',\n    level2: '',\n    level3Coefficient: '',\n    level3: '',\n",
+          "reason": "用户确认运营成品现货/配件指导价跟随或手动；仅登记对应模式字段、保存与编辑辅助逻辑，保留其他业务。",
+          "stage": "before-migrations"
+        },
+        {
+          "before": "          color: variant.color || '',\n          size: variant.sizeValue || '',\n          costCoefficient: '1',\n          cost: String(variant.costPrice ?? guidePrice?.costPrice ?? markupPrices[0]?.costPrice ?? ''),\n          guideCoefficient: guidePrice == null ? '' : String(Number(guidePrice.priceCoefficient)),\n          guide: guidePrice == null ? '' : String(guidePrice.price),\n          quantity: variant.stock,\n          skuId: variant.id,\n          markupPrices: createMarkupEditors(markupPrices),\n        });\n      });\n    }\n",
+          "after": "          color: variant.color || '',\n          size: variant.sizeValue || '',\n          costCoefficient: '1',\n          cost: String(variant.costPrice ?? guidePrice?.costPrice ?? markupPrices[0]?.costPrice ?? ''),\n          guideCoefficient: guidePrice == null ? '' : String(Number(guidePrice.priceCoefficient)),\n          guide: guidePrice == null ? '' : String(guidePrice.price),\n          guidePriceSource: guidePrice\n            ? (guidePrice.priceSource ?? 'manual')\n            : getGuideCoefficient() == null\n              ? 'manual'\n              : 'auto',\n          quantity: variant.stock,\n          skuId: variant.id,\n          markupPrices: createMarkupEditors(markupPrices),\n        });\n      });\n    }\n",
+          "reason": "用户确认运营成品现货/配件指导价跟随或手动；仅登记对应模式字段、保存与编辑辅助逻辑，保留其他业务。",
+          "stage": "before-migrations"
+        }
+      ]
     },
     "src/pages/finished-stock/shared/finishedStockTemplateFields.ts": {
       "content": "e3759fce2034d84392e65ad90ccac64525618a0f88ce8e588e213b8f04931be4",
@@ -5456,6 +5524,12 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "before": "              <t-button :theme=\"buttonTheme('reset')\" variant=\"base\" @click=\"resetPoolFilter\"\n                ><template #icon><t-icon name=\"refresh\" /></template>重置</t-button\n              >\n            </div>\n          </div>\n        </t-form>\n        <AdminListToolbar has-actions>\n          <t-button :theme=\"buttonTheme('select-product')\" :disabled=\"!poolSelected.length\" @click=\"selectPool\"\n            >批量选择</t-button\n          >\n        </AdminListToolbar>\n        <div>\n          <t-table row-key=\"id\" :data=\"poolPageRows\" :columns=\"poolColumns\" hover>\n",
+          "after": "              <t-button :theme=\"buttonTheme('reset')\" variant=\"base\" @click=\"resetPoolFilter\"\n                ><template #icon><t-icon name=\"refresh\" /></template>重置</t-button\n              >\n            </div>\n          </div>\n        </t-form>\n        <AdminListToolbar has-actions has-batch-actions :selected-count=\"poolSelected.length\">\n          <t-button :theme=\"buttonTheme('select-product')\" :disabled=\"!poolSelected.length\" @click=\"selectPool\"\n            >批量选择</t-button\n          >\n        </AdminListToolbar>\n        <div>\n          <t-table row-key=\"id\" :data=\"poolPageRows\" :columns=\"poolColumns\" hover>\n",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。",
+          "stage": "before-migrations"
+        },
         {
           "before": "                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n                  <template #warehouseEntry=\"{ row }\"\n                    ><WarehouseEntryInformation v-if=\"row.effectiveStatus === 'warehouse'\" :entry=\"row\"\n                  /></template>\n                  <template #operation=\"{ row }\">\n                    <div class=\"table-actions\">\n                      <t-link\n                        v-for=\"action in storeRowButtons(row)\"\n",
           "after": "                  >\n                  <template #stateOperatedAt=\"{ row }\">{{\n                    row.stateOperatedAt ? formatProductDateTime(row.stateOperatedAt) : '历史记录未记录'\n                  }}</template>\n                  <template #warehouseEntry=\"{ row }\"><WarehouseEntryInformation :entry=\"row\" /></template>\n                  <template #operation=\"{ row }\">\n                    <div class=\"table-actions\">\n                      <t-link\n                        v-for=\"action in storeRowButtons(row)\"\n",
@@ -13718,6 +13792,12 @@
       "content": "26004aaf6c1165b901603b9580615be3795a895f0a75d0606378ae21dcb542df",
       "approvedPlaceholderPatches": [],
       "approvedBusinessPatches": [
+        {
+          "before": "  costPrice: number;\n  price: number;\n  skuId: number;\n  variantLabel?: string;\n}\nexport interface FinishedProductGuidePrice {\n  priceCoefficient: number;\n  costPrice: number;\n  price: number;\n  skuId: number;\n  variantLabel?: string;\n}\n",
+          "after": "  costPrice: number;\n  price: number;\n  skuId: number;\n  variantLabel?: string;\n}\nexport interface FinishedProductGuidePrice {\n  priceSource?: 'auto' | 'manual';\n  priceCoefficient: number;\n  costPrice: number;\n  price: number;\n  skuId: number;\n  variantLabel?: string;\n}\n",
+          "reason": "用户确认运营成品现货/配件指导价跟随或手动；仅登记对应模式字段、保存与编辑辅助逻辑，保留其他业务。",
+          "stage": "before-migrations"
+        },
         {
           "before": "  guidePrices?: FinishedProductGuidePrice[];\n  markupPrices?: FinishedProductPrice[];\n  attributes?: FinishedProductAttributeEntry[];\n  variants?: FinishedProductVariant[];\n  specDimensions?: FinishedSpecDimension[];\n  attributeDisplayOrder?: { product: string[]; sales: string[] };\n  createdByName?: string;\n  createdByAccountId?: number;\n  status?: FinishedProductStatus;\n  createdAt?: string;\n  updatedAt?: string;\n}\n\nexport interface FinishedProductPayload {\n  categoryId?: number;\n  supplierId?: number;\n  name: string;\n  sku: string;\n  mainImageMediaId: number;\n  mainImageMediaIds?: number[];\n",
           "after": "  guidePrices?: FinishedProductGuidePrice[];\n  markupPrices?: FinishedProductPrice[];\n  attributes?: FinishedProductAttributeEntry[];\n  variants?: FinishedProductVariant[];\n  specDimensions?: FinishedSpecDimension[];\n  attributeDisplayOrder?: { product: string[]; sales: string[] };\n  templateVersionId?: number;\n  templateRevision?: number;\n  attributeTemplateSnapshot?: FinishedProductTemplateAttribute[];\n  createdByName?: string;\n  createdByAccountId?: number;\n  status?: FinishedProductStatus;\n  createdAt?: string;\n  updatedAt?: string;\n}\n\nexport interface FinishedProductPayload {\n  templateVersionId?: number;\n  templateRevision?: number;\n  categoryId?: number;\n  supplierId?: number;\n  name: string;\n  sku: string;\n  mainImageMediaId: number;\n  mainImageMediaIds?: number[];\n",
