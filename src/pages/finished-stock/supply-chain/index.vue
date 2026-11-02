@@ -1104,6 +1104,7 @@ import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
 import { useStateActivitySort } from '@/composables/useStateActivitySort';
+import { useSpecTableLayout } from '../shared/useSpecTableLayout';
 import { useCommodityModule } from '@/composables/useCommodityModule';
 const commodity = useCommodityModule();
 
@@ -1205,7 +1206,7 @@ import ProductDetail from '../management/components/ProductDetail.vue';
 import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
 import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
-import { computed, h, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { computed, h, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 const tabs: TabConfig[] = [
   { value: 'all', label: '全部' },
@@ -2130,7 +2131,9 @@ const baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
       ? [{ colKey: 'specText', title: '商品规格', minWidth: 100 }]
       : confirmedLayeredFields.value.map((key) => {
           const field = salesAttributeByKey(key);
-          return field ? createSalesColumn(field) : { colKey: key, title: layeredFieldLabels.value[key] || key };
+          return field
+            ? { ...createSalesColumn(field), title: field.label }
+            : { colKey: key, title: layeredFieldLabels.value[key] || key };
         });
   const remainingSalesColumns = salesAttributeFields.value
     .filter((field) => confirmedSpecMode.value === 'single' || !confirmedLayeredFields.value.includes(field.key))
@@ -2142,48 +2145,8 @@ const baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     ...(!isOperationsEdit.value ? tailColumns : []),
   ];
 });
-// Use the native content-sized table to measure columns before allocating spare width.
-// Pin those widths through Table props so validation tips cannot redistribute columns.
-const specTableElement = ref<HTMLElement>();
-const specColumnWidths = ref<number[]>([]);
-let specMeasurementVersion = 0;
-const specColumns = computed(() =>
-  baseSpecColumns.value.map((column, index) => ({
-    ...column,
-    ...(specColumnWidths.value[index] ? { width: specColumnWidths.value[index] } : {}),
-  })),
-);
-const specTableContentWidth = computed(() =>
-  specColumnWidths.value.length
-    ? `max(100%, ${specColumnWidths.value.reduce((sum, width) => sum + width, 0)}px)`
-    : 'max-content',
-);
-watch(
-  [
-    () =>
-      JSON.stringify([
-        baseSpecColumns.value.map((column) => [
-          column.colKey,
-          column.width,
-          column.minWidth,
-          typeof column.title === 'string' ? column.title : '',
-        ]),
-        salesAttributeFields.value.map((field) => [field.key, field.label, field.type, field.required]),
-      ]),
-    () => JSON.stringify(specRows.value.map((row) => row.specText ?? '')),
-  ],
-  async () => {
-    const version = ++specMeasurementVersion;
-    specColumnWidths.value = [];
-    await nextTick();
-    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-    if (version !== specMeasurementVersion) return;
-    const headers = specTableElement.value?.querySelectorAll('thead th');
-    if (!headers || headers.length !== baseSpecColumns.value.length) return;
-    specColumnWidths.value = Array.from(headers, (header) => Math.ceil(header.getBoundingClientRect().width));
-  },
-  { flush: 'post' },
-);
+const { tableElement: specTableElement, contentWidth: specTableContentWidth, fitColumns } = useSpecTableLayout();
+const specColumns = computed(() => fitColumns(baseSpecColumns.value));
 const specRowspanAndColspan = ({
   rowIndex,
   col,

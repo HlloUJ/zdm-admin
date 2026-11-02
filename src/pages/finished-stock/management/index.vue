@@ -319,13 +319,13 @@
                         ])
                   "
                 >
-                  <div v-if="specRows.length" class="spec-table-block">
+                  <div v-if="specRows.length" ref="specTableElement" class="spec-table-block">
                     <t-table
                       row-key="id"
                       :data="specRows"
                       :columns="specColumns"
                       :rowspan-and-colspan="specRowspanAndColspan"
-                      table-content-width="max-content"
+                      :table-content-width="specTableContentWidth"
                       bordered
                       hover
                       table-layout="auto"
@@ -678,6 +678,7 @@ import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
 import { useStateActivitySort } from '@/composables/useStateActivitySort';
+import { useSpecTableLayout } from '../shared/useSpecTableLayout';
 import { useCommodityModule } from '@/composables/useCommodityModule';
 const commodity = useCommodityModule();
 
@@ -1425,20 +1426,20 @@ const formatReadonlyPrice = (value: unknown) =>
   value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);
 const requiredColumnTitle = (label: string) => () =>
   h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);
-const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
+const baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },
+    { colKey: 'cost', title: '成本价', minWidth: 80 },
     { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 148 },
     ...productPriceLevels.value.map((item) => ({
       colKey: `markup-${item.id}`,
       title: requiredColumnTitle(item.name),
       minWidth: 176,
     })),
-    { colKey: 'quantity', title: requiredColumnTitle('数量'), minWidth: 80 },
+    { colKey: 'quantity', title: '数量', minWidth: 80 },
   ];
   const createSalesColumn = (field: (typeof salesAttributeFields.value)[number]): PrimaryTableCol<TableRowData> => ({
     colKey: field.key,
-    title: field.required ? requiredColumnTitle(field.label) : field.label,
+    title: field.label,
   });
   const orderedSpecColumns: PrimaryTableCol<TableRowData>[] =
     confirmedSpecMode.value === 'single'
@@ -1452,6 +1453,8 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     .map(createSalesColumn);
   return [...orderedSpecColumns, ...priceColumnsBase, ...remainingSalesColumns];
 });
+const { tableElement: specTableElement, contentWidth: specTableContentWidth, fitColumns } = useSpecTableLayout();
+const specColumns = computed(() => fitColumns(baseSpecColumns.value));
 const specRowspanAndColspan = ({
   rowIndex,
   col,

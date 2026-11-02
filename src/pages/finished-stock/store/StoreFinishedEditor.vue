@@ -56,7 +56,7 @@
                     :data="rows"
                     :columns="editorColumns(columns)"
                     :rowspan-and-colspan="span"
-                    table-content-width="max-content"
+                    table-content-width="100%"
                     bordered
                     hover
                     table-layout="auto"

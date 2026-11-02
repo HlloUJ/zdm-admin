@@ -994,7 +994,7 @@ test('edits prices in a specification table and preserves product details on sav
   await expect(editor.locator('.spec-table-block tbody tr')).toHaveCount(2);
   await expect(editor.locator('.spec-table-block thead th')).toContainText([
     '商品规格',
-    '*成本价',
+    '成本价',
     '*指导价',
     '*一级价格',
   ]);

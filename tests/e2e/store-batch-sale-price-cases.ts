@@ -1,3 +1,4 @@
+import { expectSpecTableFillsContainer } from './price-table-feedback';
 import { expect, test, type Page } from '@playwright/test';
 import { productWarehouseUrl } from './product-test-navigation';
 
@@ -6,11 +7,12 @@ export function registerStoreBatchSalePriceTests(
   login: (page: Page) => Promise<void>,
   base: Record<string, unknown>,
 ) {
-  async function open(page: Page, layered = false, count = 3) {
+  async function open(page: Page, layered = false, count = 3, namedAttributes = false) {
     await login(page);
     const resource = module === 'finished-stock-management' ? 'store-finished-products' : 'store-accessory-products';
     const record = {
       ...base,
+      ...(namedAttributes ? { attributeNames: { color: '颜色', sizeValue: '尺寸' } } : {}),
       specDimensions: layered
         ? [
             { key: 'color', name: '门店销售规格颜色属性（共享）', values: ['白色', '黑色'] },
@@ -54,6 +56,26 @@ export function registerStoreBatchSalePriceTests(
     await button.click();
     const drawer = page.locator('.t-drawer--open').filter({ hasText: '批量填写' });
     return { main, drawer, button, writes, record, price: drawer.getByPlaceholder('请输入商品售价', { exact: true }) };
+  }
+
+  for (const layered of [false, true]) {
+    test(`store specification table fills available width and only editable price is marked, layered=${layered}`, async ({
+      page,
+    }) => {
+      const { main, drawer, writes } = await open(page, layered, 3, true);
+      await drawer.getByRole('button', { name: '取消', exact: true }).click();
+      const table = main.locator('.spec-table-block');
+      for (const width of [1689, 900, 1393]) {
+        await page.setViewportSize({ width, height: 1000 });
+        await expectSpecTableFillsContainer(table);
+      }
+      await expect(table.locator('thead .spec-required-star')).toHaveCount(1);
+      await expect(table.getByRole('columnheader', { name: '*商品售价', exact: true })).toBeVisible();
+      for (const header of await table.locator('thead th').all()) {
+        if (!(await header.innerText()).includes('商品售价')) await expect(header).not.toContainText('*');
+      }
+      expect(writes).toHaveLength(0);
+    });
   }
 
   test('store batch sale price applies only selected single specifications and saves through the original page', async ({

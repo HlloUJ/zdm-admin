@@ -52,3 +52,28 @@ export async function expectPriceTableStable(table: Locator, before: Awaited<Ret
       .toBe(layout.color);
   }
 }
+
+/** Check real column edges, including a fixed action column at the scrolled right edge. */
+export async function expectSpecTableFillsContainer(table: Locator) {
+  await expect
+    .poll(() =>
+      table.evaluate((element) => {
+        const content = element.querySelector('.t-table__content')!;
+        content.scrollLeft = content.scrollWidth;
+        const grid = content.querySelector('table')!;
+        const header = grid.querySelector('thead th:last-child')!;
+        const cell = grid.querySelector('tbody tr:first-child td:last-child')!;
+        const bounds = grid.getBoundingClientRect();
+        if (!header || !cell) return false;
+        return (
+          bounds.width >= content.clientWidth - 2 &&
+          Math.abs(bounds.right - header.getBoundingClientRect().right) <= 2 &&
+          Math.abs(bounds.right - cell.getBoundingClientRect().right) <= 2
+        );
+      }),
+    )
+    .toBe(true);
+  await table.locator('.t-table__content').evaluate((element) => {
+    element.scrollLeft = 0;
+  });
+}

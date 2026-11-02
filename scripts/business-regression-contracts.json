@@ -42,7 +42,8 @@
         "src/components/DecimalInput.vue",
         "src/utils/numericInput.ts",
         "src/utils/numericInputValidation.ts",
-        "backend/src/main/java/com/zdm/platform/craft/Craft.java"
+        "backend/src/main/java/com/zdm/platform/craft/Craft.java",
+        "src/pages/finished-stock/shared/useSpecTableLayout.ts"
       ],
       "tables": [
         "product_state_activity",
@@ -197,6 +198,7 @@
         "src/pages/finished-stock/shared/finishedStockSpecRows.ts",
         "src/pages/finished-stock/shared/finishedStockTemplateFields.ts",
         "src/pages/finished-stock/shared/useFinishedStockSpecDialog.ts",
+        "src/pages/finished-stock/shared/useSpecTableLayout.ts",
         "src/pages/finished-stock/store/StoreFinishedEditor.vue",
         "src/pages/finished-stock/store/index.vue",
         "src/pages/finished-stock/store/price-configuration.vue",
@@ -326,8 +328,8 @@
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
-        "tests/e2e/finished-stock.spec.ts": "458a57dee118a9cc156504a88d5c02d28e140ff5e784db54b02ef7af277e4e12",
-        "tests/e2e/accessory-management.spec.ts": "c11f4e388f0aec3054daf97890411a5be8a78f881c9cac34a66c82a8857d56fd",
+        "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+        "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
         "tests/e2e/slab-collaboration.spec.ts": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
         "tests/e2e/store-finished-stock.spec.ts": "4f75f180b7d86d3967f01e367989788ac975798b955816b82fc5b7c254bb397f",
         "tests/e2e/store-accessory-management.spec.ts": "80b9738c977b9be6bded25b9f6a854f7b50bed6d1229d8c734e8c99c81b598b9",
@@ -394,14 +396,15 @@
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
         "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
         "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "c68b320b55c02156cb5104344627d1c32f64cf012981f7aaee191b91b62bc3ba",
-        "tests/e2e/product-attribute-feedback-cases.ts": "81d98b3083ab76b6387db9fffd2737ff2a8df5009da3f796da055034afa0bfe6",
-        "tests/e2e/store-batch-sale-price-cases.ts": "658f987d7f895d0724e6ff6a6aaf43265dac59e91f26a755c9465ed02f82b7f1",
+        "tests/e2e/product-attribute-feedback-cases.ts": "90a7eb5bf7ff969047eb90e5c499cd2e359f383b14f832a8521cd07bf7bf7d02",
+        "tests/e2e/store-batch-sale-price-cases.ts": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
         "src/components/DecimalInput.test.ts": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
         "src/utils/numericInput.test.ts": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
         "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java": "3e5698da75d970c3e7ee82fb93965a086876a9d771c5e44a687213be853ef90a",
         "src/utils/numericInputValidation.test.ts": "3b7a3a3dcd4fcb8f06923dbe341e0e870e9e2791c772d8496ef8e11cbea66a26",
         "tests/e2e/store-price-rules.spec.ts": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
-        "tests/e2e/decimal-editing.ts": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73"
+        "tests/e2e/decimal-editing.ts": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73",
+        "tests/e2e/price-table-feedback.ts": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7"
       },
       "testChanges": [
         {
@@ -2184,6 +2187,78 @@
           "before": "3962166d93764105f0145288af6165df4fb4583c0c60a9cfea9c0542db32cb5b",
           "after": "81d98b3083ab76b6387db9fffd2737ff2a8df5009da3f796da055034afa0bfe6",
           "reason": "用户确认仅修复公共数值控件的删除、中文输入法状态同步及拒绝输入后的光标恢复。保留原断言，新增整数/负值例外、真实删除与组合事件后数字连续输入回归；明确测试光标位置，不改超时、重试或其他业务。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "458a57dee118a9cc156504a88d5c02d28e140ff5e784db54b02ef7af277e4e12",
+          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "c11f4e388f0aec3054daf97890411a5be8a78f881c9cac34a66c82a8857d56fd",
+          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "81d98b3083ab76b6387db9fffd2737ff2a8df5009da3f796da055034afa0bfe6",
+          "after": "90a7eb5bf7ff969047eb90e5c499cd2e359f383b14f832a8521cd07bf7bf7d02",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "658f987d7f895d0724e6ff6a6aaf43265dac59e91f26a755c9465ed02f82b7f1",
+          "after": "f9fdecb7003c46d8eaf8aa7de9a0f95075ef316c8d894228c608478fa0fac4f4",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/price-table-feedback.ts",
+          "before": "e55d185bd12712863333f5ce14ac12ff6ac4a7320dfb90d86c41b5442f257fa8",
+          "after": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "f9fdecb7003c46d8eaf8aa7de9a0f95075ef316c8d894228c608478fa0fac4f4",
+          "after": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
         }
       ],
       "routes": [
@@ -2244,7 +2319,8 @@
         "tests/e2e/store-batch-sale-price-cases.ts",
         "src/components/DecimalInput.test.ts",
         "src/utils/numericInput.test.ts",
-        "src/utils/numericInputValidation.test.ts"
+        "src/utils/numericInputValidation.test.ts",
+        "tests/e2e/price-table-feedback.ts"
       ]
     }
   ]

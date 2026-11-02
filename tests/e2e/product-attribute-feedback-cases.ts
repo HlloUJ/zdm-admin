@@ -1,3 +1,4 @@
+import { expectSpecTableFillsContainer, priceTableGeometry, expectPriceTableStable } from './price-table-feedback';
 import { checkNumericEditingRecovery } from './decimal-editing';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { productWarehouseUrl } from './product-test-navigation';
@@ -129,6 +130,41 @@ async function switchToLayered(page: Page) {
 }
 
 export function registerAttributeFeedbackTests(resource: Resource, install: (page: Page) => Promise<void>) {
+  for (const client of ['supply-chain', 'admin']) {
+    for (const layered of [false, true]) {
+      test(`${client} specification columns fill the editor and required marks follow editability, layered=${layered}`, async ({
+        page,
+      }) => {
+        const { table, writes } = await openEditor(page, resource, install, layered, '销售数字属性', 2, client);
+        const block = page.locator('.spec-table-block');
+        for (const width of [1689, 900, 1393]) {
+          await page.setViewportSize({ width, height: 1000 });
+          await expectSpecTableFillsContainer(block);
+        }
+        const headers = block.locator('thead th');
+        if (client === 'admin') {
+          for (const title of ['成本价', '数量', '销售数字属性', '销售选项属性'])
+            await expect(headers.filter({ hasText: new RegExp(`^${title}$`) })).toHaveCount(1);
+          await expect(headers.filter({ hasText: /^\*指导价$/ })).toHaveCount(1);
+        } else {
+          await expect(headers.filter({ hasText: /^\*成本价$/ })).toHaveCount(1);
+          await expect(headers.filter({ hasText: /^\*数量$/ })).toHaveCount(1);
+          for (const title of ['销售数字属性', '销售选项属性'])
+            await expect(headers.filter({ hasText: new RegExp(`^${layered ? '' : '\\*'}${title}$`) })).toHaveCount(1);
+        }
+        const geometry = await priceTableGeometry(table);
+        const price = table.getByPlaceholder('请输入价格', { exact: true }).first();
+        await price.fill('');
+        await price.blur();
+        await expectPriceTableStable(table, geometry);
+        await price.fill('10');
+        await price.blur();
+        await expectPriceTableStable(table, geometry);
+        expect(writes).toHaveLength(0);
+      });
+    }
+  }
+
   test('numeric attributes and prices recover after deletion and Chinese composition before typing digits', async ({
     page,
   }) => {
