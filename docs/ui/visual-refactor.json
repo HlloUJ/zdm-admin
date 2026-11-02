@@ -1320,6 +1320,36 @@
       ],
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                </t-form-item>\n                <t-form-item label=\"工艺宽度\">\n                  <div class=\"width-range\">\n                    <t-input\n                      :model-value=\"searchForm.widthStart\"\n                      clearable\n                      inputmode=\"numeric\"\n                      placeholder=\"请输入工艺宽度\"\n                      @update:model-value=\"handleWidthSearchInput('widthStart', $event)\"\n                    />\n                    <span>-</span>\n                    <t-input\n                      :model-value=\"searchForm.widthEnd\"\n                      clearable\n                      inputmode=\"numeric\"\n                      placeholder=\"请输入工艺宽度\"\n                      @update:model-value=\"handleWidthSearchInput('widthEnd', $event)\"\n                    />\n",
+          "after": "                </t-form-item>\n                <t-form-item label=\"工艺宽度\">\n                  <div class=\"width-range\">\n                    <DecimalInput\n                      plain\n                      large-number\n                      :model-value=\"searchForm.widthStart\"\n                      clearable\n                      inputmode=\"decimal\"\n                      placeholder=\"请输入工艺宽度\"\n                      @update:model-value=\"handleWidthSearchInput('widthStart', $event)\"\n                    />\n                    <span>-</span>\n                    <DecimalInput\n                      plain\n                      large-number\n                      :model-value=\"searchForm.widthEnd\"\n                      clearable\n                      inputmode=\"decimal\"\n                      placeholder=\"请输入工艺宽度\"\n                      @update:model-value=\"handleWidthSearchInput('widthEnd', $event)\"\n                    />\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "            <t-option v-for=\"item in craftTypeOptions\" :key=\"item.value\" :label=\"item.label\" :value=\"item.value\" />\n          </t-select>\n        </t-form-item>\n        <t-form-item label=\"工艺宽度\" name=\"width\">\n          <t-input\n            :model-value=\"formData.width\"\n            clearable\n            inputmode=\"numeric\"\n            placeholder=\"请输入工艺宽度\"\n            suffix=\"mm\"\n            @update:model-value=\"handleFormWidthInput\"\n",
+          "after": "            <t-option v-for=\"item in craftTypeOptions\" :key=\"item.value\" :label=\"item.label\" :value=\"item.value\" />\n          </t-select>\n        </t-form-item>\n        <t-form-item label=\"工艺宽度\" name=\"width\" :show-error-message=\"!numericError(formData.width)\">\n          <DecimalInput\n            plain\n            large-number\n            :model-value=\"formData.width\"\n            clearable\n            inputmode=\"decimal\"\n            placeholder=\"请输入工艺宽度\"\n            suffix=\"mm\"\n            @update:model-value=\"handleFormWidthInput\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "</template>\n\n<script setup lang=\"ts\">\nimport { AdminDialog } from '@/components/foundation';\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\n",
+          "after": "</template>\n\n<script setup lang=\"ts\">\nimport DecimalInput from '@/components/DecimalInput.vue';\nimport { numericError } from '@/utils/numericInput';\nimport { AdminDialog } from '@/components/foundation';\nimport { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "});\n\nconst formRules: Record<string, FormRule[]> = {\n  image: [{ required: true, message: '请上传工艺图片', type: 'error' }],\n  name: [{ required: true, message: '请输入工艺名称', type: 'error' }],\n  type: [{ required: true, message: '请选择工艺类型', type: 'error' }],\n",
+          "after": "});\n\nconst formRules: Record<string, FormRule[]> = {\n  width: [{ validator: (value) => !numericError(value), message: '请输入非负数字，最多两位小数', type: 'error' }],\n  image: [{ required: true, message: '请上传工艺图片', type: 'error' }],\n  name: [{ required: true, message: '请输入工艺名称', type: 'error' }],\n  type: [{ required: true, message: '请选择工艺类型', type: 'error' }],\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "      : undefined;\n  formData.name = row.name;\n  formData.type = row.type;\n  formData.width = row.width.replace(/\\D/g, '');\n  formData.remark = row.remark ?? '';\n};\n\nconst handleSearch = () => {\n  Object.assign(appliedSearchForm, searchForm);\n  pagination.current = 1;\n};\n\nconst handleWidthSearchInput = (field: 'widthStart' | 'widthEnd', value: string) => {\n  searchForm[field] = value.replace(/\\D/g, '');\n};\n\nconst handleFormWidthInput = (value: string) => {\n  formData.width = value.replace(/\\D/g, '');\n};\n\nconst handleReset = () => {\n",
+          "after": "      : undefined;\n  formData.name = row.name;\n  formData.type = row.type;\n  formData.width = row.width;\n  formData.remark = row.remark ?? '';\n};\n\nconst handleSearch = () => {\n  if (numericError(searchForm.widthStart) || numericError(searchForm.widthEnd)) return;\n  Object.assign(appliedSearchForm, searchForm);\n  pagination.current = 1;\n};\n\nconst handleWidthSearchInput = (field: 'widthStart' | 'widthEnd', value: string) => {\n  searchForm[field] = value;\n};\n\nconst handleFormWidthInput = (value: string) => {\n  formData.width = value;\n};\n\nconst handleReset = () => {\n"
+        },
+        {
           "before": "  object-fit: cover;\n}\n\n.craft-image__empty {\n  font-size: var(--td-font-size-body-small);\n}\n\n.table-actions {\n  display: flex;\n",
           "after": "  object-fit: cover;\n}\n\n.craft-image__empty {\n  font: var(--td-font-body-small);\n}\n\n.table-actions {\n  display: flex;\n",
           "stage": "before-migrations",
@@ -4911,7 +4941,21 @@
     },
     "src/pages/finished-stock/shared/finishedStockPriceEditor.ts": {
       "content": "dce2fff3816ce73c57567d7a801090a23a6084991365f9e0766ccba7fe346f60",
-      "approvedPlaceholderPatches": []
+      "approvedPlaceholderPatches": [],
+      "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "import type { Ref } from 'vue';\nimport { isValidSpecPriceNumber } from '../management/priceValidation';\nimport type { BatchFillForm, DecimalField, PriceRow, SpecRow } from './finishedStockPageModel';\n",
+          "after": "import { normalizeNumeric } from '@/utils/numericInput';\nimport type { Ref } from 'vue';\nimport { isValidSpecPriceNumber } from '../management/priceValidation';\nimport type { BatchFillForm, DecimalField, PriceRow, SpecRow } from './finishedStockPageModel';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "      row[field] = '';\n      return;\n    }\n    const value = Number(rawValue);\n    row[field] = Number.isFinite(value) ? value.toFixed(2) : '';\n  };\n  const decimalNumber = (value: string) => {\n    if (!isValidSpecPriceNumber(value)) return null;\n",
+          "after": "      row[field] = '';\n      return;\n    }\n    row[field] = normalizeNumeric(rawValue);\n  };\n  const decimalNumber = (value: string) => {\n    if (!isValidSpecPriceNumber(value)) return null;\n"
+        }
+      ]
     },
     "src/pages/finished-stock/shared/finishedStockSpecRows.ts": {
       "content": "c6fec52618fe8a7f4d090409d3cda0144f11c2e17642a177e50eb29b860efcb3",
@@ -5864,6 +5908,30 @@
       "approvedBusinessPatches": [
         {
           "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "            filterable\n          />\n        </t-form-item>\n        <t-form-item help=\"请输入0.01～1之间的值\" label=\"折扣系数\" name=\"coefficient\">\n          <DecimalInput\n            v-model=\"createForm.coefficient\"\n            :style=\"{ width: '100%' }\"\n            theme=\"normal\"\n            :decimal-places=\"2\"\n            :min=\"0.01\"\n            :max=\"1\"\n            allow-input-over-limit\n            placeholder=\"请输入折扣系数\"\n",
+          "after": "            filterable\n          />\n        </t-form-item>\n        <t-form-item\n          help=\"请输入0.01～1之间的值\"\n          label=\"折扣系数\"\n          name=\"coefficient\"\n          :show-error-message=\"!numericError(createForm.coefficient)\"\n        >\n          <DecimalInput\n            v-model=\"createForm.coefficient\"\n            :style=\"{ width: '100%' }\"\n            theme=\"normal\"\n            :decimal-places=\"2\"\n            :min=\"0\"\n            :max=\"1\"\n            allow-input-over-limit\n            placeholder=\"请输入折扣系数\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "            v-model=\"form.coefficient\"\n            :placeholder=\"controlPlaceholder(kindLabel, 'input')\"\n            :decimal-places=\"2\"\n            :min=\"0.01\"\n            :max=\"999\"\n            theme=\"normal\"\n            :status=\"batchError ? 'error' : undefined\"\n",
+          "after": "            v-model=\"form.coefficient\"\n            :placeholder=\"controlPlaceholder(kindLabel, 'input')\"\n            :decimal-places=\"2\"\n            :min=\"0\"\n            :max=\"999\"\n            theme=\"normal\"\n            :status=\"batchError ? 'error' : undefined\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport DecimalInput from '@/components/DecimalInput.vue';\nimport { computed, nextTick, reactive, ref, watch } from 'vue';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\n",
+          "after": "\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\nimport DecimalInput from '@/components/DecimalInput.vue';\nimport { numericError } from '@/utils/numericInput';\nimport { validateNumericControls } from '@/utils/numericInputValidation';\nimport { computed, nextTick, reactive, ref, watch } from 'vue';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport AdminSideMenu from '@/components/AdminSideMenu.vue';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "  batchError.value = '';\n  formVisible.value = true;\n}\nfunction save() {\n  if (saving.value || activeKind.value !== 'price' || !can('batch-set')) return;\n  if (form.coefficient == null || String(form.coefficient).trim() === '') {\n    batchError.value = '请输入价格系数';\n    return rejectFormSubmission(batchFormRoot.value);\n",
+          "after": "  batchError.value = '';\n  formVisible.value = true;\n}\nasync function save() {\n  if (saving.value || activeKind.value !== 'price' || !can('batch-set')) return;\n  if (!(await validateNumericControls(batchFormRoot.value))) return;\n  if (form.coefficient == null || String(form.coefficient).trim() === '') {\n    batchError.value = '请输入价格系数';\n    return rejectFormSubmission(batchFormRoot.value);\n"
+        },
+        {
+          "stage": "before-migrations",
           "reason": "2026-10-22 user approved all query-region overflow repairs; reuse shared narrow workspace layout while preserving desktop, events, fields and business logic.",
           "before": "class=\"price-workspace\"",
           "after": "class=\"price-workspace zdm-admin-responsive-panels\""
@@ -6730,6 +6798,66 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                        >\n                          <t-option v-for=\"item in field.options\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                        </t-select>\n                        <t-input\n                          v-else\n                          v-model=\"productForm[field.key]\"\n                          v-bind=\"attributeFeedback(field, productForm[field.key], submitAttempted)\"\n                          clearable\n                          :placeholder=\"controlPlaceholder(field.label, 'input')\"\n",
+          "after": "                        >\n                          <t-option v-for=\"item in field.options\" :key=\"item\" :label=\"item\" :value=\"item\" />\n                        </t-select>\n                        <component\n                          :is=\"field.valueType === 'number' ? DecimalInput : 't-input'\"\n                          v-else\n                          v-model=\"productForm[field.key]\"\n                          :plain=\"true\"\n                          large-number\n                          v-bind=\"attributeFeedback(field, productForm[field.key], submitAttempted)\"\n                          clearable\n                          :placeholder=\"controlPlaceholder(field.label, 'input')\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                        >\n                          <t-option v-for=\"value in field.options\" :key=\"value\" :label=\"value\" :value=\"value\" />\n                        </t-select>\n                        <t-input\n                          v-else\n                          v-model=\"row[field.key]\"\n                          v-bind=\"attributeFeedback(field, row[field.key], specSubmitted, row)\"\n                          :placeholder=\"controlPlaceholder(field.label, 'input')\"\n                          @blur=\"row[field.key] = normalizeAttribute(field, row[field.key], row)\"\n",
+          "after": "                        >\n                          <t-option v-for=\"value in field.options\" :key=\"value\" :label=\"value\" :value=\"value\" />\n                        </t-select>\n                        <component\n                          :is=\"field.valueType === 'number' ? DecimalInput : 't-input'\"\n                          v-else\n                          v-model=\"row[field.key]\"\n                          :plain=\"true\"\n                          large-number\n                          v-bind=\"attributeFeedback(field, row[field.key], specSubmitted, row)\"\n                          :placeholder=\"controlPlaceholder(field.label, 'input')\"\n                          @blur=\"row[field.key] = normalizeAttribute(field, row[field.key], row)\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                      </template>\n                      <template #quantity=\"{ row }\">\n                        <div class=\"quantity-editor\">\n                          <t-input-number\n                            v-model=\"row.quantity\"\n                            :disabled=\"isOperationsEdit\"\n                            theme=\"normal\"\n                            :min=\"0\"\n",
+          "after": "                      </template>\n                      <template #quantity=\"{ row }\">\n                        <div class=\"quantity-editor\">\n                          <DecimalInput\n                            v-model=\"row.quantity\"\n                            :decimal-places=\"0\"\n                            :disabled=\"isOperationsEdit\"\n                            theme=\"normal\"\n                            :min=\"0\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                                : undefined\n                            \"\n                            placeholder=\"请输入数量\"\n                            @beforeinput.capture=\"preventZeroQuantity\"\n                            @paste.capture=\"preventZeroQuantity\"\n                            @keydown.capture=\"preventZeroQuantity\"\n                          />\n                        </div>\n                      </template>\n",
+          "after": "                                : undefined\n                            \"\n                            placeholder=\"请输入数量\"\n                          />\n                        </div>\n                      </template>\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                    :disabled=\"isSpecOptionSelected(group, value.id, item)\"\n                  />\n                </t-select>\n                <t-input\n                  v-else\n                  v-model=\"value.value\"\n                  v-bind=\"specAttributeFeedback(group, value)\"\n                  :placeholder=\"controlPlaceholder(group.name, 'input')\"\n                  @blur=\"normalizeSpecAttribute(group, value)\"\n",
+          "after": "                    :disabled=\"isSpecOptionSelected(group, value.id, item)\"\n                  />\n                </t-select>\n                <component\n                  :is=\"salesAttributeByKey(group.field)?.valueType === 'number' ? DecimalInput : 't-input'\"\n                  v-else\n                  v-model=\"value.value\"\n                  :plain=\"true\"\n                  large-number\n                  v-bind=\"specAttributeFeedback(group, value)\"\n                  :placeholder=\"controlPlaceholder(group.name, 'input')\"\n                  @blur=\"normalizeSpecAttribute(group, value)\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "            </t-form-item>\n\n            <t-form-item v-if=\"!isOperationsEdit\" label=\"数量\">\n              <t-input-number\n                v-model=\"batchFillForm.quantity\"\n                :status=\"\n                  batchFillSubmitted &&\n                  batchFillForm.quantity != null &&\n",
+          "after": "            </t-form-item>\n\n            <t-form-item v-if=\"!isOperationsEdit\" label=\"数量\">\n              <DecimalInput\n                v-model=\"batchFillForm.quantity\"\n                :decimal-places=\"0\"\n                :status=\"\n                  batchFillSubmitted &&\n                  batchFillForm.quantity != null &&\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                placeholder=\"请输入数量\"\n                theme=\"normal\"\n                :min=\"0\"\n                @beforeinput.capture=\"preventZeroQuantity\"\n                @paste.capture=\"preventZeroQuantity\"\n                @keydown.capture=\"preventZeroQuantity\"\n              />\n            </t-form-item>\n            <t-form-item\n",
+          "after": "                placeholder=\"请输入数量\"\n                theme=\"normal\"\n                :min=\"0\"\n              />\n            </t-form-item>\n            <t-form-item\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "              >\n                <t-option v-for=\"value in field.options\" :key=\"value\" :label=\"value\" :value=\"value\" />\n              </t-select>\n              <t-input\n                v-else\n                v-model=\"batchSalesAttributes[field.key]\"\n                v-bind=\"batchAttributeFeedback(field)\"\n                clearable\n                :placeholder=\"controlPlaceholder(field.label, 'input')\"\n",
+          "after": "              >\n                <t-option v-for=\"value in field.options\" :key=\"value\" :label=\"value\" :value=\"value\" />\n              </t-select>\n              <component\n                :is=\"field.valueType === 'number' ? DecimalInput : 't-input'\"\n                v-else\n                v-model=\"batchSalesAttributes[field.key]\"\n                :plain=\"true\"\n                large-number\n                v-bind=\"batchAttributeFeedback(field)\"\n                clearable\n                :placeholder=\"controlPlaceholder(field.label, 'input')\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "</template>\n\n<script setup lang=\"ts\">\nimport OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';\nimport { shelfProductsFromAll } from '@/services/productAllBatchShelf';\nimport type { BatchShelfResult } from '@/services/operationsBatchShelf';\n",
+          "after": "</template>\n\n<script setup lang=\"ts\">\nimport DecimalInput from '@/components/DecimalInput.vue';\nimport OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';\nimport { shelfProductsFromAll } from '@/services/productAllBatchShelf';\nimport type { BatchShelfResult } from '@/services/operationsBatchShelf';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "import { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { preventZeroQuantity, isPositiveIntegerQuantity } from '@/utils/quantityInput';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';\nimport {\n",
+          "after": "import { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { isPositiveIntegerQuantity } from '@/utils/quantityInput';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';\nimport {\n"
+        },
         {
           "before": "class=\"batch-fill-panel\"",
           "after": "class=\"batch-fill-panel batch-fill-panel--source\"",
@@ -8798,6 +8926,24 @@
       "template": "5e3c0a78337d9dfc5455d79cd1734fbfacea060c58f3b27362c9647869b2bf52",
       "approvedBusinessPatches": [
         {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                      class=\"guide-form-item\"\n                      name=\"priceCoefficient\"\n                      :rules=\"guidePriceCoefficientRules\"\n                      :required-mark=\"false\"\n                    >\n                      <DecimalInput\n",
+          "after": "                      class=\"guide-form-item\"\n                      name=\"priceCoefficient\"\n                      :rules=\"guidePriceCoefficientRules\"\n                      :show-error-message=\"!numericError(guideForm.priceCoefficient)\"\n                      :required-mark=\"false\"\n                    >\n                      <DecimalInput\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "            />\n          </t-select>\n        </t-form-item>\n        <t-form-item label=\"价格系数\" name=\"priceCoefficient\">\n          <DecimalInput\n            v-model=\"formData.priceCoefficient\"\n            class=\"price-coefficient-input\"\n",
+          "after": "            />\n          </t-select>\n        </t-form-item>\n        <t-form-item\n          label=\"价格系数\"\n          name=\"priceCoefficient\"\n          :show-error-message=\"!numericError(formData.priceCoefficient)\"\n        >\n          <DecimalInput\n            v-model=\"formData.priceCoefficient\"\n            class=\"price-coefficient-input\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "import { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport DecimalInput from '@/components/DecimalInput.vue';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport { computed, onMounted, reactive, ref, watch } from 'vue';\n\n",
+          "after": "import { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport DecimalInput from '@/components/DecimalInput.vue';\nimport { numericError } from '@/utils/numericInput';\nimport type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';\nimport { computed, onMounted, reactive, ref, watch } from 'vue';\n\n"
+        },
+        {
           "before": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'name', title: '门店级别', minWidth: 200, align: 'left' },\n  { colKey: 'priceCoefficient', title: '价格系数', width: 130, align: 'right' },\n  { colKey: 'status', title: '状态', width: 100, align: 'center' },\n  { colKey: 'createdByName', title: '创建人', width: 120, align: 'center' },\n  { colKey: 'createdAt', title: '创建时间', width: 180, align: 'center' },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
           "after": "const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [\n  ...(canSort.value ? [{ colKey: 'drag', title: 'dragTitle', width: 28, align: 'left' as const }] : []),\n  { colKey: 'index', title: '序号', width: 80, align: 'left' },\n  { colKey: 'name', title: '门店级别', minWidth: 200, align: 'left' },\n  { colKey: 'priceCoefficient', title: '价格系数', width: 130 },\n  { colKey: 'status', title: '状态', width: 100 },\n  { colKey: 'createdByName', title: '创建人', width: 120 },\n  { colKey: 'createdAt', title: '创建时间', width: 180 },\n  {\n    colKey: 'operation',\n    title: '操作',\n    width: 156,\n",
           "stage": "before-migrations",
@@ -9636,6 +9782,54 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "              </div>\n              <div class=\"section-title\">尺寸（mm）</div>\n              <div class=\"dimension-grid\">\n                <t-form-item label=\"长\" name=\"length\" required-mark>\n                  <span v-if=\"readonlyProductFields\">{{ productForm.length || '-' }}</span>\n                  <t-input-number\n                    v-else\n                    v-model=\"productForm.length\"\n                    class=\"measurement-input\"\n",
+          "after": "              </div>\n              <div class=\"section-title\">尺寸（mm）</div>\n              <div class=\"dimension-grid\">\n                <t-form-item\n                  label=\"长\"\n                  name=\"length\"\n                  required-mark\n                  :show-error-message=\"!numericError(productForm.length)\"\n                >\n                  <span v-if=\"readonlyProductFields\">{{ productForm.length || '-' }}</span>\n                  <DecimalInput\n                    v-else\n                    v-model=\"productForm.length\"\n                    class=\"measurement-input\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                    @change=\"handleMeasurementChange('length')\"\n                  />\n                </t-form-item>\n                <t-form-item label=\"宽\" name=\"width\" required-mark>\n                  <span v-if=\"readonlyProductFields\">{{ productForm.width || '-' }}</span>\n                  <t-input-number\n                    v-else\n                    v-model=\"productForm.width\"\n                    class=\"measurement-input\"\n",
+          "after": "                    @change=\"handleMeasurementChange('length')\"\n                  />\n                </t-form-item>\n                <t-form-item\n                  label=\"宽\"\n                  name=\"width\"\n                  required-mark\n                  :show-error-message=\"!numericError(productForm.width)\"\n                >\n                  <span v-if=\"readonlyProductFields\">{{ productForm.width || '-' }}</span>\n                  <DecimalInput\n                    v-else\n                    v-model=\"productForm.width\"\n                    class=\"measurement-input\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                    @change=\"handleMeasurementChange('width')\"\n                  />\n                </t-form-item>\n                <t-form-item label=\"高\" name=\"height\" required-mark>\n                  <span v-if=\"readonlyProductFields\">{{ productForm.height || '-' }}</span>\n                  <t-input-number\n                    v-else\n                    v-model=\"productForm.height\"\n                    class=\"measurement-input\"\n",
+          "after": "                    @change=\"handleMeasurementChange('width')\"\n                  />\n                </t-form-item>\n                <t-form-item\n                  label=\"高\"\n                  name=\"height\"\n                  required-mark\n                  :show-error-message=\"!numericError(productForm.height)\"\n                >\n                  <span v-if=\"readonlyProductFields\">{{ productForm.height || '-' }}</span>\n                  <DecimalInput\n                    v-else\n                    v-model=\"productForm.height\"\n                    class=\"measurement-input\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                <t-form-item v-if=\"isProductFormPage\" label=\"面积\" name=\"area\">\n                  <span>{{ productAreaSquareMeter == null ? '-' : `${productAreaSquareMeter.toFixed(2)} ㎡` }}</span>\n                </t-form-item>\n                <t-form-item :label=\"isProductFormPage ? '±误差' : '土误差'\" name=\"tolerance\">\n                  <span v-if=\"readonlyProductFields\">{{ productForm.tolerance || '-' }}</span>\n                  <t-input-number\n                    v-else\n                    v-model=\"productForm.tolerance\"\n                    class=\"measurement-input\"\n",
+          "after": "                <t-form-item v-if=\"isProductFormPage\" label=\"面积\" name=\"area\">\n                  <span>{{ productAreaSquareMeter == null ? '-' : `${productAreaSquareMeter.toFixed(2)} ㎡` }}</span>\n                </t-form-item>\n                <t-form-item\n                  :label=\"isProductFormPage ? '±误差' : '土误差'\"\n                  name=\"tolerance\"\n                  :show-error-message=\"!numericError(productForm.tolerance)\"\n                >\n                  <span v-if=\"readonlyProductFields\">{{ productForm.tolerance || '-' }}</span>\n                  <DecimalInput\n                    v-else\n                    v-model=\"productForm.tolerance\"\n                    class=\"measurement-input\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "              </div>\n              <div class=\"section-title\">扣角（mm）</div>\n              <div class=\"corner-grid\">\n                <t-form-item v-for=\"item in cornerFields\" :key=\"item.key\" :label=\"item.label\" :name=\"item.key\">\n                  <span v-if=\"readonlyProductFields\">{{ productForm[item.key] || '-' }}</span>\n                  <t-input-number\n                    v-else\n                    v-model=\"productForm[item.key]\"\n                    class=\"measurement-input\"\n",
+          "after": "              </div>\n              <div class=\"section-title\">扣角（mm）</div>\n              <div class=\"corner-grid\">\n                <t-form-item\n                  v-for=\"item in cornerFields\"\n                  :key=\"item.key\"\n                  :label=\"item.label\"\n                  :name=\"item.key\"\n                  :show-error-message=\"!numericError(productForm[item.key])\"\n                >\n                  <span v-if=\"readonlyProductFields\">{{ productForm[item.key] || '-' }}</span>\n                  <DecimalInput\n                    v-else\n                    v-model=\"productForm[item.key]\"\n                    class=\"measurement-input\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                </t-form-item>\n                <t-form-item label=\"库存\" name=\"stock\" required-mark>\n                  <span v-if=\"readonlyProductFields\">{{ productForm.stock ?? '-' }}</span>\n                  <t-input-number\n                    v-else\n                    v-model=\"productForm.stock\"\n                    large-number\n",
+          "after": "                </t-form-item>\n                <t-form-item label=\"库存\" name=\"stock\" required-mark>\n                  <span v-if=\"readonlyProductFields\">{{ productForm.stock ?? '-' }}</span>\n                  <DecimalInput\n                    v-else\n                    v-model=\"productForm.stock\"\n                    large-number\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "</template>\n\n<script setup lang=\"ts\">\nimport OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';\nimport { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';\nconst batchShelfResultVisible = ref(false);\n",
+          "after": "</template>\n\n<script setup lang=\"ts\">\nimport DecimalInput from '@/components/DecimalInput.vue';\nimport { numericError } from '@/utils/numericInput';\nimport OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';\nimport { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';\nconst batchShelfResultVisible = ref(false);\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "  salesFormRef.value?.clearValidate([field]);\n};\nconst handleStockChange = (value?: unknown, context?: SalesNumberChangeContext) => {\n  if (context?.type === 'props' || context?.type === 'blur') return;\n  const normalizedValue = String(value ?? '').trim();\n  stockHasLeadingZero.value = /^0\\d+/.test(normalizedValue);\n  clearSalesFieldError('stock');\n",
+          "after": "  salesFormRef.value?.clearValidate([field]);\n};\nconst handleStockChange = (value?: unknown, context?: SalesNumberChangeContext) => {\n  if (context?.type === 'props') return;\n  const normalizedValue = String(value ?? '').trim();\n  stockHasLeadingZero.value = /^0\\d+/.test(normalizedValue);\n  clearSalesFieldError('stock');\n"
+        },
         {
           "before": "        <template #offShelvedAt=\"{ row }\">{{ formatDateTime(row.offShelvedAt) }}</template>\n      </t-table>\n      <t-empty v-else description=\"暂无下架记录\" />\n    </AdminDialog>\n  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { useRoute } from 'vue-router';\nimport ProductListStatusTag from '@/components/ProductListStatusTag.vue';\nimport { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\n",
           "after": "        <template #offShelvedAt=\"{ row }\">{{ formatDateTime(row.offShelvedAt) }}</template>\n      </t-table>\n      <t-empty v-else description=\"暂无下架记录\" />\n    </AdminDialog>\n    <OperationsBatchShelfResult v-model:visible=\"batchShelfResultVisible\" :result=\"batchShelfResult\" />\n  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';\nimport { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';\nconst batchShelfResultVisible = ref(false);\nconst batchShelfResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });\nimport { useRoute } from 'vue-router';\nimport ProductListStatusTag from '@/components/ProductListStatusTag.vue';\nimport { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\n",
@@ -10997,6 +11191,66 @@
         }
       ],
       "approvedBusinessPatches": [
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "              </div>\n              <div class=\"section-title\">尺寸（mm）</div>\n              <div class=\"dimension-grid\">\n                <t-form-item label=\"长\" name=\"length\" required-mark>\n                  <t-input-number\n                    v-model=\"productForm.length\"\n                    class=\"measurement-input\"\n                    large-number\n",
+          "after": "              </div>\n              <div class=\"section-title\">尺寸（mm）</div>\n              <div class=\"dimension-grid\">\n                <t-form-item\n                  label=\"长\"\n                  name=\"length\"\n                  required-mark\n                  :show-error-message=\"!numericError(productForm.length)\"\n                >\n                  <DecimalInput\n                    v-model=\"productForm.length\"\n                    class=\"measurement-input\"\n                    large-number\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                    @change=\"handleMeasurementChange('length')\"\n                  />\n                </t-form-item>\n                <t-form-item label=\"宽\" name=\"width\" required-mark>\n                  <t-input-number\n                    v-model=\"productForm.width\"\n                    class=\"measurement-input\"\n                    large-number\n",
+          "after": "                    @change=\"handleMeasurementChange('length')\"\n                  />\n                </t-form-item>\n                <t-form-item\n                  label=\"宽\"\n                  name=\"width\"\n                  required-mark\n                  :show-error-message=\"!numericError(productForm.width)\"\n                >\n                  <DecimalInput\n                    v-model=\"productForm.width\"\n                    class=\"measurement-input\"\n                    large-number\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                    @change=\"handleMeasurementChange('width')\"\n                  />\n                </t-form-item>\n                <t-form-item label=\"高\" name=\"height\" required-mark>\n                  <t-input-number\n                    v-model=\"productForm.height\"\n                    class=\"measurement-input\"\n                    large-number\n",
+          "after": "                    @change=\"handleMeasurementChange('width')\"\n                  />\n                </t-form-item>\n                <t-form-item\n                  label=\"高\"\n                  name=\"height\"\n                  required-mark\n                  :show-error-message=\"!numericError(productForm.height)\"\n                >\n                  <DecimalInput\n                    v-model=\"productForm.height\"\n                    class=\"measurement-input\"\n                    large-number\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                    suffix=\"㎡\"\n                  />\n                </t-form-item>\n                <t-form-item :label=\"isProductFormPage ? '±误差' : '土误差'\" name=\"tolerance\">\n                  <t-input-number\n                    v-model=\"productForm.tolerance\"\n                    class=\"measurement-input\"\n                    large-number\n",
+          "after": "                    suffix=\"㎡\"\n                  />\n                </t-form-item>\n                <t-form-item\n                  :label=\"isProductFormPage ? '±误差' : '土误差'\"\n                  name=\"tolerance\"\n                  :show-error-message=\"!numericError(productForm.tolerance)\"\n                >\n                  <DecimalInput\n                    v-model=\"productForm.tolerance\"\n                    class=\"measurement-input\"\n                    large-number\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "              </div>\n              <div class=\"section-title\">扣角（mm）</div>\n              <div class=\"corner-grid\">\n                <t-form-item v-for=\"item in cornerFields\" :key=\"item.key\" :label=\"item.label\" :name=\"item.key\">\n                  <t-input-number\n                    v-model=\"productForm[item.key]\"\n                    class=\"measurement-input\"\n                    large-number\n",
+          "after": "              </div>\n              <div class=\"section-title\">扣角（mm）</div>\n              <div class=\"corner-grid\">\n                <t-form-item\n                  v-for=\"item in cornerFields\"\n                  :key=\"item.key\"\n                  :label=\"item.label\"\n                  :name=\"item.key\"\n                  :show-error-message=\"!numericError(productForm[item.key])\"\n                >\n                  <DecimalInput\n                    v-model=\"productForm[item.key]\"\n                    class=\"measurement-input\"\n                    large-number\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                  </t-select>\n                </t-form-item>\n                <t-form-item label=\"库存\" name=\"stock\" required-mark>\n                  <t-input-number\n                    v-model=\"productForm.stock\"\n                    large-number\n                    :disabled=\"readonlyProductFields\"\n",
+          "after": "                  </t-select>\n                </t-form-item>\n                <t-form-item label=\"库存\" name=\"stock\" required-mark>\n                  <DecimalInput\n                    v-model=\"productForm.stock\"\n                    large-number\n                    :disabled=\"readonlyProductFields\"\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "                    :input-props=\"stockInputProps\"\n                    theme=\"normal\"\n                    placeholder=\"请输入库存\"\n                    @beforeinput.capture=\"preventZeroQuantity\"\n                    @paste.capture=\"preventZeroQuantity\"\n                    @keydown.capture=\"preventZeroQuantity\"\n                    @change=\"handleStockChange\"\n                    @keydown=\"handleStockKeydown\"\n                  />\n",
+          "after": "                    :input-props=\"stockInputProps\"\n                    theme=\"normal\"\n                    placeholder=\"请输入库存\"\n                    @change=\"handleStockChange\"\n                    @keydown=\"handleStockKeydown\"\n                  />\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "</template>\n\n<script setup lang=\"ts\">\nimport OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';\nimport { shelfProductsFromAll } from '@/services/productAllBatchShelf';\nimport type { BatchShelfResult } from '@/services/operationsBatchShelf';\n",
+          "after": "</template>\n\n<script setup lang=\"ts\">\nimport DecimalInput from '@/components/DecimalInput.vue';\nimport { numericError } from '@/utils/numericInput';\nimport OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';\nimport { shelfProductsFromAll } from '@/services/productAllBatchShelf';\nimport type { BatchShelfResult } from '@/services/operationsBatchShelf';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "import { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { preventZeroQuantity } from '@/utils/quantityInput';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\n",
+          "after": "import { formConfirmationText } from '@/components/foundation/actions/confirmation';\nimport { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';\nimport { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';\nimport { rejectFormSubmission } from '@/utils/submitValidation';\nimport AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';\nimport { controlPlaceholder } from '@/utils/controlPlaceholder';\n"
+        },
+        {
+          "stage": "before-migrations",
+          "reason": "2026-11-02 user confirmed inventoried numeric-input migration and direct checks: integer/decimal input, zero accepted, default no negative, craft two decimals, retain excessive precision and one standard numeric error; preserve business workflows.",
+          "before": "  salesFormRef.value?.clearValidate([field]);\n};\nconst handleStockChange = (value?: unknown, context?: SalesNumberChangeContext) => {\n  if (context?.type === 'props' || context?.type === 'blur') return;\n  const normalizedValue = String(value ?? '').trim();\n  stockHasLeadingZero.value = /^0\\d+/.test(normalizedValue);\n  clearSalesFieldError('stock');\n",
+          "after": "  salesFormRef.value?.clearValidate([field]);\n};\nconst handleStockChange = (value?: unknown, context?: SalesNumberChangeContext) => {\n  if (context?.type === 'props') return;\n  const normalizedValue = String(value ?? '').trim();\n  stockHasLeadingZero.value = /^0\\d+/.test(normalizedValue);\n  clearSalesFieldError('stock');\n"
+        },
         {
           "before": "        <template #offShelvedAt=\"{ row }\">{{ formatDateTime(row.offShelvedAt) }}</template>\n      </t-table>\n      <t-empty v-else description=\"暂无下架记录\" />\n    </AdminDialog>\n  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport { useRoute } from 'vue-router';\nimport ProductListStatusTag from '@/components/ProductListStatusTag.vue';\nimport { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\n",
           "after": "        <template #offShelvedAt=\"{ row }\">{{ formatDateTime(row.offShelvedAt) }}</template>\n      </t-table>\n      <t-empty v-else description=\"暂无下架记录\" />\n    </AdminDialog>\n    <OperationsBatchShelfResult v-model:visible=\"allBatchResultVisible\" :result=\"allBatchResult\" />\n  </div>\n</template>\n\n<script setup lang=\"ts\">\nimport OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';\nimport { shelfProductsFromAll } from '@/services/productAllBatchShelf';\nimport type { BatchShelfResult } from '@/services/operationsBatchShelf';\nconst allBatchResultVisible = ref(false);\nconst allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });\nimport { useRoute } from 'vue-router';\nimport ProductListStatusTag from '@/components/ProductListStatusTag.vue';\nimport { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';\nimport WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';\n",

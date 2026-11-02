@@ -1,3 +1,4 @@
+import { normalizeNumeric } from '@/utils/numericInput';
 import type { Ref } from 'vue';
 import { isValidSpecPriceNumber } from '../management/priceValidation';
 import type { BatchFillForm, DecimalField, PriceRow, SpecRow } from './finishedStockPageModel';
@@ -24,8 +25,7 @@ export const useFinishedStockPriceEditor = (
       row[field] = '';
       return;
     }
-    const value = Number(rawValue);
-    row[field] = Number.isFinite(value) ? value.toFixed(2) : '';
+    row[field] = normalizeNumeric(rawValue);
   };
   const decimalNumber = (value: string) => {
     if (!isValidSpecPriceNumber(value)) return null;

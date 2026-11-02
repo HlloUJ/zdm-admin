@@ -404,9 +404,12 @@
                         >
                           <t-option v-for="item in field.options" :key="item" :label="item" :value="item" />
                         </t-select>
-                        <t-input
+                        <component
+                          :is="field.valueType === 'number' ? DecimalInput : 't-input'"
                           v-else
                           v-model="productForm[field.key]"
+                          :plain="true"
+                          large-number
                           v-bind="attributeFeedback(field, productForm[field.key], submitAttempted)"
                           clearable
                           :placeholder="controlPlaceholder(field.label, 'input')"
@@ -495,9 +498,12 @@
                         >
                           <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
                         </t-select>
-                        <t-input
+                        <component
+                          :is="field.valueType === 'number' ? DecimalInput : 't-input'"
                           v-else
                           v-model="row[field.key]"
+                          :plain="true"
+                          large-number
                           v-bind="attributeFeedback(field, row[field.key], specSubmitted, row)"
                           :placeholder="controlPlaceholder(field.label, 'input')"
                           @blur="row[field.key] = normalizeAttribute(field, row[field.key], row)"
@@ -586,8 +592,9 @@
                       </template>
                       <template #quantity="{ row }">
                         <div class="quantity-editor">
-                          <t-input-number
+                          <DecimalInput
                             v-model="row.quantity"
+                            :decimal-places="0"
                             :disabled="isOperationsEdit"
                             theme="normal"
                             :min="0"
@@ -600,9 +607,6 @@
                                 : undefined
                             "
                             placeholder="请输入数量"
-                            @beforeinput.capture="preventZeroQuantity"
-                            @paste.capture="preventZeroQuantity"
-                            @keydown.capture="preventZeroQuantity"
                           />
                         </div>
                       </template>
@@ -822,9 +826,12 @@
                     :disabled="isSpecOptionSelected(group, value.id, item)"
                   />
                 </t-select>
-                <t-input
+                <component
+                  :is="salesAttributeByKey(group.field)?.valueType === 'number' ? DecimalInput : 't-input'"
                   v-else
                   v-model="value.value"
+                  :plain="true"
+                  large-number
                   v-bind="specAttributeFeedback(group, value)"
                   :placeholder="controlPlaceholder(group.name, 'input')"
                   @blur="normalizeSpecAttribute(group, value)"
@@ -938,8 +945,9 @@
             </t-form-item>
 
             <t-form-item v-if="!isOperationsEdit" label="数量">
-              <t-input-number
+              <DecimalInput
                 v-model="batchFillForm.quantity"
+                :decimal-places="0"
                 :status="
                   batchFillSubmitted &&
                   batchFillForm.quantity != null &&
@@ -957,9 +965,6 @@
                 placeholder="请输入数量"
                 theme="normal"
                 :min="0"
-                @beforeinput.capture="preventZeroQuantity"
-                @paste.capture="preventZeroQuantity"
-                @keydown.capture="preventZeroQuantity"
               />
             </t-form-item>
             <t-form-item
@@ -976,9 +981,12 @@
               >
                 <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
               </t-select>
-              <t-input
+              <component
+                :is="field.valueType === 'number' ? DecimalInput : 't-input'"
                 v-else
                 v-model="batchSalesAttributes[field.key]"
+                :plain="true"
+                large-number
                 v-bind="batchAttributeFeedback(field)"
                 clearable
                 :placeholder="controlPlaceholder(field.label, 'input')"
@@ -1086,6 +1094,7 @@
 </template>
 
 <script setup lang="ts">
+import DecimalInput from '@/components/DecimalInput.vue';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
 import type { BatchShelfResult } from '@/services/operationsBatchShelf';
@@ -1101,7 +1110,7 @@ const commodity = useCommodityModule();
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
-import { preventZeroQuantity, isPositiveIntegerQuantity } from '@/utils/quantityInput';
+import { isPositiveIntegerQuantity } from '@/utils/quantityInput';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
 import {

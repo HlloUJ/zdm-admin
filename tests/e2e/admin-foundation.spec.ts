@@ -715,3 +715,53 @@ test('dashboard metric explanations use canonical secondary typography', async (
     await expect(hint).toHaveCSS('line-height', '20px');
   }
 });
+
+test('craft width and both query bounds use two-decimal numeric input without duplicate errors', async ({ page }) => {
+  await page.route('**/api/admin/crafts', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          {
+            id: 1,
+            name: '两位小数工艺',
+            type: '边工艺',
+            width: '12.50',
+            status: 'enabled',
+            imageUrl: '',
+            createdByName: '韩健',
+          },
+        ],
+      },
+    }),
+  );
+  await page.goto('/finished-stock-craft');
+  const bounds = page.locator('.width-range input');
+  await expect(bounds).toHaveCount(2);
+  await bounds.nth(0).fill('0012.4');
+  await bounds.nth(1).fill('12.6');
+  await page.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(bounds.nth(0)).toHaveValue('12.40');
+  await expect(bounds.nth(1)).toHaveValue('12.60');
+  await expect(page.getByRole('row').filter({ hasText: '两位小数工艺' })).toHaveCount(1);
+  await bounds.nth(0).fill('12.51');
+  await page.getByRole('button', { name: '查询', exact: true }).click();
+  await expect(page.getByRole('row').filter({ hasText: '两位小数工艺' })).toHaveCount(0);
+  await page.getByRole('button', { name: '重置', exact: true }).click();
+  await page.getByRole('row').filter({ hasText: '两位小数工艺' }).getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  const width = dialog.getByPlaceholder('请输入工艺宽度', { exact: true });
+  await width.fill('12.345');
+  await width.blur();
+  await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(width).toHaveValue('12.345');
+  await expect(dialog.getByText('最多输入两位小数', { exact: true })).toHaveCount(1);
+  await expect(dialog.getByText('请输入非负数字，最多两位小数', { exact: true })).toHaveCount(0);
+  await width.fill('-1');
+  await expect(width).toHaveValue('12.345');
+  await width.fill('0');
+  await width.blur();
+  await expect(width).toHaveValue('0.00');
+  await expect(dialog.getByText('最多输入两位小数', { exact: true })).toHaveCount(0);
+});

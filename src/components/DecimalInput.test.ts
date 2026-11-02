@@ -1,23 +1,29 @@
 import { mount } from '@vue/test-utils';
 import { defineComponent, nextTick, ref } from 'vue';
-import { InputNumber } from 'tdesign-vue-next';
+import { Input, InputNumber } from 'tdesign-vue-next';
 import { describe, expect, it, vi } from 'vitest';
 import DecimalInput from './DecimalInput.vue';
 import SpecPriceInput from '@/pages/finished-stock/management/components/SpecPriceInput.vue';
 
-function editor(largeNumber = true, initial: string | number | undefined = '51.00', spec = false) {
+function editor(
+  largeNumber = true,
+  initial: string | number | undefined = '51.00',
+  spec = false,
+  places = 2,
+  plain = false,
+) {
   const value = ref(initial);
   const change = vi.fn();
   const commit = vi.fn();
   const wrapper = mount(
     defineComponent({
       components: { DecimalInput, SpecPriceInput },
-      setup: () => ({ value, largeNumber, change, commit }),
+      setup: () => ({ value, largeNumber, change, commit, places, plain }),
       template: spec
         ? '<SpecPriceInput v-model="value" label="价格" placeholder="价格" :submitted="false" @change="change" @commit="commit" />'
-        : '<DecimalInput v-model="value" :large-number="largeNumber" :decimal-places="2" theme="normal" @change="change" />',
+        : '<DecimalInput v-model="value" :large-number="largeNumber" :decimal-places="places" :plain="plain" theme="normal" @change="change" />',
     }),
-    { attachTo: document.body, global: { components: { 't-input-number': InputNumber } } },
+    { attachTo: document.body, global: { components: { 't-input-number': InputNumber, 't-input': Input } } },
   );
   return { wrapper, input: wrapper.find('input'), value, change, commit };
 }
@@ -117,7 +123,9 @@ describe('小数编辑草稿（真实 TDesign 输入框）', () => {
     await input.setValue('0.25');
     expect(input.element.value).toBe('0.25');
     await input.setValue('0.257');
-    expect(input.element.value).toBe('0.25');
+    expect(input.element.value).toBe('0.257');
+    expect(wrapper.text()).toContain('最多输入两位小数');
+    await input.setValue('0.25');
     await input.trigger('keydown', { key: 'ArrowUp', code: 'ArrowUp' });
     expect(Number(value.value)).toBe(1.25);
     wrapper.unmount();
@@ -144,7 +152,7 @@ describe('小数编辑草稿（真实 TDesign 输入框）', () => {
     const wrapper = mount(DecimalInput, {
       props: { modelValue: '0', largeNumber: true },
       attrs: { min: 0.01, max: 1, disabled: true, theme: 'normal', tips: '原有提示' },
-      global: { components: { 't-input-number': InputNumber } },
+      global: { components: { 't-input-number': InputNumber, 't-input': Input } },
     });
     expect(wrapper.find('input').element.disabled).toBe(true);
     expect(wrapper.find('.t-input').classes()).toContain('t-is-error');
@@ -154,7 +162,7 @@ describe('小数编辑草稿（真实 TDesign 输入框）', () => {
   it('new specifications may defer feedback until submit without changing ordinary price blur validation', async () => {
     const wrapper = mount(SpecPriceInput, {
       props: { modelValue: '', label: '价格', placeholder: '价格', submitted: false, validationDeferred: true },
-      global: { components: { 't-input-number': InputNumber } },
+      global: { components: { 't-input-number': InputNumber, 't-input': Input } },
     });
     await wrapper.find('input').trigger('focus');
     await wrapper.find('input').trigger('blur');
@@ -170,4 +178,85 @@ describe('小数编辑草稿（真实 TDesign 输入框）', () => {
     expect(ordinary.wrapper.text()).toContain('请输入价格');
     ordinary.wrapper.unmount();
   });
+});
+
+describe('统一数值输入规范', () => {
+  it.each([0, 2])('模式 %s：零值、前导零、非法字符及粘贴不改值', async (places) => {
+    const { wrapper, input, value } = editor(true, '1', false, places);
+    input.element.focus();
+    await input.setValue('000');
+    expect(input.element.value).toBe('000');
+    expect(value.value).toBe('000');
+    await input.setValue('-1');
+    expect(input.element.value).toBe('000');
+    await input.setValue('12a3');
+    expect(input.element.value).toBe('000');
+    input.element.setSelectionRange(0, 3);
+    const paste = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, 'clipboardData', { value: { getData: () => '12a3' } });
+    input.element.dispatchEvent(paste);
+    expect(paste.defaultPrevented).toBe(true);
+    expect(input.element.value).toBe('000');
+    input.element.blur();
+    await nextTick();
+    expect(input.element.value).toBe(places ? '0.00' : '0');
+    wrapper.unmount();
+  });
+  it('超精度在失焦后保留原文并显示错误；修正立即清除', async () => {
+    const { wrapper, input, value } = editor();
+    input.element.focus();
+    await input.setValue('9007199254740993.123');
+    input.element.blur();
+    await nextTick();
+    expect(input.element.value).toBe('9007199254740993.123');
+    expect(value.value).toBe('9007199254740993.123');
+    expect(wrapper.text()).toContain('最多输入两位小数');
+    input.element.focus();
+    await input.setValue('9007199254740993.12');
+    expect(wrapper.text()).not.toContain('最多输入两位小数');
+    input.element.blur();
+    await nextTick();
+    expect(input.element.value).toBe('9007199254740993.12');
+    wrapper.unmount();
+  });
+});
+
+it('普通属性输入外观同样保留中间状态、粘贴和两位补齐', async () => {
+  const { wrapper, input, value } = editor(true, '12.00', false, 2, true);
+  input.element.focus();
+  await input.setValue('.');
+  expect(wrapper.text()).not.toContain('请输入数字');
+  input.element.blur();
+  await nextTick();
+  expect(wrapper.text()).toContain('请输入数字');
+  input.element.focus();
+  await input.setValue('000.5');
+  input.element.blur();
+  await nextTick();
+  expect(value.value).toBe('0.50');
+  expect(input.element.value).toBe('0.50');
+  wrapper.unmount();
+});
+
+it('数值型字段不静默吞掉超出安全精度的整数位', async () => {
+  const { wrapper, input, value } = editor(false, 1);
+  input.element.focus();
+  await input.setValue('9007199254740993');
+  expect(value.value).toBe('9007199254740993');
+  expect(input.element.value).toBe('9007199254740993');
+  expect(wrapper.text()).toContain('数值超出可准确处理的范围');
+  input.element.blur();
+  await nextTick();
+  expect(input.element.value).toBe('9007199254740993.00');
+  wrapper.unmount();
+});
+
+it('只聚焦和离开数值属性，不把历史原值静默回写成规范化值', async () => {
+  const { wrapper, input, value, change } = editor(true, '0012', false, 2, true);
+  input.element.focus();
+  input.element.blur();
+  await nextTick();
+  expect(value.value).toBe('0012');
+  expect(change).not.toHaveBeenCalled();
+  wrapper.unmount();
 });

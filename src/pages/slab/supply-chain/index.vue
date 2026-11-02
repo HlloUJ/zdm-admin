@@ -379,8 +379,13 @@
               </div>
               <div class="section-title">尺寸（mm）</div>
               <div class="dimension-grid">
-                <t-form-item label="长" name="length" required-mark>
-                  <t-input-number
+                <t-form-item
+                  label="长"
+                  name="length"
+                  required-mark
+                  :show-error-message="!numericError(productForm.length)"
+                >
+                  <DecimalInput
                     v-model="productForm.length"
                     class="measurement-input"
                     large-number
@@ -392,8 +397,13 @@
                     @change="handleMeasurementChange('length')"
                   />
                 </t-form-item>
-                <t-form-item label="宽" name="width" required-mark>
-                  <t-input-number
+                <t-form-item
+                  label="宽"
+                  name="width"
+                  required-mark
+                  :show-error-message="!numericError(productForm.width)"
+                >
+                  <DecimalInput
                     v-model="productForm.width"
                     class="measurement-input"
                     large-number
@@ -405,8 +415,13 @@
                     @change="handleMeasurementChange('width')"
                   />
                 </t-form-item>
-                <t-form-item label="高" name="height" required-mark>
-                  <t-input-number
+                <t-form-item
+                  label="高"
+                  name="height"
+                  required-mark
+                  :show-error-message="!numericError(productForm.height)"
+                >
+                  <DecimalInput
                     v-model="productForm.height"
                     class="measurement-input"
                     large-number
@@ -426,8 +441,12 @@
                     suffix="㎡"
                   />
                 </t-form-item>
-                <t-form-item :label="isProductFormPage ? '±误差' : '土误差'" name="tolerance">
-                  <t-input-number
+                <t-form-item
+                  :label="isProductFormPage ? '±误差' : '土误差'"
+                  name="tolerance"
+                  :show-error-message="!numericError(productForm.tolerance)"
+                >
+                  <DecimalInput
                     v-model="productForm.tolerance"
                     class="measurement-input"
                     large-number
@@ -442,8 +461,14 @@
               </div>
               <div class="section-title">扣角（mm）</div>
               <div class="corner-grid">
-                <t-form-item v-for="item in cornerFields" :key="item.key" :label="item.label" :name="item.key">
-                  <t-input-number
+                <t-form-item
+                  v-for="item in cornerFields"
+                  :key="item.key"
+                  :label="item.label"
+                  :name="item.key"
+                  :show-error-message="!numericError(productForm[item.key])"
+                >
+                  <DecimalInput
                     v-model="productForm[item.key]"
                     class="measurement-input"
                     large-number
@@ -496,7 +521,7 @@
                   </t-select>
                 </t-form-item>
                 <t-form-item label="库存" name="stock" required-mark>
-                  <t-input-number
+                  <DecimalInput
                     v-model="productForm.stock"
                     large-number
                     :disabled="readonlyProductFields"
@@ -504,9 +529,6 @@
                     :input-props="stockInputProps"
                     theme="normal"
                     placeholder="请输入库存"
-                    @beforeinput.capture="preventZeroQuantity"
-                    @paste.capture="preventZeroQuantity"
-                    @keydown.capture="preventZeroQuantity"
                     @change="handleStockChange"
                     @keydown="handleStockKeydown"
                   />
@@ -938,6 +960,8 @@
 </template>
 
 <script setup lang="ts">
+import DecimalInput from '@/components/DecimalInput.vue';
+import { numericError } from '@/utils/numericInput';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
 import type { BatchShelfResult } from '@/services/operationsBatchShelf';
@@ -951,7 +975,6 @@ import { useStateActivitySort } from '@/composables/useStateActivitySort';
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
-import { preventZeroQuantity } from '@/utils/quantityInput';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
@@ -1824,7 +1847,7 @@ const clearSalesFieldError = (field: string) => {
   salesFormRef.value?.clearValidate([field]);
 };
 const handleStockChange = (value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props' || context?.type === 'blur') return;
+  if (context?.type === 'props') return;
   const normalizedValue = String(value ?? '').trim();
   stockHasLeadingZero.value = /^0\d+/.test(normalizedValue);
   clearSalesFieldError('stock');

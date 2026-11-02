@@ -140,19 +140,24 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
       return { rowHeight: cell.height, offset: box.top - cell.top, width: box.width, height: box.height };
     });
     await productInput.fill('文字');
+    await expect(productInput).toHaveValue('12.00');
+    await productInput.fill('.');
+    await productInput.blur();
     await numbers.nth(0).fill('1.234');
-    await numbers.nth(1).fill('错误');
+    await numbers.nth(1).fill('.');
+    await numbers.nth(1).blur();
     await expect(table.getByText('最多输入两位小数', { exact: true })).toBeVisible();
     await expect(table.getByText('请输入数字', { exact: true })).toBeVisible();
     await expectNativeError(numbers.nth(0));
     await expectNativeError(numbers.nth(1));
-    await expect(page.locator('.product-attributes-panel').getByText('请输入数字', { exact: true })).toHaveCount(0);
+    await expect(page.locator('.product-attributes-panel').getByText('请输入数字', { exact: true })).toBeVisible();
     await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(0);
     await numbers.nth(1).fill('4');
     await expect(table.getByText('请输入数字', { exact: true })).toHaveCount(0);
     await numbers.nth(1).fill('');
     await expect(table.getByText('请输入销售数字属性', { exact: true })).toHaveCount(0);
-    await numbers.nth(1).fill('错误');
+    await numbers.nth(1).fill('.');
+    await numbers.nth(1).blur();
     expect(writes).toHaveLength(0);
     await page
       .locator('.form-submit-bar')
@@ -190,11 +195,13 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     await productInput.fill('12.5');
     await productInput.blur();
     await numbers.nth(0).fill('-3.5');
+    await expect(numbers.nth(0)).toHaveValue('1.234');
+    await numbers.nth(0).fill('3.5');
     await numbers.nth(0).blur();
     await numbers.nth(1).fill('4');
     await numbers.nth(1).blur();
     await expect(productInput).toHaveValue('12.50');
-    await expect(numbers.nth(0)).toHaveValue('-3.50');
+    await expect(numbers.nth(0)).toHaveValue('3.50');
     await expect(numbers.nth(1)).toHaveValue('4.00');
     await page
       .locator('.form-submit-bar')
@@ -204,7 +211,7 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     expect(writes[0]!.attributes).toEqual([{ attributeId: 1, attributeName: '商品数字属性', value: '12.50' }]);
     expect(writes[0]!.variants).toEqual(
       expect.arrayContaining([
-        expect.objectContaining({ id: 951, stock: 2, salesAttributes: { attribute_2: '-3.50', attribute_3: '选项1' } }),
+        expect.objectContaining({ id: 951, stock: 2, salesAttributes: { attribute_2: '3.50', attribute_3: '选项1' } }),
         expect.objectContaining({ id: 952, stock: 3, salesAttributes: { attribute_2: '4.00', attribute_3: '选项2' } }),
       ]),
     );
@@ -219,6 +226,9 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     const drawer = page.locator('.t-drawer--open').filter({ hasText: '批量填写' });
     const number = drawer.getByPlaceholder('请输入销售数字属性', { exact: true });
     await number.fill('文字');
+    await expect(number).toHaveValue('');
+    await number.fill('.');
+    await number.blur();
     await expect(drawer.getByText('请输入数字', { exact: true })).toBeVisible();
     await expectNativeError(number);
     await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(0);
@@ -312,6 +322,9 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     const input = drawer.getByPlaceholder(`请输入${label}`, { exact: true });
     const before = await input.boundingBox();
     await input.fill('文本');
+    await expect(input).toHaveValue('');
+    await input.fill('.');
+    await input.blur();
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
     const tip = drawer.getByText('请输入数字', { exact: true });
     await expect(tip).toBeVisible();

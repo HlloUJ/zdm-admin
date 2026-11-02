@@ -81,7 +81,9 @@ class ProductAttributeVersionTest {
     assertThatThrownBy(() -> versions.validate(numeric, product("1.234", "2.34", 8L), null)).hasMessageContaining("两位小数");
     assertThatThrownBy(() -> versions.validate(numeric, product("1.234", "2.345", null), previous)).hasMessageContaining("两位小数");
     assertThatThrownBy(() -> versions.validate(numeric, product("1.234", "3.456", 8L), previous)).hasMessageContaining("两位小数");
-    assertThatCode(() -> versions.validate(numeric, product("-1.20", "0.00", null), null)).doesNotThrowAnyException();
+    assertThatThrownBy(() -> versions.validate(numeric, product("-1.20", "0.00", null), null)).hasMessageContaining("大于或等于0");
+    assertThatCode(() -> versions.validate(numeric, product("0.00", "0.00", null), null)).doesNotThrowAnyException();
+    assertThatThrownBy(() -> versions.validate(numeric, product("1e2", "0.00", null), null)).hasMessageContaining("请输入数字");
   }
 
 }

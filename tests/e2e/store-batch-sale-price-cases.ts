@@ -126,9 +126,11 @@ export function registerStoreBatchSalePriceTests(
     await size.locator('.t-tag').filter({ hasText: /^大$/ }).click();
     await expect(drawer.getByText('当前将批量填充 1 条规格', { exact: true })).toBeVisible();
     await price.fill('-1');
+    await expect(price).toHaveValue('');
+    await price.fill('1.234');
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByText('请输入正确的商品售价', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('最多输入两位小数', { exact: true })).toBeVisible();
     await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(1);
     const prices = main.locator('.store-sale-price-input input');
     await expect(prices.nth(0)).toHaveValue('150.00');
@@ -204,8 +206,10 @@ export function registerStoreBatchSalePriceTests(
     await expect(drawer.getByText('成本价', { exact: true })).toHaveCount(0);
     await expect(drawer.getByText('数量', { exact: true })).toHaveCount(0);
     await price.fill('-1');
+    await expect(price).toHaveValue('');
+    await price.fill('1.234');
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
-    const tip = drawer.getByText('请输入正确的商品售价', { exact: true });
+    const tip = drawer.getByText('最多输入两位小数', { exact: true });
     await expect(tip).toBeVisible();
     expect(
       await tip.evaluate((element) => {

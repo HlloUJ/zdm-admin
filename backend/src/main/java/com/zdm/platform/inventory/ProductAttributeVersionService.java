@@ -163,6 +163,10 @@ public class ProductAttributeVersionService {
     }
     if ("number".equals(field.path("valueType").asText())) {
       try {
+        if (value.trim().startsWith("-")) { throw new IllegalArgumentException(name + "请输入大于或等于0的数字"); }
+        if (!value.trim().matches("(?:\\d+(?:\\.\\d*)?|\\.\\d+)")) {
+          throw new IllegalArgumentException(name + "请输入数字");
+        }
         if (new BigDecimal(value.trim()).scale() > 2) { throw new IllegalArgumentException(name + "最多输入两位小数"); }
       } catch (NumberFormatException e) { throw new IllegalArgumentException(name + "请输入数字", e); }
     }

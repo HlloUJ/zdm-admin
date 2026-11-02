@@ -220,13 +220,18 @@
             filterable
           />
         </t-form-item>
-        <t-form-item help="请输入0.01～1之间的值" label="折扣系数" name="coefficient">
+        <t-form-item
+          help="请输入0.01～1之间的值"
+          label="折扣系数"
+          name="coefficient"
+          :show-error-message="!numericError(createForm.coefficient)"
+        >
           <DecimalInput
             v-model="createForm.coefficient"
             :style="{ width: '100%' }"
             theme="normal"
             :decimal-places="2"
-            :min="0.01"
+            :min="0"
             :max="1"
             allow-input-over-limit
             placeholder="请输入折扣系数"
@@ -272,7 +277,7 @@
             v-model="form.coefficient"
             :placeholder="controlPlaceholder(kindLabel, 'input')"
             :decimal-places="2"
-            :min="0.01"
+            :min="0"
             :max="999"
             theme="normal"
             :status="batchError ? 'error' : undefined"
@@ -291,6 +296,8 @@ import { rejectFormSubmission } from '@/utils/submitValidation';
 
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import DecimalInput from '@/components/DecimalInput.vue';
+import { numericError } from '@/utils/numericInput';
+import { validateNumericControls } from '@/utils/numericInputValidation';
 import { computed, nextTick, reactive, ref, watch } from 'vue';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -720,8 +727,9 @@ function openBatch() {
   batchError.value = '';
   formVisible.value = true;
 }
-function save() {
+async function save() {
   if (saving.value || activeKind.value !== 'price' || !can('batch-set')) return;
+  if (!(await validateNumericControls(batchFormRoot.value))) return;
   if (form.coefficient == null || String(form.coefficient).trim() === '') {
     batchError.value = '请输入价格系数';
     return rejectFormSubmission(batchFormRoot.value);

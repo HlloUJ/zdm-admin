@@ -1317,8 +1317,10 @@ test('supply-chain layered product edit exposes cost for each specification', as
   await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expectPriceTableStable(table, geometry);
   await cost.fill('-1');
+  await expect(cost).toHaveValue('');
+  await cost.fill('10.001');
   await cost.blur();
-  await expect(table.getByText('请输入正确的价格', { exact: true })).toHaveCount(1);
+  await expect(table.getByText('最多输入两位小数', { exact: true })).toHaveCount(1);
   await expectPriceTableStable(table, geometry);
   await cost.fill('10');
   await cost.blur();
@@ -2621,7 +2623,7 @@ test('empty publish reports every existing field once and locates the cover; edi
 });
 
 for (const submittedBeforeCreation of [false, true]) {
-  test(`new supply specifications defer feedback until submit and reject zero (${submittedBeforeCreation})`, async ({
+  test(`new supply specifications defer feedback until submit and permit zero input (${submittedBeforeCreation})`, async ({
     page,
   }) => {
     await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
@@ -2691,8 +2693,10 @@ for (const submittedBeforeCreation of [false, true]) {
     await quantity.pressSequentially('abc-+.e中文');
     await expect(quantity).toHaveValue('');
     await quantity.pressSequentially('0');
-    await expect(quantity).toHaveValue('');
+    await expect(quantity).toHaveValue('0');
     await quantity.pressSequentially('10');
+    await expect(quantity).toHaveValue('010');
+    await quantity.blur();
     await expect(quantity).toHaveValue('10');
     const pastePrevented = await quantity.evaluate((input) => {
       const data = new DataTransfer();
@@ -2703,14 +2707,16 @@ for (const submittedBeforeCreation of [false, true]) {
       );
     });
     expect(pastePrevented).toBe(true);
-    await expect(quantity).toHaveValue('10');
+    await expect(quantity).toHaveValue('0');
     await page.getByRole('button', { name: '批量填写', exact: true }).click();
     const batchQuantity = page.locator('.batch-field-grid').getByPlaceholder('请输入数量', { exact: true });
     await batchQuantity.click();
     await batchQuantity.pressSequentially('0abc-+.');
-    await expect(batchQuantity).toHaveValue('');
+    await expect(batchQuantity).toHaveValue('0');
     await batchQuantity.click();
     await batchQuantity.pressSequentially('12');
+    await expect(batchQuantity).toHaveValue('012');
+    await batchQuantity.blur();
     await expect(batchQuantity).toHaveValue('12');
     await page.locator('.t-drawer:visible').getByRole('button', { name: '确认保存', exact: true }).click();
     await expect(quantity).toHaveValue('12');
@@ -2730,7 +2736,9 @@ for (const submittedBeforeCreation of [false, true]) {
     await cost.fill('10');
     await quantity.fill('1');
     await quantity.press('ArrowDown');
-    await expect(quantity).toHaveValue('1');
+    await expect(quantity).toHaveValue('0');
+    await expect(table.locator('.quantity-editor .t-input__tips')).toHaveText('请输入大于0的整数');
+    await quantity.fill('1');
     await expect(table.locator('.quantity-editor .t-input__tips')).toHaveCount(0);
     await table.getByPlaceholder('请选择销售属性1（共享）', { exact: true }).click();
     await page.getByText('白色', { exact: true }).click();

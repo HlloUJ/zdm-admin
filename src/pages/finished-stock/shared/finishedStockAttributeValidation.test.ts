@@ -6,16 +6,16 @@ import {
 } from './finishedStockAttributeValidation';
 const number = { key: 'attribute_2', label: '数字属性', required: true, valueType: 'number' };
 describe('template attribute type and precision rules', () => {
-  it.each(['0', '-12.5', '+12', '.5', '12.', '1e2', '1e-2', '9007199254740993.12'])(
-    'accepts existing numeric syntax without price/inventory constraints: %s',
+  it.each(['0', '.5', '12.', '0012', '9007199254740993.12'])('accepts the numeric standard syntax: %s', (value) => {
+    expect(templateAttributeError(number, value)).toBe('');
+  });
+  it.each(['文字', 'NaN', 'Infinity', '0x10', '--1', '1e9999999999', '+12', '1e2', '1e-2'])(
+    'rejects invalid decimal values: %s',
     (value) => {
-      expect(templateAttributeError(number, value)).toBe('');
+      expect(templateAttributeError(number, value)).toBe('请输入数字');
     },
   );
-  it.each(['文字', 'NaN', 'Infinity', '0x10', '--1', '1e9999999999'])('rejects invalid decimal values: %s', (value) => {
-    expect(templateAttributeError(number, value)).toBe('请输入数字');
-  });
-  it.each(['1.234', '-0.001', '1e-3', '1.2300'])('rejects excessive precision without rounding: %s', (value) => {
+  it.each(['1.234', '1.2300'])('rejects excessive precision without rounding: %s', (value) => {
     expect(templateAttributeError(number, value)).toBe('最多输入两位小数');
     expect(formatTemplateNumber(value)).toBe(value);
   });
@@ -23,8 +23,9 @@ describe('template attribute type and precision rules', () => {
     expect(formatTemplateNumber('12')).toBe('12.00');
     expect(formatTemplateNumber('12.5')).toBe('12.50');
     expect(formatTemplateNumber('9007199254740993.1')).toBe('9007199254740993.10');
-    expect(formatTemplateNumber('-1e-2')).toBe('-0.01');
-    expect(formatTemplateNumber('1e10001')).toBe('1.00e10001');
+    expect(formatTemplateNumber('-1e-2')).toBe('-1e-2');
+    expect(templateAttributeError(number, '-12.5')).toBe('请输入大于或等于0的数字');
+    expect(formatTemplateNumber('1e10001')).toBe('1e10001');
   });
   it('keeps required, optional batch and bound selection semantics separate', () => {
     expect(templateAttributeError(number, '')).toBe('请输入数字属性');
