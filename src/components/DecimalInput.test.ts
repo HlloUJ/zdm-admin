@@ -11,6 +11,7 @@ function editor(
   spec = false,
   places = 2,
   plain = false,
+  allowNegative = false,
 ) {
   const value = ref(initial);
   const change = vi.fn();
@@ -18,10 +19,10 @@ function editor(
   const wrapper = mount(
     defineComponent({
       components: { DecimalInput, SpecPriceInput },
-      setup: () => ({ value, largeNumber, change, commit, places, plain }),
+      setup: () => ({ value, largeNumber, change, commit, places, plain, allowNegative }),
       template: spec
         ? '<SpecPriceInput v-model="value" label="价格" placeholder="价格" :submitted="false" @change="change" @commit="commit" />'
-        : '<DecimalInput v-model="value" :large-number="largeNumber" :decimal-places="places" :plain="plain" theme="normal" @change="change" />',
+        : '<DecimalInput v-model="value" :large-number="largeNumber" :decimal-places="places" :plain="plain" :allow-negative="allowNegative" theme="normal" @change="change" />',
     }),
     { attachTo: document.body, global: { components: { 't-input-number': InputNumber, 't-input': Input } } },
   );
@@ -123,8 +124,9 @@ describe('小数编辑草稿（真实 TDesign 输入框）', () => {
     await input.setValue('0.25');
     expect(input.element.value).toBe('0.25');
     await input.setValue('0.257');
-    expect(input.element.value).toBe('0.257');
-    expect(wrapper.text()).toContain('最多输入两位小数');
+    expect(input.element.value).toBe('0.25');
+    expect(value.value).toBe(largeNumber ? '0.25' : 0.25);
+    expect(wrapper.text()).not.toContain('最多输入两位小数');
     await input.setValue('0.25');
     await input.trigger('keydown', { key: 'ArrowUp', code: 'ArrowUp' });
     expect(Number(value.value)).toBe(1.25);
@@ -184,33 +186,35 @@ describe('统一数值输入规范', () => {
   it.each([0, 2])('模式 %s：零值、前导零、非法字符及粘贴不改值', async (places) => {
     const { wrapper, input, value } = editor(true, '1', false, places);
     input.element.focus();
+    await input.setValue('0');
     await input.setValue('000');
-    expect(input.element.value).toBe('000');
-    expect(value.value).toBe('000');
+    expect(input.element.value).toBe('0');
+    expect(value.value).toBe('0');
     await input.setValue('-1');
-    expect(input.element.value).toBe('000');
+    expect(input.element.value).toBe('0');
     await input.setValue('12a3');
-    expect(input.element.value).toBe('000');
-    input.element.setSelectionRange(0, 3);
+    expect(input.element.value).toBe('0');
+    input.element.setSelectionRange(0, 1);
     const paste = new Event('paste', { bubbles: true, cancelable: true });
     Object.defineProperty(paste, 'clipboardData', { value: { getData: () => '12a3' } });
     input.element.dispatchEvent(paste);
     expect(paste.defaultPrevented).toBe(true);
-    expect(input.element.value).toBe('000');
+    expect(input.element.value).toBe('0');
     input.element.blur();
     await nextTick();
     expect(input.element.value).toBe(places ? '0.00' : '0');
     wrapper.unmount();
   });
-  it('超精度在失焦后保留原文并显示错误；修正立即清除', async () => {
+  it('超精度输入不应用，合法长数值不丢精度', async () => {
     const { wrapper, input, value } = editor();
     input.element.focus();
+    await input.setValue('9007199254740993.12');
     await input.setValue('9007199254740993.123');
     input.element.blur();
     await nextTick();
-    expect(input.element.value).toBe('9007199254740993.123');
-    expect(value.value).toBe('9007199254740993.123');
-    expect(wrapper.text()).toContain('最多输入两位小数');
+    expect(input.element.value).toBe('9007199254740993.12');
+    expect(value.value).toBe('9007199254740993.12');
+    expect(wrapper.text()).not.toContain('最多输入两位小数');
     input.element.focus();
     await input.setValue('9007199254740993.12');
     expect(wrapper.text()).not.toContain('最多输入两位小数');
@@ -230,7 +234,7 @@ it('普通属性输入外观同样保留中间状态、粘贴和两位补齐', a
   await nextTick();
   expect(wrapper.text()).toContain('请输入数字');
   input.element.focus();
-  await input.setValue('000.5');
+  await input.setValue('0.5');
   input.element.blur();
   await nextTick();
   expect(value.value).toBe('0.50');
@@ -258,5 +262,67 @@ it('只聚焦和离开数值属性，不把历史原值静默回写成规范化�
   await nextTick();
   expect(value.value).toBe('0012');
   expect(change).not.toHaveBeenCalled();
+  wrapper.unmount();
+});
+
+it.each([false, true])('真实控件的选区、粘贴、输入法及负零输入门禁，plain=%s', async (plain) => {
+  const { wrapper, input, value, change } = editor(true, '0.12', false, 2, plain, true);
+  input.element.focus();
+  const insert = (text: string) => {
+    const event = new InputEvent('beforeinput', {
+      bubbles: true,
+      cancelable: true,
+      inputType: 'insertText',
+      data: text,
+    });
+    input.element.dispatchEvent(event);
+    return event;
+  };
+  input.element.setSelectionRange(4, 4);
+  expect(insert('3').defaultPrevented).toBe(true);
+  expect(value.value).toBe('0.12');
+  input.element.setSelectionRange(3, 4);
+  expect(insert('3').defaultPrevented).toBe(false);
+  await input.setValue('0.13');
+  for (const text of ['00', '-00', '12.345']) {
+    input.element.setSelectionRange(0, input.element.value.length);
+    const paste = new Event('paste', { bubbles: true, cancelable: true });
+    Object.defineProperty(paste, 'clipboardData', { value: { getData: () => text } });
+    const calls = change.mock.calls.length;
+    input.element.dispatchEvent(paste);
+    expect(input.element.value).toBe('0.13');
+    expect(value.value).toBe('0.13');
+    expect(change).toHaveBeenCalledTimes(calls);
+  }
+  await input.setValue('-0');
+  await input.setValue('-00');
+  expect(input.element.value).toBe('-0');
+  await input.setValue('-0.5');
+  await input.trigger('compositionstart');
+  input.element.value = '-0.567';
+  await input.trigger('input');
+  expect(value.value).toBe('-0.5');
+  await input.trigger('compositionend');
+  expect(input.element.value).toBe('-0.5');
+  input.element.blur();
+  await nextTick();
+  expect(input.element.value).toBe('-0.50');
+  wrapper.unmount();
+});
+
+it('价格封装在不完整小数校验后仍可整段替换为合法价格', async () => {
+  const { wrapper, input, value } = editor(true, '', true);
+  input.element.focus();
+  await input.setValue('.');
+  input.element.blur();
+  await nextTick();
+  input.element.focus();
+  await input.setValue('180');
+  expect(input.element.value).toBe('180');
+  expect(value.value).toBe('180');
+  input.element.blur();
+  await nextTick();
+  expect(value.value).toBe('180.00');
+  expect(wrapper.text()).not.toContain('请输入数字');
   wrapper.unmount();
 });

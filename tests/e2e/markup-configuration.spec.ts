@@ -224,7 +224,8 @@ test('价格配置引用统一门店级别并仅配置系数', async ({ page }) 
   await expect(createDialog.locator('.price-coefficient-input input')).toHaveValue('');
   await createDialog.locator('.price-coefficient-input input').fill('1.234');
   await createDialog.locator('.price-coefficient-input input').blur();
-  await expect(createDialog.getByText('最多输入两位小数', { exact: true })).toBeVisible();
+  await expect(createDialog.locator('.price-coefficient-input input')).toHaveValue('');
+  await expect(createDialog.getByText('最多输入两位小数', { exact: true })).toHaveCount(0);
   await createDialog.locator('.price-coefficient-input input').fill('0');
   await createDialog.locator('.price-coefficient-input input').blur();
   await expect(createDialog.getByText('请输入正确的价格系数', { exact: true })).toHaveCount(0);

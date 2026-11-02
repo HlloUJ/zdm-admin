@@ -1324,7 +1324,8 @@ test('supply-chain layered product edit exposes cost for each specification', as
   await expect(cost).toHaveValue('');
   await cost.fill('10.001');
   await cost.blur();
-  await expect(table.getByText('最多输入两位小数', { exact: true })).toHaveCount(1);
+  await expect(cost).toHaveValue('');
+  await expect(table.getByText('最多输入两位小数', { exact: true })).toHaveCount(0);
   await expectPriceTableStable(table, geometry);
   await cost.fill('10');
   await cost.blur();

@@ -15,6 +15,19 @@ export async function checkDecimalEditing(input: Locator) {
     await expect(input).toHaveValue('5.2');
     await input.blur();
     await expect(input).toHaveValue('5.20');
+    await input.click();
+    await input.press('End');
+    await input.press('3');
+    await expect(input).toHaveValue('5.20');
+    await input.press('ControlOrMeta+A');
+    await input.press('0');
+    await input.press('0');
+    await expect(input).toHaveValue('0');
+    await input.press(decimalKey);
+    await input.pressSequentially('50');
+    await expect(input).toHaveValue('0.50');
+    await input.press('1');
+    await expect(input).toHaveValue('0.50');
   }
   await input.fill(original);
   await input.blur();

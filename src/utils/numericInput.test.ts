@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeNumeric, numericError, numericPattern } from './numericInput';
+import { normalizeNumeric, numericError, numericPattern, acceptsNumericInput } from './numericInput';
 describe('数值输入唯一规则', () => {
   it.each(['12a3', '+1', '1e2', '1,000', '1 2', '-1', '1..2'])('默认拒绝非法输入 %s', (value) => {
     expect(numericPattern().test(value)).toBe(false);
@@ -23,5 +23,25 @@ describe('数值输入唯一规则', () => {
     expect(normalizeNumeric('-000.5', 2, true)).toBe('-0.50');
     expect(normalizeNumeric('-0.00', 2, true)).toBe('0.00');
     expect(normalizeNumeric('9007199254740993.1')).toBe('9007199254740993.10');
+  });
+});
+
+describe('输入阶段阻止超精度和连续前导零', () => {
+  it.each(['00', '000', '0012', '00.5', '12.345'])('拒绝整次编辑 %s', (value) => {
+    expect(acceptsNumericInput(value)).toBe(false);
+  });
+  it.each(['', '0', '0.', '0.00', '.5', '12.', '12.34', '10', '100', '01'])('保留合法编辑 %s', (value) => {
+    expect(acceptsNumericInput(value)).toBe(true);
+  });
+  it('整数、负值例外和特殊精度分别判断，不改历史校验', () => {
+    expect(acceptsNumericInput('0', 0)).toBe(true);
+    expect(acceptsNumericInput('0.', 0)).toBe(false);
+    expect(acceptsNumericInput('-0', 2, true)).toBe(true);
+    expect(acceptsNumericInput('-00', 2, true)).toBe(false);
+    expect(acceptsNumericInput('-0.50', 2, true)).toBe(true);
+    expect(acceptsNumericInput('-0.50')).toBe(false);
+    expect(acceptsNumericInput('1.234', 3)).toBe(true);
+    expect(acceptsNumericInput('1.2345', 3)).toBe(false);
+    expect(numericError('12.345')).toBe('最多输入两位小数');
   });
 });

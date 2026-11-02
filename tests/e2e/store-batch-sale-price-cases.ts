@@ -97,6 +97,7 @@ export function registerStoreBatchSalePriceTests(
     page,
   }) => {
     const { main, drawer, button, writes, price } = await open(page, true);
+    await expect(drawer.locator('.batch-filter-row')).toHaveCount(2);
     const titleLayout = await drawer.locator('.batch-filter-row').evaluateAll((elements) =>
       elements.map((element) => {
         const label = element.querySelector('.batch-filter-label')!;
@@ -128,16 +129,21 @@ export function registerStoreBatchSalePriceTests(
     await price.fill('-1');
     await expect(price).toHaveValue('');
     await price.fill('1.234');
+    await expect(price).toHaveValue('');
+    await price.fill('.');
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByText('最多输入两位小数', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('请输入数字', { exact: true })).toBeVisible();
     await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(1);
     const prices = main.locator('.store-sale-price-input input');
     await expect(prices.nth(0)).toHaveValue('150.00');
     await expect(prices.nth(1)).toHaveValue('300.00');
     await expect(prices.nth(2)).toHaveValue('75.00');
     expect(writes).toHaveLength(0);
+    await price.click();
+    await expect(price).toHaveValue('.');
     await price.fill('180');
+    await expect(price).toHaveValue('180');
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
     await expect(drawer).toBeHidden();
     await expect(prices.nth(0)).toHaveValue('180.00');
@@ -208,8 +214,10 @@ export function registerStoreBatchSalePriceTests(
     await price.fill('-1');
     await expect(price).toHaveValue('');
     await price.fill('1.234');
+    await expect(price).toHaveValue('');
+    await price.fill('.');
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
-    const tip = drawer.getByText('最多输入两位小数', { exact: true });
+    const tip = drawer.getByText('请输入数字', { exact: true });
     await expect(tip).toBeVisible();
     expect(
       await tip.evaluate((element) => {

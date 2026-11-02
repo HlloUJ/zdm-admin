@@ -203,11 +203,14 @@ test('price batch fills selected inputs locally and only Save writes configurati
   await expect(dialog.locator('.t-dialog__header-content')).toHaveText('批量设置');
   await expect(dialog.getByText(/已选分类|已选择.*个分类|留空将/)).toHaveCount(0);
   await checkDecimalEditing(dialog.locator('.t-input-number input'));
+  const priorCoefficient = await dialog.locator('.t-input-number input').inputValue();
   await dialog.locator('.t-input-number input').fill('2.234');
+  await expect(dialog.locator('.t-input-number input')).toHaveValue(priorCoefficient);
+  await dialog.locator('.t-input-number input').fill('0');
   await dialog.getByRole('button', { name: '确认批量设置', exact: true }).click();
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('最多输入两位小数', { exact: true })).toHaveCount(1);
-  await expect(dialog.locator('.t-input-number input')).toHaveValue('2.234');
+  await expect(dialog.getByText('请填写正确的系数', { exact: true })).toHaveCount(1);
+  await expect(dialog.locator('.t-input-number input')).toHaveValue('0.00');
   expect(requests.filter((request) => request.method === 'POST')).toHaveLength(0);
   await dialog.locator('.t-input-number input').fill('2.2');
   await dialog.getByRole('button', { name: '确认批量设置', exact: true }).click();

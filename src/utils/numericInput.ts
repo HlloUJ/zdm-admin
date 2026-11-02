@@ -2,6 +2,10 @@
 export const numericPattern = (places = 2, negative = false) =>
   new RegExp(`^${negative ? '-?' : ''}\\d*${places === 0 ? '' : '(?:\\.\\d*)?'}$`);
 
+/** Editing gate only: existing values still use the non-destructive validators below. */
+export const acceptsNumericInput = (text: string, places = 2, negative = false) =>
+  numericPattern(places, negative).test(text) && !/^-?00/.test(text) && (text.split('.')[1]?.length ?? 0) <= places;
+
 export function numericError(value: unknown, places = 2, negative = false, complete = true): string {
   const text = String(value ?? '');
   if (!text) return '';

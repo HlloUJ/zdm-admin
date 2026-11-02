@@ -22,7 +22,7 @@
 
 <script setup lang="ts" generic="T extends string | number | null | undefined">
 import { computed, ref, watch } from 'vue';
-import { numericError, numericPattern, normalizeNumeric, numericNumberError } from '@/utils/numericInput';
+import { numericError, acceptsNumericInput, normalizeNumeric, numericNumberError } from '@/utils/numericInput';
 
 const props = withDefaults(
   defineProps<{
@@ -97,7 +97,7 @@ const inputTarget = (event: Event) => {
   const input = event.target as HTMLInputElement | null;
   return input?.tagName === 'INPUT' && !input.disabled && !input.readOnly ? input : null;
 };
-const accepts = (text: string) => numericPattern(props.decimalPlaces, props.allowNegative).test(text);
+const accepts = (text: string) => acceptsNumericInput(text, props.decimalPlaces, props.allowNegative);
 const replacement = (input: HTMLInputElement, text: string) =>
   input.value.slice(0, input.selectionStart ?? input.value.length) +
   text +
