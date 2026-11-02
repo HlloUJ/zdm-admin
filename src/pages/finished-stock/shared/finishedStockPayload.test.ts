@@ -45,6 +45,26 @@ describe('legacy values in a version-bound source product', () => {
     expect(payload.attributes).toEqual([{ attributeId: 53, attributeName: '旧数字', value: '' }]);
     expect(payload.variants[0]?.salesAttributes).toEqual({});
   });
+  it('formats changed numeric attributes but keeps layered dimension values and unchanged raw values', () => {
+    const payload = buildFinishedProductPayload({
+      ...context,
+      form: { ...context.form, attribute_53: '12.5' },
+      attributeFields: [{ ...context.attributeFields[0]!, valueType: 'number' }],
+      salesAttributeFields: [{ ...context.salesAttributeFields[0]!, valueType: 'number' }],
+      specRows: [{ ...context.specRows[0]!, skuId: undefined, attribute_57: '1' }],
+    });
+    expect(payload.attributes[0]?.value).toBe('12.50');
+    expect(payload.variants[0]?.salesAttributes?.attribute_57).toBe('1.00');
+    const layered = buildFinishedProductPayload({
+      ...context,
+      specMode: 'layered',
+      salesAttributeFields: [{ ...context.salesAttributeFields[0]!, valueType: 'number' }],
+      specRows: [{ ...context.specRows[0]!, skuId: undefined, attribute_57: '1' }],
+      specDimensions: [{ key: 'attribute_57', name: '原维度', values: ['1'] }],
+    });
+    expect(layered.variants[0]?.salesAttributes?.attribute_57).toBe('1');
+    expect(layered.specDimensions?.[0]?.values).toEqual(['1']);
+  });
   it('preserves unchanged raw legacy values including whitespace', () => {
     const old = {
       attributes: [{ attributeId: 53, value: ' 历史文本 ' }],

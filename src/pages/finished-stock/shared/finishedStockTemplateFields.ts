@@ -21,6 +21,7 @@ export const buildFinishedStockTemplateFields = (
       attributeId: attribute.attributeId,
       label: attribute.name,
       required: attribute.requiredFlag,
+      valueType: attribute.valueType,
       skuFlag: attribute.skuFlag === true,
       type: attribute.valueType === 'select' ? ('select' as const) : ('input' as const),
       options: attribute.options.map((option) => option.value),
@@ -36,6 +37,7 @@ export const buildFinishedStockTemplateFields = (
         label: dimension.name,
         required: false,
         skuFlag: false,
+        valueType: 'text',
         type: 'input',
         options: [],
       });
@@ -50,6 +52,7 @@ export const buildFinishedStockTemplateFields = (
           label: entry.attributeName,
           required: false,
           skuFlag: false,
+          valueType: 'text',
           type: 'input',
           options: [],
         });
@@ -68,6 +71,7 @@ export const buildFinishedStockTemplateFields = (
               productAttributes.find((attribute) => attribute.id === attributeId)?.name ?? `销售属性 ${attributeId}`,
             required: false,
             skuFlag: false,
+            valueType: 'text',
             type: 'input',
             options: [],
           });

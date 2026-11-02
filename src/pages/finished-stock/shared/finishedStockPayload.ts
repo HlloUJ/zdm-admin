@@ -1,3 +1,4 @@
+import { templateAttributeValue } from './finishedStockAttributeValidation';
 import type { FinishedProductPayload, FinishedSpecDimension } from '@/services/finishedProducts';
 import type { ProductForm, SpecMode, SpecRow, StockItem } from './finishedStockPageModel';
 
@@ -5,6 +6,7 @@ interface AttributeField {
   key: string;
   attributeId: number;
   label: string;
+  valueType?: string;
 }
 
 interface ProductPayloadContext {
@@ -47,11 +49,11 @@ export const buildFinishedProductPayload = (context: ProductPayloadContext): Fin
       .map((field) => ({
         attributeId: field.attributeId,
         attributeName: field.label,
-        value:
-          context.previousProduct?.attributes.find((entry) => entry.attributeId === field.attributeId)?.value ===
-          String(context.form[field.key] ?? '')
-            ? String(context.form[field.key] ?? '')
-            : String(context.form[field.key] ?? '').trim(),
+        value: templateAttributeValue(
+          field,
+          context.form[field.key],
+          context.previousProduct?.attributes.find((entry) => entry.attributeId === field.attributeId)?.value,
+        ),
       }))
       .filter(
         (attribute) =>
@@ -67,11 +69,15 @@ export const buildFinishedProductPayload = (context: ProductPayloadContext): Fin
         context.salesAttributeFields
           .map((field) => [
             field.key,
-            context.previousProduct?.variants.find((variant) => variant.id === row.skuId)?.salesAttributes?.[
-              field.key
-            ] === String(row[field.key] ?? '')
-              ? String(row[field.key] ?? '')
-              : String(row[field.key] ?? '').trim(),
+            templateAttributeValue(
+              context.specMode === 'layered' && context.specDimensions.some((dimension) => dimension.key === field.key)
+                ? { ...field, valueType: 'text' }
+                : field,
+              row[field.key],
+              context.previousProduct?.variants.find((variant) => variant.id === row.skuId)?.salesAttributes?.[
+                field.key
+              ],
+            ),
           ])
           .filter(
             ([key, value]) =>

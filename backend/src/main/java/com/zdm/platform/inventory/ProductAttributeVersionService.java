@@ -162,8 +162,9 @@ public class ProductAttributeVersionService {
       return;
     }
     if ("number".equals(field.path("valueType").asText())) {
-      try { new BigDecimal(value.trim()); }
-      catch (NumberFormatException e) { throw new IllegalArgumentException(name + "请输入数字", e); }
+      try {
+        if (new BigDecimal(value.trim()).scale() > 2) { throw new IllegalArgumentException(name + "最多输入两位小数"); }
+      } catch (NumberFormatException e) { throw new IllegalArgumentException(name + "请输入数字", e); }
     }
     if ("select".equals(field.path("valueType").asText())) {
       var options = new LinkedHashSet<String>();

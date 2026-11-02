@@ -126,4 +126,25 @@ class ProductAttributeVersionApiTest extends SpringContainerTestSupport {
     mvc.perform(put(endpoint(scope)+"/{id}/edit",id).contentType("application/json").content(json.writeValueAsBytes(original))).andExpect(status().isBadRequest());
     assertThat(jdbc.queryForObject("SELECT value FROM "+scope+"_product_attribute_entries WHERE "+scope+"_product_id=?",String.class,id)).isEqualTo(" 历史文本 ");
   }
+  @ParameterizedTest @ValueSource(strings={"finished","accessory"})
+  void newPrecisionRejectsInvalidWritesWithoutChangingHistoricalValuesOrLogs(String scope) throws Exception {
+    var request=fixture(scope);
+    ((ObjectNode)request.path("attributes").get(0)).put("value","1.234");
+    mvc.perform(post(endpoint(scope)).contentType("application/json").content(json.writeValueAsBytes(request)))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("历史数字最多输入两位小数"));
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM "+scope+"_products",Long.class)).isZero();
+    ((ObjectNode)request.path("attributes").get(0)).put("value","12.50");
+    var product=create(scope,request);long id=product.path("id").asLong();
+    jdbc.update("UPDATE "+scope+"_product_attribute_entries SET value=' 1.2345 ' WHERE "+scope+"_product_id=?",id);
+    ((ObjectNode)product.path("attributes").get(0)).put("value"," 1.2345 ");
+    mvc.perform(put(endpoint(scope)+"/{id}/edit",id).contentType("application/json").content(json.writeValueAsBytes(product)))
+        .andExpect(status().isOk());
+    long logs=jdbc.queryForObject("SELECT COUNT(*) FROM "+scope+"_operation_logs WHERE product_id=?",Long.class,id);
+    ((ObjectNode)product.path("attributes").get(0)).put("value","2.345");
+    mvc.perform(put(endpoint(scope)+"/{id}/edit",id).contentType("application/json").content(json.writeValueAsBytes(product)))
+        .andExpect(status().isBadRequest()).andExpect(jsonPath("$.message").value("历史数字最多输入两位小数"));
+    assertThat(jdbc.queryForObject("SELECT value FROM "+scope+"_product_attribute_entries WHERE "+scope+"_product_id=?",String.class,id)).isEqualTo(" 1.2345 ");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM "+scope+"_operation_logs WHERE product_id=?",Long.class,id)).isEqualTo(logs);
+  }
+
 }

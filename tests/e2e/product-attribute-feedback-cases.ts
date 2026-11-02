@@ -1,0 +1,301 @@
+import { expect, test, type Locator, type Page } from '@playwright/test';
+import { productWarehouseUrl } from './product-test-navigation';
+
+type Resource = 'finished-products' | 'accessory-products';
+async function openEditor(
+  page: Page,
+  resource: Resource,
+  install: (page: Page) => Promise<void>,
+  layered = false,
+  numberLabel = '销售数字属性',
+) {
+  await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
+  await install(page);
+  const snapshot = [
+    {
+      attributeId: 1,
+      name: '商品数字属性',
+      attributeRole: 'product',
+      valueType: 'number',
+      requiredFlag: true,
+      skuFlag: false,
+      sortOrder: 1,
+      options: [],
+    },
+    {
+      attributeId: 2,
+      name: numberLabel,
+      attributeRole: 'sales',
+      valueType: 'number',
+      requiredFlag: true,
+      skuFlag: true,
+      sortOrder: 2,
+      options: [],
+    },
+    {
+      attributeId: 3,
+      name: '销售选项属性',
+      attributeRole: 'sales',
+      valueType: 'select',
+      requiredFlag: true,
+      skuFlag: true,
+      sortOrder: 3,
+      options: ['选项1', '选项2', '选项3'].map((value) => ({ value })),
+    },
+  ];
+  const product = {
+    id: 95,
+    name: '动态属性反馈商品',
+    categoryId: 5,
+    supplierId: 2,
+    status: 'warehouse',
+    sourceStatus: 'warehouse',
+    templateVersionId: 1,
+    templateRevision: 0,
+    attributeTemplateSnapshot: snapshot,
+    mainImageMediaId: 1,
+    mainImageMediaIds: [1],
+    videoMediaId: 2,
+    detail: '<p>保留详情</p>',
+    totalStock: 5,
+    attributes: [{ attributeId: 1, attributeName: '商品数字属性', value: '12.00' }],
+    specDimensions: layered
+      ? [
+          { key: 'attribute_2', name: '销售数字属性', values: ['1.2345', '2.00'] },
+          { key: 'attribute_3', name: '销售选项属性', values: ['选项1', '选项2'] },
+        ]
+      : [],
+    variants: [0, 1].map((index) => ({
+      id: 951 + index,
+      variantLabel: `规格${index + 1}`,
+      displayMode: layered ? 'layered' : 'single',
+      costPrice: (index + 1) * 10,
+      stock: index + 2,
+      salesAttributes: {
+        attribute_2: index === 0 ? (layered ? '1.2345' : '1.00') : '2.00',
+        attribute_3: `选项${index + 1}`,
+      },
+    })),
+  };
+  const writes: Record<string, unknown>[] = [];
+  await page.route(`**/api/admin/${resource}`, (route) => route.fulfill({ json: { code: 0, data: [product] } }));
+  await page.route(new RegExp(`/api/admin/${resource}/95(?:/edit)?$`), (route) => {
+    const body = route.request().method() === 'GET' ? {} : route.request().postDataJSON();
+    if (route.request().method() !== 'GET') writes.push(body);
+    return route.fulfill({ json: { code: 0, data: { ...product, ...body } } });
+  });
+  await page.route(`**/api/admin/${resource}/price-level-options`, (route) =>
+    route.fulfill({ json: { code: 0, data: [] } }),
+  );
+  await page.route(`**/api/admin/${resource}/attribute-template-options`, (route) =>
+    route.fulfill({ json: { code: 0, data: [{ versionId: 2, revision: 0, categoryId: 5, content: [] }] } }),
+  );
+  const module = resource === 'finished-products' ? 'finished-stock-management' : 'accessory-management';
+  await page.goto(productWarehouseUrl(`/supply-chain/${module}`));
+  await page.getByText('编辑', { exact: true }).first().click();
+  await expect(page.locator('.form-shell')).toBeVisible();
+  return { table: page.locator('.spec-table-block'), writes, product };
+}
+
+async function expectNativeError(input: Locator) {
+  await expect
+    .poll(() =>
+      input.evaluate((node) => {
+        const control = node.closest('.t-input')!;
+        const probe = document.createElement('span');
+        probe.style.color = 'var(--td-error-color)';
+        control.appendChild(probe);
+        const nativeError = getComputedStyle(probe).color;
+        probe.remove();
+        return getComputedStyle(control).borderColor === nativeError;
+      }),
+    )
+    .toBe(true);
+}
+
+async function switchToLayered(page: Page) {
+  const dialog = page.locator('.spec-dialog');
+  await dialog.getByText('分层展示：选择标准属性构建规格', { exact: true }).click();
+  await page.getByRole('button', { name: '确认切换展示模式', exact: true }).click();
+  return dialog;
+}
+
+export function registerAttributeFeedbackTests(resource: Resource, install: (page: Page) => Promise<void>) {
+  test('dynamic attributes show every type error with one summary and preserve valid numeric precision', async ({
+    page,
+  }) => {
+    const { table, writes } = await openEditor(page, resource, install);
+    const productInput = page.locator('.product-attributes-panel input').first();
+    const numbers = table.getByPlaceholder('请输入销售数字属性', { exact: true });
+    const geometry = await numbers.nth(1).evaluate((input) => {
+      const cell = input.closest('tr')!.getBoundingClientRect(),
+        box = input.getBoundingClientRect();
+      return { rowHeight: cell.height, offset: box.top - cell.top, width: box.width, height: box.height };
+    });
+    await productInput.fill('文字');
+    await numbers.nth(0).fill('1.234');
+    await numbers.nth(1).fill('错误');
+    await page
+      .locator('.form-submit-bar')
+      .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+      .click();
+    await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(1);
+    await expect(page.getByText('商品数字属性请输入数字', { exact: true })).toBeVisible();
+    await expect(table.getByText('销售数字属性最多输入两位小数', { exact: true })).toBeVisible();
+    await expect(table.getByText('销售数字属性请输入数字', { exact: true })).toBeVisible();
+    await expectNativeError(productInput);
+    await expectNativeError(numbers.nth(0));
+    await expectNativeError(numbers.nth(1));
+    expect(
+      await numbers.nth(1).evaluate((input) => {
+        const cell = input.closest('tr')!.getBoundingClientRect(),
+          box = input.getBoundingClientRect();
+        return { rowHeight: cell.height, offset: box.top - cell.top, width: box.width, height: box.height };
+      }),
+    ).toEqual(geometry);
+    expect(writes).toHaveLength(0);
+    const tips = table.locator('.t-input__tips').filter({ hasText: '销售数字属性' });
+    for (const tip of await tips.all()) {
+      expect(
+        await tip.evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          const row = element.closest('tr')!.getBoundingClientRect();
+          return (
+            element.scrollWidth <= element.clientWidth &&
+            box.bottom <= row.bottom &&
+            box.top >= element.parentElement!.querySelector('input')!.getBoundingClientRect().bottom
+          );
+        }),
+      ).toBe(true);
+    }
+    await productInput.fill('12.5');
+    await productInput.blur();
+    await numbers.nth(0).fill('-3.5');
+    await numbers.nth(0).blur();
+    await numbers.nth(1).fill('4');
+    await numbers.nth(1).blur();
+    await expect(productInput).toHaveValue('12.50');
+    await expect(numbers.nth(0)).toHaveValue('-3.50');
+    await expect(numbers.nth(1)).toHaveValue('4.00');
+    await page
+      .locator('.form-submit-bar')
+      .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
+      .click();
+    await expect.poll(() => writes.length).toBe(1);
+    expect(writes[0]!.attributes).toEqual([{ attributeId: 1, attributeName: '商品数字属性', value: '12.50' }]);
+    expect(writes[0]!.variants).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 951, stock: 2, salesAttributes: { attribute_2: '-3.50', attribute_3: '选项1' } }),
+        expect.objectContaining({ id: 952, stock: 3, salesAttributes: { attribute_2: '4.00', attribute_3: '选项2' } }),
+      ]),
+    );
+  });
+
+  test('batch dynamic attribute rejection is atomic and blanks never override required source values', async ({
+    page,
+  }) => {
+    const { table, writes } = await openEditor(page, resource, install);
+    const numbers = table.getByPlaceholder('请输入销售数字属性', { exact: true });
+    await page.getByRole('button', { name: '批量填写', exact: true }).click();
+    const drawer = page.locator('.t-drawer--open').filter({ hasText: '批量填写' });
+    const number = drawer.getByPlaceholder('请输入销售数字属性', { exact: true });
+    await number.fill('7.555');
+    await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
+    await expect(drawer).toBeVisible();
+    await expect(drawer.getByText('销售数字属性最多输入两位小数', { exact: true })).toBeVisible();
+    await expectNativeError(number);
+    await expect(numbers.nth(0)).toHaveValue('1.00');
+    await expect(numbers.nth(1)).toHaveValue('2.00');
+    await number.fill('7.5');
+    await number.blur();
+    await expect(number).toHaveValue('7.50');
+    await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
+    await expect(drawer).toBeHidden();
+    await expect(numbers.nth(0)).toHaveValue('7.50');
+    await expect(numbers.nth(1)).toHaveValue('7.50');
+    await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(0)).toHaveValue('10.00');
+    await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(1)).toHaveValue('20.00');
+    await expect(table.locator('.quantity-editor input').nth(0)).toHaveValue('2');
+    await expect(table.locator('.quantity-editor input').nth(1)).toHaveValue('3');
+    await page.getByRole('button', { name: '批量填写', exact: true }).click();
+    await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
+    await expect(drawer).toBeHidden();
+    await expect(numbers.nth(0)).toHaveValue('7.50');
+    await expect(numbers.nth(1)).toHaveValue('7.50');
+    expect(writes).toHaveLength(0);
+  });
+
+  test('layered numeric attributes reject precision before replacing any specifications', async ({ page }) => {
+    const { table, writes } = await openEditor(page, resource, install);
+    await page.getByRole('button', { name: '编辑规格', exact: true }).click();
+    const dialog = await switchToLayered(page);
+    await dialog.locator('.spec-attr-tag').getByText('销售数字属性', { exact: true }).click();
+    const number = dialog.getByPlaceholder('请输入销售数字属性', { exact: true });
+    await number.fill('3.456');
+    await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('销售数字属性最多输入两位小数', { exact: true })).toBeVisible();
+    await expectNativeError(number);
+    await expect(table.locator('tbody tr')).toHaveCount(2);
+    await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(0)).toHaveValue('10.00');
+    await number.fill('3.5');
+    await number.blur();
+    await expect(number).toHaveValue('3.50');
+    await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(table.locator('tbody tr')).toHaveCount(1);
+    await expect(table.locator('tbody tr')).toContainText('3.50');
+    await expect(table.getByPlaceholder('请输入价格', { exact: true })).toHaveValue('');
+    expect(writes).toHaveLength(0);
+  });
+
+  test('unchanged legacy layered values preserve SKU data while new combinations cannot inherit their exemption', async ({
+    page,
+  }) => {
+    const { table, writes } = await openEditor(page, resource, install, true);
+    await page.getByRole('button', { name: '编辑规格', exact: true }).click();
+    const dialog = page.locator('.spec-dialog');
+    await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
+    await expect(dialog).toBeHidden();
+    await expect(table.locator('tbody tr')).toHaveCount(2);
+    await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(0)).toHaveValue('10.00');
+    await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(1)).toHaveValue('20.00');
+    await page.getByRole('button', { name: '编辑规格', exact: true }).click();
+    const choices = dialog.locator('.spec-group').filter({ hasText: '销售选项属性' });
+    await choices.getByRole('button', { name: '新增属性值', exact: true }).click();
+    await choices.getByPlaceholder('请选择销售选项属性', { exact: true }).last().click();
+    await page.getByRole('listitem', { name: '选项3', exact: true }).click();
+    await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText('销售数字属性最多输入两位小数', { exact: true })).toBeVisible();
+    await expect(table.locator('tbody tr')).toHaveCount(2);
+    expect(writes).toHaveLength(0);
+  });
+  test('long dynamic attribute feedback wraps completely above the batch drawer footer', async ({ page }) => {
+    const label = '较长的数字属性名称'.repeat(6);
+    await openEditor(page, resource, install, false, label);
+    await page.getByRole('button', { name: '批量填写', exact: true }).click();
+    const drawer = page.locator('.t-drawer--open').filter({ hasText: '批量填写' });
+    const input = drawer.getByPlaceholder(`请输入${label}`, { exact: true });
+    const before = await input.boundingBox();
+    await input.fill('文本');
+    await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
+    const tip = drawer.getByText(`${label}请输入数字`, { exact: true });
+    await expect(tip).toBeVisible();
+    await expectNativeError(input);
+    expect(
+      await tip.evaluate((element) => {
+        const box = element.getBoundingClientRect();
+        const footer = element.closest('.t-drawer')!.querySelector('.t-drawer__footer')!.getBoundingClientRect();
+        return {
+          wrapped: box.height > parseFloat(getComputedStyle(element).lineHeight),
+          complete: element.scrollWidth <= element.clientWidth,
+          aboveFooter: box.bottom <= footer.top,
+        };
+      }),
+    ).toEqual({ wrapped: true, complete: true, aboveFooter: true });
+    const after = await input.boundingBox();
+    expect(after?.width).toBe(before?.width);
+    expect(after?.height).toBe(before?.height);
+  });
+}

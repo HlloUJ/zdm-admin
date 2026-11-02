@@ -73,4 +73,15 @@ class ProductAttributeVersionTest {
     assertThat(accessory.getAttributeTemplateSnapshot().get(0).path("name").asText()).isEqualTo("数字商品属性");
     assertThat(ProductAttributeVersionService.usedNames(finished.getAttributeTemplateSnapshot(), product("12", "旧选项", 8L).path("variants"))).containsOnlyKeys("attribute_57");
   }
+  @Test void twoDecimalPrecisionAppliesToNewValuesWithoutTakingLegacySkuExemptions() throws Exception {
+    var numeric = definition().deepCopy();
+    ((com.fasterxml.jackson.databind.node.ObjectNode)numeric.get(1)).put("valueType", "number");
+    var previous = product("1.234", "2.345", 8L);
+    assertThatCode(() -> versions.validate(numeric, previous.deepCopy(), previous)).doesNotThrowAnyException();
+    assertThatThrownBy(() -> versions.validate(numeric, product("1.234", "2.34", 8L), null)).hasMessageContaining("两位小数");
+    assertThatThrownBy(() -> versions.validate(numeric, product("1.234", "2.345", null), previous)).hasMessageContaining("两位小数");
+    assertThatThrownBy(() -> versions.validate(numeric, product("1.234", "3.456", 8L), previous)).hasMessageContaining("两位小数");
+    assertThatCode(() -> versions.validate(numeric, product("-1.20", "0.00", null), null)).doesNotThrowAnyException();
+  }
+
 }

@@ -398,14 +398,7 @@
                         <t-select
                           v-if="field.type === 'select'"
                           v-model="productForm[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(
-                              productForm[field.key],
-                              field.label,
-                              submitAttempted && field.required,
-                              field.type === 'select',
-                            )
-                          "
+                          v-bind="attributeFeedback(field, productForm[field.key], submitAttempted)"
                           clearable
                           :placeholder="controlPlaceholder(field.label, 'select')"
                         >
@@ -414,16 +407,10 @@
                         <t-input
                           v-else
                           v-model="productForm[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(
-                              productForm[field.key],
-                              field.label,
-                              submitAttempted && field.required,
-                              false,
-                            )
-                          "
+                          v-bind="attributeFeedback(field, productForm[field.key], submitAttempted)"
                           clearable
                           :placeholder="controlPlaceholder(field.label, 'input')"
+                          @blur="productForm[field.key] = normalizeAttribute(field, productForm[field.key])"
                         />
                       </t-form-item>
                     </div>
@@ -503,14 +490,7 @@
                           v-else-if="field.type === 'select'"
                           v-model="row[field.key]"
                           clearable
-                          v-bind="
-                            requiredFieldFeedback(
-                              row[field.key],
-                              field.label,
-                              specSubmitted && field.required,
-                              field.type === 'select',
-                            )
-                          "
+                          v-bind="attributeFeedback(field, row[field.key], specSubmitted, row)"
                           :placeholder="controlPlaceholder(field.label, 'select')"
                         >
                           <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
@@ -518,10 +498,9 @@
                         <t-input
                           v-else
                           v-model="row[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(row[field.key], field.label, specSubmitted && field.required, false)
-                          "
+                          v-bind="attributeFeedback(field, row[field.key], specSubmitted, row)"
                           :placeholder="controlPlaceholder(field.label, 'input')"
+                          @blur="row[field.key] = normalizeAttribute(field, row[field.key], row)"
                         />
                       </template>
                       <template #cost="{ row }">
@@ -830,7 +809,7 @@
                 <t-select
                   v-if="salesAttributeByKey(group.field)?.type === 'select'"
                   :value="value.value"
-                  v-bind="fieldFeedback(specDraftFieldStatus(value.value, value.id), `请选择${group.name}`)"
+                  v-bind="specAttributeFeedback(group, value)"
                   clearable
                   :placeholder="controlPlaceholder(group.name, 'select')"
                   @change="value.value = String($event ?? '')"
@@ -846,13 +825,9 @@
                 <t-input
                   v-else
                   v-model="value.value"
-                  v-bind="
-                    fieldFeedback(
-                      isDuplicateSpecValue(group, value) || specDraftFieldStatus(value.value, value.id),
-                      isDuplicateSpecValue(group, value) ? '属性值重复' : `请输入${group.name}`,
-                    )
-                  "
+                  v-bind="specAttributeFeedback(group, value)"
                   :placeholder="controlPlaceholder(group.name, 'input')"
+                  @blur="normalizeSpecAttribute(group, value)"
                 />
                 <t-button
                   shape="square"
@@ -995,6 +970,7 @@
               <t-select
                 v-if="field.type === 'select'"
                 v-model="batchSalesAttributes[field.key]"
+                v-bind="batchAttributeFeedback(field)"
                 clearable
                 :placeholder="controlPlaceholder(field.label, 'select')"
               >
@@ -1003,8 +979,10 @@
               <t-input
                 v-else
                 v-model="batchSalesAttributes[field.key]"
+                v-bind="batchAttributeFeedback(field)"
                 clearable
                 :placeholder="controlPlaceholder(field.label, 'input')"
+                @blur="normalizeBatchAttribute(field)"
               />
             </t-form-item>
           </div>
@@ -1126,6 +1104,12 @@ import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/
 import { preventZeroQuantity, isPositiveIntegerQuantity } from '@/utils/quantityInput';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
+import {
+  templateAttributeError,
+  formatTemplateNumber,
+  unchangedTemplateValue,
+  type TemplateAttributeField,
+} from '../shared/finishedStockAttributeValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { stateActivitySortIcon, stateActivityColumns } from '@/services/productStateActivity';
@@ -1631,6 +1615,109 @@ const templateAttributeFields = computed(() =>
     productAttributes.value,
   ),
 );
+
+const attributePrevious = (field: TemplateAttributeField, row?: SpecRow) => {
+  if (!editingProduct.value) return { exists: false, value: undefined };
+  if (row) {
+    const previous =
+      row.skuId == null ? undefined : editingProduct.value.variants.find((variant) => variant.id === row.skuId);
+    return { exists: Boolean(previous), value: previous?.salesAttributes?.[field.key] };
+  }
+  const entry = editingProduct.value.attributes.find((item) => `attribute_${item.attributeId}` === field.key);
+  return { exists: true, value: entry?.value };
+};
+const attributeMessage = (field: TemplateAttributeField, value: unknown, row?: SpecRow) => {
+  const previous = attributePrevious(field, row);
+  return templateAttributeError(field, value, {
+    legacyUnchanged: previous.exists && unchangedTemplateValue(value, previous.value),
+  });
+};
+const attributeFeedback = (field: TemplateAttributeField, value: unknown, submitted: boolean, row?: SpecRow) => {
+  const message = submitted ? attributeMessage(field, value, row) : '';
+  return fieldFeedback(Boolean(message), message);
+};
+const formatAttributeInput = (field: TemplateAttributeField, value: unknown) =>
+  field.valueType === 'number' && String(value ?? '').trim() ? formatTemplateNumber(value) : String(value ?? '');
+const normalizeAttribute = (field: TemplateAttributeField, value: unknown, row?: SpecRow) => {
+  const previous = attributePrevious(field, row);
+  if (previous.exists && unchangedTemplateValue(value, previous.value)) return String(value ?? '');
+  return attributeMessage(field, value, row) ? String(value ?? '') : formatAttributeInput(field, value);
+};
+const batchAttributeFeedback = (field: TemplateAttributeField) => {
+  const message = batchFillSubmitted.value
+    ? templateAttributeError(field, batchSalesAttributes.value[field.key], { optional: true })
+    : '';
+  return fieldFeedback(Boolean(message), message);
+};
+const normalizeBatchAttribute = (field: TemplateAttributeField) => {
+  if (!templateAttributeError(field, batchSalesAttributes.value[field.key], { optional: true }))
+    batchSalesAttributes.value[field.key] = formatAttributeInput(field, batchSalesAttributes.value[field.key]);
+};
+const specTypeFeedback = useFormFeedback(specDialogVisible);
+const specAttributeMessage = (group: SpecGroup, value: SpecValue) => {
+  const field = salesAttributeByKey(group.field);
+  if (!field) return '';
+  const rejected = specTypeFeedback.field(`${group.field}:${value.id}`, value.value);
+  if (rejected.status === 'error') return rejected.tips ?? '';
+  const unchanged =
+    Boolean(value.value.trim()) &&
+    Boolean(
+      editingProduct.value?.variants.some((variant) =>
+        unchangedTemplateValue(value.value, variant.salesAttributes?.[field.key]),
+      ),
+    );
+  return templateAttributeError({ ...field, required: true }, value.value, { legacyUnchanged: unchanged });
+};
+const specAttributeFeedback = (group: SpecGroup, value: SpecValue) => {
+  const message = validatedSpecDraftIds.value.has(value.id) ? specAttributeMessage(group, value) : '';
+  const duplicate = isDuplicateSpecValue(group, value);
+  return fieldFeedback(Boolean(message) || duplicate, message || (duplicate ? '属性值重复' : ''));
+};
+const normalizeSpecAttribute = (group: SpecGroup, value: SpecValue) => {
+  const field = salesAttributeByKey(group.field);
+  if (!field || specAttributeMessage(group, value)) return;
+  if (
+    editingProduct.value?.variants.some((variant) =>
+      unchangedTemplateValue(value.value, variant.salesAttributes?.[field.key]),
+    )
+  )
+    return;
+  value.value = formatAttributeInput(field, value.value);
+};
+const validateAttributeDrafts = () => {
+  specTypeFeedback.clear();
+  const groups = specGroups.filter((group) => group.selected);
+  if (groups.some((group) => group.values.some((value) => Boolean(specAttributeMessage(group, value))))) return false;
+  groups.forEach((group) => group.values.forEach((value) => normalizeSpecAttribute(group, value)));
+  return true;
+};
+const validateAttributeRows = (rows: SpecRow[], fields: LayeredSpecField[]) => {
+  let valid = true;
+  for (const row of rows)
+    for (const key of fields) {
+      const field = salesAttributeByKey(key);
+      if (!field) continue;
+      const group = specGroups.find((item) => item.field === key);
+      const draft = group?.values.find((value) => value.id === row._specValueIds?.[key]);
+      const previous = attributePrevious(field, row);
+      if (
+        draft &&
+        previous.exists &&
+        unchangedTemplateValue(draft.value, previous.value) &&
+        previous.value !== undefined
+      )
+        row[key] = previous.value;
+      const message = attributeMessage(field, row[key], row);
+      if (message) {
+        valid = false;
+        group?.values
+          .filter((value) => value.value.trim() === String(row[key] ?? '').trim())
+          .forEach((value) => specTypeFeedback.reject(`${key}:${value.id}`, value.value, message));
+      }
+    }
+  return valid;
+};
+
 const attributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'product'));
 const salesAttributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'sales'));
 const layeredFieldLabels = computed<Record<string, string>>(() => ({
@@ -2454,6 +2541,8 @@ const {
   specToPriceRow,
 } = useFinishedStockSpecDialog({
   onValidationFailed: () => rejectFormSubmission(specFormRoot.value),
+  validateAttributeDrafts,
+  validateAttributeRows,
   validatedSpecDraftIds,
   specRows,
   specMode,
@@ -2525,6 +2614,12 @@ const savePriceDrawer = () => {
     if (batchFillForm.quantity != null && !isPositiveIntegerQuantity(batchFillForm.quantity)) {
       return rejectFormSubmission(priceFormRoot.value);
     }
+    if (
+      batchEditableSalesFields.value.some((field) =>
+        templateAttributeError(field, batchSalesAttributes.value[field.key], { optional: true }),
+      )
+    )
+      return rejectFormSubmission(priceFormRoot.value);
     const matchedIds = new Set(batchFillMatchedRows.value.map((row) => row.id));
     if (!matchedIds.size) {
       adminFeedback.warning('当前条件下没有可批量填写的规格');
@@ -2537,7 +2632,7 @@ const savePriceDrawer = () => {
             ...Object.fromEntries(
               batchEditableSalesFields.value
                 .filter((field) => batchSalesAttributes.value[field.key]?.trim())
-                .map((field) => [field.key, batchSalesAttributes.value[field.key]]),
+                .map((field) => [field.key, formatAttributeInput(field, batchSalesAttributes.value[field.key])]),
             ),
             markupPrices: Object.fromEntries(
               productPriceLevels.value.map((level) => {
@@ -2628,6 +2723,15 @@ const validateProductForm = () => {
     previousProduct: editingProduct.value ?? undefined,
     guidePriceSettingCoefficient: guidePriceSettingCoefficient.value,
   });
+  for (const field of attributeFields.value) {
+    const message = attributeMessage(field, productForm[field.key]);
+    if (message) issues.push({ kind: 'warning', message, tab: 'base' });
+  }
+  for (const row of specRows.value)
+    for (const field of salesAttributeFields.value) {
+      const message = attributeMessage(field, row[field.key], row);
+      if (message) issues.push({ kind: 'warning', message, tab: 'sales' });
+    }
   salesSpecificationFeedback.clear();
   if (!issues.length) return issues;
   const issue = issues.find((item) => item.kind === 'error' && !item.tab);

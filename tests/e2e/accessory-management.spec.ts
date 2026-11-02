@@ -1,3 +1,4 @@
+import { registerAttributeFeedbackTests } from './product-attribute-feedback-cases';
 import { productAttributeVersionFixture } from './product-attribute-version-fixture';
 import { productWarehouseUrl } from './product-test-navigation';
 import {
@@ -3039,3 +3040,5 @@ for (const mode of ['single', 'layered'] as const) {
     }
   });
 }
+
+registerAttributeFeedbackTests('accessory-products', installFinishedMocks);
