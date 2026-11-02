@@ -51,11 +51,11 @@ export function templateAttributeError(
     return !optional && field.required ? `${field.type === 'select' ? '请选择' : '请输入'}${field.label}` : '';
   if (field.valueType === 'number') {
     const parts = decimalParts(text);
-    if (!parts) return `${field.label}请输入数字`;
-    if (parts.scale > 2) return `${field.label}最多输入两位小数`;
+    if (!parts) return '请输入数字';
+    if (parts.scale > 2) return '最多输入两位小数';
   }
   if ((field.valueType === 'select' || field.type === 'select') && !field.options?.includes(text)) {
-    return `${field.label}请选择绑定版本中的有效选项`;
+    return '请选择有效选项';
   }
   return '';
 }

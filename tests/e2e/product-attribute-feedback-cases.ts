@@ -140,9 +140,9 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
       .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
       .click();
     await expect(page.getByText('表单校验未通过，请检查标红字段', { exact: true })).toHaveCount(1);
-    await expect(page.getByText('商品数字属性请输入数字', { exact: true })).toBeVisible();
-    await expect(table.getByText('销售数字属性最多输入两位小数', { exact: true })).toBeVisible();
-    await expect(table.getByText('销售数字属性请输入数字', { exact: true })).toBeVisible();
+    await expect(page.locator('.product-attributes-panel').getByText('请输入数字', { exact: true })).toBeVisible();
+    await expect(table.getByText('最多输入两位小数', { exact: true })).toBeVisible();
+    await expect(table.getByText('请输入数字', { exact: true })).toBeVisible();
     await expectNativeError(productInput);
     await expectNativeError(numbers.nth(0));
     await expectNativeError(numbers.nth(1));
@@ -154,7 +154,7 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
       }),
     ).toEqual(geometry);
     expect(writes).toHaveLength(0);
-    const tips = table.locator('.t-input__tips').filter({ hasText: '销售数字属性' });
+    const tips = table.locator('.t-input__tips').filter({ hasText: /^(请输入数字|最多输入两位小数)$/ });
     for (const tip of await tips.all()) {
       expect(
         await tip.evaluate((element) => {
@@ -202,7 +202,7 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     await number.fill('7.555');
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
     await expect(drawer).toBeVisible();
-    await expect(drawer.getByText('销售数字属性最多输入两位小数', { exact: true })).toBeVisible();
+    await expect(drawer.getByText('最多输入两位小数', { exact: true })).toBeVisible();
     await expectNativeError(number);
     await expect(numbers.nth(0)).toHaveValue('1.00');
     await expect(numbers.nth(1)).toHaveValue('2.00');
@@ -234,7 +234,7 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     await number.fill('3.456');
     await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText('销售数字属性最多输入两位小数', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('最多输入两位小数', { exact: true })).toBeVisible();
     await expectNativeError(number);
     await expect(table.locator('tbody tr')).toHaveCount(2);
     await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(0)).toHaveValue('10.00');
@@ -267,11 +267,11 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     await page.getByRole('listitem', { name: '选项3', exact: true }).click();
     await dialog.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
     await expect(dialog).toBeVisible();
-    await expect(dialog.getByText('销售数字属性最多输入两位小数', { exact: true })).toBeVisible();
+    await expect(dialog.getByText('最多输入两位小数', { exact: true })).toBeVisible();
     await expect(table.locator('tbody tr')).toHaveCount(2);
     expect(writes).toHaveLength(0);
   });
-  test('long dynamic attribute feedback wraps completely above the batch drawer footer', async ({ page }) => {
+  test('long attribute labels retain concise feedback completely above the batch drawer footer', async ({ page }) => {
     const label = '较长的数字属性名称'.repeat(6);
     await openEditor(page, resource, install, false, label);
     await page.getByRole('button', { name: '批量填写', exact: true }).click();
@@ -280,7 +280,7 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     const before = await input.boundingBox();
     await input.fill('文本');
     await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
-    const tip = drawer.getByText(`${label}请输入数字`, { exact: true });
+    const tip = drawer.getByText('请输入数字', { exact: true });
     await expect(tip).toBeVisible();
     await expectNativeError(input);
     expect(
@@ -293,7 +293,7 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
           aboveFooter: box.bottom <= footer.top,
         };
       }),
-    ).toEqual({ wrapped: true, complete: true, aboveFooter: true });
+    ).toEqual({ wrapped: false, complete: true, aboveFooter: true });
     const after = await input.boundingBox();
     expect(after?.width).toBe(before?.width);
     expect(after?.height).toBe(before?.height);

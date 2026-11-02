@@ -13,10 +13,10 @@ describe('template attribute type and precision rules', () => {
     },
   );
   it.each(['文字', 'NaN', 'Infinity', '0x10', '--1', '1e9999999999'])('rejects invalid decimal values: %s', (value) => {
-    expect(templateAttributeError(number, value)).toContain('请输入数字');
+    expect(templateAttributeError(number, value)).toBe('请输入数字');
   });
   it.each(['1.234', '-0.001', '1e-3', '1.2300'])('rejects excessive precision without rounding: %s', (value) => {
-    expect(templateAttributeError(number, value)).toContain('最多输入两位小数');
+    expect(templateAttributeError(number, value)).toBe('最多输入两位小数');
     expect(formatTemplateNumber(value)).toBe(value);
   });
   it('formats legal values exactly without floating point loss', () => {
@@ -31,7 +31,7 @@ describe('template attribute type and precision rules', () => {
     expect(templateAttributeError(number, '', { optional: true })).toBe('');
     expect(
       templateAttributeError({ ...number, valueType: 'select', type: 'select', options: ['旧选项'] }, '新选项'),
-    ).toContain('绑定版本');
+    ).toBe('请选择有效选项');
   });
   it('only exempts unchanged historical values and preserves their raw representation', () => {
     expect(templateAttributeError(number, ' 旧文字 ', { legacyUnchanged: true })).toBe('');

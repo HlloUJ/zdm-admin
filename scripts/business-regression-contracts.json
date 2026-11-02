@@ -376,8 +376,8 @@
         "tests/e2e/product-attribute-version-fixture.ts": "e0712713a226d51ed9e9e818ea891f2be494a6c09e103b7745b58ea13068d913",
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
         "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
-        "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "27e8504b18b2484f61cda4f4f7194bd39516a67c1859c117eb57b130b29a4e01",
-        "tests/e2e/product-attribute-feedback-cases.ts": "c6baa58a29191827cf94c96966adaa875d0c6a0cf36bee5036cb27e2a7a19e8b"
+        "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "7b3130c619c25ea04771b598fa2d34e63738a5517d11ae4d4e5f9b4c96a77d8c",
+        "tests/e2e/product-attribute-feedback-cases.ts": "4986c99b57ac8eaa80886a956d57c3b51ba8a217f25e17aa6b9e38659309a67f"
       },
       "testChanges": [
         {
@@ -1914,6 +1914,18 @@
           "before": "6294ad41434f57c895c4d822098f4880eedae441c748c40c54b97be0fd614a07",
           "after": "2e597d98526786b6070e1b94ff9c87c04ac94785d1843db6aa3456c3aa0368a4",
           "reason": "用户确认仅供应链成品现货/配件四入口动态属性类型与两位小数校验、原生错误反馈及批量原子应用；保留历史原值、SKU规则和其他端边界。保留原测试全部断言、超时和零重试，新增定向用例。"
+        },
+        {
+          "file": "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts",
+          "before": "27e8504b18b2484f61cda4f4f7194bd39516a67c1859c117eb57b130b29a4e01",
+          "after": "7b3130c619c25ea04771b598fa2d34e63738a5517d11ae4d4e5f9b4c96a77d8c",
+          "reason": "用户确认仅修正供应链成品现货/配件四入口三类错误提示文案；精确匹配简短新文案，长字段名场景仍检查提示完整、底栏边界及控件尺寸，保留其他业务断言和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "c6baa58a29191827cf94c96966adaa875d0c6a0cf36bee5036cb27e2a7a19e8b",
+          "after": "4986c99b57ac8eaa80886a956d57c3b51ba8a217f25e17aa6b9e38659309a67f",
+          "reason": "用户确认仅修正供应链成品现货/配件四入口三类错误提示文案；精确匹配简短新文案，长字段名场景仍检查提示完整、底栏边界及控件尺寸，保留其他业务断言和零重试。"
         }
       ],
       "routes": [
