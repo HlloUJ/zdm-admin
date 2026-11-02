@@ -326,3 +326,100 @@ it('价格封装在不完整小数校验后仍可整段替换为合法价格', a
   expect(wrapper.text()).not.toContain('请输入数字');
   wrapper.unmount();
 });
+
+it.each([false, true])('真实删除允许临时前导零并可继续编辑，plain=%s', async (plain) => {
+  const { wrapper, input, value } = editor(true, '100.23', false, 2, plain);
+  input.element.focus();
+  input.element.setSelectionRange(0, 1);
+  input.element.dispatchEvent(new InputEvent('beforeinput', { bubbles: true, inputType: 'deleteContentForward' }));
+  input.element.value = '00.23';
+  input.element.setSelectionRange(0, 0);
+  input.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentForward' }));
+  await nextTick();
+  expect(input.element.value).toBe('00.23');
+  expect(value.value).toBe('00.23');
+  input.element.value = '0.23';
+  input.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentForward' }));
+  await nextTick();
+  expect(input.element.value).toBe('0.23');
+  input.element.setSelectionRange(0, input.element.value.length);
+  input.element.value = '';
+  input.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+  await nextTick();
+  expect(value.value).toBe('');
+  await input.setValue('12.3');
+  input.element.blur();
+  await nextTick();
+  expect(value.value).toBe('12.30');
+  wrapper.unmount();
+});
+
+it.each([false, true])('中文组合结束后清除内部状态，数字连续输入不被旧值覆盖，plain=%s', async (plain) => {
+  const { wrapper, input, value, change } = editor(true, '12.00', false, 2, plain);
+  input.element.focus();
+  input.element.setSelectionRange(0, 5);
+  await input.trigger('select');
+  await input.trigger('compositionstart');
+  for (const text of ['z', 'zh', '中文']) {
+    input.element.value = text;
+    input.element.dispatchEvent(
+      new InputEvent('input', { bubbles: true, inputType: 'insertCompositionText', isComposing: true }),
+    );
+    await nextTick();
+    expect(input.element.value).toBe(text);
+    expect(value.value).toBe('12.00');
+  }
+  await input.trigger('compositionend');
+  await nextTick();
+  expect(input.element.value).toBe('12.00');
+  expect(input.element.selectionStart).toBe(0);
+  expect(input.element.selectionEnd).toBe(5);
+  expect(change).not.toHaveBeenCalled();
+  for (const text of ['1', '11', '111', '111.', '111.2', '111.23']) {
+    await input.setValue(text);
+    await nextTick();
+    expect(input.element.value).toBe(text);
+    expect(value.value).toBe(text);
+  }
+  wrapper.unmount();
+});
+
+it.each([false, true])('不支持取消的非法输入恢复原选区，后续整数位仍可输入，plain=%s', async (plain) => {
+  const { wrapper, input, value } = editor(true, '12.34', false, 2, plain);
+  input.element.focus();
+  input.element.setSelectionRange(1, 1);
+  await input.trigger('select');
+  input.element.dispatchEvent(
+    new InputEvent('beforeinput', { bubbles: true, cancelable: false, inputType: 'insertText', data: '中' }),
+  );
+  input.element.value = '1中2.34';
+  input.element.setSelectionRange(2, 2);
+  input.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '中' }));
+  await nextTick();
+  expect(input.element.value).toBe('12.34');
+  expect(input.element.selectionStart).toBe(1);
+  expect(input.element.selectionEnd).toBe(1);
+  input.element.setRangeText('5', 1, 1, 'end');
+  input.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: '5' }));
+  await nextTick();
+  expect(value.value).toBe('152.34');
+  wrapper.unmount();
+});
+
+it.each([0, 2])('整数及负值例外也支持删除产生的中间状态，places=%s', async (places) => {
+  const { wrapper, input, value } = editor(true, '-100', false, places, false, true);
+  input.element.focus();
+  input.element.value = places ? '-00.00' : '-00';
+  input.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentForward' }));
+  await nextTick();
+  expect(input.element.value).toBe(places ? '-00.00' : '-00');
+  input.element.blur();
+  await nextTick();
+  expect(value.value).toBe(places ? '0.00' : '0');
+  input.element.focus();
+  input.element.value = '';
+  input.element.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'deleteContentBackward' }));
+  await nextTick();
+  expect(value.value).toBe('');
+  wrapper.unmount();
+});

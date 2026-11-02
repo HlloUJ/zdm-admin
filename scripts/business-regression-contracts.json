@@ -394,14 +394,14 @@
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
         "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
         "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "c68b320b55c02156cb5104344627d1c32f64cf012981f7aaee191b91b62bc3ba",
-        "tests/e2e/product-attribute-feedback-cases.ts": "3962166d93764105f0145288af6165df4fb4583c0c60a9cfea9c0542db32cb5b",
+        "tests/e2e/product-attribute-feedback-cases.ts": "81d98b3083ab76b6387db9fffd2737ff2a8df5009da3f796da055034afa0bfe6",
         "tests/e2e/store-batch-sale-price-cases.ts": "658f987d7f895d0724e6ff6a6aaf43265dac59e91f26a755c9465ed02f82b7f1",
-        "src/components/DecimalInput.test.ts": "2ab108da1f36b09f46076b71cd8d25b39a3c6249accc31c79d04bd695c548958",
+        "src/components/DecimalInput.test.ts": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
         "src/utils/numericInput.test.ts": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
         "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java": "3e5698da75d970c3e7ee82fb93965a086876a9d771c5e44a687213be853ef90a",
         "src/utils/numericInputValidation.test.ts": "3b7a3a3dcd4fcb8f06923dbe341e0e870e9e2791c772d8496ef8e11cbea66a26",
         "tests/e2e/store-price-rules.spec.ts": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
-        "tests/e2e/decimal-editing.ts": "948f97c7d82c0270ea09dc03441a2762dd413ffe2528d6d9888d5ba9542ed745"
+        "tests/e2e/decimal-editing.ts": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73"
       },
       "testChanges": [
         {
@@ -2166,6 +2166,24 @@
           "before": "6292142a38db568a1dc850647046695b82be3ebe1d13849ff48df00f3320dcd2",
           "after": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
           "reason": "用户确认两位小数与连续前导零输入限制；仅同步对应输入断言，保留原业务、布局、历史值兼容与保存断言。对应整段替换测试等待原生焦点草稿回显，布局断言先确认范围行已渲染；不更改超时、重试或门禁逻辑。"
+        },
+        {
+          "file": "src/components/DecimalInput.test.ts",
+          "before": "2ab108da1f36b09f46076b71cd8d25b39a3c6249accc31c79d04bd695c548958",
+          "after": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
+          "reason": "用户确认仅修复公共数值控件的删除、中文输入法状态同步及拒绝输入后的光标恢复。保留原断言，新增整数/负值例外、真实删除与组合事件后数字连续输入回归；明确测试光标位置，不改超时、重试或其他业务。"
+        },
+        {
+          "file": "tests/e2e/decimal-editing.ts",
+          "before": "948f97c7d82c0270ea09dc03441a2762dd413ffe2528d6d9888d5ba9542ed745",
+          "after": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73",
+          "reason": "用户确认仅修复公共数值控件的删除、中文输入法状态同步及拒绝输入后的光标恢复。保留原断言，新增整数/负值例外、真实删除与组合事件后数字连续输入回归；明确测试光标位置，不改超时、重试或其他业务。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "3962166d93764105f0145288af6165df4fb4583c0c60a9cfea9c0542db32cb5b",
+          "after": "81d98b3083ab76b6387db9fffd2737ff2a8df5009da3f796da055034afa0bfe6",
+          "reason": "用户确认仅修复公共数值控件的删除、中文输入法状态同步及拒绝输入后的光标恢复。保留原断言，新增整数/负值例外、真实删除与组合事件后数字连续输入回归；明确测试光标位置，不改超时、重试或其他业务。"
         }
       ],
       "routes": [

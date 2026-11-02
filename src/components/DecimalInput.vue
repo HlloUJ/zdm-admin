@@ -10,12 +10,13 @@
     @input.capture="handleInput"
     @beforeinput.capture="handleBeforeInput"
     @paste.capture="handlePaste"
-    @compositionstart.capture="composing = true"
+    @compositionstart.capture="handleCompositionStart"
     @compositionend.capture="handleCompositionEnd"
     @change="handleChange"
     @focus="handleFocus"
     @focusin="handleNativeFocus"
     @keydown.capture="handleDecimalKeydown"
+    @select.capture="rememberSelection"
     @blur="handleBlur"
   />
 </template>
@@ -102,7 +103,27 @@ const replacement = (input: HTMLInputElement, text: string) =>
   input.value.slice(0, input.selectionStart ?? input.value.length) +
   text +
   input.value.slice(input.selectionEnd ?? input.value.length);
+type Selection = { value: string; start: number; end: number; direction: 'forward' | 'backward' | 'none' };
+let selection: Selection | undefined;
+const rememberSelection = (event: Event) => {
+  const input = inputTarget(event);
+  if (!input || composing.value) return;
+  selection = {
+    value: input.value,
+    start: input.selectionStart ?? input.value.length,
+    end: input.selectionEnd ?? input.value.length,
+    direction: input.selectionDirection ?? 'none',
+  };
+};
+const restoreDraft = (input: HTMLInputElement) => {
+  const saved = selection?.value === draft.value ? selection : undefined;
+  const start = saved?.start ?? Math.min(input.selectionStart ?? draft.value.length, draft.value.length);
+  const end = saved?.end ?? start;
+  input.value = draft.value;
+  input.setSelectionRange(start, end, saved?.direction);
+};
 const handleBeforeInput = (event: InputEvent) => {
+  rememberSelection(event);
   const input = inputTarget(event);
   if (!input || composing.value || event.isComposing || !event.inputType.startsWith('insert') || event.data == null)
     return;
@@ -120,20 +141,30 @@ const handlePaste = (event: ClipboardEvent) => {
 const handleInput = (event: Event) => {
   const input = inputTarget(event);
   if (!input) return;
+  // Let TDesign receive composing input so its composition draft stays in sync.
+  if (composing.value || (event as InputEvent).isComposing) return;
   // Keep TDesign's visual component and step controls, bypass its lossy input truncation/filtering.
   event.stopImmediatePropagation();
-  if (composing.value) return;
-  if (!accepts(input.value)) {
-    input.value = draft.value;
+  if (!(event as InputEvent).inputType?.startsWith('delete') && !accepts(input.value)) {
+    restoreDraft(input);
     return;
   }
   publish(input.value, { type: 'input', e: event });
 };
+const handleCompositionStart = (event: CompositionEvent) => {
+  rememberSelection(event);
+  composing.value = true;
+};
 const handleCompositionEnd = (event: CompositionEvent) => {
+  const input = inputTarget(event);
   composing.value = false;
-  handleInput(event);
+  if (!input) return;
+  if (accepts(input.value)) publish(input.value, { type: 'input', e: event });
+  else restoreDraft(input);
+  // Do not stop compositionend: TDesign must also reset its composition state.
 };
 const handleChange = (value: unknown, context: ChangeContext = {}) => {
+  if (composing.value || context.e?.type === 'compositionend') return;
   if (context.type === 'props' || context.type === 'input' || context.type === 'blur' || context.type === 'enter')
     return;
   const text = String(value ?? '');
@@ -148,6 +179,7 @@ const handleNativeFocus = (event: FocusEvent) => {
   if ((event.target as HTMLElement | null)?.tagName === 'INPUT') handleFocus(undefined, { e: event });
 };
 const handleDecimalKeydown = (event: KeyboardEvent) => {
+  rememberSelection(event);
   if (event.code !== 'NumpadDecimal' || event.ctrlKey || event.metaKey || event.altKey || event.isComposing) return;
   const input = inputTarget(event);
   if (!input || input.selectionStart === null) return;
@@ -157,6 +189,7 @@ const handleDecimalKeydown = (event: KeyboardEvent) => {
   publish(input.value, { type: 'input', e: event });
 };
 const handleBlur = (_value: unknown, context: ChangeContext = {}) => {
+  composing.value = false;
   touched.value = true;
   if (!edited.value) {
     focused.value = false;

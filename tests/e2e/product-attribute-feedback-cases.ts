@@ -1,3 +1,4 @@
+import { checkNumericEditingRecovery } from './decimal-editing';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { productWarehouseUrl } from './product-test-navigation';
 
@@ -128,6 +129,14 @@ async function switchToLayered(page: Page) {
 }
 
 export function registerAttributeFeedbackTests(resource: Resource, install: (page: Page) => Promise<void>) {
+  test('numeric attributes and prices recover after deletion and Chinese composition before typing digits', async ({
+    page,
+  }) => {
+    const { table, writes } = await openEditor(page, resource, install);
+    await checkNumericEditingRecovery(page.locator('.product-attributes-panel input').first());
+    await checkNumericEditingRecovery(table.getByPlaceholder('请输入价格', { exact: true }).first());
+    expect(writes).toHaveLength(0);
+  });
   test('dynamic attributes show every type error with one summary and preserve valid numeric precision', async ({
     page,
   }) => {
