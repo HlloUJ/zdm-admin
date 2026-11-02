@@ -13,7 +13,7 @@ export function registerStoreBatchSalePriceTests(
       ...base,
       specDimensions: layered
         ? [
-            { key: 'color', name: '颜色', values: ['白色', '黑色'] },
+            { key: 'color', name: '门店销售规格颜色属性（共享）', values: ['白色', '黑色'] },
             { key: 'sizeValue', name: '尺寸', values: ['大', '小'] },
           ]
         : [],
@@ -60,6 +60,12 @@ export function registerStoreBatchSalePriceTests(
     page,
   }) => {
     const { main, drawer, writes, price } = await open(page);
+    expect(
+      await main.getByRole('button', { name: '批量填写', exact: true }).evaluate((button) => {
+        const table = button.closest('.spec-table-block')!.querySelector('.t-table')!;
+        return button.getBoundingClientRect().top - table.getBoundingClientRect().bottom;
+      }),
+    ).toBe(24);
     await expect(drawer.getByText('当前将批量填充 3 条规格', { exact: true })).toBeVisible();
     await drawer
       .locator('.batch-filter-values .t-tag')
@@ -91,6 +97,26 @@ export function registerStoreBatchSalePriceTests(
     page,
   }) => {
     const { main, drawer, button, writes, price } = await open(page, true);
+    const titleLayout = await drawer.locator('.batch-filter-row').evaluateAll((elements) =>
+      elements.map((element) => {
+        const label = element.querySelector('.batch-filter-label')!;
+        return {
+          width: label.getBoundingClientRect().width,
+          height: label.getBoundingClientRect().height,
+          lineHeight: parseFloat(getComputedStyle(label).lineHeight),
+          complete: label.scrollWidth <= label.clientWidth,
+          optionLeft: element.querySelector('.batch-filter-values')!.getBoundingClientRect().left,
+        };
+      }),
+    );
+    expect(titleLayout).toHaveLength(2);
+    expect(titleLayout[0]!.width).toBeGreaterThan(100);
+    expect(titleLayout[0]!.width).toBe(titleLayout[1]!.width);
+    expect(titleLayout[0]!.optionLeft).toBe(titleLayout[1]!.optionLeft);
+    for (const row of titleLayout) {
+      expect(row.complete).toBe(true);
+      expect(row.height).toBe(row.lineHeight);
+    }
     const color = drawer.locator('.batch-filter-row').filter({ hasText: '颜色' });
     const size = drawer.locator('.batch-filter-row').filter({ hasText: '尺寸' });
     await color

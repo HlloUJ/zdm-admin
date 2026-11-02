@@ -5124,6 +5124,18 @@
       ],
       "approvedBusinessPatches": [
         {
+          "before": "                      </div>\n                    </template>\n                  </t-table>\n                  <t-space>\n                    <t-button\n                      :theme=\"buttonTheme('batch-fill')\"\n                      variant=\"outline\"\n",
+          "after": "                      </div>\n                    </template>\n                  </t-table>\n                  <div class=\"spec-table-actions\">\n                    <t-button\n                      :theme=\"buttonTheme('batch-fill')\"\n                      variant=\"outline\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认仅门店两模块批量填写按钮接入已有规格操作区，保持表格到按钮24px间距；按钮主题、事件、禁用及业务逻辑不变。"
+        },
+        {
+          "before": "                    >\n                      <template #icon><t-icon name=\"edit\" /></template>批量填写\n                    </t-button>\n                  </t-space>\n                </div>\n              </t-form-item>\n              <t-form-item label=\"总库存\"\n",
+          "after": "                    >\n                      <template #icon><t-icon name=\"edit\" /></template>批量填写\n                    </t-button>\n                  </div>\n                </div>\n              </t-form-item>\n              <t-form-item label=\"总库存\"\n",
+          "stage": "before-migrations",
+          "reason": "用户确认仅门店两模块批量填写按钮接入已有规格操作区，保持表格到按钮24px间距；按钮主题、事件、禁用及业务逻辑不变。"
+        },
+        {
           "before": "                      </div>\n                    </template>\n                  </t-table>\n                </div>\n              </t-form-item>\n              <t-form-item label=\"总库存\"\n",
           "after": "                      </div>\n                    </template>\n                  </t-table>\n                  <t-space>\n                    <t-button\n                      :theme=\"buttonTheme('batch-fill')\"\n                      variant=\"outline\"\n                      :disabled=\"saving || !ready\"\n                      @click=\"openBatchSalePrice\"\n                    >\n                      <template #icon><t-icon name=\"edit\" /></template>批量填写\n                    </t-button>\n                  </t-space>\n                </div>\n              </t-form-item>\n              <t-form-item label=\"总库存\"\n",
           "stage": "before-migrations",

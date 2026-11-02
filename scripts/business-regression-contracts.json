@@ -377,8 +377,8 @@
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
         "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
         "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "7b3130c619c25ea04771b598fa2d34e63738a5517d11ae4d4e5f9b4c96a77d8c",
-        "tests/e2e/product-attribute-feedback-cases.ts": "cd5dff501f0b979a160ed73e3a2603b1e70e04ae4235e77808e1d21fb7380d2e",
-        "tests/e2e/store-batch-sale-price-cases.ts": "98f0a1f14e15344d2af9d799db14ba22a821ef0f637f5ac6713a95972ae1f019"
+        "tests/e2e/product-attribute-feedback-cases.ts": "28271650a56e493f2418cc8f0754f8a5a0e6437c9b92a0866d60c4b161d5f8f3",
+        "tests/e2e/store-batch-sale-price-cases.ts": "b8691f3f2ccc6437457450ae1d15fd7ccfe2ee4d039e890d0e58e63d87196710"
       },
       "testChanges": [
         {
@@ -1951,6 +1951,18 @@
           "before": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
           "after": "80b9738c977b9be6bded25b9f6a854f7b50bed6d1229d8c734e8c99c81b598b9",
           "reason": "用户确认门店两模块编辑页批量填写商品售价；仅引入共用6项新回归，原测试和断言保留，不改超时、重试或覆盖。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "cd5dff501f0b979a160ed73e3a2603b1e70e04ae4235e77808e1d21fb7380d2e",
+          "after": "28271650a56e493f2418cc8f0754f8a5a0e6437c9b92a0866d60c4b161d5f8f3",
+          "reason": "用户确认仅三端成品/配件批量标题不换行且按最长标题自适应、选项列对齐，以及门店按钮24px间距；新增对应三端布局断言与运营端用例，保留原有业务、反馈、换行间距及取消保存断言。"
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "98f0a1f14e15344d2af9d799db14ba22a821ef0f637f5ac6713a95972ae1f019",
+          "after": "b8691f3f2ccc6437457450ae1d15fd7ccfe2ee4d039e890d0e58e63d87196710",
+          "reason": "用户确认仅三端成品/配件批量标题不换行且按最长标题自适应、选项列对齐，以及门店按钮24px间距；新增对应三端布局断言与运营端用例，保留原有业务、反馈、换行间距及取消保存断言。"
         }
       ],
       "routes": [

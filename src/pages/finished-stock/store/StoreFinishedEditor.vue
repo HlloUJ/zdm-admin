@@ -111,7 +111,7 @@
                       </div>
                     </template>
                   </t-table>
-                  <t-space>
+                  <div class="spec-table-actions">
                     <t-button
                       :theme="buttonTheme('batch-fill')"
                       variant="outline"
@@ -120,7 +120,7 @@
                     >
                       <template #icon><t-icon name="edit" /></template>批量填写
                     </t-button>
-                  </t-space>
+                  </div>
                 </div>
               </t-form-item>
               <t-form-item label="总库存"

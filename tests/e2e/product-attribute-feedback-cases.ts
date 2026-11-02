@@ -9,9 +9,15 @@ async function openEditor(
   layered = false,
   numberLabel = '销售数字属性',
   variantCount = 2,
+  client = 'supply-chain',
 ) {
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await install(page);
+  if (client === 'admin')
+    await page.addInitScript(() => {
+      const user = JSON.parse(localStorage.getItem('zdm-admin-user') || '{}');
+      localStorage.setItem('zdm-admin-user', JSON.stringify({ ...user, clientCode: 'admin' }));
+    });
   const snapshot = [
     {
       attributeId: 1,
@@ -50,7 +56,7 @@ async function openEditor(
     categoryId: 5,
     supplierId: 2,
     status: 'warehouse',
-    sourceStatus: 'warehouse',
+    sourceStatus: client === 'admin' ? 'selling' : 'warehouse',
     templateVersionId: 1,
     templateRevision: 0,
     attributeTemplateSnapshot: snapshot,
@@ -62,7 +68,7 @@ async function openEditor(
     attributes: [{ attributeId: 1, attributeName: '商品数字属性', value: '12.00' }],
     specDimensions: layered
       ? [
-          { key: 'attribute_2', name: '销售数字属性', values: ['1.2345', '2.00'] },
+          { key: 'attribute_2', name: numberLabel, values: ['1.2345', '2.00'] },
           { key: 'attribute_3', name: '销售选项属性', values: ['选项1', '选项2'] },
         ]
       : [],
@@ -92,7 +98,7 @@ async function openEditor(
     route.fulfill({ json: { code: 0, data: [{ versionId: 2, revision: 0, categoryId: 5, content: [] }] } }),
   );
   const module = resource === 'finished-products' ? 'finished-stock-management' : 'accessory-management';
-  await page.goto(productWarehouseUrl(`/supply-chain/${module}`));
+  await page.goto(productWarehouseUrl(client === 'admin' ? `/${module}` : `/supply-chain/${module}`));
   await page.getByText('编辑', { exact: true }).first().click();
   await expect(page.locator('.form-shell')).toBeVisible();
   return { table: page.locator('.spec-table-block'), writes, product };
@@ -359,4 +365,37 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
     await expect(row.locator('.t-tag').first()).toHaveText('全部');
     await expect(row.locator('.t-tag')).toHaveCount(61);
   });
+  for (const client of ['supply-chain', 'admin']) {
+    test(`${client} batch range titles use the longest unwrapped label and align option columns`, async ({ page }) => {
+      const { writes } = await openEditor(page, resource, install, true, '配件专属销售属性2（共享）', 2, client);
+      await page.getByRole('button', { name: '批量填写', exact: true }).click();
+      const drawer = page.locator('.t-drawer--open').filter({ hasText: '批量填写' });
+      const rows = await drawer.locator('.batch-filter-row').evaluateAll((elements) =>
+        elements.map((element) => {
+          const label = element.querySelector('.batch-filter-label')!;
+          const values = element.querySelector('.batch-filter-values')!.getBoundingClientRect();
+          const tag = element.querySelector('.t-tag')!.getBoundingClientRect();
+          const box = label.getBoundingClientRect();
+          return {
+            labelWidth: box.width,
+            labelHeight: box.height,
+            lineHeight: parseFloat(getComputedStyle(label).lineHeight),
+            complete: label.scrollWidth <= label.clientWidth,
+            optionLeft: values.left,
+            centered: Math.abs(box.top + box.height / 2 - tag.top - tag.height / 2),
+          };
+        }),
+      );
+      expect(rows).toHaveLength(2);
+      expect(rows[0]!.labelWidth).toBeGreaterThan(100);
+      expect(rows[0]!.labelWidth).toBe(rows[1]!.labelWidth);
+      expect(rows[0]!.optionLeft).toBe(rows[1]!.optionLeft);
+      for (const row of rows) {
+        expect(row.complete).toBe(true);
+        expect(row.labelHeight).toBe(row.lineHeight);
+        expect(row.centered).toBeLessThanOrEqual(1);
+      }
+      expect(writes).toHaveLength(0);
+    });
+  }
 }
