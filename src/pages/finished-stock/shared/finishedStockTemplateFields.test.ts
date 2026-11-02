@@ -54,3 +54,27 @@ describe('source-product attribute version isolation', () => {
     ).toEqual([53, 57]);
   });
 });
+
+describe('SKU eligibility follows the captured version', () => {
+  it('keeps an old eligible field and excludes new fields or later SKU flag changes', () => {
+    const snapshot = [field(56, 'sales', 1), field(57, 'sales', 2), { ...field(58, 'sales', 3), skuFlag: false }];
+    const product = {
+      categoryId: 110,
+      attributes: [],
+      variants: [],
+      attributeTemplateSnapshot: snapshot,
+    } as unknown as StockItem;
+    const latest = [field(57, 'sales', 1), field(58, 'sales', 2), field(99, 'sales', 3)];
+    const fields = buildFinishedStockTemplateFields(110, latest, [], product, []);
+    expect(fields.filter((item) => item.role === 'sales' && item.skuFlag).map((item) => item.attributeId)).toEqual([
+      56, 57,
+    ]);
+    expect(fields.find((item) => item.attributeId === 58)?.skuFlag).toBe(false);
+    expect(fields.some((item) => item.attributeId === 99)).toBe(false);
+  });
+  it('carries SKU flags from the already captured new-product bindings', () => {
+    const captured = [field(56, 'sales', 1), { ...field(57, 'sales', 2), skuFlag: false }];
+    const fields = buildFinishedStockTemplateFields(110, captured, [], null, []);
+    expect(fields.filter((item) => item.skuFlag).map((item) => item.attributeId)).toEqual([56]);
+  });
+});

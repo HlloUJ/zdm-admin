@@ -307,8 +307,8 @@
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
-        "tests/e2e/finished-stock.spec.ts": "462af55fb6e4c5b68108bc161940281a9502dbb25953ade708ce57c80c5e04b9",
-        "tests/e2e/accessory-management.spec.ts": "a60c118de98896e0552f19f4c5ddd9fc912a082e42fb41a065f17ae00b5f3466",
+        "tests/e2e/finished-stock.spec.ts": "fb66e834a47fef9fca2fcc1eeb678841da2ea410e0257b577a467b871a87eeeb",
+        "tests/e2e/accessory-management.spec.ts": "34e24741dfafeb566cd324c6ad536791e664f67327908c5e42db3ae25948454b",
         "tests/e2e/slab-collaboration.spec.ts": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
         "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
         "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
@@ -372,7 +372,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java": "14f84fbce6075e6b7ae87d86da56d5247d7a9a05c79184ce383aab561641d6a0",
         "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java": "c6ae4a64986bfffa142ea231f8641ebd178bbbbb13a43624902c0b7922326478",
         "tests/e2e/product-attribute-version-fixture.ts": "e0712713a226d51ed9e9e818ea891f2be494a6c09e103b7745b58ea13068d913",
-        "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "43b19fb4bd5a2ceb78e9f5306c02853b1a401028e05290b51c621a7a3280e109",
+        "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
         "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "a961ddb074d8cbc1f528c367641976b12b86eea00080d536c1601a3155ec7eab"
       },
       "testChanges": [
@@ -1838,6 +1838,36 @@
           "before": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
           "after": "8f9a3694189b65e6250f49f97ce662e5a78e97f4d033de20e54b231575d6574e",
           "reason": "用户单独确认：仅运营成品现货创建时间排序测试先等初始form-options响应完成再刷新，保留全部断言、超时和零重试，不改业务。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "462af55fb6e4c5b68108bc161940281a9502dbb25953ade708ce57c80c5e04b9",
+          "after": "fb66e834a47fef9fca2fcc1eeb678841da2ea410e0257b577a467b871a87eeeb",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "fb66e834a47fef9fca2fcc1eeb678841da2ea410e0257b577a467b871a87eeeb",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "a60c118de98896e0552f19f4c5ddd9fc912a082e42fb41a065f17ae00b5f3466",
+          "after": "34e24741dfafeb566cd324c6ad536791e664f67327908c5e42db3ae25948454b",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "34e24741dfafeb566cd324c6ad536791e664f67327908c5e42db3ae25948454b",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts",
+          "before": "43b19fb4bd5a2ceb78e9f5306c02853b1a401028e05290b51c621a7a3280e109",
+          "after": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
         }
       ],
       "routes": [

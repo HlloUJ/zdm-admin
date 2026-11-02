@@ -1638,17 +1638,7 @@ const layeredFieldLabels = computed<Record<string, string>>(() => ({
   ...Object.fromEntries(salesAttributeFields.value.map((field) => [field.key, field.label])),
 }));
 const skuAttributeFields = computed(() =>
-  salesAttributeFields.value.filter(
-    (field) =>
-      confirmedLayeredFields.value.includes(field.key) ||
-      categoryAttributeBindings.value.some(
-        (binding) =>
-          binding.categoryId === selectedCategoryId.value &&
-          binding.attributeId === field.attributeId &&
-          binding.attributeRole === 'sales' &&
-          binding.skuFlag === true,
-      ),
-  ),
+  salesAttributeFields.value.filter((field) => confirmedLayeredFields.value.includes(field.key) || field.skuFlag),
 );
 const specGroups = reactive<SpecGroup[]>([]);
 watch(

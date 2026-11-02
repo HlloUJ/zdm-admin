@@ -1996,6 +1996,10 @@ async function openSpecConversionFixture(
   mode: 'single' | 'layered',
   dimensions = ['颜色', '尺寸'],
   extraAttributes: Record<string, string> = {},
+  versionOptions?: {
+    skuFlags?: Record<number, boolean>;
+    latestAttributes: { id: number; name: string; skuFlag: boolean }[];
+  },
 ) {
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
@@ -2063,7 +2067,7 @@ async function openSpecConversionFixture(
       attributeRole: 'sales',
       valueType: 'text',
       requiredFlag: false,
-      skuFlag: true,
+      skuFlag: versionOptions?.skuFlags?.[index + 2] ?? true,
       sortOrder: index,
       options: [] as never[],
     })),
@@ -2084,15 +2088,18 @@ async function openSpecConversionFixture(
         code: 0,
         data: [
           {
-            versionId: 1,
+            versionId: versionOptions ? 2 : 1,
             revision: 0,
             categoryId: 5,
-            content: dimensions.map((name, index) => ({
-              attributeId: index + 2,
-              name,
+            content: (
+              versionOptions?.latestAttributes ??
+              dimensions.map((name, index) => ({ id: index + 2, name, skuFlag: true }))
+            ).map((attribute, index) => ({
+              attributeId: attribute.id,
+              name: attribute.name,
               valueType: 'input',
               attributeRole: 'sales',
-              skuFlag: true,
+              skuFlag: attribute.skuFlag,
               sortOrder: index,
               options: [],
             })),
@@ -2989,3 +2996,42 @@ test('editing keeps its bound fields after the category publishes a newer templa
   await expect(table.getByRole('textbox').filter({ hasText: '' }).first()).toBeVisible();
   expect(latestReads).toBe(0);
 });
+
+for (const mode of ['single', 'layered'] as const) {
+  test(`bound SKU eligibility ignores latest template changes from ${mode} mode`, async ({ page }) => {
+    const dialog = await openSpecConversionFixture(
+      page,
+      mode,
+      ['商品属性3（共享）', '销售属性1（共享）', '不参与规格的旧属性'],
+      {},
+      {
+        skuFlags: { 2: mode === 'single', 4: false },
+        latestAttributes: [
+          { id: 3, name: '销售属性1（共享）', skuFlag: true },
+          { id: 4, name: '不参与规格的旧属性', skuFlag: true },
+          { id: 99, name: '新版本销售属性', skuFlag: true },
+        ],
+      },
+    );
+    const table = page.locator('.spec-table-block');
+    const expectOriginalRows = async () => {
+      await expect(table.locator('tbody tr')).toHaveCount(2);
+      await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(0)).toHaveValue('10.00');
+      await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(1)).toHaveValue('20.00');
+      await expect(table.locator('.quantity-editor input').nth(0)).toHaveValue('2');
+      await expect(table.locator('.quantity-editor input').nth(1)).toHaveValue('3');
+    };
+    for (let opening = 0; opening < 2; opening++) {
+      if (mode === 'single') await switchSpecMode(page, 'layered');
+      await expect(dialog.locator('.spec-attr-tag')).toHaveText(['商品属性3（共享）', '销售属性1（共享）']);
+      await expect(dialog.locator('.spec-attr-tag').filter({ hasText: '新版本销售属性' })).toHaveCount(0);
+      await expect(dialog.locator('.spec-attr-tag').filter({ hasText: '不参与规格的旧属性' })).toHaveCount(0);
+      await dialog.getByRole('button', { name: '取消', exact: true }).click();
+      await expectOriginalRows();
+      if (opening === 0) {
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await page.getByRole('button', { name: '编辑规格', exact: true }).click();
+      }
+    }
+  });
+}
