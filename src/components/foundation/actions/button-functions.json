@@ -293,6 +293,7 @@
     "stock": {
       "publish": "publish-product",
       "batchShelf": "shelf",
+      "batchDelete": "delete",
       "batchOffShelf": "off-shelf",
       "batchRestore": "restore-stock",
       "batchPurge": "purge",
@@ -309,6 +310,7 @@
     "store-toolbar": {
       "select": "product-center",
       "batch-shelf": "shelf",
+      "batch-delete": "delete",
       "off-shelf": "off-shelf",
       "batch-restore": "restore-stock",
       "batch-purge": "purge",
@@ -331,6 +333,7 @@
     "store-confirm": {
       "shelf": "shelf",
       "batch-shelf": "shelf",
+      "batch-delete": "delete",
       "restore": "restore-stock",
       "batch-restore": "restore-stock",
       "delete": "delete",
@@ -389,6 +392,7 @@
     "批量放回到仓库": "批量放回仓库",
     "批量放回仓库": "批量放回仓库",
     "批量上架": "批量上架",
+    "批量删除": "批量删除",
     "批量彻底删除": "批量彻底删除",
     "删除至回收站": "删除至回收站",
     "确认订单": "订单",

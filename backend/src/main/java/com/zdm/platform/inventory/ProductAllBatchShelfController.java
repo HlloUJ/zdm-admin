@@ -13,6 +13,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ProductAllBatchShelfController {
   private final ProductAllBatchShelfService service;
   public ProductAllBatchShelfController(ProductAllBatchShelfService service) { this.service = service; }
+  @PostMapping("/{resource:finished-products|accessory-products|slabs|store-finished-products|store-accessory-products}/batch-delete")
+  public ApiResponse<OperationsBatchShelfService.Result> delete(@PathVariable String resource,
+      @Valid @RequestBody OperationsBatchShelfController.Request request) {
+    return ApiResponse.ok(service.delete(resource, request.ids()));
+  }
   @PostMapping("/{resource:finished-products|accessory-products|slabs|store-finished-products|store-accessory-products}/all-batch-shelf")
   public ApiResponse<OperationsBatchShelfService.Result> shelf(@PathVariable String resource,
       @Valid @RequestBody OperationsBatchShelfController.Request request) {

@@ -32,6 +32,18 @@ public final class FunctionPermissionNormalizer {
   private FunctionPermissionNormalizer() {
   }
 
+  public static String canonicalBatchPermission(String permission) {
+    String product = "((?:admin|supply-chain)\\.(?:finished-stock-management|accessory-management|slab-management)|store\\.(?:finished-stock-management|accessory-management))";
+    var shelf = java.util.regex.Pattern.compile("^" + product + "\\.(?:warehouse\\.)?batch-shelf$").matcher(permission);
+    if (shelf.matches()) { return shelf.group(1) + ".warehouse.shelf"; }
+    var state = java.util.regex.Pattern.compile("^" + product + "\\.(selling|recycle)\\.batch-(off-shelf|restore|purge)$").matcher(permission);
+    if (state.matches() && ("selling".equals(state.group(2)) && "off-shelf".equals(state.group(3))
+        || "recycle".equals(state.group(2)) && Set.of("restore", "purge").contains(state.group(3)))) {
+      return state.group(1) + "." + state.group(2) + "." + state.group(3);
+    }
+    return permission.replaceFirst("^(store\\.customer-management\\.(?:daily|archived))\\.batch-(archive|restore|purge)$", "$1.$2");
+  }
+
   public static String normalizeCsv(String permissionCsv) {
     if (!StringUtils.hasText(permissionCsv)) {
       return "";
@@ -84,7 +96,8 @@ public final class FunctionPermissionNormalizer {
     return permission.substring(permission.lastIndexOf('.') + 1);
   }
 
-  private static Stream<String> expandLegacyScopedPermission(String permission) {
+  private static Stream<String> expandLegacyScopedPermission(String rawPermission) {
+    String permission = canonicalBatchPermission(rawPermission);
     var batch = java.util.regex.Pattern.compile("^((?:admin|supply-chain)\\.(?:finished-stock-management|accessory-management|slab-management)|store\\.(?:finished-stock-management|accessory-management))\\.warehouse\\.batch-shelf$").matcher(permission);
     if (batch.matches()) { return Stream.of(permission, batch.group(1) + ".warehouse.view", batch.group(1) + ".batch-shelf"); }
     var product = java.util.regex.Pattern.compile(

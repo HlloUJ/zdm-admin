@@ -1,3 +1,4 @@
+import { canonicalBatchPermission } from './batchActionPermissions';
 import { productAllViewPages } from './productAllView';
 import { canPreviewStoreOrders } from './orderPrototypePreview';
 import { getUserFunctionAudience, isFunctionAllowedForAudience } from './functionAudience';
@@ -237,12 +238,15 @@ export function isSuperAdmin(user: LoginUser) {
 }
 
 export function hasPermission(user: LoginUser, permission: string) {
+  permission = canonicalBatchPermission(permission);
   if (canPreviewStoreOrders(user, permission)) return true;
   if (!isFunctionAllowedForAudience(permission, getUserFunctionAudience(user))) return false;
   return (
     isSuperAdmin(user) ||
     user.permissions.includes('all') ||
-    getPermissionCandidates(permission).some((candidate) => user.permissions.includes(candidate))
+    getPermissionCandidates(permission).some((candidate) =>
+      user.permissions.some((grant) => canonicalBatchPermission(grant) === candidate),
+    )
   );
 }
 

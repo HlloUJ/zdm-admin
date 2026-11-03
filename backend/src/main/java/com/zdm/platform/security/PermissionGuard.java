@@ -17,9 +17,10 @@ public class PermissionGuard {
   }
 
   public boolean hasPermission(String permission) {
+    permission = com.zdm.platform.common.FunctionPermissionNormalizer.canonicalBatchPermission(permission);
     CurrentIdentity identity = identity();
     return FunctionAudiencePolicy.allows(permission, identity)
-        && (identity.isSuperAdmin() || identity.permissions().contains("all") || identity.permissions().contains(permission));
+        && (identity.isSuperAdmin() || identity.permissions().contains("all") || identity.permissions().stream().map(com.zdm.platform.common.FunctionPermissionNormalizer::canonicalBatchPermission).toList().contains(permission));
   }
 
   public boolean hasView(String permissionPrefix) {

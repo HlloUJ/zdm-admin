@@ -160,7 +160,8 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
     }
   }
   @ParameterizedTest @ValueSource(strings = {"finished", "accessory", "slab"})
-  void sourceArrivalKeepsRealActorAndHistoricalLogsWithoutRedundantReason(String kind) throws Exception {
+  // Keep the established evidence identifier; assertions cover source arrival without a redundant reason.
+  void reentryKeepsRealTriggerReasonAndHistoricalLogs(String kind) throws Exception {
     identity("admin"); product(kind, "selling");
     jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");

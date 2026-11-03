@@ -9,7 +9,7 @@ const surfaces = [
   { path: '/store/accessory-management', resource: 'store-accessory-products', client: 'store' },
 ] as const;
 for (const surface of surfaces)
-  for (const tab of ['all']) {
+  for (const tab of ['all', 'warehouse']) {
     test(`${surface.path} ${tab} All-only batch uses one request, grouped failures and retains native availability`, async ({
       page,
     }) => {
@@ -50,7 +50,7 @@ for (const surface of surfaces)
         effectiveStatus: id === 72 ? 'selling' : 'warehouse',
         name: `批量商品${id}`,
         status: id === 72 ? 'selling' : 'warehouse',
-        sourceStatus: 'selling',
+        sourceStatus: surface.client === 'supply-chain' && id !== 72 ? 'warehouse' : 'selling',
         sourceUnavailable: false,
         sourceMessage: '',
         createdAt: `2026-10-30T09:${id - 60}:00`,
@@ -128,7 +128,7 @@ for (const surface of surfaces)
     });
   }
 
-test('supply slab warehouse uses the global grant with its unchanged partial-failure flow', async ({ page }) => {
+test('supply slab warehouse uses shared shelf permission and the unified partial-failure result', async ({ page }) => {
   await installAdminApiMocks(page);
   await page.addInitScript(() => {
     localStorage.setItem('zdm-admin-token', 'dev-token');
@@ -159,7 +159,23 @@ test('supply slab warehouse uses the global grant with its unchanged partial-fai
   let allRequests = 0;
   await page.route('**/api/admin/slabs/all-batch-shelf', (route) => {
     allRequests++;
-    return route.fulfill({ status: 500, json: { code: 500, message: '仓库不应调用全部接口' } });
+    const ids = route.request().postDataJSON().ids;
+    expect([...ids].sort()).toEqual([401, 402]);
+    Object.assign(
+      products.find((p) => p.id === 401)!,
+      { status: 'selling', sourceStatus: 'selling' },
+    );
+    return route.fulfill({
+      json: {
+        code: 0,
+        data: {
+          total: 2,
+          successCount: 1,
+          failureCount: 1,
+          failures: [{ id: 402, code: 'VALIDATION_FAILED', reason: '库存不足' }],
+        },
+      },
+    });
   });
   await page.route('**/api/admin/slabs/batch-status', (route) => {
     const body = route.request().postDataJSON();
@@ -176,16 +192,18 @@ test('supply slab warehouse uses the global grant with its unchanged partial-fai
   await page.goto('/supply-chain/slab-management?tab=warehouse');
   const main = page.getByRole('main');
   await expect(main.locator('tbody tr')).toHaveCount(2);
-  await expect(main.getByText('上架', { exact: true })).toHaveCount(0);
+  await expect(main.getByText('上架', { exact: true })).toHaveCount(2);
   await main.locator('thead .t-checkbox__input').click();
   await main.getByRole('button', { name: '批量上架', exact: true }).click();
   await page.locator('.t-dialog:visible').getByRole('button', { name: '确认批量上架', exact: true }).click();
-  await expect(page.getByText('已上架 1 个大板，未上架 1 个大板', { exact: true })).toBeVisible();
-  await expect(main.locator('.t-alert')).toContainText('库存不足');
-  await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(1);
-  expect(requests).toEqual([[402], [401]]);
-  expect(allRequests).toBe(0);
-  await expect(page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' })).toHaveCount(0);
+  const result = page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' });
+  await expect(result).toContainText('成功上架1件，失败1件。');
+  await expect(result.getByRole('columnheader')).toHaveText(['商品ID', '失败原因']);
+  await expect(result.locator('tbody')).toContainText('402');
+  await expect(result.locator('tbody')).toContainText('库存不足');
+  await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(0);
+  expect(requests).toEqual([]);
+  expect(allRequests).toBe(1);
 });
 
 for (const [terminal, client, modules, entry] of [
@@ -197,9 +215,7 @@ for (const [terminal, client, modules, entry] of [
   ],
   ['城市合伙人门店管理后台', 'store', ['finished-stock-management', 'accessory-management'], '商品中心'],
 ] as const) {
-  test(`${client} saves only the shared global batch-shelf grants without state or single-action grants`, async ({
-    page,
-  }) => {
+  test(`${client} saves shared shelf grants with state views and no duplicate batch grants`, async ({ page }) => {
     await installAdminApiMocks(page);
     await page.addInitScript(() => {
       localStorage.setItem('zdm-admin-token', 'dev-token');
@@ -225,25 +241,30 @@ for (const [terminal, client, modules, entry] of [
       .filter({ has: page.locator('.permission-tab-cell').getByText('页面全局', { exact: true }) });
     await expect(globals).toHaveCount(modules.length);
     for (let i = 0; i < modules.length; i++) {
-      await expect(globals.nth(i).locator('.permission-action-grid .t-checkbox')).toHaveText([
-        entry,
-        '批量上架',
-        '操作日志',
-      ]);
-      await globals.nth(i).getByText('批量上架', { exact: true }).click();
+      await expect(globals.nth(i).locator('.permission-action-grid .t-checkbox')).toHaveText([entry, '操作日志']);
+      const warehouse = matrix
+        .locator('tbody tr')
+        .filter({ has: page.locator('.permission-tab-cell').getByText('仓库中', { exact: true }) });
+      await warehouse.nth(i).getByText('上架', { exact: true }).click();
     }
     const saved = page.waitForRequest(
       (r) => r.method() === 'PUT' && r.url().endsWith(`/terminal-function-policies/${client}`),
     );
     await main.getByRole('button', { name: /^确认(?:新增|保存|配置权限)$/, exact: true }).click();
     expect((await saved).postDataJSON().functionPermissions.split(',').sort()).toEqual(
-      modules.map((m) => `${client}.${m}.batch-shelf`).sort(),
+      modules.flatMap((m) => [`${client}.${m}.warehouse.view`, `${client}.${m}.warehouse.shelf`]).sort(),
     );
     await page.reload();
     await main.locator('.terminal-tabs').getByText(terminal, { exact: true }).click();
     await main.locator('.permission-module-list').getByText('商品管理', { exact: true }).click();
     for (let i = 0; i < modules.length; i++)
-      await expect(globals.nth(i).getByRole('checkbox', { name: '批量上架', exact: true })).toBeChecked();
+      await expect(
+        matrix
+          .locator('tbody tr')
+          .filter({ has: page.locator('.permission-tab-cell').getByText('仓库中', { exact: true }) })
+          .nth(i)
+          .getByRole('checkbox', { name: '上架', exact: true }),
+      ).toBeChecked();
     const warehouseRows = matrix
       .locator('tbody tr')
       .filter({ has: page.locator('.permission-tab-cell').getByText('仓库中', { exact: true }) });

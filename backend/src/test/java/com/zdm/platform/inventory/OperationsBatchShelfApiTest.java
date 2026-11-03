@@ -133,7 +133,7 @@ class OperationsBatchShelfApiTest extends SpringContainerTestSupport {
   @ParameterizedTest @ValueSource(strings={"finished-products","accessory-products","slabs"})
   void rejectsMissingGrantOtherClientsAndOutOfScopeRecords(String resource) throws Exception {
     long id=ready(resource);String p=prefix(resource);
-    identity("admin","all",List.of(p+".warehouse.view",p+".warehouse.shelf"));
+    identity("admin","all",List.of(p+".warehouse.view",p+".warehouse.edit"));
     mvc.perform(post("/api/admin/"+resource+"/batch-shelf").contentType("application/json").content("{\"ids\":["+id+"]}")).andExpect(status().isForbidden());
     for(String client:List.of("supply-chain","store")) {
       identity(client,"all",List.of("all"));
