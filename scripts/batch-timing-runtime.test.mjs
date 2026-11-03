@@ -1,12 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { execFileSync, spawnSync } from 'node:child_process';
+import { execFileSync, spawnSync, spawn } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, appendFileSync, readFileSync, rmSync, realpathSync } from 'node:fs';
 import os from 'node:os';
+import { once } from 'node:events';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readTimeline, refreshTimeline, recordValidationTiming } from './batch-timing-store.mjs';
-import { requireBatchTiming } from './batch-timing-runtime.mjs';
+import {
+  requireBatchTiming,
+  reconcileInterruptedValidationTiming,
+  inspectValidationProcesses,
+} from './batch-timing-runtime.mjs';
 import { runVerificationTask } from './verification-runner.mjs';
 function fixture(t) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'batch-timing-entry-')));
@@ -142,4 +148,124 @@ test('authorization tampering cannot pass the report/cleanup proof', (t) => {
   state.authorizedAt += 10;
   writeFileSync(file, JSON.stringify(state));
   assert.throws(() => requireBatchTiming(f.common, 'timing'), /Authorization boundary changed/);
+});
+
+function interruptedFixture(t) {
+  const f = fixture(t),
+    now = Date.now(),
+    startedAt = new Date(now - 20).toISOString();
+  const original = { attemptId: 'legacy', fingerprint: 'f'.repeat(64), status: 'running', startedAt };
+  recordValidationTiming(f.common, 'timing', original);
+  const file = '.task-verification/attempts/' + 'f'.repeat(64) + '/legacy.started.json';
+  mkdirSync(path.dirname(path.join(f.task, file)), { recursive: true });
+  const bytes = JSON.stringify(original);
+  writeFileSync(path.join(f.task, file), bytes);
+  const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
+  const directory = path.join(f.common, 'task-assets/timing');
+  mkdirSync(path.join(directory, 'blobs'), { recursive: true });
+  writeFileSync(path.join(directory, 'blobs', digest(bytes)), bytes);
+  const assets = JSON.stringify([{ file, digest: digest(bytes) }]);
+  const manifest = path.join(directory, 'assets-' + digest(assets) + '.json');
+  writeFileSync(manifest, assets);
+  const head = 'a'.repeat(40),
+    key = head + ':123';
+  const completion = {
+    events: [
+      {
+        name: 'ci',
+        key,
+        status: 'success',
+        startedAt: now - 10,
+        finishedAt: now - 5,
+        result: {
+          headSha: head,
+          runId: '123',
+          branch: 'main',
+          attempt: 1,
+          conclusion: 'success',
+          jobs: ['Frontend quality', 'Backend quality'].map((name) => ({
+            name,
+            status: 'completed',
+            conclusion: 'success',
+          })),
+        },
+      },
+      {
+        name: 'evidence',
+        key,
+        status: 'success',
+        result: { head, runId: '123', coverage: { frontend: 1, backend: { tests: 1 } } },
+      },
+      {
+        name: 'handoff',
+        key,
+        status: 'success',
+        result: { runtimeHealthy: true, integrationHealthy: true, backupRetained: true },
+      },
+      { name: 'preserve', key, status: 'success', result: { manifest } },
+    ],
+  };
+  return { ...f, file, bytes, manifest, options: { root: f.task, completion, key, now } };
+}
+test('cleanup reconciliation preserves immutable starts, requires gates and preservation, and is idempotent', (t) => {
+  const f = interruptedFixture(t);
+  for (const missing of ['ci', 'evidence', 'handoff', 'preserve']) {
+    const options = structuredClone(f.options);
+    options.completion.events = options.completion.events.filter((e) => e.name !== missing);
+    assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', options), /required/);
+  }
+  const failed = structuredClone(f.options);
+  failed.completion.events[0].result.jobs[0].conclusion = 'failure';
+  assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', failed));
+  const wrongHead = structuredClone(f.options);
+  wrongHead.completion.events[1].result.head = 'b'.repeat(40);
+  assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', wrongHead));
+  const later = structuredClone(f.options);
+  later.completion.events[0].startedAt = Date.parse(JSON.parse(f.bytes).startedAt) - 1;
+  assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', later), /newer validation/);
+  assert.throws(() => requireBatchTiming(f.common, 'timing'), /Unfinished local validation/);
+  const result = reconcileInterruptedValidationTiming(f.common, 'timing', f.options);
+  assert.deepEqual(result, { interrupted: 1, durationMs: null });
+  assert.equal(readFileSync(path.join(f.task, f.file), 'utf8'), f.bytes);
+  const state = readTimeline(f.common, 'timing');
+  assert.equal(state.validations[0].finishedAt, null);
+  assert.equal(state.validationInterruptions[0].durationMs, null);
+  assert.equal(requireBatchTiming(f.common, 'timing').localUnknownDurationAttempts[0], 'legacy');
+  assert.deepEqual(reconcileInterruptedValidationTiming(f.common, 'timing', f.options), { interrupted: 0 });
+});
+test('a real active task process blocks reconciliation; exit permits the same preserved record', async (t) => {
+  const f = interruptedFixture(t);
+  const child = spawn(process.execPath, ['-e', "process.send('ready');setInterval(()=>{},1000)"], {
+    cwd: f.task,
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+  });
+  await once(child, 'message');
+  try {
+    assert.throws(() => inspectValidationProcesses(f.task), /processes remain active/);
+    assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', f.options), /processes remain active/);
+    assert.equal(readTimeline(f.common, 'timing').validationInterruptions, undefined);
+  } finally {
+    const exited = once(child, 'exit');
+    child.kill('SIGTERM');
+    await exited;
+  }
+  assert.equal(reconcileInterruptedValidationTiming(f.common, 'timing', f.options).interrupted, 1);
+});
+test('unknown process inspection, damaged preservation and real completion never become interrupted success', (t) => {
+  const f = interruptedFixture(t),
+    previous = process.env.PATH;
+  try {
+    process.env.PATH = '';
+    assert.throws(() => inspectValidationProcesses(f.task), /inspection unavailable/);
+  } finally {
+    process.env.PATH = previous;
+  }
+  const completion = path.join(f.task, f.file.replace('.started.json', '.json'));
+  writeFileSync(completion, '{}');
+  assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', f.options), /Completion exists/);
+  rmSync(completion);
+  writeFileSync(f.manifest, '[]');
+  assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', f.options));
+  assert.equal(readTimeline(f.common, 'timing').validationInterruptions, undefined);
+  assert.equal(readFileSync(path.join(f.task, f.file), 'utf8'), f.bytes);
 });

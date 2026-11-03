@@ -143,8 +143,27 @@ export function ingestContext(state, record, source) {
   const turn = state.turns.find((t) => t.thread === source.thread && t.id === p.turn_id);
   if (turn) turn.projectVerified = state.roots.includes(p.cwd);
 }
+export function interruptedValidationIds(state) {
+  const ids = new Set();
+  for (const item of state.validationInterruptions ?? []) {
+    const original = (state.validations ?? []).find((v) => v.id === item.id);
+    assert.ok(original && original.startedAt === item.startedAt, 'Foreign interrupted validation');
+    assert.ok(!ids.has(item.id), 'Duplicate interrupted validation');
+    assert.equal(item.status, 'interrupted');
+    assert.equal(item.finishedAt, null, 'Unknown validation end must stay unknown');
+    assert.equal(item.durationMs, null, 'Unknown validation duration must stay unknown');
+    assert.ok(finite(item.confirmedInactiveAt) && item.confirmedInactiveAt >= item.startedAt);
+    assert.match(item.gateKey, /^[a-f0-9]{40}:\d+$/);
+    for (const key of ['attemptDigest', 'preservationDigest', 'processInspectionDigest'])
+      assert.match(item[key], /^[a-f0-9]{64}$/);
+    ids.add(item.id);
+  }
+  return ids;
+}
 export function summarizeBatch(state, { now = Date.now(), completion = null } = {}) {
   assert.equal(state.version, BATCH_TIMING_VERSION);
+  const interrupted = interruptedValidationIds(state);
+  const unresolved = (state.validations ?? []).filter((v) => v.finishedAt == null && !interrupted.has(v.id));
   const delivery = state.delivery;
   const bound = state.turns.filter((t) => !delivery || t.startedAt <= delivery.closedAt);
   const closing = delivery
@@ -170,8 +189,7 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
   if (bound.some((t) => !t.projectVerified)) problems.push('unverified-project-turn');
   if (bound.some((t) => t.finishedAt == null && t !== closing) && delivery) problems.push('unclosed-earlier-turn');
   if (delivery && !closing) problems.push('missing-closing-turn');
-  if (delivery && (state.validations ?? []).some((v) => v.finishedAt == null))
-    problems.push('unfinished-local-validation');
+  if (delivery && unresolved.length) problems.push('unfinished-local-validation');
   if (sealed && questions.some((q) => q.answeredAt == null)) problems.push('unanswered-question-at-close');
   const partition = {
     executionRoundsMs: duration(active),
@@ -204,7 +222,12 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
       clip((state.validations ?? []).filter((v) => v.finishedAt != null).map((v) => [v.startedAt, v.finishedAt])),
     ),
     localFailedAttempts: (state.validations ?? []).filter((v) => v.status === 'failed').length,
-    localPendingAttempts: (state.validations ?? []).filter((v) => v.finishedAt == null).length,
+    localPendingAttempts: unresolved.length,
+    localInterruptedAttempts: (state.validations ?? []).filter((v) => v.finishedAt == null && interrupted.has(v.id))
+      .length,
+    localUnknownDurationAttempts: (state.validations ?? [])
+      .filter((v) => v.finishedAt == null && interrupted.has(v.id))
+      .map((v) => v.id),
     localRepairMs: null,
     localRepairMeaning: 'Not explicitly recorded; a failed test does not prove a code-repair interval.',
     detailedPhaseClassification: 'separate-from-boundary-completeness',
