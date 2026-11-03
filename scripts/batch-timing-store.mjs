@@ -17,7 +17,13 @@ import {
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { newTimeline, ingestNative, ingestContext, summarizeBatch } from './batch-timing-core.mjs';
+import {
+  newTimeline,
+  ingestNative,
+  ingestContext,
+  summarizeBatch,
+  interruptedValidationIds,
+} from './batch-timing-core.mjs';
 
 export const timingDirectory = (common, batch) => {
   assert.match(batch, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -344,4 +350,23 @@ export function recordValidationTiming(common, batch, attempt) {
 export function timingRequiredFile(common, batch) {
   timingDirectory(common, batch);
   return path.join(common, 'task-batches/timing-required', batch + '.json');
+}
+
+// Resolution is additive: the original running observation and raw attempt remain untouched.
+export function recordValidationInterruptions(common, batch, interruptions) {
+  const directory = timingDirectory(common, batch);
+  return lock(directory, () => {
+    const state = readTimeline(common, batch);
+    assert.ok(state);
+    state.validationInterruptions ??= [];
+    for (const item of interruptions) {
+      assert.ok(!state.validationInterruptions.some((v) => v.id === item.id), 'Interruption already recorded');
+      const original = state.validations.find((v) => v.id === item.id);
+      assert.ok(original?.finishedAt == null && original?.status === 'running', 'Validation no longer pending');
+      state.validationInterruptions.push(item);
+    }
+    interruptedValidationIds(state);
+    atomic(path.join(directory, 'timeline.json'), state);
+    atomic(path.join(directory, 'observations.json'), { interrupted: interruptions.map((v) => v.id) });
+  });
 }
