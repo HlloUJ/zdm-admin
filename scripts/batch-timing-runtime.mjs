@@ -23,10 +23,27 @@ export function timingCommon(root) {
   assert.equal(value.status, 0, 'Batch timing repository unavailable');
   return path.resolve(root, value.stdout.trim());
 }
+const belongsToBatch = (root, batch) => realpathSync(root) === realpathSync(batch.worktree);
+
+// Observation is optional; strict binding and authorization checks remain separate.
+export function observeCurrentTiming(root, options = {}, report = console.error) {
+  try {
+    return refreshCurrentTiming(root, options);
+  } catch (error) {
+    try {
+      report('Batch timing observation unavailable: ' + error.message);
+    } catch {
+      /* Observation reporting cannot block quality checks. */
+    }
+    return { status: 'unavailable', reason: error.message };
+  }
+}
+
 export function refreshCurrentTiming(root, { env = process.env, bind = false, resume = false } = {}) {
   if (env.CI || env.GITHUB_ACTIONS === 'true') return { status: 'not-required' };
   const batch = readActiveBatch(root);
   if (!batch) return { status: 'no-active-batch' };
+  if (!belongsToBatch(root, batch)) return { status: 'outside-active-batch' };
   if (bind) return bindBatchTiming(root, batch, { env, resume });
   const common = batch.repository.commonDir,
     state = readTimeline(common, batch.id);
@@ -70,7 +87,7 @@ export function observeValidationTiming(root, attempt, env = process.env) {
   if (env.CI || env.GITHUB_ACTIONS === 'true') return;
   try {
     const batch = readActiveBatch(root);
-    if (batch && readTimeline(batch.repository.commonDir, batch.id))
+    if (batch && belongsToBatch(root, batch) && readTimeline(batch.repository.commonDir, batch.id))
       recordValidationTiming(batch.repository.commonDir, batch.id, attempt);
   } catch (error) {
     console.error('Batch validation timing unavailable: ' + error.message);
@@ -79,7 +96,7 @@ export function observeValidationTiming(root, attempt, env = process.env) {
 
 export function currentTimingSummary(root) {
   const batch = readActiveBatch(root);
-  if (!batch) return null;
+  if (!batch || !belongsToBatch(root, batch)) return null;
   return readTimingSummaryFor(batch.repository.commonDir, batch.id);
 }
 

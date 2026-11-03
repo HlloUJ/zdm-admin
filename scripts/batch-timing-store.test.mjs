@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import {
   mkdtempSync,
   mkdirSync,
@@ -213,4 +213,133 @@ test('real detached collector records approval, survives task carrier removal, s
   assert.equal(readFileSync(path.join(f.directory, 'summary.json'), 'utf8'), finalBytes);
   assert.ok(readdirSync(f.directory).some((name) => name.startsWith('observer-')));
   assert.ok(existsSync(path.join(f.directory, 'observer.json')));
+});
+
+test('native abort closes an interrupted round and permits explicit handoff without marking it successful', (t) => {
+  const f = fixture(t);
+  f.bind();
+  f.append(event(f, 'turn_aborted', 'one', 100));
+  const other = 'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
+  writeFileSync(
+    path.join(f.sessions, 'rollout-fixture-' + other + '.jsonl'),
+    f.row('session_meta', { id: other, cwd: f.root }, -1) + f.start('two', 200),
+  );
+  f.bind({ env: { CODEX_THREAD_ID: other }, resume: true });
+  const state = readTimeline(f.common, 'timing');
+  assert.equal(state.turns[0].finishedAt, epoch + 100);
+  assert.equal(state.turns[0].termination, 'interrupted');
+  assert.equal(state.authorizedAt, epoch + 1);
+  assert.equal(state.sources.length, 2);
+  assert.equal(readTimingSummary(f.common, 'timing').interruptedTurnIds.length, 1);
+});
+
+test('legacy cursor past an ignored abort recovers exact terminal metadata once, preserving original authorization', (t) => {
+  const f = fixture(t);
+  f.bind();
+  f.append(event(f, 'turn_aborted', 'one', 100));
+  const file = path.join(f.directory, 'timeline.json');
+  const state = readTimeline(f.common, 'timing');
+  state.sources[0].offset = Buffer.byteLength(readFileSync(f.file));
+  delete state.sources[0].terminalReplayVersion;
+  writeFileSync(file, JSON.stringify(state));
+  const recovered = refreshTimeline(f.common, 'timing').state;
+  assert.equal(recovered.turns[0].finishedAt, epoch + 100);
+  assert.equal(recovered.turns[0].termination, 'interrupted');
+  assert.equal(recovered.authorizedAt, state.authorizedAt);
+  assert.equal(recovered.requestId, state.requestId);
+  assert.equal(recovered.sources[0].offset, state.sources[0].offset);
+  assert.deepEqual(refreshTimeline(f.common, 'timing').state, recovered);
+});
+
+for (const terminal of ['task_complete', 'turn_aborted']) {
+  test(`new binding rejects an already ${terminal} authorization source`, (t) => {
+    const f = fixture(t);
+    f.append(event(f, terminal, 'one', 100));
+    assert.throws(() => f.bind(), /authorization turn already ended/);
+    assert.equal(readTimeline(f.common, 'timing'), null);
+  });
+}
+
+test('legacy stale authorization retains its boundary but reports whole-batch time unavailable', (t) => {
+  const f = fixture(t);
+  f.bind();
+  f.append(event(f, 'turn_aborted', 'one', 100));
+  f.batch.createdAt = new Date(epoch + 200).toISOString();
+  f.bind();
+  const summary = readTimingSummary(f.common, 'timing');
+  assert.equal(summary.wallMs, null);
+  assert.equal(summary.executionRoundsMs, null);
+  assert.equal(summary.status, 'incomplete');
+  assert.ok(summary.issues.includes('authorization-turn-ended-before-registration'));
+  assert.equal(readTimeline(f.common, 'timing').authorizedAt, epoch + 1);
+});
+
+test('collector upgrade replaces only its proven owned stale bundle and retains unrelated processes', async (t) => {
+  const f = fixture(t);
+  f.bind();
+  const oldCode = path.join(f.root, 'old-collector');
+  mkdirSync(oldCode);
+  for (const name of ['batch-timing-core.mjs', 'batch-timing-store.mjs', 'batch-timing-observer.mjs'])
+    writeFileSync(
+      path.join(oldCode, name),
+      readFileSync(new URL(name, import.meta.url), 'utf8') + '\n// Previous collector version\n',
+    );
+  const { pathToFileURL } = await import('node:url');
+  const previous = await import(pathToFileURL(path.join(oldCode, 'batch-timing-store.mjs')).href);
+  const owner = previous.ensureObserver(f.directory);
+  await until(() => {
+    try {
+      process.kill(owner.pid, 0);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  const upgraded = ensureObserver(f.directory);
+  t.after(() => {
+    try {
+      process.kill(upgraded.pid, 'SIGTERM');
+    } catch {
+      /* exited */
+    }
+  });
+  assert.notEqual(upgraded.pid, owner.pid);
+  assert.notEqual(upgraded.bundleDigest, owner.bundleDigest);
+  assert.equal(ensureObserver(f.directory).pid, upgraded.pid);
+  f.append(event(f, 'turn_aborted', 'one', 100));
+  await until(() => readTimeline(f.common, 'timing').turns[0].termination === 'interrupted');
+  const lease = path.join(f.directory, 'observer.json');
+  writeFileSync(lease, JSON.stringify({ ...upgraded, pid: process.pid }));
+  assert.throws(() => ensureObserver(f.directory), /Cannot prove timing observer exited/);
+  process.kill(process.pid, 0);
+  writeFileSync(lease, JSON.stringify(upgraded));
+});
+
+test('a command containing collector arguments cannot authorize stopping an unrelated process', async (t) => {
+  const f = fixture(t);
+  f.bind();
+  const directory = f.directory,
+    token = 'fixture-token',
+    bundleDigest = 'a'.repeat(64);
+  const suffix =
+    path.join(directory, 'observer-' + bundleDigest, 'batch-timing-observer.mjs') + ' ' + directory + ' ' + token;
+  const child = spawn(process.execPath, ['-e', "process.send('ready');setInterval(()=>{},1000)", suffix], {
+    stdio: ['ignore', 'ignore', 'ignore', 'ipc'],
+  });
+  await new Promise((resolve, reject) => {
+    child.once('message', resolve);
+    child.once('error', reject);
+  });
+  try {
+    writeFileSync(
+      path.join(directory, 'observer.json'),
+      JSON.stringify({ pid: child.pid, host: os.hostname(), token, bundleDigest }),
+    );
+    assert.throws(() => ensureObserver(directory), /Cannot prove timing observer exited/);
+    process.kill(child.pid, 0);
+  } finally {
+    const exited = new Promise((resolve) => child.once('exit', resolve));
+    child.kill('SIGTERM');
+    await exited;
+  }
 });

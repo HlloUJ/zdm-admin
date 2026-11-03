@@ -16,7 +16,6 @@ import {
 import { runVerificationTask } from './verification-runner.mjs';
 function fixture(t) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'batch-timing-entry-')));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
   const anchor = path.join(root, 'main'),
     task = path.join(root, 'task');
   mkdirSync(anchor);
@@ -65,6 +64,7 @@ function fixture(t) {
     } catch {
       /* stopped collector */
     }
+    rmSync(root, { recursive: true, force: true });
   });
   return { root, anchor, task, common, cli, env, file, row, at };
 }
@@ -268,4 +268,70 @@ test('unknown process inspection, damaged preservation and real completion never
   assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', f.options));
   assert.equal(readTimeline(f.common, 'timing').validationInterruptions, undefined);
   assert.equal(readFileSync(path.join(f.task, f.file), 'utf8'), f.bytes);
+});
+
+test('optional timing observation reports errors without hiding actual verification failures', async (t) => {
+  const f = fixture(t);
+  const { observeCurrentTiming } = await import('./batch-timing-runtime.mjs');
+  const reports = [];
+  const observed = observeCurrentTiming(f.task, { env: { ...f.env, CODEX_THREAD_ID: 'unbound' } }, (s) =>
+    reports.push(s),
+  );
+  assert.equal(observed.status, 'unavailable');
+  assert.equal(
+    observeCurrentTiming(f.task, { env: { ...f.env, CODEX_THREAD_ID: 'unbound' } }, () => {
+      throw new Error('report unavailable');
+    }).status,
+    'unavailable',
+  );
+  assert.match(reports[0], /not bound/);
+  const result = await runVerificationTask(
+    {
+      root: f.task,
+      name: 'quality still fails',
+      command: process.execPath,
+      args: ['-e', 'process.exit(9)'],
+      env: f.env,
+      reuse: false,
+    },
+    { report: () => {} },
+  );
+  assert.equal(result.exitCode, 9);
+  assert.equal(readTimeline(f.common, 'timing').sources.length, 1);
+});
+
+test('another worktree never observes or writes the active business timeline', async (t) => {
+  const f = fixture(t);
+  const { refreshCurrentTiming, observeValidationTiming, currentTimingSummary } =
+    await import('./batch-timing-runtime.mjs');
+  const before = readFileSync(path.join(f.common, 'task-timing/timing/timeline.json'), 'utf8');
+  assert.equal(refreshCurrentTiming(f.anchor, { env: f.env }).status, 'outside-active-batch');
+  observeValidationTiming(
+    f.anchor,
+    { attemptId: 'foreign', startedAt: new Date().toISOString(), status: 'running' },
+    f.env,
+  );
+  assert.equal(currentTimingSummary(f.anchor), null);
+  assert.equal(readFileSync(path.join(f.common, 'task-timing/timing/timeline.json'), 'utf8'), before);
+});
+
+test('actual changed-check CLI continues after timing damage and preserves its quality exit code', (t) => {
+  const f = fixture(t);
+  writeFileSync(
+    path.join(f.task, 'package.json'),
+    JSON.stringify({ scripts: { 'verify:local': 'node -e "process.exit(7)"' } }),
+  );
+  const env = { ...f.env, CODEX_THREAD_ID: 'unbound' };
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./check-changed.mjs', import.meta.url)), 'package.json'],
+    { cwd: f.task, env, encoding: 'utf8' },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Batch timing observation unavailable/);
+  assert.match(result.stdout, /shared configuration checks/);
+  assert.doesNotMatch(result.stdout, /Missing script/);
+  const failedAttempt = refreshTimeline(f.common, 'timing').state.validations.find((v) => v.status === 'failed');
+  assert.ok(failedAttempt);
+  assert.doesNotMatch(result.stderr, /AssertionError/);
 });

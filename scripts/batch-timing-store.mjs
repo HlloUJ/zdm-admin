@@ -68,7 +68,8 @@ export function inspectNativeSource(file, { thread, common }) {
   let offset = 0,
     meta = null,
     last = null,
-    request = null;
+    request = null,
+    terminal = null;
   const complete = bytes.subarray(0, bytes.lastIndexOf(10) + 1);
   for (const line of complete.toString('utf8').split('\n')) {
     if (!line) continue;
@@ -82,6 +83,7 @@ export function inspectNativeSource(file, { thread, common }) {
     if (row.type === 'event_msg' && p.type === 'task_started') {
       last = { turn: p.turn_id, at: Date.parse(row.timestamp), offset };
       request = null;
+      terminal = null;
     }
     if (
       last &&
@@ -92,10 +94,17 @@ export function inspectNativeSource(file, { thread, common }) {
       !request
     )
       request = { id: p.item.id, at: Date.parse(row.timestamp) };
+    if (
+      last &&
+      row.type === 'event_msg' &&
+      p.turn_id === last.turn &&
+      ['task_complete', 'turn_aborted'].includes(p.type)
+    )
+      terminal = { type: p.type, at: Date.parse(row.timestamp) };
     offset += Buffer.byteLength(line + '\n');
   }
   assert.ok(meta && last && request && Number.isFinite(request.at), 'Missing native authorization-turn identity');
-  return { ...last, request, ...sourceIdentity(file) };
+  return { ...last, request, terminal, ...sourceIdentity(file) };
 }
 function lock(directory, run) {
   safe(path.dirname(directory));
@@ -151,6 +160,21 @@ export function consumeSource(state, source) {
       { device: source.device, inode: source.inode },
       'Native source identity changed',
     );
+    // Repair only terminal metadata already consumed by older collectors. Never replay messages or guess an end.
+    if (source.terminalReplayVersion !== 1) {
+      const prefix = readFileSync(source.file).subarray(0, source.offset).toString('utf8');
+      for (const line of prefix.split('\n').filter(Boolean)) {
+        const row = JSON.parse(line),
+          p = row.payload ?? {};
+        if (
+          row.type === 'event_msg' &&
+          ['task_complete', 'turn_aborted'].includes(p.type) &&
+          state.turns.some((t) => t.thread === source.thread && t.id === p.turn_id && t.finishedAt == null)
+        )
+          ingestNative(state, row, source);
+      }
+      source.terminalReplayVersion = 1;
+    }
     const size = lstatSync(source.file).size;
     assert.ok(size >= source.offset, 'Native source truncated');
     const fd = openSync(source.file, 'r');
@@ -217,6 +241,7 @@ export function bindBatchTiming(
     if (!state) {
       assert.ok(!existsSync(marker), 'Required timing state missing; never reset authorization time');
     }
+    if (!state) assert.ok(!identity.terminal, 'Native authorization turn already ended; no new batch timing binding');
     if (!state)
       state = newTimeline({
         batch: batch.id,
@@ -228,10 +253,17 @@ export function bindBatchTiming(
         thread: env.CODEX_THREAD_ID,
         initialTurn: identity.turn,
       });
+    if (batch.createdAt) {
+      const registeredAt = Date.parse(batch.createdAt);
+      assert.ok(Number.isFinite(registeredAt), 'Invalid batch registration time');
+      if (state.registeredAt != null) assert.equal(state.registeredAt, registeredAt);
+      else state.registeredAt = registeredAt;
+    }
     assert.equal(state.common, common);
     assert.equal(state.batch, batch.id);
     assert.equal(state.delivery, null, 'Closed batch timing cannot be rebound');
     if (!state.sources.some((s) => s.thread === env.CODEX_THREAD_ID)) {
+      assert.ok(!identity.terminal, 'Native resume turn already ended');
       assert.ok(!state.sources.length || resume, 'New thread requires explicit batch resume');
       for (const source of state.sources) consumeSource(state, source);
       assert.ok(!state.turns.some((t) => t.finishedAt == null), 'Previous execution still open; never take over');
@@ -263,6 +295,9 @@ export function ensureObserver(directory) {
   return lock(directory, () => startObserver(directory));
 }
 function startObserver(directory) {
+  const names = ['batch-timing-core.mjs', 'batch-timing-store.mjs', 'batch-timing-observer.mjs'];
+  const content = names.map((name) => [name, readFileSync(new URL(name, import.meta.url))]);
+  const digest = hash(Buffer.concat(content.map(([, bytes]) => bytes)));
   const lease = path.join(directory, 'observer.json');
   safe(lease);
   if (existsSync(lease)) {
@@ -272,24 +307,35 @@ function startObserver(directory) {
       process.kill(old.pid, 0);
       const identity = spawnSync('ps', ['-p', String(old.pid), '-o', 'command='], { encoding: 'utf8' });
       assert.equal(identity.status, 0, 'Cannot prove timing observer process identity');
-      assert.ok(
-        identity.stdout.includes(
+      assert.equal(
+        identity.stdout.trim(),
+        process.execPath +
+          ' ' +
           path.join(directory, 'observer-' + old.bundleDigest, 'batch-timing-observer.mjs') +
-            ' ' +
-            directory +
-            ' ' +
-            old.token,
-        ),
+          ' ' +
+          directory +
+          ' ' +
+          old.token,
         'Timing PID belongs to another process; preserve lease',
       );
-      return old;
+      if (old.bundleDigest === digest) return old;
+      // Retire only the positively identified collector; a new parser must not reuse a stale bundle.
+      process.kill(old.pid, 'SIGTERM');
+      let exited = false;
+      for (let i = 0; i < 100; i++) {
+        const status = spawnSync('ps', ['-p', String(old.pid), '-o', 'stat='], { encoding: 'utf8' });
+        if (status.status === 1 || (status.status === 0 && /^Z/.test(status.stdout.trim()))) {
+          exited = true;
+          break;
+        }
+        assert.equal(status.status, 0, 'Cannot prove old collector exit');
+        Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
+      }
+      assert.ok(exited, 'Previous timing collector still active; retain lease');
     } catch (error) {
       assert.equal(error.code, 'ESRCH', 'Cannot prove timing observer exited');
     }
   }
-  const names = ['batch-timing-core.mjs', 'batch-timing-store.mjs', 'batch-timing-observer.mjs'];
-  const content = names.map((name) => [name, readFileSync(new URL(name, import.meta.url))]);
-  const digest = hash(Buffer.concat(content.map(([, bytes]) => bytes)));
   const bundle = path.join(directory, 'observer-' + digest);
   safe(bundle);
   mkdirSync(bundle, { recursive: true, mode: 0o700 });
