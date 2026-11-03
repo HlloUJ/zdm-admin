@@ -209,3 +209,41 @@ test('retained real PR73 metadata automatically explains the original 47m gap an
   assert.equal(r.unclassifiedBetweenRoundsMs, 0);
   assertTimingReady(s, { now: f.closedAt + 100000 });
 });
+
+test('proved interrupted validation keeps end and duration unknown without counting four days as validation', () => {
+  const s = state();
+  begin(s, 'one', 0);
+  s.validations = [{ id: 'legacy', startedAt: start + 10, finishedAt: null, status: 'running' }];
+  assert.throws(() => assertTimingReady(s, { now: start + 400000000 }), /Unfinished local validation/);
+  s.validationInterruptions = [
+    {
+      id: 'legacy',
+      startedAt: start + 10,
+      status: 'interrupted',
+      finishedAt: null,
+      durationMs: null,
+      confirmedInactiveAt: start + 400000000,
+      gateKey: 'a'.repeat(40) + ':123',
+      attemptDigest: 'b'.repeat(64),
+      preservationDigest: 'c'.repeat(64),
+      processInspectionDigest: 'd'.repeat(64),
+    },
+  ];
+  const result = assertTimingReady(s, { now: start + 400000000 });
+  assert.equal(result.localValidationMs, 0);
+  assert.equal(result.localPendingAttempts, 0);
+  assert.equal(result.localInterruptedAttempts, 1);
+  assert.deepEqual(result.localUnknownDurationAttempts, ['legacy']);
+  assert.equal(s.validations[0].status, 'running');
+  assert.equal(s.validations[0].finishedAt, null);
+  for (const change of [
+    { durationMs: 0 },
+    { finishedAt: start + 11 },
+    { attemptDigest: 'unknown' },
+    { id: 'foreign' },
+  ]) {
+    const copy = structuredClone(s);
+    Object.assign(copy.validationInterruptions[0], change);
+    assert.throws(() => assertTimingReady(copy, { now: start + 400000000 }));
+  }
+});
