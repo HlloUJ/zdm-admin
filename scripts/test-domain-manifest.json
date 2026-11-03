@@ -514,8 +514,13 @@
       "dynamicImports": 0
     },
     "scripts/completion-session.test.mjs": {
-      "digest": "273b6201a5acaa23edab0efe9b7ef38b61efa7ae8375eb4faae31413b1b81f89",
-      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "digest": "2cc2b128ab65a061955fe2b4effbab8e50127c2da2f24ec0bfc23aeaf79a73fe",
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-status.mjs": {
@@ -647,7 +652,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "15a0d2202c920b6a95e2daec5581fc0c7da16b0c3b2866bf3b21e32c97ca15cd",
+      "digest": "5c3c870c952fd1518a5f71b8aa01587fa933ed60805ff6eaa006d752e4e8ce15",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -1151,7 +1156,7 @@
       "dynamicImports": 0
     },
     "scripts/task-completion.mjs": {
-      "digest": "11a9b2365f4c27405f18b6ee3ed536227879689a616fd1ce928020a297a4962f",
+      "digest": "8e8e7613b8e7ae07ec0fe00ad491a96e6938dc98c7ab9a0b6a4fd59c76c52601",
       "imports": ["scripts/completion-cli.mjs", "scripts/dev-task.mjs", "scripts/task-batch.mjs", "scripts/verify.mjs"],
       "dynamicImports": 1
     },

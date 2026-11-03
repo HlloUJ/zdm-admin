@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, symlinkSync, lstatSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
@@ -16,6 +16,7 @@ import {
   completionPhase,
 } from './completion-session.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
+import { assetKind } from './task-completion.mjs';
 import { waitQuality } from './wait-quality.mjs';
 const state = () => ({ version: 1, batch: 'example', startedAt: 0, events: [], repairs: [] });
 test('one private session survives resume and never resets whole completion start', (t) => {
@@ -443,3 +444,23 @@ for (const patch of [
     );
   });
 }
+
+test('only exact official generated Husky runtime is preservable; source hooks and modified bytes remain blocked', (t) => {
+  const root = mkdtempSync(path.join(os.tmpdir(), 'husky-asset-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(path.join(root, '.husky/_'), { recursive: true });
+  const file = '.husky/_/pre-commit';
+  const source = '#!/usr/bin/env sh\n. "$(dirname "$0")/h"';
+  const classify = (name) => assetKind(name, lstatSync(path.join(root, name)), root);
+  writeFileSync(path.join(root, file), source);
+  assert.equal(classify(file), 'generated-output');
+  writeFileSync(path.join(root, file), source + '\n# custom content');
+  assert.equal(classify(file), 'blocked');
+  writeFileSync(path.join(root, '.husky/_/unknown'), source);
+  assert.equal(classify('.husky/_/unknown'), 'blocked');
+  writeFileSync(path.join(root, '.husky/pre-commit'), source);
+  assert.equal(classify('.husky/pre-commit'), 'blocked');
+  rmSync(path.join(root, file));
+  symlinkSync(path.join(root, '.husky/pre-commit'), path.join(root, file));
+  assert.equal(classify(file), 'blocked');
+});

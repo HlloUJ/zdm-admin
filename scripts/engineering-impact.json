@@ -66,7 +66,12 @@
       "dynamicImports": 0
     },
     "scripts/completion-session.test.mjs": {
-      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
@@ -277,7 +282,12 @@
       "dynamicImports": 1
     },
     "scripts/completion-session.test.mjs": {
-      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-status.mjs": {
@@ -697,7 +707,7 @@
     "scripts/sync-integration.test.mjs": "43931f15522ced4b1a2b5a55972ce94e696c3608c67e3fa492e5353228c9179b",
     "scripts/task-batch.mjs": "2a49301086662648fdbefaa726a23bdfef31e50450b2b22e50c8bd568a687566",
     "scripts/task-batch.test.mjs": "110f8903a85d06d3c0017b003dbe646a431046650ae27b08d510bfd502741920",
-    "scripts/task-completion.mjs": "11a9b2365f4c27405f18b6ee3ed536227879689a616fd1ce928020a297a4962f",
+    "scripts/task-completion.mjs": "8e8e7613b8e7ae07ec0fe00ad491a96e6938dc98c7ab9a0b6a4fd59c76c52601",
     "scripts/task-dependencies.mjs": "e771583db66522283935becd001598f9dd4dbb75b7cb8568e964403666125fbe",
     "scripts/task-dependencies.test.mjs": "9ad11fa8bf8ca9e796a6efdfcf7914feb61002a9ad067e9822658e0e1a63009f",
     "scripts/task-runtime-state.mjs": "70ecda8bcaadce54f2c7c8f8348c3b680010c09969447c287179f2cc6274c950",
