@@ -25,15 +25,23 @@ function fixture(t) {
   save();
   return { root, plan, save };
 }
-test('two selections retain whole files, disjoint union and single worker using public test-list syntax', (t) => {
+test('two selections retain whole files, disjoint union and single worker using exact public entry-file regexes', (t) => {
   const f = fixture(t),
     selected = [];
   for (const n of [1, 2]) {
     const out = selectShardArgs(f.root, [`--shard=${n}/2`, '--workers=1'], path.join(f.root, 'out' + n));
     assert.ok(!out.args.some((a) => a.startsWith('--shard')));
-    assert.ok(out.args.includes('--test-list'));
+    assert.ok(!out.args.includes('--test-list'));
+    assert.ok(out.args.includes('--workers=1'));
+    for (const file of f.plan.files) {
+      const absolute = path.join(f.root, 'tests/e2e', file.file);
+      assert.equal(
+        out.args.some((arg) => arg.startsWith('(?:^|/)') && new RegExp(arg).test(absolute)),
+        file.shard === n,
+      );
+    }
     assert.equal(out.selection.current, n);
-    const list = readFileSync(out.args[out.args.indexOf('--test-list') + 1], 'utf8')
+    const list = readFileSync(path.join(f.root, 'out' + n, 'selected-files.txt'), 'utf8')
       .trim()
       .split('\n');
     assert.deepEqual(list, out.selection.files);
