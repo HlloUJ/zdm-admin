@@ -12,9 +12,13 @@ public class FinishedProductGuidePrice {
   private Long finishedProductId;
   @NotNull private Long skuId;
   private String variantLabel;
+  private String priceSource;
   @NotNull @DecimalMin("0.0000") @Digits(integer = 3, fraction = 4) private BigDecimal priceCoefficient;
   @NotNull @DecimalMin("0.00") private BigDecimal costPrice;
   @NotNull @DecimalMin("0.00") private BigDecimal price;
+
+  public String getPriceSource() { return priceSource; }
+  public void setPriceSource(String value) { this.priceSource = value; }
 
   public Long getId() { return id; }
   public void setId(Long value) { this.id = value; }

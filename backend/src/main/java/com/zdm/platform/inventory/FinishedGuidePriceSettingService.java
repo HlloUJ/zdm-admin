@@ -13,12 +13,14 @@ public class FinishedGuidePriceSettingService {
   private static final long SETTING_ID = 1L;
   private final FinishedGuidePriceSettingMapper mapper;
   private final CurrentIdentityProvider identityProvider;
+  private final GuidePriceConfigurationSyncService priceSync;
 
   public FinishedGuidePriceSettingService(
       FinishedGuidePriceSettingMapper mapper,
-      CurrentIdentityProvider identityProvider) {
+      CurrentIdentityProvider identityProvider, GuidePriceConfigurationSyncService priceSync) {
     this.mapper = mapper;
     this.identityProvider = identityProvider;
+    this.priceSync = priceSync;
   }
 
   public FinishedGuidePriceSetting getSetting() {
@@ -47,6 +49,7 @@ public class FinishedGuidePriceSettingService {
     } else {
       mapper.updateById(setting);
     }
+    priceSync.sync(GuidePriceConfigurationSyncService.Commodity.FINISHED, setting.getPriceCoefficient());
     FinishedGuidePriceSetting result = mapper.selectById(SETTING_ID);
     if (result != null && !com.zdm.platform.security.DataScope.canAccess(identityProvider.require(), result.getCreatedByAccountId())) { return null; }
     return result;

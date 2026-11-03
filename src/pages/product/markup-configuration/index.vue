@@ -21,6 +21,7 @@
                       class="guide-form-item"
                       name="priceCoefficient"
                       :rules="guidePriceCoefficientRules"
+                      :show-error-message="!numericError(guideForm.priceCoefficient)"
                       :required-mark="false"
                     >
                       <DecimalInput
@@ -159,7 +160,11 @@
             />
           </t-select>
         </t-form-item>
-        <t-form-item label="价格系数" name="priceCoefficient">
+        <t-form-item
+          label="价格系数"
+          name="priceCoefficient"
+          :show-error-message="!numericError(formData.priceCoefficient)"
+        >
           <DecimalInput
             v-model="formData.priceCoefficient"
             class="price-coefficient-input"
@@ -204,6 +209,7 @@ import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import DecimalInput from '@/components/DecimalInput.vue';
+import { numericError } from '@/utils/numericInput';
 import type { FormInstanceFunctions, FormRule, PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import { computed, onMounted, reactive, ref, watch } from 'vue';
 

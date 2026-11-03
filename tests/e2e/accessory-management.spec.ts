@@ -1,3 +1,5 @@
+import { registerAttributeFeedbackTests } from './product-attribute-feedback-cases';
+import { productAttributeVersionFixture } from './product-attribute-version-fixture';
 import { productWarehouseUrl } from './product-test-navigation';
 import {
   expectEditableDrawer,
@@ -33,6 +35,8 @@ async function installFinishedMocks(page: Page, clientCode = 'supply-chain') {
         message: 'ok',
         data: [
           {
+            versionId: 1,
+            revision: 0,
             categoryId: 5,
             content: [
               {
@@ -56,6 +60,8 @@ async function installFinishedMocks(page: Page, clientCode = 'supply-chain') {
             ],
           },
           {
+            versionId: 1,
+            revision: 0,
             categoryId: 6,
             content: [
               {
@@ -611,7 +617,7 @@ test('source specification editor exposes cost and stock without operations pric
     await picker.getByRole('button', { name, exact: true }).click();
   await page.getByRole('button', { name: '确认，下一步' }).click();
   await page.getByRole('button', { name: '创建规格', exact: true }).click();
-  await page.getByPlaceholder('请输入商品规格').fill('测试规格');
+  await page.getByPlaceholder('请输入商品规格').fill('测试规格'.repeat(12));
   await page
     .locator('.t-dialog:visible')
     .getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true })
@@ -619,6 +625,44 @@ test('source specification editor exposes cost and stock without operations pric
   const table = page.locator('.spec-table-block');
   await expect(table.getByRole('columnheader', { name: '*成本价', exact: true })).toBeVisible();
   await expect(table.getByRole('columnheader', { name: /指导价/ })).toHaveCount(0);
+  const originalViewport = page.viewportSize()!;
+  await page.setViewportSize({ width: 1689, height: 1000 });
+  const tableEdges = () =>
+    table.evaluate((element) => {
+      const content = element.querySelector('.t-table__content')!;
+      const grid = content.querySelector('table')!;
+      const lastHeader = grid.querySelector('thead th:last-child')!;
+      const lastCell = grid.querySelector('tbody tr:first-child td:last-child')!;
+      const right = grid.getBoundingClientRect().right;
+      return {
+        headerGap: Math.abs(right - lastHeader.getBoundingClientRect().right),
+        rowGap: Math.abs(right - lastCell.getBoundingClientRect().right),
+        overflowing: content.scrollWidth > content.clientWidth + 1,
+      };
+    });
+  await expect.poll(tableEdges).toEqual({ headerGap: 0, rowGap: 0, overflowing: false });
+  await page.setViewportSize({ width: 900, height: 1000 });
+  await expect
+    .poll(() =>
+      table.locator('.t-table__content').evaluate((content) => {
+        const right = content.getBoundingClientRect().right;
+        const grid = content.querySelector('table')!;
+        const lastHeader = grid.querySelector('thead th:last-child')!;
+        const lastCell = grid.querySelector('tbody tr:first-child td:last-child')!;
+        return {
+          scrollable: content.scrollWidth > content.clientWidth,
+          headerVisible: Math.abs(right - lastHeader.getBoundingClientRect().right) <= 2,
+          rowVisible: Math.abs(right - lastCell.getBoundingClientRect().right) <= 2,
+        };
+      }),
+    )
+    .toEqual({ scrollable: true, headerVisible: true, rowVisible: true });
+  await table.locator('.t-table__content').evaluate((content) => {
+    content.scrollLeft = content.scrollWidth;
+  });
+  await expect(table.getByRole('columnheader', { name: '操作', exact: true })).toBeVisible();
+  await page.setViewportSize(originalViewport);
+
   await page.getByText('批量填写', { exact: true }).click();
   await expect(page.locator('.batch-field-grid').getByText('成本价', { exact: true })).toBeVisible();
   await expect(page.locator('.batch-field-grid').getByText('指导价', { exact: true })).toHaveCount(0);
@@ -661,6 +705,8 @@ test('uses only template-bound role attributes and builds dynamic sales specific
     route.fulfill(
       respond([
         {
+          versionId: 1,
+          revision: 0,
           categoryId: 5,
           content: [
             {
@@ -781,10 +827,44 @@ test('uses published bindings for new products and keeps unpublished historical 
     route.fulfill(
       respond([
         {
+          ...productAttributeVersionFixture({
+            categoryId: 5,
+            attributes: [{ attributeId: 1, attributeName: 'E2E 共享属性', value: '历史商品值' }],
+            variants: [
+              {
+                variantKey: 'history-sku',
+                variantLabel: '历史规格',
+                displayMode: 'single',
+                stock: 1,
+                salesAttributes: { attribute_2: '历史销售值' },
+              },
+            ],
+            specDimensions: [],
+          }),
           id: 1,
           categoryId: 5,
           supplierId: 2,
           name: '历史模板商品',
+          attributeTemplateSnapshot: [
+            {
+              attributeId: 1,
+              name: 'E2E 共享属性',
+              attributeRole: 'product',
+              valueType: 'text',
+              requiredFlag: false,
+              sortOrder: 1,
+              options: [],
+            },
+            {
+              attributeId: 2,
+              name: 'E2E 配件专属属性',
+              attributeRole: 'sales',
+              valueType: 'text',
+              requiredFlag: false,
+              sortOrder: 2,
+              options: [],
+            },
+          ],
           sku: 'history-product',
           status: 'warehouse',
           totalStock: 1,
@@ -831,6 +911,17 @@ test('edits prices in a specification table and preserves product details on sav
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page, 'admin');
   let product = {
+    ...productAttributeVersionFixture({
+      categoryId: 5,
+      attributes: [{ attributeId: 1, attributeName: '商品属性', value: '保留属性' }],
+      variants: ['A', 'B'].map((key, index) => ({
+        id: index + 801,
+        variantLabel: `规格${key}`,
+        displayMode: 'single',
+        stock: index + 2,
+      })),
+      specDimensions: [],
+    }),
     id: 71,
     name: '多规格价格商品',
     sku: 'PRICE-71',
@@ -903,7 +994,7 @@ test('edits prices in a specification table and preserves product details on sav
   await expect(editor.locator('.spec-table-block tbody tr')).toHaveCount(2);
   await expect(editor.locator('.spec-table-block thead th')).toContainText([
     '商品规格',
-    '*成本价',
+    '成本价',
     '*指导价',
     '*一级价格',
   ]);
@@ -997,6 +1088,12 @@ test('supply-chain product edit exposes cost and excludes operations prices', as
   await installFinishedMocks(page);
   const longSpec = '超长商品规格说明'.repeat(20);
   const product = {
+    ...productAttributeVersionFixture({
+      categoryId: 5,
+      attributes: [{ attributeId: 1, attributeName: 'E2E 共享属性', value: 'E2E 共享属性值' }],
+      variants: [{ id: 821, variantLabel: longSpec, displayMode: 'single', stock: 2, costPrice: 10 }],
+      specDimensions: [],
+    }),
     id: 72,
     name: '供应链成本价商品',
     sku: 'COST-72',
@@ -1092,6 +1189,12 @@ test('supply-chain edit can select temporarily not shelved for a selling product
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
   const product = {
+    ...productAttributeVersionFixture({
+      categoryId: 5,
+      attributes: [],
+      variants: [{ id: 841, variantLabel: '单规格', displayMode: 'single', stock: 1, costPrice: 10 }],
+      specDimensions: [],
+    }),
     id: 74,
     name: '已上架商品',
     status: 'selling',
@@ -1123,6 +1226,33 @@ test('supply-chain layered product edit exposes cost for each specification', as
   await page.addInitScript(() => window.localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
   const product = {
+    ...productAttributeVersionFixture({
+      categoryId: 5,
+      attributes: [],
+      variants: [
+        {
+          id: 831,
+          variantLabel: '岩板 / 小',
+          displayMode: 'layered',
+          salesAttributes: { material: '岩板', color: '灰色', size: '小' },
+          stock: 1,
+          costPrice: 10,
+        },
+        {
+          id: 832,
+          variantLabel: '岩板 / 大',
+          displayMode: 'layered',
+          salesAttributes: { material: '岩板', color: '灰色', size: '大' },
+          stock: 1,
+          costPrice: 12,
+        },
+      ],
+      specDimensions: [
+        { key: 'material', name: '销售属性1（共享）', values: ['岩板'] },
+        { key: 'color', name: '销售属性2（共享）', values: ['灰色'] },
+        { key: 'size', name: '销售属性3（共享）', values: ['小', '大'] },
+      ],
+    }),
     id: 73,
     name: '分层规格成本价商品',
     sku: 'COST-73',
@@ -1191,8 +1321,11 @@ test('supply-chain layered product edit exposes cost for each specification', as
   await editor.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expectPriceTableStable(table, geometry);
   await cost.fill('-1');
+  await expect(cost).toHaveValue('');
+  await cost.fill('10.001');
   await cost.blur();
-  await expect(table.getByText('请输入正确的价格', { exact: true })).toHaveCount(1);
+  await expect(cost).toHaveValue('');
+  await expect(table.getByText('最多输入两位小数', { exact: true })).toHaveCount(0);
   await expectPriceTableStable(table, geometry);
   await cost.fill('10');
   await cost.blur();
@@ -1702,6 +1835,8 @@ test('switches empty and cleared select attributes to single mode without errors
         code: 0,
         data: [
           {
+            versionId: 1,
+            revision: 0,
             categoryId: 5,
             content: [
               {
@@ -1776,6 +1911,8 @@ test('clears unsaved specification drafts on mode changes and preserves confirma
         code: 0,
         data: [
           {
+            versionId: 1,
+            revision: 0,
             categoryId: 5,
             content: ['尺寸', '颜色'].map((name, index) => ({
               attributeId: index + 2,
@@ -1867,10 +2004,38 @@ async function openSpecConversionFixture(
   mode: 'single' | 'layered',
   dimensions = ['颜色', '尺寸'],
   extraAttributes: Record<string, string> = {},
+  versionOptions?: {
+    skuFlags?: Record<number, boolean>;
+    latestAttributes: { id: number; name: string; skuFlag: boolean }[];
+  },
 ) {
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page);
   const product = {
+    ...productAttributeVersionFixture({
+      categoryId: 5,
+      attributes: [],
+      variants: [0, 1].map((index) => ({
+        id: 951 + index,
+        displayMode: mode,
+        variantLabel: index === 0 ? '标准款' : '加长款',
+        costPrice: (index + 1) * 10,
+        stock: index + 2,
+        salesAttributes: {
+          ...(mode === 'layered'
+            ? { attribute_2: index === 0 ? '白色' : '黑色', attribute_3: index === 0 ? '大号' : '小号' }
+            : {}),
+          ...extraAttributes,
+        },
+      })),
+      specDimensions:
+        mode === 'layered'
+          ? [
+              { key: 'attribute_2', name: '颜色', values: ['白色', '黑色'] },
+              { key: 'attribute_3', name: '尺寸', values: ['大号', '小号'] },
+            ]
+          : [],
+    }),
     id: 95,
     categoryId: 5,
     supplierId: 2,
@@ -1903,6 +2068,21 @@ async function openSpecConversionFixture(
       },
     })),
   };
+  product.attributeTemplateSnapshot = [
+    ...dimensions.map((name, index) => ({
+      attributeId: index + 2,
+      name,
+      attributeRole: 'sales',
+      valueType: 'text',
+      requiredFlag: false,
+      skuFlag: versionOptions?.skuFlags?.[index + 2] ?? true,
+      sortOrder: index,
+      options: [] as never[],
+    })),
+    ...product.attributeTemplateSnapshot.filter(
+      (field) => !dimensions.some((_, index) => field.attributeId === index + 2),
+    ),
+  ];
   await page.route('**/api/admin/accessory-products', (route) => route.fulfill({ json: { code: 0, data: [product] } }));
   await page.route(/\/api\/admin\/accessory-products\/95(?:\/edit)?$/, (route) =>
     route.fulfill({ json: { code: 0, data: { ...product, ...route.request().postDataJSON() } } }),
@@ -1916,13 +2096,18 @@ async function openSpecConversionFixture(
         code: 0,
         data: [
           {
+            versionId: versionOptions ? 2 : 1,
+            revision: 0,
             categoryId: 5,
-            content: dimensions.map((name, index) => ({
-              attributeId: index + 2,
-              name,
+            content: (
+              versionOptions?.latestAttributes ??
+              dimensions.map((name, index) => ({ id: index + 2, name, skuFlag: true }))
+            ).map((attribute, index) => ({
+              attributeId: attribute.id,
+              name: attribute.name,
               valueType: 'input',
               attributeRole: 'sales',
-              skuFlag: true,
+              skuFlag: attribute.skuFlag,
               sortOrder: index,
               options: [],
             })),
@@ -2273,6 +2458,12 @@ for (const failSecond of [false, true]) {
     await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
     await installFinishedMocks(page);
     const products = [71, 72, 73].map((id) => ({
+      ...productAttributeVersionFixture({
+        categoryId: 5,
+        attributes: [],
+        variants: [{ id: id * 10, variantLabel: '单规格', displayMode: 'single', stock: 1, costPrice: 10 }],
+        specDimensions: [],
+      }),
       id,
       name: `批量下架商品${id}`,
       status: 'selling',
@@ -2439,7 +2630,7 @@ test('empty publish reports every existing field once and locates the cover; edi
 });
 
 for (const submittedBeforeCreation of [false, true]) {
-  test(`new supply specifications defer feedback until submit and reject zero (${submittedBeforeCreation})`, async ({
+  test(`new supply specifications defer feedback until submit and permit zero input (${submittedBeforeCreation})`, async ({
     page,
   }) => {
     await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
@@ -2450,6 +2641,8 @@ for (const submittedBeforeCreation of [false, true]) {
           code: 0,
           data: [
             {
+              versionId: 1,
+              revision: 0,
               categoryId: 5,
               content: [
                 {
@@ -2507,8 +2700,10 @@ for (const submittedBeforeCreation of [false, true]) {
     await quantity.pressSequentially('abc-+.e中文');
     await expect(quantity).toHaveValue('');
     await quantity.pressSequentially('0');
-    await expect(quantity).toHaveValue('');
+    await expect(quantity).toHaveValue('0');
     await quantity.pressSequentially('10');
+    await expect(quantity).toHaveValue('010');
+    await quantity.blur();
     await expect(quantity).toHaveValue('10');
     const pastePrevented = await quantity.evaluate((input) => {
       const data = new DataTransfer();
@@ -2519,14 +2714,16 @@ for (const submittedBeforeCreation of [false, true]) {
       );
     });
     expect(pastePrevented).toBe(true);
-    await expect(quantity).toHaveValue('10');
+    await expect(quantity).toHaveValue('0');
     await page.getByRole('button', { name: '批量填写', exact: true }).click();
     const batchQuantity = page.locator('.batch-field-grid').getByPlaceholder('请输入数量', { exact: true });
     await batchQuantity.click();
     await batchQuantity.pressSequentially('0abc-+.');
-    await expect(batchQuantity).toHaveValue('');
+    await expect(batchQuantity).toHaveValue('0');
     await batchQuantity.click();
     await batchQuantity.pressSequentially('12');
+    await expect(batchQuantity).toHaveValue('012');
+    await batchQuantity.blur();
     await expect(batchQuantity).toHaveValue('12');
     await page.locator('.t-drawer:visible').getByRole('button', { name: '确认保存', exact: true }).click();
     await expect(quantity).toHaveValue('12');
@@ -2546,7 +2743,9 @@ for (const submittedBeforeCreation of [false, true]) {
     await cost.fill('10');
     await quantity.fill('1');
     await quantity.press('ArrowDown');
-    await expect(quantity).toHaveValue('1');
+    await expect(quantity).toHaveValue('0');
+    await expect(table.locator('.quantity-editor .t-input__tips')).toHaveText('请输入大于0的整数');
+    await quantity.fill('1');
     await expect(table.locator('.quantity-editor .t-input__tips')).toHaveCount(0);
     await table.getByPlaceholder('请选择销售属性1（共享）', { exact: true }).click();
     await page.getByText('白色', { exact: true }).click();
@@ -2594,6 +2793,12 @@ test('operations batch drawer uses native footer and cancel keeps specification 
     route.fulfill({ json: { code: 0, data: [] } }),
   );
   const product = {
+    ...productAttributeVersionFixture({
+      categoryId: 5,
+      attributes: [],
+      variants: [{ id: 11, variantLabel: '标准规格', displayMode: 'single', costPrice: 10, stock: 1 }],
+      specDimensions: [],
+    }),
     id: 1,
     name: '抽屉规范测试商品',
     categoryId: 5,
@@ -2713,6 +2918,12 @@ test('operations retains readonly specifications without creation or editing ent
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await installFinishedMocks(page, 'admin');
   const product = {
+    ...productAttributeVersionFixture({
+      categoryId: 5,
+      attributes: [],
+      variants: [{ id: 11, variantLabel: '标准规格', displayMode: 'single', costPrice: 10, stock: 1 }],
+      specDimensions: [],
+    }),
     id: 1,
     name: '运营规格只读回归商品',
     categoryId: 5,
@@ -2761,3 +2972,82 @@ test('long layered attribute errors grow wrapped rows without covering their foo
   });
   expect(result).toEqual({ wraps: true, complete: true, insideRow: true, beforeFooter: true });
 });
+
+test('editing keeps its bound fields after the category publishes a newer template', async ({ page }) => {
+  const dialog = await openSpecConversionFixture(page, 'single', ['历史尺寸'], { attribute_2: '保留值' });
+  await dialog.getByRole('button', { name: '取消', exact: true }).click();
+  let latestReads = 0;
+  await page.route('**/api/admin/accessory-products/attribute-template-options', (route) => {
+    latestReads++;
+    return route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          {
+            categoryId: 5,
+            versionId: 2,
+            revision: 0,
+            content: [
+              {
+                attributeId: 99,
+                name: '新版本字段',
+                attributeRole: 'sales',
+                valueType: 'text',
+                requiredFlag: true,
+                sortOrder: 1,
+                options: [],
+              },
+            ],
+          },
+        ],
+      },
+    });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  const table = page.locator('.spec-table-block');
+  await expect(table.getByRole('columnheader', { name: '历史尺寸', exact: true })).toBeVisible();
+  await expect(table.getByRole('columnheader', { name: /新版本字段/ })).toHaveCount(0);
+  await expect(table.getByRole('textbox').filter({ hasText: '' }).first()).toBeVisible();
+  expect(latestReads).toBe(0);
+});
+
+for (const mode of ['single', 'layered'] as const) {
+  test(`bound SKU eligibility ignores latest template changes from ${mode} mode`, async ({ page }) => {
+    const dialog = await openSpecConversionFixture(
+      page,
+      mode,
+      ['商品属性3（共享）', '销售属性1（共享）', '不参与规格的旧属性'],
+      {},
+      {
+        skuFlags: { 2: mode === 'single', 4: false },
+        latestAttributes: [
+          { id: 3, name: '销售属性1（共享）', skuFlag: true },
+          { id: 4, name: '不参与规格的旧属性', skuFlag: true },
+          { id: 99, name: '新版本销售属性', skuFlag: true },
+        ],
+      },
+    );
+    const table = page.locator('.spec-table-block');
+    const expectOriginalRows = async () => {
+      await expect(table.locator('tbody tr')).toHaveCount(2);
+      await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(0)).toHaveValue('10.00');
+      await expect(table.getByPlaceholder('请输入价格', { exact: true }).nth(1)).toHaveValue('20.00');
+      await expect(table.locator('.quantity-editor input').nth(0)).toHaveValue('2');
+      await expect(table.locator('.quantity-editor input').nth(1)).toHaveValue('3');
+    };
+    for (let opening = 0; opening < 2; opening++) {
+      if (mode === 'single') await switchSpecMode(page, 'layered');
+      await expect(dialog.locator('.spec-attr-tag')).toHaveText(['商品属性3（共享）', '销售属性1（共享）']);
+      await expect(dialog.locator('.spec-attr-tag').filter({ hasText: '新版本销售属性' })).toHaveCount(0);
+      await expect(dialog.locator('.spec-attr-tag').filter({ hasText: '不参与规格的旧属性' })).toHaveCount(0);
+      await dialog.getByRole('button', { name: '取消', exact: true }).click();
+      await expectOriginalRows();
+      if (opening === 0) {
+        await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+        await page.getByRole('button', { name: '编辑规格', exact: true }).click();
+      }
+    }
+  });
+}
+
+registerAttributeFeedbackTests('accessory-products', installFinishedMocks);

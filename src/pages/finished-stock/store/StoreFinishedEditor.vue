@@ -56,7 +56,7 @@
                     :data="rows"
                     :columns="editorColumns(columns)"
                     :rowspan-and-colspan="span"
-                    table-content-width="max-content"
+                    table-content-width="100%"
                     bordered
                     hover
                     table-layout="auto"
@@ -111,6 +111,16 @@
                       </div>
                     </template>
                   </t-table>
+                  <div class="spec-table-actions">
+                    <t-button
+                      :theme="buttonTheme('batch-fill')"
+                      variant="outline"
+                      :disabled="saving || !ready"
+                      @click="openBatchSalePrice"
+                    >
+                      <template #icon><t-icon name="edit" /></template>批量填写
+                    </t-button>
+                  </div>
                 </div>
               </t-form-item>
               <t-form-item label="总库存"
@@ -128,6 +138,77 @@
       <t-button :theme="buttonTheme('cancel')" variant="base" :disabled="saving" @click="emit('cancel')">取消</t-button>
     </AdminSectionCard>
   </section>
+  <t-drawer
+    v-model:visible="batchVisible"
+    header="批量填写"
+    placement="right"
+    size="min(1180px, 100%)"
+    lazy
+    destroy-on-close
+  >
+    <div ref="batchFormRoot" class="batch-fill-panel batch-fill-panel--store">
+      <t-card title="选择批量范围">
+        <template #actions>
+          <t-typography-text theme="secondary">未选择属性值时默认填充全部规格</t-typography-text>
+        </template>
+        <div class="batch-filter-list">
+          <div v-for="filter in batchOptions" :key="filter.key" class="batch-filter-row">
+            <t-typography-text class="batch-filter-label" strong>{{ filter.label }}</t-typography-text>
+            <div class="batch-filter-values">
+              <t-check-tag
+                :checked="!batchFilters[filter.key]?.length"
+                size="small"
+                :checked-props="{ theme: 'primary', variant: 'light-outline' }"
+                :unchecked-props="{ variant: 'outline' }"
+                @change="batchFilters[filter.key] = []"
+                >全部</t-check-tag
+              >
+              <t-check-tag
+                v-for="value in filter.values"
+                :key="value"
+                :checked="Boolean(batchFilters[filter.key]?.includes(value))"
+                size="small"
+                :checked-props="{ theme: 'primary', variant: 'light-outline' }"
+                :unchecked-props="{ variant: 'outline' }"
+                @change="toggleBatchValue(filter.key, value)"
+                >{{ value }}</t-check-tag
+              >
+            </div>
+          </div>
+        </div>
+        <t-typography-text class="batch-match-tip" theme="secondary">
+          当前将批量填充 {{ batchSkus.length }} 条规格
+        </t-typography-text>
+      </t-card>
+      <t-card title="填写字段">
+        <template #actions>
+          <t-typography-text theme="secondary">留空的字段不会覆盖原规格数据</t-typography-text>
+        </template>
+        <t-form :data="{ price: batchPrice }" label-align="top">
+          <div class="batch-field-grid">
+            <t-form-item label="商品售价">
+              <SpecPriceInput
+                v-model="batchPrice"
+                form-layout
+                label="商品售价"
+                placeholder="请输入商品售价"
+                optional
+                :submitted="batchSubmitted"
+              />
+            </t-form-item>
+          </div>
+        </t-form>
+      </t-card>
+    </div>
+    <template #footer>
+      <t-space size="small">
+        <t-button :theme="buttonTheme('save')" @click="applyBatchSalePrice">
+          <template #icon><t-icon name="save" /></template>{{ formConfirmationText('edit') }}
+        </t-button>
+        <t-button :theme="buttonTheme('cancel')" @click="batchVisible = false">取消</t-button>
+      </t-space>
+    </template>
+  </t-drawer>
 </template>
 <script setup lang="ts">
 import { useCommodityModule } from '@/composables/useCommodityModule';
@@ -139,7 +220,11 @@ import { rejectFormSubmission } from '@/utils/submitValidation';
 import { computed, onMounted, reactive, ref, watch, h } from 'vue';
 import type { FormInstanceFunctions, PrimaryTableCol } from 'tdesign-vue-next';
 import { AdminSectionCard, adminFeedback, getSafeErrorMessage } from '@/components/foundation';
-import { type StoreFinishedProduct, type StoreFinishedEditCategory } from '@/services/storeFinishedStock';
+import {
+  type StoreFinishedProduct,
+  type StoreFinishedEditCategory,
+  type StoreSkuPrice,
+} from '@/services/storeFinishedStock';
 const { listStoreFinishedEditCategories, saveStoreFinishedEdit } = commodity.store;
 import StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';
 import SpecPriceInput from '../management/components/SpecPriceInput.vue';
@@ -234,6 +319,51 @@ const drafts = reactive(Object.fromEntries(props.product.skus.map((sku) => [sku.
 const submitted = ref(false);
 const saving = ref(false);
 const ready = ref(false);
+const batchVisible = ref(false);
+const batchPrice = ref('');
+const batchSubmitted = ref(false);
+const batchFormRoot = ref<HTMLElement>();
+const batchFilters = reactive<Record<string, string[]>>({});
+const batchSkuValue = (item: StoreSkuPrice, key: string) =>
+  key === '__sku_label__' ? item.label : String(item.salesAttributes?.[key] ?? item[key as keyof StoreSkuPrice] ?? '');
+const batchOptions = computed(() => {
+  const dimensions = props.product.skus.some((item) => item.displayMode === 'layered')
+    ? props.product.specDimensions
+    : [];
+  const fields = dimensions.length
+    ? dimensions.map((item) => ({ key: item.key, label: item.name }))
+    : [{ key: '__sku_label__', label: '商品规格' }];
+  return fields.map((field) => ({
+    ...field,
+    values: [...new Set(props.product.skus.map((item) => batchSkuValue(item, field.key)).filter(Boolean))],
+  }));
+});
+const batchSkus = computed(() =>
+  props.product.skus.filter((item) =>
+    batchOptions.value.every((field) => {
+      const selected = batchFilters[field.key] ?? [];
+      return !selected.length || selected.includes(batchSkuValue(item, field.key));
+    }),
+  ),
+);
+function openBatchSalePrice() {
+  batchPrice.value = '';
+  batchSubmitted.value = false;
+  Object.keys(batchFilters).forEach((key) => delete batchFilters[key]);
+  batchVisible.value = true;
+}
+function toggleBatchValue(key: string, value: string) {
+  const selected = batchFilters[key] ?? [];
+  batchFilters[key] = selected.includes(value) ? selected.filter((item) => item !== value) : [...selected, value];
+}
+function applyBatchSalePrice() {
+  batchSubmitted.value = true;
+  const value = batchPrice.value.trim();
+  if (value && !isValidSpecPriceNumber(value)) return rejectFormSubmission(batchFormRoot.value);
+  if (!batchSkus.value.length) return adminFeedback.warning('当前条件下没有可批量填写的规格');
+  if (value) batchSkus.value.forEach((item) => editDraftPrice(drafts[item.skuId], value, item.costPrice));
+  batchVisible.value = false;
+}
 interface CategoryOption {
   label: string;
   value: number;

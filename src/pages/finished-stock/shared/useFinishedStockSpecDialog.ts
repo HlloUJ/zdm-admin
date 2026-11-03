@@ -18,6 +18,8 @@ import type { buildFinishedStockTemplateFields } from './finishedStockTemplateFi
 type SalesField = ReturnType<typeof buildFinishedStockTemplateFields>[number];
 interface SpecDialogContext {
   onValidationFailed: () => unknown;
+  validateAttributeDrafts?: () => boolean;
+  validateAttributeRows?: (rows: SpecRow[], fields: LayeredSpecField[]) => boolean;
   validatedSpecDraftIds: Ref<Set<number>>;
   specRows: Ref<SpecRow[]>;
   specMode: Ref<SpecMode>;
@@ -40,6 +42,8 @@ interface SpecDialogContext {
 /** Shared specification draft lifecycle for admin and supply-chain product editors. */
 export function useFinishedStockSpecDialog({
   onValidationFailed,
+  validateAttributeDrafts,
+  validateAttributeRows,
   validatedSpecDraftIds,
   specRows,
   specMode,
@@ -344,6 +348,8 @@ export function useFinishedStockSpecDialog({
         specMode.value === 'single' ? '商品规格不能为空，请填写后再确认创建' : '请填写所有规格属性值后再确认创建';
       return onValidationFailed();
     }
+    if (specMode.value === 'layered' && validateAttributeDrafts && !validateAttributeDrafts())
+      return onValidationFailed();
     if (specMode.value === 'single' && singleSpecs.value.some(isDuplicateSingleSpec)) {
       specDraftError.value = '商品规格名称不能重复，请修改后再确认创建';
       return onValidationFailed();
@@ -371,6 +377,8 @@ export function useFinishedStockSpecDialog({
       return onValidationFailed();
     }
     const fields = selectedSpecGroups.value.map((group) => group.field);
+    if (specMode.value === 'layered' && validateAttributeRows && !validateAttributeRows(rows, fields))
+      return onValidationFailed();
     if (specMode.value === 'layered' && rows.some((row) => fields.some((field) => !String(row[field] || '').trim()))) {
       specDraftError.value = '请补充每条规格的属性值后再确认创建';
       return onValidationFailed();

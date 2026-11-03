@@ -25,18 +25,22 @@
                 </t-form-item>
                 <t-form-item label="工艺宽度">
                   <div class="width-range">
-                    <t-input
+                    <DecimalInput
+                      plain
+                      large-number
                       :model-value="searchForm.widthStart"
                       clearable
-                      inputmode="numeric"
+                      inputmode="decimal"
                       placeholder="请输入工艺宽度"
                       @update:model-value="handleWidthSearchInput('widthStart', $event)"
                     />
                     <span>-</span>
-                    <t-input
+                    <DecimalInput
+                      plain
+                      large-number
                       :model-value="searchForm.widthEnd"
                       clearable
-                      inputmode="numeric"
+                      inputmode="decimal"
                       placeholder="请输入工艺宽度"
                       @update:model-value="handleWidthSearchInput('widthEnd', $event)"
                     />
@@ -157,11 +161,13 @@
             <t-option v-for="item in craftTypeOptions" :key="item.value" :label="item.label" :value="item.value" />
           </t-select>
         </t-form-item>
-        <t-form-item label="工艺宽度" name="width">
-          <t-input
+        <t-form-item label="工艺宽度" name="width" :show-error-message="!numericError(formData.width)">
+          <DecimalInput
+            plain
+            large-number
             :model-value="formData.width"
             clearable
-            inputmode="numeric"
+            inputmode="decimal"
             placeholder="请输入工艺宽度"
             suffix="mm"
             @update:model-value="handleFormWidthInput"
@@ -215,6 +221,8 @@
 </template>
 
 <script setup lang="ts">
+import DecimalInput from '@/components/DecimalInput.vue';
+import { numericError } from '@/utils/numericInput';
 import { AdminDialog } from '@/components/foundation';
 import { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
@@ -331,6 +339,7 @@ const formData = reactive<CraftForm>({
 });
 
 const formRules: Record<string, FormRule[]> = {
+  width: [{ validator: (value) => !numericError(value), message: '请输入非负数字，最多两位小数', type: 'error' }],
   image: [{ required: true, message: '请上传工艺图片', type: 'error' }],
   name: [{ required: true, message: '请输入工艺名称', type: 'error' }],
   type: [{ required: true, message: '请选择工艺类型', type: 'error' }],
@@ -446,21 +455,22 @@ const fillFormData = (row: CraftItem) => {
       : undefined;
   formData.name = row.name;
   formData.type = row.type;
-  formData.width = row.width.replace(/\D/g, '');
+  formData.width = row.width;
   formData.remark = row.remark ?? '';
 };
 
 const handleSearch = () => {
+  if (numericError(searchForm.widthStart) || numericError(searchForm.widthEnd)) return;
   Object.assign(appliedSearchForm, searchForm);
   pagination.current = 1;
 };
 
 const handleWidthSearchInput = (field: 'widthStart' | 'widthEnd', value: string) => {
-  searchForm[field] = value.replace(/\D/g, '');
+  searchForm[field] = value;
 };
 
 const handleFormWidthInput = (value: string) => {
-  formData.width = value.replace(/\D/g, '');
+  formData.width = value;
 };
 
 const handleReset = () => {

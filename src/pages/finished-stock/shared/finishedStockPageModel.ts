@@ -2,6 +2,7 @@ import type { WarehouseEntryInformation } from '@/services/warehouseEntry';
 import type { TableRowData } from 'tdesign-vue-next';
 import type {
   FinishedProductAttributeEntry,
+  FinishedProductTemplateAttribute,
   FinishedProductGuidePrice,
   FinishedProductPrice,
   FinishedProductVariant,
@@ -70,6 +71,10 @@ export interface StockItem extends WarehouseEntryInformation {
   code: string;
   image: string;
   name: string;
+  templateVersionId?: number;
+  templateRevision?: number;
+  attributeTemplateSnapshot?: FinishedProductTemplateAttribute[];
+  attributeDisplayOrder?: { product: string[]; sales: string[] };
   categoryId?: number;
   supplierId?: number;
   category: string;
@@ -134,6 +139,7 @@ export interface SpecRow extends TableRowData {
   cost: string;
   guideCoefficient: string;
   guide: string;
+  guidePriceSource?: 'auto' | 'manual';
   level1Coefficient: string;
   level1: string;
   level2Coefficient: string;

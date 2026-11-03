@@ -319,13 +319,13 @@
                         ])
                   "
                 >
-                  <div v-if="specRows.length" class="spec-table-block">
+                  <div v-if="specRows.length" ref="specTableElement" class="spec-table-block">
                     <t-table
                       row-key="id"
                       :data="specRows"
                       :columns="specColumns"
                       :rowspan-and-colspan="specRowspanAndColspan"
-                      table-content-width="max-content"
+                      :table-content-width="specTableContentWidth"
                       bordered
                       hover
                       table-layout="auto"
@@ -375,13 +375,14 @@
                         </div>
                       </template>
                       <template #guide="{ row }">
-                        <div class="price-pair">
+                        <div class="price-pair with-source">
                           <SpecPriceInput
                             v-model="row.guideCoefficient"
                             placeholder="请输入系数"
                             label="系数"
                             :submitted="submitAttempted"
                             @change="handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)"
+                            @commit="markGuidePriceManual(row)"
                           />
                           <SpecPriceInput
                             v-model="row.guide"
@@ -389,6 +390,12 @@
                             label="价格"
                             :submitted="submitAttempted"
                             @change="handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)"
+                            @commit="markGuidePriceManual(row)"
+                          />
+                          <PriceSourceToggle
+                            :source="row.guidePriceSource"
+                            :available="guidePriceSettingCoefficient != null"
+                            @toggle="toggleGuidePriceSource(row)"
                           />
                         </div>
                       </template>
@@ -670,6 +677,7 @@
 </template>
 
 <script setup lang="ts">
+import { operationsHistoricalLayeredFields } from './historicalSpecification';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';
 const batchShelfResultVisible = ref(false);
@@ -678,6 +686,7 @@ import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
 import { useStateActivitySort } from '@/composables/useStateActivitySort';
+import { useSpecTableLayout } from '../shared/useSpecTableLayout';
 import { useCommodityModule } from '@/composables/useCommodityModule';
 const commodity = useCommodityModule();
 
@@ -1087,19 +1096,6 @@ const layeredFieldLabels = computed<Record<string, string>>(() => ({
   ...Object.fromEntries(confirmedSpecDimensions.value.map((dimension) => [dimension.key, dimension.name])),
   ...Object.fromEntries(salesAttributeFields.value.map((field) => [field.key, field.label])),
 }));
-const skuAttributeFields = computed(() =>
-  salesAttributeFields.value.filter(
-    (field) =>
-      confirmedLayeredFields.value.includes(field.key) ||
-      categoryAttributeBindings.value.some(
-        (binding) =>
-          binding.categoryId === selectedCategoryId.value &&
-          binding.attributeId === field.attributeId &&
-          binding.attributeRole === 'sales' &&
-          binding.skuFlag === true,
-      ),
-  ),
-);
 
 const salesAttributeByKey = (key: LayeredSpecField) => salesAttributeFields.value.find((field) => field.key === key);
 const reasonState = reactive<{
@@ -1190,6 +1186,10 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     createdAt: record.createdAt,
     image: record.mainImageUrl || '',
     name: record.name,
+    templateVersionId: record.templateVersionId,
+    templateRevision: record.templateRevision,
+    attributeTemplateSnapshot: record.attributeTemplateSnapshot,
+    attributeDisplayOrder: record.attributeDisplayOrder,
     categoryId: record.categoryId,
     supplierId: record.supplierId,
     category: categoryPathById(record.categoryId),
@@ -1219,6 +1219,8 @@ const toProductPayload = (
 ): FinishedProductPayload => {
   const nextItem = { ...item, ...patch };
   return {
+    templateVersionId: nextItem.templateVersionId,
+    templateRevision: nextItem.templateRevision,
     categoryId: nextItem.categoryId,
     supplierId: nextItem.supplierId,
     name: nextItem.name,
@@ -1419,23 +1421,23 @@ const formatReadonlyPrice = (value: unknown) =>
   value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);
 const requiredColumnTitle = (label: string) => () =>
   h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);
-const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
+const baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
-    { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },
-    { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 148 },
+    { colKey: 'cost', title: '成本价', minWidth: 80 },
+    { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 176 },
     ...productPriceLevels.value.map((item) => ({
       colKey: `markup-${item.id}`,
       title: requiredColumnTitle(item.name),
       minWidth: 176,
     })),
-    { colKey: 'quantity', title: requiredColumnTitle('数量'), minWidth: 80 },
+    { colKey: 'quantity', title: '数量', minWidth: 80 },
   ];
   const createSalesColumn = (field: (typeof salesAttributeFields.value)[number]): PrimaryTableCol<TableRowData> => ({
     colKey: field.key,
-    title: field.required ? requiredColumnTitle(field.label) : field.label,
+    title: field.label,
   });
   const orderedSpecColumns: PrimaryTableCol<TableRowData>[] =
-    confirmedSpecMode.value === 'single'
+    confirmedSpecMode.value === 'single' || !confirmedLayeredFields.value.length
       ? [{ colKey: 'specText', title: '商品规格', minWidth: 100 }]
       : confirmedLayeredFields.value.map((key) => {
           const field = salesAttributeByKey(key);
@@ -1446,6 +1448,8 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     .map(createSalesColumn);
   return [...orderedSpecColumns, ...priceColumnsBase, ...remainingSalesColumns];
 });
+const { tableElement: specTableElement, contentWidth: specTableContentWidth, fitColumns } = useSpecTableLayout();
+const specColumns = computed(() => fitColumns(baseSpecColumns.value));
 const specRowspanAndColspan = ({
   rowIndex,
   col,
@@ -1480,7 +1484,7 @@ const batchFilterOptions = computed(() =>
   batchFilterFields.value.map((field) => ({
     field,
     label: field === 'specText' ? '商品规格' : layeredFieldLabels.value[field],
-    values: Array.from(new Set(specRows.value.map((row) => String(row[field] || '')).filter(Boolean))),
+    values: Array.from(new Set(specRows.value.map((row) => String(row[field] ?? '')).filter(Boolean))),
   })),
 );
 const isBatchFilterValueSelected = (field: BatchFilterField, value: string) =>
@@ -1489,7 +1493,7 @@ const batchFillMatchedRows = computed(() =>
   specRows.value.filter((row) =>
     batchFilterFields.value.every((field) => {
       const selectedValues = batchFillFilters[field] ?? [];
-      return selectedValues.length === 0 || selectedValues.includes(String(row[field] || ''));
+      return selectedValues.length === 0 || selectedValues.includes(String(row[field] ?? ''));
     }),
   ),
 );
@@ -1638,21 +1642,18 @@ const openFormPage = (row: StockItem) => {
     });
     selectedCategoryId.value = row.categoryId;
     selectedCategoryPath.value = row.category.replaceAll('/', ' > ');
-    specRows.value = createEditSpecRows(row);
+    specRows.value = createEditSpecRows(row).map((spec) => ({
+      ...spec,
+      specText: row.variants.find((variant) => variant.id === spec.skuId)?.variantLabel ?? spec.specText,
+    }));
     confirmedSpecMode.value = row.variants[0]?.displayMode ?? 'single';
     confirmedSpecDimensions.value = copySpecDimensions(row.specDimensions);
     if (confirmedSpecMode.value === 'layered') {
       specRows.value = orderLayeredRows(specRows.value, confirmedSpecDimensions.value);
     }
-    confirmedLayeredFields.value = (
-      row.specDimensions?.length
-        ? row.specDimensions.map((dimension) => dimension.key)
-        : skuAttributeFields.value
-            .map((field) => field.key)
-            .filter((field) => row.variants.some((variant) => variant.salesAttributes?.[field]))
-    ) as LayeredSpecField[];
+    confirmedLayeredFields.value = operationsHistoricalLayeredFields(row);
     if (confirmedSpecMode.value === 'layered' && !row.specDimensions?.length) {
-      adminFeedback.warning('此商品缺少历史规格顺序，请在编辑规格中核对后保存');
+      adminFeedback.warning('此商品缺少历史规格顺序，已保留原规格；如需调整规格，请在供应链端核对。');
     }
   }
 };
@@ -1670,6 +1671,8 @@ const {
 
   handleSpecCoefficientChange,
   handleSpecPriceChange,
+  toggleGuidePriceSource,
+  markGuidePriceManual,
   toggleSpecPriceSource,
   markSpecPriceManual,
   handleMarkupCoefficientChange,
@@ -1678,7 +1681,12 @@ const {
 
   handleBatchCoefficientChange,
   handleBatchPriceChange,
-} = useFinishedStockPriceEditor(() => productPriceLevels.value, batchFillForm, batchMarkupPrices);
+} = useFinishedStockPriceEditor(
+  () => productPriceLevels.value,
+  batchFillForm,
+  batchMarkupPrices,
+  () => guidePriceSettingCoefficient.value,
+);
 
 const operationLogsVisible = ref(false);
 const canViewOperationLogs = computed(() =>
@@ -1760,6 +1768,7 @@ const savePriceDrawer = () => {
               }),
             ),
             cost: batchFillForm.cost || row.cost,
+            guidePriceSource: batchFillForm.guideCoefficient || batchFillForm.guide ? 'manual' : row.guidePriceSource,
             guideCoefficient:
               batchFillForm.guideCoefficient ||
               (batchFillForm.guide && Number(batchFillForm.cost || row.cost) > 0
@@ -1922,9 +1931,14 @@ const openConfirm = (type: ConfirmType, product: StockItem | null, content: stri
 const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
 };
-const detailAttributeNames = computed(() =>
-  Object.fromEntries(productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name])),
-);
+const detailAttributeNames = computed(() => {
+  const product = formPageVisible.value ? editingProduct.value : detailProduct.value;
+  return Object.fromEntries(
+    product?.attributeTemplateSnapshot
+      ? product.attributeTemplateSnapshot.map((attribute) => [`attribute_${attribute.attributeId}`, attribute.name])
+      : productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name]),
+  );
+});
 const openProductEditor = async (row: StockItem) => {
   try {
     await refreshPriceConfigurations();

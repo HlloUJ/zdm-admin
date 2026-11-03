@@ -73,12 +73,15 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
         variantMapper, attributeEntryMapper, jdbcTemplate, mediaAssetService);
   }
 
-  public record AttributeTemplateOption(Long categoryId, Long versionId, Integer versionNo,
+  @org.springframework.beans.factory.annotation.Autowired
+  private ProductAttributeVersionService attributeVersions;
+
+  public record AttributeTemplateOption(Long categoryId, Long versionId, Integer versionNo, Integer revision,
       com.fasterxml.jackson.databind.JsonNode content) {}
 
   public List<AttributeTemplateOption> attributeTemplateOptions() {
     return jdbcTemplate.query("""
-        SELECT version.category_id, version.id, version.version_no, version.content
+        SELECT version.category_id, version.id, version.version_no, version.revision, version.content
         FROM category_template_versions version
         JOIN product_categories category ON category.id = version.category_id
         WHERE category.scope = 'finished' AND category.tenant_id IS NULL
@@ -91,7 +94,7 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
         """, (row, index) -> {
           try {
             return new AttributeTemplateOption(row.getLong("category_id"), row.getLong("id"),
-                row.getInt("version_no"), new com.fasterxml.jackson.databind.ObjectMapper().readTree(row.getString("content")));
+                row.getInt("version_no"), row.getInt("revision"), new com.fasterxml.jackson.databind.ObjectMapper().readTree(row.getString("content")));
           } catch (com.fasterxml.jackson.core.JsonProcessingException error) {
             throw new IllegalStateException("属性模板配置读取失败", error);
           }
@@ -161,6 +164,11 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
         && product.getVariants().stream().anyMatch(v -> "layered".equals(v.getDisplayMode()))) {
       throw new IllegalArgumentException("请提供分层规格属性及顺序");
     }
+    var binding = attributeVersions.bind("finished", product.getCategoryId(), product.getTemplateVersionId(), product.getTemplateRevision());
+    product.setTemplateVersionId(binding.id());
+    product.setTemplateRevision(binding.revision());
+    product.setAttributeTemplateSnapshot(binding.content());
+    attributeVersions.validate(binding.content(), product, null);
     writeValidator.validateAndNormalize(product);
     CurrentIdentity identity = identityProvider.require();
     product.setId(null);
@@ -210,7 +218,18 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     product.setSourceStatus(existing.getSourceStatus());
     product.setOperationsDeleted(existing.getOperationsDeleted());
     boolean costChanged = !sourceCosts(existing).equals(sourceCosts(product));
+    ProductAttributeVersionService.requireBinding(product.getTemplateVersionId(), product.getTemplateRevision(), existing.getTemplateVersionId(), existing.getTemplateRevision(), existing.getAttributeTemplateSnapshot());
+    product.setTemplateVersionId(existing.getTemplateVersionId());
+    product.setTemplateRevision(existing.getTemplateRevision());
+    product.setAttributeTemplateSnapshot(existing.getAttributeTemplateSnapshot());
+    attributeVersions.validate(existing.getAttributeTemplateSnapshot(), product, attachDetails(existing));
+    var unchangedAttributeValues = attributeVersions.unchangedProductAttributes(product, existing);
     writeValidator.validateAndNormalize(product);
+    if (product.getAttributes() != null) {
+      product.getAttributes().forEach(entry -> {
+        if (unchangedAttributeValues.containsKey(entry.getAttributeId())) { entry.setValue(unchangedAttributeValues.get(entry.getAttributeId())); }
+      });
+    }
     product.setGuidePrice(existing.getGuidePrice());
     product.setId(id);
     product.setPublisherType(existing.getPublisherType());
@@ -326,6 +345,9 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
     FinishedProduct existing = attachDetails(getById(id));
     if (existing == null) { throw new IllegalArgumentException("运营商品不存在"); }
     lifecycle.requireFinishedOperational(existing);
+    if (request.getTemplateVersionId() != null || request.getTemplateRevision() != null) {
+      ProductAttributeVersionService.requireBinding(request.getTemplateVersionId(), request.getTemplateRevision(), existing.getTemplateVersionId(), existing.getTemplateRevision(), existing.getAttributeTemplateSnapshot());
+    }
     Map<String,Object> before = operationLogs.snapshot(existing);
     if (priceOnly) {
       Map<Long,java.math.BigDecimal> costs = sourceCosts(existing);

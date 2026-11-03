@@ -15,7 +15,7 @@ public class Craft extends BaseEntity implements com.zdm.platform.security.Creat
   @NotBlank
   private String type;
 
-  @Pattern(regexp = "\\d*", message = "工艺宽度仅支持数字")
+  @Pattern(regexp = "(?:\\d+(?:\\.\\d{1,2})?)?", message = "工艺宽度请输入非负数字，最多两位小数")
   private String width;
   private String description;
   private Long imageMediaId;

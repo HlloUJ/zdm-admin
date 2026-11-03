@@ -299,7 +299,7 @@
             </div>
           </div>
         </t-form>
-        <AdminListToolbar has-actions>
+        <AdminListToolbar has-actions has-batch-actions :selected-count="poolSelected.length">
           <t-button :theme="buttonTheme('select-product')" :disabled="!poolSelected.length" @click="selectPool"
             >批量选择</t-button
           >

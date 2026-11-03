@@ -31,11 +31,13 @@ public class StoreAccessoryProductService {
   public record ProductView(Long id, Long productId, String name, String merchantCode,
       String status, String effectiveStatus, boolean sourceUnavailable, String sourceMessage,
       Integer totalStock, String imageUrl, List<String> imageUrls, String videoUrl,
-      String detail, Long categoryId, String categoryName,
+      String detail, Long categoryId, String categoryName, Map<String, List<String>> attributeDisplayOrder,
       List<AccessoryProductAttributeEntry> attributes, List<AccessorySpecDimension> specDimensions,
       List<SkuPrice> skus, String createdByName, LocalDateTime createdAt, Map<String, String> attributeNames,
       String storeLevelName, Long storeCategoryId, String storeCategoryName, BigDecimal categoryCoefficient, boolean salePriceAttention, String stateOperatorName, @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'") LocalDateTime stateOperatedAt, String warehouseEntryType, String warehouseEntryReason, String warehouseEntryDetail) {
     public ProductView {
+      attributeDisplayOrder = attributeDisplayOrder == null ? null : Map.copyOf(attributeDisplayOrder.entrySet().stream()
+          .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, entry -> List.copyOf(entry.getValue()))));
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
       specDimensions = specDimensions == null ? null : List.copyOf(specDimensions);
@@ -50,6 +52,7 @@ public class StoreAccessoryProductService {
     }
     public List<SkuPrice> skus() { return List.copyOf(skus); }
     public Map<String, String> attributeNames() { return Map.copyOf(attributeNames); }
+    public Map<String, List<String>> attributeDisplayOrder() { return attributeDisplayOrder == null ? null : Map.copyOf(attributeDisplayOrder); }
   }
   public record PoolProduct(Long id, String name, String merchantCode, Integer totalStock,
       String imageUrl, Long categoryId, BigDecimal guidePriceMin,
@@ -65,16 +68,19 @@ public class StoreAccessoryProductService {
   }
   public record PoolDetail(Long id, String name, String merchantCode, Integer totalStock,
       String imageUrl, List<String> imageUrls, String videoUrl, String detail,
-      String categoryName, List<AccessoryProductAttributeEntry> attributes,
+      String categoryName, Map<String, List<String>> attributeDisplayOrder, List<AccessoryProductAttributeEntry> attributes,
       List<AccessorySpecDimension> specDimensions, List<PoolSku> skus, Map<String, String> attributeNames,
       String storeLevelName) {
     public PoolDetail {
+      attributeDisplayOrder = attributeDisplayOrder == null ? null : Map.copyOf(attributeDisplayOrder.entrySet().stream()
+          .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, entry -> List.copyOf(entry.getValue()))));
       imageUrls = List.copyOf(imageUrls);
       attributes = List.copyOf(attributes);
       specDimensions = List.copyOf(specDimensions);
       skus = List.copyOf(skus);
       attributeNames = Map.copyOf(attributeNames);
     }
+    public Map<String, List<String>> attributeDisplayOrder() { return attributeDisplayOrder == null ? null : Map.copyOf(attributeDisplayOrder); }
   }
   public record LogEntry(Long id, Long listingId, Long productId, String productName,
       String operationType, String operationSummary, String beforeStatus, String afterStatus,
@@ -206,9 +212,9 @@ public class StoreAccessoryProductService {
     return new PoolDetail(id, product.getName(), product.getSku(), product.getTotalStock(),
         product.getMainImageUrl(), product.getMainImageUrls() == null ? List.of()
             : product.getMainImageUrls(), product.getVideoUrl(), product.getDetail(),
-        categoryName, product.getAttributes() == null ? List.of()
+        categoryName, product.getAttributeDisplayOrder(), product.getAttributes() == null ? List.of()
             : product.getAttributes(), product.getSpecDimensions() == null ? List.of()
-            : product.getSpecDimensions(), skus, poolAttributeNames(skus),
+            : product.getSpecDimensions(), skus, product.getAttributeTemplateSnapshot() == null ? poolAttributeNames(skus) : ProductAttributeVersionService.names(product.getAttributeTemplateSnapshot()),
         store.storeLevelId() == null ? null
             : namesById("store_levels", List.of(store.storeLevelId())).get(store.storeLevelId()));
   }
@@ -665,13 +671,14 @@ public class StoreAccessoryProductService {
     String reason = sourceMessage(listing, source);
     List<SkuPrice> prices = product.getVariants() == null ? List.of()
         : product.getVariants().stream().map(priceForVariant).toList();
+    Map<String, String> versionNames = product.getAttributeTemplateSnapshot() == null ? attributeNames : ProductAttributeVersionService.names(product.getAttributeTemplateSnapshot());
     ProductView rendered = new ProductView(number(listing.get("id")), productId, product.getName(), product.getSku(),
         status, effective, unavailable, reason, product.getTotalStock(), product.getMainImageUrl(),
         product.getMainImageUrls() == null ? List.of() : product.getMainImageUrls(), product.getVideoUrl(),
-        product.getDetail(), product.getCategoryId(), categoryName,
+        product.getDetail(), product.getCategoryId(), categoryName, product.getAttributeDisplayOrder(),
         product.getAttributes() == null ? List.of() : product.getAttributes(), product.getSpecDimensions(),
         prices, (String) listing.get("created_by_name"), timestamp(listing.get("created_at")),
-        attributeNames.entrySet().stream().filter(entry -> prices.stream()
+        versionNames.entrySet().stream().filter(entry -> prices.stream()
             .anyMatch(sku -> sku.salesAttributes() != null && sku.salesAttributes().containsKey(entry.getKey())))
             .collect(java.util.stream.Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue)), storeLevelName, number(listing.get("store_category_id")),
         pricing.categoryName(number(listing.get("store_category_id"))), pricing.coefficient(number(listing.get("store_category_id"))), flag(listing.get("sale_price_attention")),

@@ -74,9 +74,12 @@ export function selectShardArgs(root, args, directory) {
     .sort();
   mkdirSync(directory, { recursive: true });
   const list = path.join(directory, 'selected-files.txt');
-  // Public Playwright test-list syntax: paths relative to testDir, no title filtering.
+  // Preserve the reviewed entry inventory as evidence. Select entry files through the public
+  // positional file regex API: --test-list filters by test definition location and drops
+  // cases registered by imported helpers, even when their entry file is selected.
   writeFileSync(list, files.join('\n') + '\n');
   const selection = { version: 1, digest, current, total: 2, files, strategy: plan.strategy };
   writeFileSync(path.join(directory, 'shard-selection.json'), JSON.stringify(selection, null, 2) + '\n');
-  return { args: [...args.filter((a) => !a.startsWith('--shard=')), '--test-list', list, '--workers=1'], selection };
+  const patterns = files.map((file) => '(?:^|/)tests/e2e/' + file.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '$');
+  return { args: [...args.filter((a) => !a.startsWith('--shard=')), ...patterns, '--workers=1'], selection };
 }

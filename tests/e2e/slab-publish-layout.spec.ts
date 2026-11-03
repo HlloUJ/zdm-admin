@@ -215,14 +215,16 @@ test('发布尺寸实时计算只读面积，误差位于下一行', async ({ pa
   await expect(area).toHaveValue('');
 });
 
-test('供应链大板库存禁止零值输入而保留正常整数和清空校验', async ({ page }) => {
+test('供应链大板库存允许零值输入并规范化整数及保留清空校验', async ({ page }) => {
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const item = page.locator('.slab-publish-page .t-form-item__stock');
   const stock = item.getByPlaceholder('请输入库存', { exact: true });
   await stock.click();
   await stock.pressSequentially('0');
-  await expect(stock).toHaveValue('');
+  await expect(stock).toHaveValue('0');
   await stock.pressSequentially('10');
+  await expect(stock).toHaveValue('010');
+  await stock.blur();
   await expect(stock).toHaveValue('10');
   const rejected = await stock.evaluate((element) => {
     const input = element as HTMLInputElement;
@@ -232,10 +234,10 @@ test('供应链大板库存禁止零值输入而保留正常整数和清空校�
     return !input.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: data }));
   });
   expect(rejected).toBe(true);
-  await expect(stock).toHaveValue('10');
+  await expect(stock).toHaveValue('0');
   await stock.fill('1');
   await stock.press('ArrowDown');
-  await expect(stock).toHaveValue('1');
+  await expect(stock).toHaveValue('0');
   await stock.fill('');
   await page.getByRole('button', { name: /^确认(?:新增|保存)$/, exact: true }).click();
   await expect(item.getByText('请输入库存', { exact: true })).toBeVisible();
