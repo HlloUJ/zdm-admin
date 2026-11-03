@@ -1,2 +1,2 @@
 node scripts/check-managed-branch-commit.mjs
-npx lint-staged
+node scripts/accepted-source-hook.mjs

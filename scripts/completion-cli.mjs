@@ -1,3 +1,4 @@
+import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { requireBatchTiming, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
 import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs';
@@ -66,6 +67,8 @@ export async function completionCommand(
 ) {
   const limits = {
     begin: [0, 1],
+    freeze: [0, 0],
+    'check-source': [1, 1],
     deliver: [2, 2],
     recover: [0, 0],
     status: [1, 1],
@@ -165,6 +168,12 @@ export async function completionCommand(
     const file = path.join(directory, 'completion-session.json');
     return finalHandoffPlan(root, batch, rest[0], { execute, state: existsSync(file) ? read(file) : undefined });
   }
+  if (['begin', 'freeze', 'deliver'].includes(mode)) {
+    const acceptance = freezeAcceptedSource(batch.worktree, batch);
+    if (mode === 'freeze')
+      return { acceptance, protection: 'local-content-addressed; remote-independent-enforcement-not-implied' };
+  }
+  if (mode === 'check-source') return assertAcceptedSource(batch.worktree, batch.id, rest[0]);
   if (['recover', 'deliver'].includes(mode)) recoverWriter(directory);
   const state = openCompletion(directory, batch.id, {
       requestedAt: mode === 'begin' ? rest[0] : undefined,
@@ -381,11 +390,9 @@ export async function completionCommand(
   }
   assert.equal(execute(anchor, 'git', ['status', '--porcelain']), '');
   git('merge-base', '--is-ancestor', batch.recordedHead, expectedMain);
-  assert.equal(
-    git('rev-parse', batch.recordedHead + '^{tree}'),
-    git('rev-parse', expectedMain + '^{tree}'),
-    'Candidate tree changed',
-  );
+  assertAcceptedSource(anchor, batch.id, expectedMain);
+  // Exact business/control-plane identity is frozen; main CI validates the final technical tree.
+  assert.ok(readAcceptance(anchor, batch.id), 'Missing accepted source');
   const ciEvent = [...state.events].reverse().find((e) => e.name === 'ci' && e.key === key && e.status === 'success');
   assert.ok(ciEvent, 'Use the single wait entry before settle');
   assertCompletionQuality(ciEvent.result, expectedMain, runId);

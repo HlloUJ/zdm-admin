@@ -148,6 +148,8 @@ async function main(args) {
       'handoff-plan',
       'final-handoff',
       'begin',
+      'freeze',
+      'check-source',
       'measure',
       'repair-start',
       'repair-finish',
