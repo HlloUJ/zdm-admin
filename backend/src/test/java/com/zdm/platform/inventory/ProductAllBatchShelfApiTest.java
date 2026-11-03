@@ -102,6 +102,7 @@ class ProductAllBatchShelfApiTest extends SpringContainerTestSupport {
       payload.putArray("attributes"); payload.putArray("markupPrices");
       payload.putArray("variants").addObject().put("variantLabel","单规格").put("displayMode","single").put("stock",2).put("costPrice",10);
     }
+    if (!"slabs".equals(resource)) { com.zdm.platform.support.ProductAttributeVersionFixtures.bind(jdbc,json,payload); }
     var response=mvc.perform(post("/api/admin/"+resource).contentType("application/json").content(json.writeValueAsBytes(payload))).andExpect(status().isOk()).andReturn().getResponse();
     JsonNode data=json.readTree(response.getContentAsByteArray());
     assertThat(data.path("code").asInt()).as(data.toString()).isZero();

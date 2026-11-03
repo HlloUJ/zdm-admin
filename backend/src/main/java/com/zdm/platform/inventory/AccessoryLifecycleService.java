@@ -320,8 +320,13 @@ public class AccessoryLifecycleService {
     for(var variant:variants) {
       BigDecimal cost=(BigDecimal)variant.get("cost_price");
       if(cost==null || cost.signum()<0) { throw new IllegalArgumentException("请完善商品成本价"); }
-      if(kind==Kind.ACCESSORY && guide!=null) {
-        jdbc.update("INSERT INTO accessory_product_guide_prices (accessory_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES (?,?,?,?,?,?)",id,variant.get("sku_id"),variant.get("variant_label"),guide,cost,amount(cost,guide));
+      if(kind==Kind.ACCESSORY) {
+        var previousGuide = before.stream().filter(value -> !value.containsKey("store_level_id")
+            && java.util.Objects.equals(value.get("sku_id"), variant.get("sku_id"))).findFirst().orElse(Map.of());
+        BigDecimal guideCoefficient = guide != null ? guide : (BigDecimal) previousGuide.get("price_coefficient");
+        if (guideCoefficient != null) {
+          jdbc.update("INSERT INTO accessory_product_guide_prices (accessory_product_id,sku_id,variant_label,price_coefficient,cost_price,price,price_source) VALUES (?,?,?,?,?,?,?)",id,variant.get("sku_id"),variant.get("variant_label"),guideCoefficient,cost,amount(cost,guideCoefficient),guide != null ? "auto" : "manual");
+        }
       }
       for(var level:levels) {
         boolean configured = level.get("price_coefficient") != null && "enabled".equals(level.get("configuration_status"));
@@ -343,6 +348,10 @@ public class AccessoryLifecycleService {
     }
     BigDecimal cost=(BigDecimal)variants.getFirst().get("cost_price");
     BigDecimal guidePrice=guide==null ? null : amount(cost,guide);
+    if (kind == Kind.ACCESSORY) {
+      var savedGuide = jdbc.queryForList("SELECT price FROM accessory_product_guide_prices WHERE accessory_product_id=? ORDER BY sku_id LIMIT 1", BigDecimal.class, id);
+      guidePrice = savedGuide.isEmpty() ? null : savedGuide.getFirst();
+    }
     jdbc.update("UPDATE "+kind.table+" SET guide_price=?"+(kind==Kind.SLAB?",guide_price_coefficient=?":"")+" WHERE id=?",kind==Kind.SLAB?new Object[]{guidePrice,guide,id}:new Object[]{guidePrice,id});
     sqlSession.clearCache();
     if(logImpact) { record(kind,row,"admin","PRICE_UPDATE",kind==Kind.ACCESSORY ? "供应链成本变更，按当前系数重算售价" : null,(String)row.get("status"),(String)row.get("status"),Map.of("价格联动",Map.of("before",before,"after",priceSnapshot(kind,id)))); }

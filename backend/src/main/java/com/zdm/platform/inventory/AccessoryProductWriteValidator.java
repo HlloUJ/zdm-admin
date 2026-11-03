@@ -58,7 +58,7 @@ final class AccessoryProductWriteValidator {
     validateCategory(product.getCategoryId());
     validateSupplier(product.getSupplierId());
     validateMedia(product);
-    validateAttributes(product.getAttributes());
+    validateAttributes(product.getAttributes(), product.getAttributeTemplateSnapshot());
     normalizeVariants(product);
     AccessorySpecValidator.validate(product);
     if (lifecycle.isSupplyChain()) {
@@ -121,10 +121,19 @@ final class AccessoryProductWriteValidator {
     }
   }
 
-  private void validateAttributes(List<AccessoryProductAttributeEntry> entries) {
+  private void validateAttributes(List<AccessoryProductAttributeEntry> entries, com.fasterxml.jackson.databind.JsonNode snapshot) {
     List<AccessoryProductAttributeEntry> normalized = entries == null ? List.of() : entries;
     Set<Long> ids = new LinkedHashSet<>();
     for (AccessoryProductAttributeEntry entry : normalized) {
+      var boundNames = ProductAttributeVersionService.names(snapshot);
+      if (snapshot != null) {
+        String name = boundNames.get("attribute_" + entry.getAttributeId());
+        if (name == null) { throw new IllegalArgumentException("商品属性不属于绑定版本"); }
+        if (!ids.add(entry.getAttributeId())) { throw new IllegalArgumentException("商品属性不能重复"); }
+        entry.setAttributeName(name);
+        if (entry.getValue() != null) { entry.setValue(entry.getValue().trim()); }
+        continue;
+      }
       List<String> names = jdbcTemplate.queryForList("""
           SELECT name FROM product_attributes
           WHERE id = ?

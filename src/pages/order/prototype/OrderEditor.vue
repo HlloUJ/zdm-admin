@@ -76,26 +76,26 @@
         <div>{{ row.specification }} / {{ row.material }}</div></template
       >
       <template #quantity="{ row }"
-        ><t-input-number
+        ><DecimalInput
           placeholder="请输入购买件数"
           :value="row.quantity"
-          :min="1"
+          :min="0"
           :decimal-places="0"
           :aria-label="`${row.name}购买件数`"
           @change="changeLine(row, 'quantity', Number($event))"
       /></template>
       <template #billingQuantity="{ row }"
-        ><t-input-number
+        ><DecimalInput
           placeholder="请输入计价数量"
           :value="row.billingQuantity"
-          :min="0.001"
-          :decimal-places="3"
+          :min="0"
+          :decimal-places="2"
           :suffix="row.unit"
           :aria-label="`${row.name}计价数量`"
           @change="changeLine(row, 'billingQuantity', Number($event))"
       /></template>
       <template #price="{ row }"
-        ><t-input-number
+        ><DecimalInput
           placeholder="请输入单价"
           :value="row.price"
           :min="0"
@@ -104,7 +104,7 @@
           @change="changeLine(row, 'price', Number($event))"
       /></template>
       <template #discount="{ row }"
-        ><t-input-number
+        ><DecimalInput
           v-model="row.discount"
           placeholder="请输入商品折扣"
           :disabled="draft.discountMode !== 'items'"
@@ -132,7 +132,7 @@
       >
       <t-col :span="6"
         ><t-form-item label="整单折扣"
-          ><t-input-number
+          ><DecimalInput
             v-model="draft.discount"
             placeholder="请输入整单折扣"
             :disabled="draft.discountMode !== 'order'"
@@ -142,7 +142,7 @@
       ></t-col>
       <t-col :span="6"
         ><t-form-item label="减免金额"
-          ><t-input-number
+          ><DecimalInput
             v-model="draft.reduction"
             placeholder="请输入减免金额"
             :min="0"
@@ -151,7 +151,7 @@
       ></t-col>
       <t-col :span="6"
         ><t-form-item label="抹零金额"
-          ><t-input-number
+          ><DecimalInput
             v-model="draft.rounding"
             placeholder="请输入抹零金额"
             :min="0"
@@ -160,7 +160,7 @@
       ></t-col>
       <t-col :span="6"
         ><t-form-item label="运费"
-          ><t-input-number
+          ><DecimalInput
             v-model="draft.freight"
             placeholder="请输入运费"
             :min="0"
@@ -188,6 +188,8 @@
   </AdminFormDialog>
 </template>
 <script setup lang="ts">
+import DecimalInput from '@/components/DecimalInput.vue';
+import { validateNumericControls } from '@/utils/numericInputValidation';
 import { computed, ref, watch } from 'vue';
 import { AdminListPage, AdminFormDialog, AdminDetailPage, adminFeedback } from '@/components/foundation';
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
@@ -268,6 +270,7 @@ const columns = [
   { colKey: 'operation', title: '操作', width: 75 },
 ];
 async function save() {
+  if (!(await validateNumericControls(dialog.value))) return;
   feedback.clear();
   let valid = true;
   for (const [key, value, message] of [

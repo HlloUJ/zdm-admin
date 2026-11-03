@@ -11,6 +11,16 @@ import java.util.List;
 
 @TableName(value = "finished_products", autoResultMap = true)
 public class FinishedProduct extends BaseEntity implements com.zdm.platform.security.CreatorOwned, com.zdm.platform.account.NamedCreatorOwned, StateActivityAware {
+  private Long templateVersionId;
+  private Integer templateRevision;
+  @TableField(typeHandler = com.baomidou.mybatisplus.extension.handlers.JacksonTypeHandler.class)
+  private com.fasterxml.jackson.databind.JsonNode attributeTemplateSnapshot;
+  public Long getTemplateVersionId() { return templateVersionId; }
+  public void setTemplateVersionId(Long value) { templateVersionId = value; }
+  public Integer getTemplateRevision() { return templateRevision; }
+  public void setTemplateRevision(Integer value) { templateRevision = value; }
+  public com.fasterxml.jackson.databind.JsonNode getAttributeTemplateSnapshot() { return attributeTemplateSnapshot == null ? null : attributeTemplateSnapshot.deepCopy(); }
+  public void setAttributeTemplateSnapshot(com.fasterxml.jackson.databind.JsonNode value) { attributeTemplateSnapshot = value == null ? null : value.deepCopy(); }
   @TableField(exist = false)
   @com.fasterxml.jackson.annotation.JsonFormat(pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSSSS'Z'")
   @com.fasterxml.jackson.annotation.JsonProperty(access = com.fasterxml.jackson.annotation.JsonProperty.Access.READ_ONLY)

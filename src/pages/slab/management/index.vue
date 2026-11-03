@@ -414,9 +414,14 @@
               </div>
               <div class="section-title">尺寸（mm）</div>
               <div class="dimension-grid">
-                <t-form-item label="长" name="length" required-mark>
+                <t-form-item
+                  label="长"
+                  name="length"
+                  required-mark
+                  :show-error-message="!numericError(productForm.length)"
+                >
                   <span v-if="readonlyProductFields">{{ productForm.length || '-' }}</span>
-                  <t-input-number
+                  <DecimalInput
                     v-else
                     v-model="productForm.length"
                     class="measurement-input"
@@ -428,9 +433,14 @@
                     @change="handleMeasurementChange('length')"
                   />
                 </t-form-item>
-                <t-form-item label="宽" name="width" required-mark>
+                <t-form-item
+                  label="宽"
+                  name="width"
+                  required-mark
+                  :show-error-message="!numericError(productForm.width)"
+                >
                   <span v-if="readonlyProductFields">{{ productForm.width || '-' }}</span>
-                  <t-input-number
+                  <DecimalInput
                     v-else
                     v-model="productForm.width"
                     class="measurement-input"
@@ -442,9 +452,14 @@
                     @change="handleMeasurementChange('width')"
                   />
                 </t-form-item>
-                <t-form-item label="高" name="height" required-mark>
+                <t-form-item
+                  label="高"
+                  name="height"
+                  required-mark
+                  :show-error-message="!numericError(productForm.height)"
+                >
                   <span v-if="readonlyProductFields">{{ productForm.height || '-' }}</span>
-                  <t-input-number
+                  <DecimalInput
                     v-else
                     v-model="productForm.height"
                     class="measurement-input"
@@ -459,9 +474,13 @@
                 <t-form-item v-if="isProductFormPage" label="面积" name="area">
                   <span>{{ productAreaSquareMeter == null ? '-' : `${productAreaSquareMeter.toFixed(2)} ㎡` }}</span>
                 </t-form-item>
-                <t-form-item :label="isProductFormPage ? '±误差' : '土误差'" name="tolerance">
+                <t-form-item
+                  :label="isProductFormPage ? '±误差' : '土误差'"
+                  name="tolerance"
+                  :show-error-message="!numericError(productForm.tolerance)"
+                >
                   <span v-if="readonlyProductFields">{{ productForm.tolerance || '-' }}</span>
-                  <t-input-number
+                  <DecimalInput
                     v-else
                     v-model="productForm.tolerance"
                     class="measurement-input"
@@ -476,9 +495,15 @@
               </div>
               <div class="section-title">扣角（mm）</div>
               <div class="corner-grid">
-                <t-form-item v-for="item in cornerFields" :key="item.key" :label="item.label" :name="item.key">
+                <t-form-item
+                  v-for="item in cornerFields"
+                  :key="item.key"
+                  :label="item.label"
+                  :name="item.key"
+                  :show-error-message="!numericError(productForm[item.key])"
+                >
                   <span v-if="readonlyProductFields">{{ productForm[item.key] || '-' }}</span>
-                  <t-input-number
+                  <DecimalInput
                     v-else
                     v-model="productForm[item.key]"
                     class="measurement-input"
@@ -527,7 +552,7 @@
                 </t-form-item>
                 <t-form-item label="库存" name="stock" required-mark>
                   <span v-if="readonlyProductFields">{{ productForm.stock ?? '-' }}</span>
-                  <t-input-number
+                  <DecimalInput
                     v-else
                     v-model="productForm.stock"
                     large-number
@@ -1139,6 +1164,8 @@
 </template>
 
 <script setup lang="ts">
+import DecimalInput from '@/components/DecimalInput.vue';
+import { numericError } from '@/utils/numericInput';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';
 const batchShelfResultVisible = ref(false);
@@ -2178,7 +2205,7 @@ const clearSalesFieldError = (field: string) => {
   salesFormRef.value?.clearValidate([field]);
 };
 const handleStockChange = (value?: unknown, context?: SalesNumberChangeContext) => {
-  if (context?.type === 'props' || context?.type === 'blur') return;
+  if (context?.type === 'props') return;
   const normalizedValue = String(value ?? '').trim();
   stockHasLeadingZero.value = /^0\d+/.test(normalizedValue);
   clearSalesFieldError('stock');

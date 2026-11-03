@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
 
@@ -221,6 +222,12 @@ test('only an authorized scope is visible and cannot create versions', async ({ 
 });
 
 test('attribute list paginates without dropping draft rows on save', async ({ page }) => {
+  await page.context().route('https://tdesign.gtimg.com/icon/0.4.2/fonts/index.js', (route) =>
+    route.fulfill({
+      path: fileURLToPath(new URL('../fixtures/official-ui/vendor/tdesign-icons-0.4.2.js.txt', import.meta.url)),
+      contentType: 'application/javascript',
+    }),
+  );
   const versions = await setup(page);
   const draft = versions.find((version) => version.id === 2)!;
   const original = (draft.content as Record<string, unknown>[])[0]!;

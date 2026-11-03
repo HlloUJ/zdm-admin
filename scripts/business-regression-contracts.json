@@ -36,7 +36,22 @@
         "src/services/auth.ts",
         "src/services/operationsBatchShelf.ts",
         "src/components/OperationsBatchShelfResult.vue",
-        "src/services/productAllBatchShelf.ts"
+        "src/services/productAllBatchShelf.ts",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAttributeVersionService.java",
+        "src/pages/finished-stock/shared/finishedStockAttributeValidation.ts",
+        "src/components/DecimalInput.vue",
+        "src/utils/numericInput.ts",
+        "src/utils/numericInputValidation.ts",
+        "backend/src/main/java/com/zdm/platform/craft/Craft.java",
+        "src/pages/finished-stock/shared/useSpecTableLayout.ts",
+        "backend/src/main/java/com/zdm/platform/inventory/GuidePriceConfigurationSyncService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePrice.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePrice.java",
+        "src/pages/finished-stock/management/historicalSpecification.ts"
       ],
       "tables": [
         "product_state_activity",
@@ -59,6 +74,11 @@
         "backend/src/main/java/com/zdm/platform/catalog/TemplateVersionService.java",
         "backend/src/main/java/com/zdm/platform/common/FunctionPermissionNormalizer.java",
         "backend/src/main/java/com/zdm/platform/config/SecurityConfig.java",
+        "backend/src/main/java/com/zdm/platform/craft/Craft.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftController.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftMapper.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftPermissionGuard.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftService.java",
         "backend/src/main/java/com/zdm/platform/employee/AdminEmployeeInviteController.java",
         "backend/src/main/java/com/zdm/platform/employee/EmployeeController.java",
         "backend/src/main/java/com/zdm/platform/employee/EmployeeInviteAccess.java",
@@ -67,6 +87,8 @@
         "backend/src/main/java/com/zdm/platform/employee/OpenEmployeeInviteController.java",
         "backend/src/main/java/com/zdm/platform/employee/SupplyChainAdminController.java",
         "backend/src/main/java/com/zdm/platform/employee/SupplyChainAdminService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryInvalidationMedia.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryLifecycleService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryMarkupConfigurationController.java",
@@ -76,6 +98,9 @@
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProduct.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductArrivalLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePrice.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePriceMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePriceService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductListDetails.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductMapper.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductService.java",
@@ -83,6 +108,8 @@
         "backend/src/main/java/com/zdm/platform/inventory/AccessorySpecValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryStateActivityService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessorySupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedInvalidationMedia.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedMarkupConfigurationController.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedMarkupConfigurationService.java",
@@ -91,16 +118,21 @@
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProduct.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductArrivalLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePrice.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePriceMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePriceService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductListDetails.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductMapper.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductWriteValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedSpecValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedSupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/GuidePriceConfigurationSyncService.java",
         "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfController.java",
         "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfController.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAttributeVersionService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductLifecycleService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductStateActivityService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabInvalidationSnapshotService.java",
@@ -155,6 +187,7 @@
         "backend/src/main/resources/function-audience-policy.json",
         "src/components/AdminSideMenu.vue",
         "src/components/AdminTopNav.vue",
+        "src/components/DecimalInput.vue",
         "src/components/OperationsBatchShelfResult.vue",
         "src/components/ProductListStatusTag.vue",
         "src/components/WarehouseEntryInformation.vue",
@@ -170,10 +203,13 @@
         "src/pages/finished-stock/management/components/FinishedOperationLogs.vue",
         "src/pages/finished-stock/management/components/FinishedSalesLogTable.vue",
         "src/pages/finished-stock/management/components/ProductDetail.vue",
+        "src/pages/finished-stock/management/components/SpecPriceInput.vue",
+        "src/pages/finished-stock/management/historicalSpecification.ts",
         "src/pages/finished-stock/management/index.vue",
         "src/pages/finished-stock/management/layeredSpecs.ts",
         "src/pages/finished-stock/shared/StoreFinishedStockDetailAdapter.vue",
         "src/pages/finished-stock/shared/StoreFinishedStockPoolDetailAdapter.vue",
+        "src/pages/finished-stock/shared/finishedStockAttributeValidation.ts",
         "src/pages/finished-stock/shared/finishedStockFormValidation.ts",
         "src/pages/finished-stock/shared/finishedStockListFilter.ts",
         "src/pages/finished-stock/shared/finishedStockPageModel.ts",
@@ -182,6 +218,7 @@
         "src/pages/finished-stock/shared/finishedStockSpecRows.ts",
         "src/pages/finished-stock/shared/finishedStockTemplateFields.ts",
         "src/pages/finished-stock/shared/useFinishedStockSpecDialog.ts",
+        "src/pages/finished-stock/shared/useSpecTableLayout.ts",
         "src/pages/finished-stock/store/StoreFinishedEditor.vue",
         "src/pages/finished-stock/store/index.vue",
         "src/pages/finished-stock/store/price-configuration.vue",
@@ -190,6 +227,8 @@
         "src/pages/finished-stock/store/useStoreFinishedLogs.ts",
         "src/pages/finished-stock/supply-chain/index.vue",
         "src/pages/login/index.vue",
+        "src/pages/order/prototype/OrderActionDialog.vue",
+        "src/pages/order/prototype/OrderEditor.vue",
         "src/pages/order/prototype/SalesOrderList.vue",
         "src/pages/order/prototype/index.vue",
         "src/pages/order/prototype/resources.ts",
@@ -245,7 +284,9 @@
         "src/services/storeAccessoryStock.ts",
         "src/services/storeFinishedStock.ts",
         "src/services/terminalFunctionPolicies.ts",
-        "src/services/warehouseEntry.ts"
+        "src/services/warehouseEntry.ts",
+        "src/utils/numericInput.ts",
+        "src/utils/numericInputValidation.ts"
       ],
       "browserTests": [
         "tests/e2e/accessory-management.spec.ts",
@@ -272,7 +313,8 @@
         "tests/e2e/store-order-prototype.spec.ts",
         "tests/e2e/product-all-view.spec.ts",
         "tests/e2e/operations-batch-shelf.spec.ts",
-        "tests/e2e/terminal-all-batch-shelf.spec.ts"
+        "tests/e2e/terminal-all-batch-shelf.spec.ts",
+        "tests/e2e/store-price-rules.spec.ts"
       ],
       "backendTests": [
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
@@ -298,34 +340,40 @@
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java"
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java",
+        "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java"
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
-        "tests/e2e/finished-stock.spec.ts": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
-        "tests/e2e/accessory-management.spec.ts": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+        "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+        "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
         "tests/e2e/slab-collaboration.spec.ts": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
-        "tests/e2e/store-finished-stock.spec.ts": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
-        "tests/e2e/store-accessory-management.spec.ts": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
+        "tests/e2e/store-finished-stock.spec.ts": "49ecdf64ee80f2af34c4c24b110b32abec8b8900527f9cf421156dbc4cb3aa1d",
+        "tests/e2e/store-accessory-management.spec.ts": "7e77cbe7e8533ed41d1c3009b91532fb50bb8d6e605a7beff9d230ca42b5a1df",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "e6ad11fb8318983152eed5602fc136bf895df05372f622596f9fa7fa789bd014",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "edc02a65b4b6fb2d5d364df54a1311e4d639246ffe6e6aa5b381b7790325be82",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "f30e0fcac5182b16a15af8af9e3811352d8b9b551625c2f559e329e6d31a4276",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "4039e8369af0719300c4538dba93c641d1d36ce322e6e9fb35b9a164f45abbd9",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
-        "tests/e2e/accessory-markup-configuration.spec.ts": "27ff2ff5fcdf02b917425ed3e714bf9a47fafebb817775de33541cff82d2da7e",
+        "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
         "tests/e2e/accessory-permissions.spec.ts": "6ea9de56855c2d8c1b55c7d1e0f618d65364f351e3855d1548398448ccc5af20",
-        "tests/e2e/admin-foundation.spec.ts": "e58fee0573a2d5ee3a6a9930bd54cc33ae7f0c937c61651766750d50fe6b6ec2",
+        "tests/e2e/admin-foundation.spec.ts": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
         "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
         "tests/e2e/feedback-foundation.spec.ts": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
         "tests/e2e/finished-stock-permissions.spec.ts": "feca7ab507537e187d02b0a46d8f8ca6c6fc8692b7b001928983c7ff72079b50",
         "tests/e2e/login.spec.ts": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
-        "tests/e2e/markup-configuration.spec.ts": "f6537e115a129a012269ec8318142c897fd9532454ff1c7aa160c97f81c8cea5",
+        "tests/e2e/markup-configuration.spec.ts": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
         "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
         "tests/e2e/permission-center.spec.ts": "0667262a2650c67c0aff2103cbc42df26e9a7b34bc635ed63e4a395795f7a516",
         "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
         "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
-        "tests/e2e/slab-publish-layout.spec.ts": "1cccc4b0fd932b46bbaadbd95790c44b51b4ca0a666f30e672f0cd60ecec6927",
+        "tests/e2e/slab-publish-layout.spec.ts": "72c9f702531a2f9b23dc674633356d31d5c7df049dbfa67c7b2c5fed9e36a970",
         "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
         "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
         "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
@@ -333,8 +381,8 @@
         "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java": "f245b9dd1fc458b657a2ffdbb0679ed97547e8f74d6e6a895fa1e986cdb3aff9",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java": "24637bff45722355d31fd78e75a37e5533b7c8411a9ed94f4558a30a8e62dca7",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "97768eae0f4967e63e2bb45fe6e9e34aa364ad740e0808e0ad3ac229d0c23e99",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "bde62e7120d3739e89b4ca6f52dcf59d38b694711754ccc0e23109ef6bad5c0d",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "c144f45995267956d54ff58068be134a793807b1f0e5c28ca244a4ebe337f861",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "e80adada95be2e20996dad23b7d6508b0c262e94968b9a7f00709c61db445b1f",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
@@ -344,7 +392,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
+        "tests/e2e/product-all-view.spec.ts": "8f9a3694189b65e6250f49f97ce662e5a78e97f4d033de20e54b231575d6574e",
         "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "b2479de668b905ee4615750c51a8384f6bc480eca564fda103d2b856d5825a6d",
@@ -352,16 +400,36 @@
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java": "9f3dee717ec95bff55c0351f718cdfe956e98324849bec98dd0e2da014836018",
         "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java": "b5c2589b50e90976401dba166539890aff278f434fcde20a62b2d5ffa7879f52",
         "tests/e2e/operations-batch-shelf.spec.ts": "74533ffdc10b350e969cd17581c19acdc313946aefb236785b6422d512f7248d",
-        "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java": "120223be8f4f069949e4056a60029a173f73b9ea4c278d4fcf736d24e202084d",
+        "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java": "1b77d7854c90ab8dc50e56d7be18dfb697e2d63975f9bd2144e48e1674b8c98c",
         "src/services/operationsBatchShelf.test.ts": "538f45bbccd3fb65c5acba5207107b2846d2ae31d17e12a3c48beeb67f6c40b3",
         "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
         "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7",
         "tests/e2e/terminal-all-batch-shelf.spec.ts": "81fb13981b2ab1db199f8eedecaf8327024d1c3281240e22316a2605b10b29b8",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "b35d9531eb1a0f69542e017db9c4b1cc9729234abb506256f2e051a55f2a7ef8",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "cae634ab8cfcbc7aebaa6ea74e55b5226dff9d966b43bfd755ddbefcf3930ed7",
         "src/services/terminalAllBatchShelf.test.ts": "881bed04c4aee9012b955ef337bbebe759bde5e7e8a6435d22bd461070453113",
         "src/services/productGlobalPermissions.test.ts": "e1ebf3f1474e2395d41ef84e2e232558955bf3f0680adc6fb6e5d4d560552860",
         "src/services/functionCatalog.test.ts": "00b57bef779983c25d62af6586fc4b32a9ace41bc3b6e6a7fb91ae8073135ffd",
-        "src/components/WarehouseEntryInformation.test.ts": "df107925fa93ed62ca3fe202b3706f32f246b41f7e0751516abe87decbdd99a3"
+        "src/components/WarehouseEntryInformation.test.ts": "df107925fa93ed62ca3fe202b3706f32f246b41f7e0751516abe87decbdd99a3",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java": "4d8b280890870833713fede0af7ce8efb6811bf13db596d5e0552b5661e6f8ec",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java": "2e597d98526786b6070e1b94ff9c87c04ac94785d1843db6aa3456c3aa0368a4",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java": "14f84fbce6075e6b7ae87d86da56d5247d7a9a05c79184ce383aab561641d6a0",
+        "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java": "c6ae4a64986bfffa142ea231f8641ebd178bbbbb13a43624902c0b7922326478",
+        "tests/e2e/product-attribute-version-fixture.ts": "e0712713a226d51ed9e9e818ea891f2be494a6c09e103b7745b58ea13068d913",
+        "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
+        "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
+        "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "c68b320b55c02156cb5104344627d1c32f64cf012981f7aaee191b91b62bc3ba",
+        "tests/e2e/product-attribute-feedback-cases.ts": "62190c505726220afce7e76fb7560ee838faa1c156f40a27ec764f6636e4a4a5",
+        "tests/e2e/store-batch-sale-price-cases.ts": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
+        "src/components/DecimalInput.test.ts": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
+        "src/utils/numericInput.test.ts": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
+        "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java": "3e5698da75d970c3e7ee82fb93965a086876a9d771c5e44a687213be853ef90a",
+        "src/utils/numericInputValidation.test.ts": "3b7a3a3dcd4fcb8f06923dbe341e0e870e9e2791c772d8496ef8e11cbea66a26",
+        "tests/e2e/store-price-rules.spec.ts": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
+        "tests/e2e/decimal-editing.ts": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73",
+        "tests/e2e/price-table-feedback.ts": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
+        "src/pages/finished-stock/shared/guidePriceSource.test.ts": "78b7b219cb169c86b10590cef5faaf1394ec3c00e27101c4b784001e224f2fad",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java": "8f4a40ce5c9d7b76b6c2b11a5afaea0554d45a4907cafd6f19c31412a97effff",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java": "a2ea4de0623f1b0338db2d0cf2bd9c9b27c64bce5c64fdbceeb5c6df393ee1f9"
       },
       "testChanges": [
         {
@@ -1706,6 +1774,576 @@
           "before": "64af88acb197b415b7f7c26a1b261940f57b9a03d66e4fc54d8e3e260547fe95",
           "after": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
           "reason": "用户确认仅本次两项：供应链成品现货/配件富文本连续上传无需回车，保留手动空行及上传失败内容；运营端同两模块清理无效创建残留。移除测试手动回车绕过，新增连续媒体/手动空行/失败不插入及只读编辑断言，保留其余断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "29d6fcdb09cc0f73a438608131beabb628c3d73f29d89c9e305325a71c796509",
+          "reason": "用户确认供应链两模块销售规格表格宽度修复：仅扩充原成本/数量用例的宽屏表头/内容边缘对齐、窄屏溢出滚动及操作列固定断言；用长规格构造真实溢出，原字段、抽屉、取消保留值断言、超时及零重试不变。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "76a82f25160b60095a0e260e6558229951bc7c3976d0452c365be1ea8d554089",
+          "reason": "用户确认供应链两模块销售规格表格宽度修复：仅扩充原成本/数量用例的宽屏表头/内容边缘对齐、窄屏溢出滚动及操作列固定断言；用长规格构造真实溢出，原字段、抽屉、取消保留值断言、超时及零重试不变。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
+          "after": "f0ef35e2462a46c058a5f161c3d415639a23f713ceca93ea5734f6a7076b7827",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
+          "after": "7a6267b43a674e7899c577f48340e74fdcabc0dac0c5fd1fab8c0db7c49a90ce",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java",
+          "before": "97768eae0f4967e63e2bb45fe6e9e34aa364ad740e0808e0ad3ac229d0c23e99",
+          "after": "c144f45995267956d54ff58068be134a793807b1f0e5c28ca244a4ebe337f861",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java",
+          "before": "bde62e7120d3739e89b4ca6f52dcf59d38b694711754ccc0e23109ef6bad5c0d",
+          "after": "e80adada95be2e20996dad23b7d6508b0c262e94968b9a7f00709c61db445b1f",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "e6ad11fb8318983152eed5602fc136bf895df05372f622596f9fa7fa789bd014",
+          "after": "f30e0fcac5182b16a15af8af9e3811352d8b9b551625c2f559e329e6d31a4276",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "edc02a65b4b6fb2d5d364df54a1311e4d639246ffe6e6aa5b381b7790325be82",
+          "after": "4039e8369af0719300c4538dba93c641d1d36ce322e6e9fb35b9a164f45abbd9",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java",
+          "before": "b35d9531eb1a0f69542e017db9c4b1cc9729234abb506256f2e051a55f2a7ef8",
+          "after": "cae634ab8cfcbc7aebaa6ea74e55b5226dff9d966b43bfd755ddbefcf3930ed7",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "29d6fcdb09cc0f73a438608131beabb628c3d73f29d89c9e305325a71c796509",
+          "after": "462af55fb6e4c5b68108bc161940281a9502dbb25953ade708ce57c80c5e04b9",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "462af55fb6e4c5b68108bc161940281a9502dbb25953ade708ce57c80c5e04b9",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "76a82f25160b60095a0e260e6558229951bc7c3976d0452c365be1ea8d554089",
+          "after": "a60c118de98896e0552f19f4c5ddd9fc912a082e42fb41a065f17ae00b5f3466",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "a60c118de98896e0552f19f4c5ddd9fc912a082e42fb41a065f17ae00b5f3466",
+          "reason": "用户确认属性版本PRD：本次仅补齐创建版本及原模板夹具、添加隔离断言，保留全部既有断言、超时和零重试；以9885205区分原表格任务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "f0ef35e2462a46c058a5f161c3d415639a23f713ceca93ea5734f6a7076b7827",
+          "after": "ff7d0c0c5b0e8a22bf70015616ac24663bc36403b1e1b9e844ab9a9c4c8ed975",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
+          "after": "ff7d0c0c5b0e8a22bf70015616ac24663bc36403b1e1b9e844ab9a9c4c8ed975",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "7a6267b43a674e7899c577f48340e74fdcabc0dac0c5fd1fab8c0db7c49a90ce",
+          "after": "97b81f4823ba5ea5cfbf797e24f39cabb829ede9bf0ebe9760bc1bc152ac0a54",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
+          "after": "97b81f4823ba5ea5cfbf797e24f39cabb829ede9bf0ebe9760bc1bc152ac0a54",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java",
+          "before": "120223be8f4f069949e4056a60029a173f73b9ea4c278d4fcf736d24e202084d",
+          "after": "1b77d7854c90ab8dc50e56d7be18dfb697e2d63975f9bd2144e48e1674b8c98c",
+          "reason": "用户确认属性版本PRD：只补齐原测试的版本绑定及合法字段排序夹具，保留原业务断言、超时和零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java",
+          "before": "599d91187cd9719e65431f190fd6fce67a752db63469c8c5a9b56a283cd4110e",
+          "after": "c6ae4a64986bfffa142ea231f8641ebd178bbbbb13a43624902c0b7922326478",
+          "reason": "本次新增版本测试夹具按已声明商品/销售角色构造绑定定义，保留旧测试全部业务断言。"
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "b976209847e8c1e0300f78f9f439e83af8ad5e556029efb59c3b5e7757fa5911",
+          "after": "8f9a3694189b65e6250f49f97ce662e5a78e97f4d033de20e54b231575d6574e",
+          "reason": "用户单独确认：仅运营成品现货创建时间排序测试先等初始form-options响应完成再刷新，保留全部断言、超时和零重试，不改业务。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "462af55fb6e4c5b68108bc161940281a9502dbb25953ade708ce57c80c5e04b9",
+          "after": "fb66e834a47fef9fca2fcc1eeb678841da2ea410e0257b577a467b871a87eeeb",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "fb66e834a47fef9fca2fcc1eeb678841da2ea410e0257b577a467b871a87eeeb",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "a60c118de98896e0552f19f4c5ddd9fc912a082e42fb41a065f17ae00b5f3466",
+          "after": "34e24741dfafeb566cd324c6ad536791e664f67327908c5e42db3ae25948454b",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "34e24741dfafeb566cd324c6ad536791e664f67327908c5e42db3ae25948454b",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts",
+          "before": "43b19fb4bd5a2ceb78e9f5306c02853b1a401028e05290b51c621a7a3280e109",
+          "after": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
+          "reason": "用户确认本次规格候选补修：只传递绑定/已捕获版本的skuFlag并修正供应链筛选，保留已有维度兼容规则；不改其他业务。新增版本隔离回归，保留原断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "46bee849f45d242f225b2413431baf7408bab5eaf5671e70e36a3c98b45f278d",
+          "reason": "用户确认仅供应链成品现货/配件四入口动态属性类型与两位小数校验、原生错误反馈及批量原子应用；保留历史原值、SKU规则和其他端边界。保留原测试全部断言、超时和零重试，新增定向用例。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "fb66e834a47fef9fca2fcc1eeb678841da2ea410e0257b577a467b871a87eeeb",
+          "after": "46bee849f45d242f225b2413431baf7408bab5eaf5671e70e36a3c98b45f278d",
+          "reason": "用户确认仅供应链成品现货/配件四入口动态属性类型与两位小数校验、原生错误反馈及批量原子应用；保留历史原值、SKU规则和其他端边界。保留原测试全部断言、超时和零重试，新增定向用例。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "34e24741dfafeb566cd324c6ad536791e664f67327908c5e42db3ae25948454b",
+          "after": "94fb177fe2949918812c02a9404ba54ac0f9af9ede1845ca429b05c415bfd733",
+          "reason": "用户确认仅供应链成品现货/配件四入口动态属性类型与两位小数校验、原生错误反馈及批量原子应用；保留历史原值、SKU规则和其他端边界。保留原测试全部断言、超时和零重试，新增定向用例。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "94fb177fe2949918812c02a9404ba54ac0f9af9ede1845ca429b05c415bfd733",
+          "reason": "用户确认仅供应链成品现货/配件四入口动态属性类型与两位小数校验、原生错误反馈及批量原子应用；保留历史原值、SKU规则和其他端边界。保留原测试全部断言、超时和零重试，新增定向用例。"
+        },
+        {
+          "file": "src/pages/finished-stock/shared/finishedStockPayload.test.ts",
+          "before": "a961ddb074d8cbc1f528c367641976b12b86eea00080d536c1601a3155ec7eab",
+          "after": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
+          "reason": "用户确认仅供应链成品现货/配件四入口动态属性类型与两位小数校验、原生错误反馈及批量原子应用；保留历史原值、SKU规则和其他端边界。保留原测试全部断言、超时和零重试，新增定向用例。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java",
+          "before": "5bbc92076a1af78c31cbf37ce0d894c27c4e25d1edaadae0409a0a69d813402b",
+          "after": "72ce7b9122260d95ab8f0539aa819a92349aa52a01678d9a263bf4a706e4eb40",
+          "reason": "用户确认仅供应链成品现货/配件四入口动态属性类型与两位小数校验、原生错误反馈及批量原子应用；保留历史原值、SKU规则和其他端边界。保留原测试全部断言、超时和零重试，新增定向用例。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java",
+          "before": "6294ad41434f57c895c4d822098f4880eedae441c748c40c54b97be0fd614a07",
+          "after": "2e597d98526786b6070e1b94ff9c87c04ac94785d1843db6aa3456c3aa0368a4",
+          "reason": "用户确认仅供应链成品现货/配件四入口动态属性类型与两位小数校验、原生错误反馈及批量原子应用；保留历史原值、SKU规则和其他端边界。保留原测试全部断言、超时和零重试，新增定向用例。"
+        },
+        {
+          "file": "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts",
+          "before": "27e8504b18b2484f61cda4f4f7194bd39516a67c1859c117eb57b130b29a4e01",
+          "after": "7b3130c619c25ea04771b598fa2d34e63738a5517d11ae4d4e5f9b4c96a77d8c",
+          "reason": "用户确认仅修正供应链成品现货/配件四入口三类错误提示文案；精确匹配简短新文案，长字段名场景仍检查提示完整、底栏边界及控件尺寸，保留其他业务断言和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "c6baa58a29191827cf94c96966adaa875d0c6a0cf36bee5036cb27e2a7a19e8b",
+          "after": "4986c99b57ac8eaa80886a956d57c3b51ba8a217f25e17aa6b9e38659309a67f",
+          "reason": "用户确认仅修正供应链成品现货/配件四入口三类错误提示文案；精确匹配简短新文案，长字段名场景仍检查提示完整、底栏边界及控件尺寸，保留其他业务断言和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "4986c99b57ac8eaa80886a956d57c3b51ba8a217f25e17aa6b9e38659309a67f",
+          "after": "1fe276899cc7f1deddc42ec1eb355632a7b63a1a375fb34890c110eadb587bde",
+          "reason": "用户确认两处数字属性实时字段反馈；仅新增首次提交前错误可见、即时清除、留空不提前报必填、无汇总Toast及无写入断言，保留原有提交校验、原子应用及布局断言。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "1fe276899cc7f1deddc42ec1eb355632a7b63a1a375fb34890c110eadb587bde",
+          "after": "cd5dff501f0b979a160ed73e3a2603b1e70e04ae4235e77808e1d21fb7380d2e",
+          "reason": "用户确认仅供应链两模块批量填写布局；新增60规格自然换行至少3行、标题与第一行中心一致及原标准行距断言；原错误测试补充卡片底部原生内边距断言，其他业务及布局断言全部保留。"
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
+          "after": "4f75f180b7d86d3967f01e367989788ac975798b955816b82fc5b7c254bb397f",
+          "reason": "用户确认门店两模块编辑页批量填写商品售价；仅引入共用6项新回归，原测试和断言保留，不改超时、重试或覆盖。"
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
+          "after": "80b9738c977b9be6bded25b9f6a854f7b50bed6d1229d8c734e8c99c81b598b9",
+          "reason": "用户确认门店两模块编辑页批量填写商品售价；仅引入共用6项新回归，原测试和断言保留，不改超时、重试或覆盖。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "cd5dff501f0b979a160ed73e3a2603b1e70e04ae4235e77808e1d21fb7380d2e",
+          "after": "28271650a56e493f2418cc8f0754f8a5a0e6437c9b92a0866d60c4b161d5f8f3",
+          "reason": "用户确认仅三端成品/配件批量标题不换行且按最长标题自适应、选项列对齐，以及门店按钮24px间距；新增对应三端布局断言与运营端用例，保留原有业务、反馈、换行间距及取消保存断言。"
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "98f0a1f14e15344d2af9d799db14ba22a821ef0f637f5ac6713a95972ae1f019",
+          "after": "b8691f3f2ccc6437457450ae1d15fd7ccfe2ee4d039e890d0e58e63d87196710",
+          "reason": "用户确认仅三端成品/配件批量标题不换行且按最长标题自适应、选项列对齐，以及门店按钮24px间距；新增对应三端布局断言与运营端用例，保留原有业务、反馈、换行间距及取消保存断言。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "28271650a56e493f2418cc8f0754f8a5a0e6437c9b92a0866d60c4b161d5f8f3",
+          "after": "4afa46ce24c955176fa911847aac26d736d364057e79cd8d4ddd13a0a81fffb2",
+          "reason": "2026-11-02 user separately confirmed direct numeric migration tests and check records; no unrelated assertions or gate changes."
+        },
+        {
+          "file": "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts",
+          "before": "7b3130c619c25ea04771b598fa2d34e63738a5517d11ae4d4e5f9b4c96a77d8c",
+          "after": "c68b320b55c02156cb5104344627d1c32f64cf012981f7aaee191b91b62bc3ba",
+          "reason": "2026-11-02 user separately confirmed direct numeric migration tests and check records; no unrelated assertions or gate changes."
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java",
+          "before": "72ce7b9122260d95ab8f0539aa819a92349aa52a01678d9a263bf4a706e4eb40",
+          "after": "4d8b280890870833713fede0af7ce8efb6811bf13db596d5e0552b5661e6f8ec",
+          "reason": "2026-11-02 user separately confirmed direct numeric migration tests and check records; no unrelated assertions or gate changes."
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "01e9459c65fb8f9021b4383b2b01ba2633ed85dacf499664ee3f6c8cd20df6df",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "94fb177fe2949918812c02a9404ba54ac0f9af9ede1845ca429b05c415bfd733",
+          "after": "01e9459c65fb8f9021b4383b2b01ba2633ed85dacf499664ee3f6c8cd20df6df",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "1450eb3b334e1ee5d9c31bd14793311c97173acff5529697e88619a14967b2bf",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "46bee849f45d242f225b2413431baf7408bab5eaf5671e70e36a3c98b45f278d",
+          "after": "1450eb3b334e1ee5d9c31bd14793311c97173acff5529697e88619a14967b2bf",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "tests/e2e/accessory-markup-configuration.spec.ts",
+          "before": "27ff2ff5fcdf02b917425ed3e714bf9a47fafebb817775de33541cff82d2da7e",
+          "after": "0e44c88f4270ad96ee19861c138e8f8e601c797cdb99db856bf4996d3617a11d",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "tests/e2e/markup-configuration.spec.ts",
+          "before": "f6537e115a129a012269ec8318142c897fd9532454ff1c7aa160c97f81c8cea5",
+          "after": "0ef7e3c0bc519cb681ef6ca6677cb84d329013d534a0662d6dafe58863769723",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "b8691f3f2ccc6437457450ae1d15fd7ccfe2ee4d039e890d0e58e63d87196710",
+          "after": "85cead21c96b292e70d79f8a7b912976092fe6ce9048b01f626754adf630137b",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "tests/e2e/slab-publish-layout.spec.ts",
+          "before": "1cccc4b0fd932b46bbaadbd95790c44b51b4ca0a666f30e672f0cd60ecec6927",
+          "after": "72c9f702531a2f9b23dc674633356d31d5c7df049dbfa67c7b2c5fed9e36a970",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "e58fee0573a2d5ee3a6a9930bd54cc33ae7f0c937c61651766750d50fe6b6ec2",
+          "after": "0ef43335476c677998556a62e62beec30017cbce37e132e0e331ffab737359c6",
+          "reason": "2026-11-02 user confirmed direct numeric migration tests/check records. Replace obsolete blocked-zero or entered-negative expectations, assert precision is retained and invalid batches do not apply; preserve all unrelated layout/business assertions, timeouts and zero retries."
+        },
+        {
+          "file": "src/components/DecimalInput.test.ts",
+          "before": "16406a62ad59a528dab1a89124de3a2182e3d2d88dc05ad796045dc12a62646c",
+          "after": "da2beda0183d4d6fe4fd25638b51ad8caff029d1dafc03d1a5cc8632c53011cd",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "src/utils/numericInput.test.ts",
+          "before": "c0f9d55e6760f961e1c6f8c4ec61be3715bbe164073e87c5c8fa0ea24627eea8",
+          "after": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "01e9459c65fb8f9021b4383b2b01ba2633ed85dacf499664ee3f6c8cd20df6df",
+          "after": "c11f4e388f0aec3054daf97890411a5be8a78f881c9cac34a66c82a8857d56fd",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "c11f4e388f0aec3054daf97890411a5be8a78f881c9cac34a66c82a8857d56fd",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/accessory-markup-configuration.spec.ts",
+          "before": "0e44c88f4270ad96ee19861c138e8f8e601c797cdb99db856bf4996d3617a11d",
+          "after": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/accessory-markup-configuration.spec.ts",
+          "before": "27ff2ff5fcdf02b917425ed3e714bf9a47fafebb817775de33541cff82d2da7e",
+          "after": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "0ef43335476c677998556a62e62beec30017cbce37e132e0e331ffab737359c6",
+          "after": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "e58fee0573a2d5ee3a6a9930bd54cc33ae7f0c937c61651766750d50fe6b6ec2",
+          "after": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "1450eb3b334e1ee5d9c31bd14793311c97173acff5529697e88619a14967b2bf",
+          "after": "458a57dee118a9cc156504a88d5c02d28e140ff5e784db54b02ef7af277e4e12",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "458a57dee118a9cc156504a88d5c02d28e140ff5e784db54b02ef7af277e4e12",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/markup-configuration.spec.ts",
+          "before": "0ef7e3c0bc519cb681ef6ca6677cb84d329013d534a0662d6dafe58863769723",
+          "after": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/markup-configuration.spec.ts",
+          "before": "f6537e115a129a012269ec8318142c897fd9532454ff1c7aa160c97f81c8cea5",
+          "after": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "4afa46ce24c955176fa911847aac26d736d364057e79cd8d4ddd13a0a81fffb2",
+          "after": "3962166d93764105f0145288af6165df4fb4583c0c60a9cfea9c0542db32cb5b",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "85cead21c96b292e70d79f8a7b912976092fe6ce9048b01f626754adf630137b",
+          "after": "e7fd5e9b60d69bfea258ffc20b7d760780531af685855438fceef646de7e27c1",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "tests/e2e/store-price-rules.spec.ts",
+          "before": "4a3bb2df2fae823b2bbce113192976ccf0f66128afc89d73fa7c0b9b893a35ec",
+          "after": "6292142a38db568a1dc850647046695b82be3ebe1d13849ff48df00f3320dcd2",
+          "reason": "用户确认：仅同步两位小数输入上限与禁止连续前导零的输入断言；保留原有业务、布局、历史值兼容及提交验证，补充选区、粘贴、输入法及负零例外验证。"
+        },
+        {
+          "file": "src/components/DecimalInput.test.ts",
+          "before": "da2beda0183d4d6fe4fd25638b51ad8caff029d1dafc03d1a5cc8632c53011cd",
+          "after": "2ab108da1f36b09f46076b71cd8d25b39a3c6249accc31c79d04bd695c548958",
+          "reason": "用户确认两位小数与连续前导零输入限制；仅同步对应输入断言，保留原业务、布局、历史值兼容与保存断言。对应整段替换测试等待原生焦点草稿回显，布局断言先确认范围行已渲染；不更改超时、重试或门禁逻辑。"
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "e7fd5e9b60d69bfea258ffc20b7d760780531af685855438fceef646de7e27c1",
+          "after": "658f987d7f895d0724e6ff6a6aaf43265dac59e91f26a755c9465ed02f82b7f1",
+          "reason": "用户确认两位小数与连续前导零输入限制；仅同步对应输入断言，保留原业务、布局、历史值兼容与保存断言。对应整段替换测试等待原生焦点草稿回显，布局断言先确认范围行已渲染；不更改超时、重试或门禁逻辑。"
+        },
+        {
+          "file": "tests/e2e/store-price-rules.spec.ts",
+          "before": "6292142a38db568a1dc850647046695b82be3ebe1d13849ff48df00f3320dcd2",
+          "after": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
+          "reason": "用户确认两位小数与连续前导零输入限制；仅同步对应输入断言，保留原业务、布局、历史值兼容与保存断言。对应整段替换测试等待原生焦点草稿回显，布局断言先确认范围行已渲染；不更改超时、重试或门禁逻辑。"
+        },
+        {
+          "file": "src/components/DecimalInput.test.ts",
+          "before": "2ab108da1f36b09f46076b71cd8d25b39a3c6249accc31c79d04bd695c548958",
+          "after": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
+          "reason": "用户确认仅修复公共数值控件的删除、中文输入法状态同步及拒绝输入后的光标恢复。保留原断言，新增整数/负值例外、真实删除与组合事件后数字连续输入回归；明确测试光标位置，不改超时、重试或其他业务。"
+        },
+        {
+          "file": "tests/e2e/decimal-editing.ts",
+          "before": "948f97c7d82c0270ea09dc03441a2762dd413ffe2528d6d9888d5ba9542ed745",
+          "after": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73",
+          "reason": "用户确认仅修复公共数值控件的删除、中文输入法状态同步及拒绝输入后的光标恢复。保留原断言，新增整数/负值例外、真实删除与组合事件后数字连续输入回归；明确测试光标位置，不改超时、重试或其他业务。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "3962166d93764105f0145288af6165df4fb4583c0c60a9cfea9c0542db32cb5b",
+          "after": "81d98b3083ab76b6387db9fffd2737ff2a8df5009da3f796da055034afa0bfe6",
+          "reason": "用户确认仅修复公共数值控件的删除、中文输入法状态同步及拒绝输入后的光标恢复。保留原断言，新增整数/负值例外、真实删除与组合事件后数字连续输入回归；明确测试光标位置，不改超时、重试或其他业务。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "458a57dee118a9cc156504a88d5c02d28e140ff5e784db54b02ef7af277e4e12",
+          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "c11f4e388f0aec3054daf97890411a5be8a78f881c9cac34a66c82a8857d56fd",
+          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "81d98b3083ab76b6387db9fffd2737ff2a8df5009da3f796da055034afa0bfe6",
+          "after": "90a7eb5bf7ff969047eb90e5c499cd2e359f383b14f832a8521cd07bf7bf7d02",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "658f987d7f895d0724e6ff6a6aaf43265dac59e91f26a755c9465ed02f82b7f1",
+          "after": "f9fdecb7003c46d8eaf8aa7de9a0f95075ef316c8d894228c608478fa0fac4f4",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/price-table-feedback.ts",
+          "before": "e55d185bd12712863333f5ce14ac12ff6ac4a7320dfb90d86c41b5442f257fa8",
+          "after": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/store-batch-sale-price-cases.ts",
+          "before": "f9fdecb7003c46d8eaf8aa7de9a0f95075ef316c8d894228c608478fa0fac4f4",
+          "after": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
+          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/accessory-management.spec.ts",
+          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
+          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "90a7eb5bf7ff969047eb90e5c499cd2e359f383b14f832a8521cd07bf7bf7d02",
+          "after": "a235030fa07ecbdc4f418ce2428b727a6c1dcbd41dacbd6f96ff35b8b464f91b",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "4f75f180b7d86d3967f01e367989788ac975798b955816b82fc5b7c254bb397f",
+          "after": "49ecdf64ee80f2af34c4c24b110b32abec8b8900527f9cf421156dbc4cb3aa1d",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "f433d0c1641b02addc4174b97e9c50cf4973b56c9c39b69ebe0bf385fe520f34",
+          "after": "49ecdf64ee80f2af34c4c24b110b32abec8b8900527f9cf421156dbc4cb3aa1d",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "80b9738c977b9be6bded25b9f6a854f7b50bed6d1229d8c734e8c99c81b598b9",
+          "after": "7e77cbe7e8533ed41d1c3009b91532fb50bb8d6e605a7beff9d230ca42b5a1df",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "39099e25e46019f5888c0af727ab4e07ed8ce9ca6d77721abed7689a1c8fe01d",
+          "after": "7e77cbe7e8533ed41d1c3009b91532fb50bb8d6e605a7beff9d230ca42b5a1df",
+          "reason": "用户确认仅运营成品现货/配件指导价按SKU跟随或手动、配置同步、成本重算和旧值补标，以及门店两模块商品中心批量选择右侧计数；保留其他业务、权限及日志类型。仅新增对应验证，保留旧断言、超时及零重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "ff7d0c0c5b0e8a22bf70015616ac24663bc36403b1e1b9e844ab9a9c4c8ed975",
+          "after": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
+          "reason": "用户已确认指导价手动改价切换手动。旧权限测试仅将手动改价请求标为manual，增加持久模式断言；原防夹带、权限、状态、日志及金额断言全部保留，未改超时和重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java",
+          "before": "f325c07b5cb2d4f9e2c615ea2560368cc12079ddeabb35a531a0aa9c5e1b5f78",
+          "after": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
+          "reason": "用户已确认指导价手动改价切换手动。旧权限测试仅将手动改价请求标为manual，增加持久模式断言；原防夹带、权限、状态、日志及金额断言全部保留，未改超时和重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "97b81f4823ba5ea5cfbf797e24f39cabb829ede9bf0ebe9760bc1bc152ac0a54",
+          "after": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
+          "reason": "用户已确认指导价手动改价切换手动。旧权限测试仅将手动改价请求标为manual，增加持久模式断言；原防夹带、权限、状态、日志及金额断言全部保留，未改超时和重试。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java",
+          "before": "a55a7833fe6e6fb2ac084ab8dba6c81d14808e4f5a07b0dd5d6539abe4754fdb",
+          "after": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
+          "reason": "用户已确认指导价手动改价切换手动。旧权限测试仅将手动改价请求标为manual，增加持久模式断言；原防夹带、权限、状态、日志及金额断言全部保留，未改超时和重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "a235030fa07ecbdc4f418ce2428b727a6c1dcbd41dacbd6f96ff35b8b464f91b",
+          "after": "62190c505726220afce7e76fb7560ee838faa1c156f40a27ec764f6636e4a4a5",
+          "reason": "用户确认只补修运营成品现货/配件缺历史规格顺序的回退：仅绑定版本及原SKU、临时展示排序、零值筛选、保留原标签，提示供应链核对；不补写历史、不改其他端及价格规则。仅增加六项页面回归，保留所有旧用例、断言、超时和零重试。"
         }
       ],
       "routes": [
@@ -1756,7 +2394,19 @@
         "src/services/terminalAllBatchShelf.test.ts",
         "src/services/productGlobalPermissions.test.ts",
         "src/services/functionCatalog.test.ts",
-        "src/components/WarehouseEntryInformation.test.ts"
+        "src/components/WarehouseEntryInformation.test.ts",
+        "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java",
+        "tests/e2e/product-attribute-version-fixture.ts",
+        "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts",
+        "src/pages/finished-stock/shared/finishedStockPayload.test.ts",
+        "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts",
+        "tests/e2e/product-attribute-feedback-cases.ts",
+        "tests/e2e/store-batch-sale-price-cases.ts",
+        "src/components/DecimalInput.test.ts",
+        "src/utils/numericInput.test.ts",
+        "src/utils/numericInputValidation.test.ts",
+        "tests/e2e/price-table-feedback.ts",
+        "src/pages/finished-stock/shared/guidePriceSource.test.ts"
       ]
     }
   ]

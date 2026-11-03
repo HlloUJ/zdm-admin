@@ -398,32 +398,22 @@
                         <t-select
                           v-if="field.type === 'select'"
                           v-model="productForm[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(
-                              productForm[field.key],
-                              field.label,
-                              submitAttempted && field.required,
-                              field.type === 'select',
-                            )
-                          "
+                          v-bind="attributeFeedback(field, productForm[field.key], submitAttempted)"
                           clearable
                           :placeholder="controlPlaceholder(field.label, 'select')"
                         >
                           <t-option v-for="item in field.options" :key="item" :label="item" :value="item" />
                         </t-select>
-                        <t-input
+                        <component
+                          :is="field.valueType === 'number' ? DecimalInput : 't-input'"
                           v-else
                           v-model="productForm[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(
-                              productForm[field.key],
-                              field.label,
-                              submitAttempted && field.required,
-                              false,
-                            )
-                          "
+                          :plain="true"
+                          large-number
+                          v-bind="attributeFeedback(field, productForm[field.key], submitAttempted)"
                           clearable
                           :placeholder="controlPlaceholder(field.label, 'input')"
+                          @blur="productForm[field.key] = normalizeAttribute(field, productForm[field.key])"
                         />
                       </t-form-item>
                     </div>
@@ -469,13 +459,17 @@
                     <template #icon><t-icon name="add" /></template>
                     创建规格
                   </t-button>
-                  <div v-if="specRows.length" class="spec-table-block spec-table-block--stable-feedback">
+                  <div
+                    v-if="specRows.length"
+                    ref="specTableElement"
+                    class="spec-table-block spec-table-block--stable-feedback"
+                  >
                     <t-table
                       row-key="id"
                       :data="specRows"
                       :columns="specColumns"
                       :rowspan-and-colspan="specRowspanAndColspan"
-                      table-content-width="max-content"
+                      :table-content-width="specTableContentWidth"
                       bordered
                       hover
                       table-layout="auto"
@@ -499,25 +493,20 @@
                           v-else-if="field.type === 'select'"
                           v-model="row[field.key]"
                           clearable
-                          v-bind="
-                            requiredFieldFeedback(
-                              row[field.key],
-                              field.label,
-                              specSubmitted && field.required,
-                              field.type === 'select',
-                            )
-                          "
+                          v-bind="attributeFeedback(field, row[field.key], specSubmitted, row)"
                           :placeholder="controlPlaceholder(field.label, 'select')"
                         >
                           <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
                         </t-select>
-                        <t-input
+                        <component
+                          :is="field.valueType === 'number' ? DecimalInput : 't-input'"
                           v-else
                           v-model="row[field.key]"
-                          v-bind="
-                            requiredFieldFeedback(row[field.key], field.label, specSubmitted && field.required, false)
-                          "
+                          :plain="true"
+                          large-number
+                          v-bind="attributeFeedback(field, row[field.key], specSubmitted, row)"
                           :placeholder="controlPlaceholder(field.label, 'input')"
+                          @blur="row[field.key] = normalizeAttribute(field, row[field.key], row)"
                         />
                       </template>
                       <template #cost="{ row }">
@@ -603,8 +592,9 @@
                       </template>
                       <template #quantity="{ row }">
                         <div class="quantity-editor">
-                          <t-input-number
+                          <DecimalInput
                             v-model="row.quantity"
+                            :decimal-places="0"
                             :disabled="isOperationsEdit"
                             theme="normal"
                             :min="0"
@@ -617,9 +607,6 @@
                                 : undefined
                             "
                             placeholder="请输入数量"
-                            @beforeinput.capture="preventZeroQuantity"
-                            @paste.capture="preventZeroQuantity"
-                            @keydown.capture="preventZeroQuantity"
                           />
                         </div>
                       </template>
@@ -826,7 +813,7 @@
                 <t-select
                   v-if="salesAttributeByKey(group.field)?.type === 'select'"
                   :value="value.value"
-                  v-bind="fieldFeedback(specDraftFieldStatus(value.value, value.id), `请选择${group.name}`)"
+                  v-bind="specAttributeFeedback(group, value)"
                   clearable
                   :placeholder="controlPlaceholder(group.name, 'select')"
                   @change="value.value = String($event ?? '')"
@@ -839,16 +826,15 @@
                     :disabled="isSpecOptionSelected(group, value.id, item)"
                   />
                 </t-select>
-                <t-input
+                <component
+                  :is="salesAttributeByKey(group.field)?.valueType === 'number' ? DecimalInput : 't-input'"
                   v-else
                   v-model="value.value"
-                  v-bind="
-                    fieldFeedback(
-                      isDuplicateSpecValue(group, value) || specDraftFieldStatus(value.value, value.id),
-                      isDuplicateSpecValue(group, value) ? '属性值重复' : `请输入${group.name}`,
-                    )
-                  "
+                  :plain="true"
+                  large-number
+                  v-bind="specAttributeFeedback(group, value)"
                   :placeholder="controlPlaceholder(group.name, 'input')"
+                  @blur="normalizeSpecAttribute(group, value)"
                 />
                 <t-button
                   shape="square"
@@ -904,7 +890,7 @@
       destroy-on-close
       @close="closePriceDrawer"
     >
-      <div ref="priceFormRoot" class="batch-fill-panel">
+      <div ref="priceFormRoot" class="batch-fill-panel batch-fill-panel--source">
         <t-card class="batch-section" title="选择批量范围">
           <template #actions
             ><t-typography-text theme="secondary">未选择属性值时默认填充全部规格</t-typography-text></template
@@ -959,8 +945,9 @@
             </t-form-item>
 
             <t-form-item v-if="!isOperationsEdit" label="数量">
-              <t-input-number
+              <DecimalInput
                 v-model="batchFillForm.quantity"
+                :decimal-places="0"
                 :status="
                   batchFillSubmitted &&
                   batchFillForm.quantity != null &&
@@ -978,9 +965,6 @@
                 placeholder="请输入数量"
                 theme="normal"
                 :min="0"
-                @beforeinput.capture="preventZeroQuantity"
-                @paste.capture="preventZeroQuantity"
-                @keydown.capture="preventZeroQuantity"
               />
             </t-form-item>
             <t-form-item
@@ -991,16 +975,22 @@
               <t-select
                 v-if="field.type === 'select'"
                 v-model="batchSalesAttributes[field.key]"
+                v-bind="batchAttributeFeedback(field)"
                 clearable
                 :placeholder="controlPlaceholder(field.label, 'select')"
               >
                 <t-option v-for="value in field.options" :key="value" :label="value" :value="value" />
               </t-select>
-              <t-input
+              <component
+                :is="field.valueType === 'number' ? DecimalInput : 't-input'"
                 v-else
                 v-model="batchSalesAttributes[field.key]"
+                :plain="true"
+                large-number
+                v-bind="batchAttributeFeedback(field)"
                 clearable
                 :placeholder="controlPlaceholder(field.label, 'input')"
+                @blur="normalizeBatchAttribute(field)"
               />
             </t-form-item>
           </div>
@@ -1104,6 +1094,7 @@
 </template>
 
 <script setup lang="ts">
+import DecimalInput from '@/components/DecimalInput.vue';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
 import type { BatchShelfResult } from '@/services/operationsBatchShelf';
@@ -1113,15 +1104,22 @@ import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
 import { initialProductListTab, isAllProductStatus, productCreationColumns } from '@/services/productAllView';
 import WarehouseEntryInformation from '@/components/WarehouseEntryInformation.vue';
 import { useStateActivitySort } from '@/composables/useStateActivitySort';
+import { useSpecTableLayout } from '../shared/useSpecTableLayout';
 import { useCommodityModule } from '@/composables/useCommodityModule';
 const commodity = useCommodityModule();
 
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { operationConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
-import { preventZeroQuantity, isPositiveIntegerQuantity } from '@/utils/quantityInput';
+import { isPositiveIntegerQuantity } from '@/utils/quantityInput';
 import { rejectFormSubmission } from '@/utils/submitValidation';
 import { fieldFeedback, requiredFieldFeedback, useFormFeedback } from '@/utils/formValidation';
+import {
+  templateAttributeError,
+  formatTemplateNumber,
+  unchangedTemplateValue,
+  type TemplateAttributeField,
+} from '../shared/finishedStockAttributeValidation';
 import AdminListToolbar from '@/components/foundation/AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { stateActivitySortIcon, stateActivityColumns } from '@/services/productStateActivity';
@@ -1381,6 +1379,16 @@ const pendingUploadedMediaIds = new Set<number>();
 const productCategories = ref<ProductCategoryRecord[]>([]);
 const productAttributes = ref<ProductAttributeRecord[]>([]);
 const categoryAttributeBindings = ref<FinishedProductTemplateAttribute[]>([]);
+const newProductBindings = ref<FinishedProductTemplateAttribute[]>([]);
+let capturedTemplateCategory: number | undefined;
+let templateCapture = 0;
+watch(formPageVisible, (visible) => {
+  if (!visible) {
+    capturedTemplateCategory = undefined;
+    newProductBindings.value = [];
+    templateCapture++;
+  }
+});
 let templateRefresh: Promise<void> | undefined;
 const refreshCategoryAttributeBindings = () => {
   if (!templateRefresh) {
@@ -1396,9 +1404,25 @@ const refreshCategoryAttributeBindings = () => {
 };
 const refreshVisibleProductTemplate = () => {
   if (!formPageVisible.value || document.visibilityState === 'hidden') return;
-  void Promise.all([refreshCategoryAttributeBindings(), refreshPriceConfigurations()]).catch(() => {
-    adminFeedback.error('发布配置刷新失败，请重试');
-  });
+  const category = selectedCategoryId.value;
+  const capture = !editingProduct.value && category != null && capturedTemplateCategory !== category;
+  const token = capture ? ++templateCapture : templateCapture;
+  void Promise.all([capture ? refreshCategoryAttributeBindings() : Promise.resolve(), refreshPriceConfigurations()])
+    .then(() => {
+      if (
+        capture &&
+        token === templateCapture &&
+        formPageVisible.value &&
+        !editingProduct.value &&
+        selectedCategoryId.value === category
+      ) {
+        newProductBindings.value = categoryAttributeBindings.value.filter((binding) => binding.categoryId === category);
+        capturedTemplateCategory = category;
+      }
+    })
+    .catch(() => {
+      adminFeedback.error('发布配置刷新失败，请重试');
+    });
 };
 watch([formPageVisible, selectedCategoryId], refreshVisibleProductTemplate, { flush: 'post' });
 const productSuppliers = ref<SupplierRecord[]>([]);
@@ -1595,12 +1619,117 @@ const batchMarkupPrices = ref<
 const templateAttributeFields = computed(() =>
   buildFinishedStockTemplateFields(
     selectedCategoryId.value,
-    categoryAttributeBindings.value,
+    newProductBindings.value,
     confirmedSpecDimensions.value,
     editingProduct.value,
     productAttributes.value,
   ),
 );
+
+const attributePrevious = (field: TemplateAttributeField, row?: SpecRow) => {
+  if (!editingProduct.value) return { exists: false, value: undefined };
+  if (row) {
+    const previous =
+      row.skuId == null ? undefined : editingProduct.value.variants.find((variant) => variant.id === row.skuId);
+    return { exists: Boolean(previous), value: previous?.salesAttributes?.[field.key] };
+  }
+  const entry = editingProduct.value.attributes.find((item) => `attribute_${item.attributeId}` === field.key);
+  return { exists: true, value: entry?.value };
+};
+const attributeMessage = (field: TemplateAttributeField, value: unknown, row?: SpecRow) => {
+  const previous = attributePrevious(field, row);
+  return templateAttributeError(field, value, {
+    legacyUnchanged: previous.exists && unchangedTemplateValue(value, previous.value),
+  });
+};
+const attributeFeedback = (field: TemplateAttributeField, value: unknown, submitted: boolean, row?: SpecRow) => {
+  const showNumericError = Boolean(row) && field.valueType === 'number' && Boolean(String(value ?? '').trim());
+  const message = submitted || showNumericError ? attributeMessage(field, value, row) : '';
+  return fieldFeedback(Boolean(message), message);
+};
+const formatAttributeInput = (field: TemplateAttributeField, value: unknown) =>
+  field.valueType === 'number' && String(value ?? '').trim() ? formatTemplateNumber(value) : String(value ?? '');
+const normalizeAttribute = (field: TemplateAttributeField, value: unknown, row?: SpecRow) => {
+  const previous = attributePrevious(field, row);
+  if (previous.exists && unchangedTemplateValue(value, previous.value)) return String(value ?? '');
+  return attributeMessage(field, value, row) ? String(value ?? '') : formatAttributeInput(field, value);
+};
+const batchAttributeFeedback = (field: TemplateAttributeField) => {
+  const value = batchSalesAttributes.value[field.key];
+  const showNumericError = field.valueType === 'number' && Boolean(String(value ?? '').trim());
+  const message =
+    batchFillSubmitted.value || showNumericError ? templateAttributeError(field, value, { optional: true }) : '';
+  return fieldFeedback(Boolean(message), message);
+};
+const normalizeBatchAttribute = (field: TemplateAttributeField) => {
+  if (!templateAttributeError(field, batchSalesAttributes.value[field.key], { optional: true }))
+    batchSalesAttributes.value[field.key] = formatAttributeInput(field, batchSalesAttributes.value[field.key]);
+};
+const specTypeFeedback = useFormFeedback(specDialogVisible);
+const specAttributeMessage = (group: SpecGroup, value: SpecValue) => {
+  const field = salesAttributeByKey(group.field);
+  if (!field) return '';
+  const rejected = specTypeFeedback.field(`${group.field}:${value.id}`, value.value);
+  if (rejected.status === 'error') return rejected.tips ?? '';
+  const unchanged =
+    Boolean(value.value.trim()) &&
+    Boolean(
+      editingProduct.value?.variants.some((variant) =>
+        unchangedTemplateValue(value.value, variant.salesAttributes?.[field.key]),
+      ),
+    );
+  return templateAttributeError({ ...field, required: true }, value.value, { legacyUnchanged: unchanged });
+};
+const specAttributeFeedback = (group: SpecGroup, value: SpecValue) => {
+  const message = validatedSpecDraftIds.value.has(value.id) ? specAttributeMessage(group, value) : '';
+  const duplicate = isDuplicateSpecValue(group, value);
+  return fieldFeedback(Boolean(message) || duplicate, message || (duplicate ? '属性值重复' : ''));
+};
+const normalizeSpecAttribute = (group: SpecGroup, value: SpecValue) => {
+  const field = salesAttributeByKey(group.field);
+  if (!field || specAttributeMessage(group, value)) return;
+  if (
+    editingProduct.value?.variants.some((variant) =>
+      unchangedTemplateValue(value.value, variant.salesAttributes?.[field.key]),
+    )
+  )
+    return;
+  value.value = formatAttributeInput(field, value.value);
+};
+const validateAttributeDrafts = () => {
+  specTypeFeedback.clear();
+  const groups = specGroups.filter((group) => group.selected);
+  if (groups.some((group) => group.values.some((value) => Boolean(specAttributeMessage(group, value))))) return false;
+  groups.forEach((group) => group.values.forEach((value) => normalizeSpecAttribute(group, value)));
+  return true;
+};
+const validateAttributeRows = (rows: SpecRow[], fields: LayeredSpecField[]) => {
+  let valid = true;
+  for (const row of rows)
+    for (const key of fields) {
+      const field = salesAttributeByKey(key);
+      if (!field) continue;
+      const group = specGroups.find((item) => item.field === key);
+      const draft = group?.values.find((value) => value.id === row._specValueIds?.[key]);
+      const previous = attributePrevious(field, row);
+      if (
+        draft &&
+        previous.exists &&
+        unchangedTemplateValue(draft.value, previous.value) &&
+        previous.value !== undefined
+      )
+        row[key] = previous.value;
+      const message = attributeMessage(field, row[key], row);
+      if (message) {
+        valid = false;
+        group?.values
+          .filter((value) => value.value.trim() === String(row[key] ?? '').trim())
+          .forEach((value) => specTypeFeedback.reject(`${key}:${value.id}`, value.value, message));
+      }
+    }
+  return valid;
+};
+
 const attributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'product'));
 const salesAttributeFields = computed(() => templateAttributeFields.value.filter((field) => field.role === 'sales'));
 const layeredFieldLabels = computed<Record<string, string>>(() => ({
@@ -1608,17 +1737,7 @@ const layeredFieldLabels = computed<Record<string, string>>(() => ({
   ...Object.fromEntries(salesAttributeFields.value.map((field) => [field.key, field.label])),
 }));
 const skuAttributeFields = computed(() =>
-  salesAttributeFields.value.filter(
-    (field) =>
-      confirmedLayeredFields.value.includes(field.key) ||
-      categoryAttributeBindings.value.some(
-        (binding) =>
-          binding.categoryId === selectedCategoryId.value &&
-          binding.attributeId === field.attributeId &&
-          binding.attributeRole === 'sales' &&
-          binding.skuFlag === true,
-      ),
-  ),
+  salesAttributeFields.value.filter((field) => confirmedLayeredFields.value.includes(field.key) || field.skuFlag),
 );
 const specGroups = reactive<SpecGroup[]>([]);
 watch(
@@ -1745,6 +1864,10 @@ const toStockItem = (record: FinishedProductRecord): StockItem => {
     createdAt: record.createdAt,
     image: record.mainImageUrl || '',
     name: record.name,
+    templateVersionId: record.templateVersionId,
+    templateRevision: record.templateRevision,
+    attributeTemplateSnapshot: record.attributeTemplateSnapshot,
+    attributeDisplayOrder: record.attributeDisplayOrder,
     categoryId: record.categoryId,
     supplierId: record.supplierId,
     category: categoryPathById(record.categoryId),
@@ -1774,6 +1897,8 @@ const toProductPayload = (
 ): FinishedProductPayload => {
   const nextItem = { ...item, ...patch };
   return {
+    templateVersionId: nextItem.templateVersionId,
+    templateRevision: nextItem.templateRevision,
     categoryId: nextItem.categoryId,
     supplierId: nextItem.supplierId,
     name: nextItem.name,
@@ -1983,7 +2108,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
 });
 const requiredColumnTitle = (label: string) => () =>
   h('span', [h('span', { class: 'spec-required-star', style: { color: 'var(--td-error-color)' } }, '*'), label]);
-const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
+const baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   const priceColumnsBase: PrimaryTableCol<TableRowData>[] = [
     { colKey: 'cost', title: requiredColumnTitle('成本价'), minWidth: 80 },
     { colKey: 'guide', title: requiredColumnTitle('指导价'), minWidth: 148 },
@@ -2006,7 +2131,9 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
       ? [{ colKey: 'specText', title: '商品规格', minWidth: 100 }]
       : confirmedLayeredFields.value.map((key) => {
           const field = salesAttributeByKey(key);
-          return field ? createSalesColumn(field) : { colKey: key, title: layeredFieldLabels.value[key] || key };
+          return field
+            ? { ...createSalesColumn(field), title: field.label }
+            : { colKey: key, title: layeredFieldLabels.value[key] || key };
         });
   const remainingSalesColumns = salesAttributeFields.value
     .filter((field) => confirmedSpecMode.value === 'single' || !confirmedLayeredFields.value.includes(field.key))
@@ -2018,6 +2145,8 @@ const specColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     ...(!isOperationsEdit.value ? tailColumns : []),
   ];
 });
+const { tableElement: specTableElement, contentWidth: specTableContentWidth, fitColumns } = useSpecTableLayout();
+const specColumns = computed(() => fitColumns(baseSpecColumns.value));
 const specRowspanAndColspan = ({
   rowIndex,
   col,
@@ -2386,6 +2515,8 @@ const {
   specToPriceRow,
 } = useFinishedStockSpecDialog({
   onValidationFailed: () => rejectFormSubmission(specFormRoot.value),
+  validateAttributeDrafts,
+  validateAttributeRows,
   validatedSpecDraftIds,
   specRows,
   specMode,
@@ -2457,6 +2588,12 @@ const savePriceDrawer = () => {
     if (batchFillForm.quantity != null && !isPositiveIntegerQuantity(batchFillForm.quantity)) {
       return rejectFormSubmission(priceFormRoot.value);
     }
+    if (
+      batchEditableSalesFields.value.some((field) =>
+        templateAttributeError(field, batchSalesAttributes.value[field.key], { optional: true }),
+      )
+    )
+      return rejectFormSubmission(priceFormRoot.value);
     const matchedIds = new Set(batchFillMatchedRows.value.map((row) => row.id));
     if (!matchedIds.size) {
       adminFeedback.warning('当前条件下没有可批量填写的规格');
@@ -2469,7 +2606,7 @@ const savePriceDrawer = () => {
             ...Object.fromEntries(
               batchEditableSalesFields.value
                 .filter((field) => batchSalesAttributes.value[field.key]?.trim())
-                .map((field) => [field.key, batchSalesAttributes.value[field.key]]),
+                .map((field) => [field.key, formatAttributeInput(field, batchSalesAttributes.value[field.key])]),
             ),
             markupPrices: Object.fromEntries(
               productPriceLevels.value.map((level) => {
@@ -2527,6 +2664,20 @@ const deleteSpec = (id: number) => {
   specRows.value = specRows.value.filter((item) => item.id !== id);
 };
 const validateProductForm = () => {
+  if (
+    !isOperationsEdit.value &&
+    (editingProduct.value
+      ? !editingProduct.value.attributeTemplateSnapshot
+      : !newProductBindings.value[0]?.templateVersionId)
+  ) {
+    return [
+      {
+        kind: 'error' as const,
+        message: editingProduct.value ? '商品属性版本尚未绑定，请核对后重试' : '该类目尚无已发布属性模板，请先发布模板',
+        tab: 'base' as const,
+      },
+    ];
+  }
   const issues = finishedStockFormIssues({
     commodityLabel: commodity.shortLabel,
     client: 'supply-chain',
@@ -2543,8 +2694,18 @@ const validateProductForm = () => {
     videoMediaId: videoMedia.value?.mediaId,
     categoryId: selectedCategoryId.value,
     editingProduct: editingProduct.value != null,
+    previousProduct: editingProduct.value ?? undefined,
     guidePriceSettingCoefficient: guidePriceSettingCoefficient.value,
   });
+  for (const field of attributeFields.value) {
+    const message = attributeMessage(field, productForm[field.key]);
+    if (message) issues.push({ kind: 'warning', message, tab: 'base' });
+  }
+  for (const row of specRows.value)
+    for (const field of salesAttributeFields.value) {
+      const message = attributeMessage(field, row[field.key], row);
+      if (message) issues.push({ kind: 'warning', message, tab: 'sales' });
+    }
   salesSpecificationFeedback.clear();
   if (!issues.length) return issues;
   const issue = issues.find((item) => item.kind === 'error' && !item.tab);
@@ -2568,8 +2729,10 @@ const specVariantLabel = (row: SpecRow) =>
     .filter(Boolean)
     .join(' / ') ||
   '未命名规格';
-const buildProductPayloadFromForm = (): FinishedProductPayload =>
-  buildFinishedProductPayload({
+const buildProductPayloadFromForm = (): FinishedProductPayload => ({
+  templateVersionId: editingProduct.value?.templateVersionId ?? newProductBindings.value[0]?.templateVersionId,
+  templateRevision: editingProduct.value?.templateRevision ?? newProductBindings.value[0]?.templateRevision,
+  ...buildFinishedProductPayload({
     totalStock: totalStock.value,
     form: productForm,
     specRows: specRows.value,
@@ -2583,7 +2746,9 @@ const buildProductPayloadFromForm = (): FinishedProductPayload =>
     specMode: confirmedSpecMode.value,
     specDimensions: confirmedSpecDimensions.value,
     variantLabel: specVariantLabel,
-  });
+    previousProduct: editingProduct.value ?? undefined,
+  }),
+});
 const buildOperationsPricePayload = (): Pick<
   FinishedProductPayload,
   'name' | 'status' | 'guidePrices' | 'markupPrices'
@@ -2715,9 +2880,14 @@ const openConfirm = (type: ConfirmType, product: StockItem | null, content: stri
 const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
 };
-const detailAttributeNames = computed(() =>
-  Object.fromEntries(productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name])),
-);
+const detailAttributeNames = computed(() => {
+  const product = formPageVisible.value ? editingProduct.value : detailProduct.value;
+  return Object.fromEntries(
+    product?.attributeTemplateSnapshot
+      ? product.attributeTemplateSnapshot.map((attribute) => [`attribute_${attribute.attributeId}`, attribute.name])
+      : productAttributes.value.map((attribute) => [`attribute_${attribute.id}`, attribute.name]),
+  );
+});
 const openProductEditor = async (row: StockItem) => {
   try {
     await refreshPriceConfigurations();

@@ -1508,4 +1508,24 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     SecurityContextHolder.getContext().setAuthentication(
         new UsernamePasswordAuthenticationToken(identity, null, List.of()));
   }
+  @Test
+  @org.springframework.transaction.annotation.Transactional
+  void boundDefinitionNamesAndOrderSurviveLiveAttributeRenameInPoolAndSelectedDetails() throws Exception {
+    jdbc.update("INSERT INTO stores(id,tenant_id,name,type,status) VALUES(889961,1,'版本门店','cityPartner','enabled')");
+    jdbc.update("INSERT INTO product_categories(id,name,scope) VALUES(889961,'版本类目','finished')");
+    String definition="[{\"attributeId\":889961,\"name\":\"绑定版本原名\",\"attributeRole\":\"sales\",\"valueType\":\"text\",\"sortOrder\":1}]";
+    jdbc.update("INSERT INTO category_template_versions(id,category_id,version_no,state,content) VALUES(889961,889961,1,'published',?)",definition);
+    jdbc.update("INSERT INTO finished_products(id,name,category_id,total_stock,status,source_status,operations_deleted,template_version_id,template_revision,attribute_template_snapshot,attribute_display_order) VALUES(889961,'版本商品',889961,3,'selling','selling',FALSE,889961,0,?,JSON_OBJECT('product',JSON_ARRAY(),'sales',JSON_ARRAY('attribute_889961')))",definition);
+    jdbc.update("INSERT INTO product_attributes(id,name,scope,value_type,attribute_role) VALUES(889961,'当前名称','finished','text','sales')");
+    jdbc.update("INSERT INTO finished_product_variants(id,finished_product_id,variant_label,stock,cost_price,sales_attributes) VALUES(889961,889961,'规格',3,10,JSON_OBJECT('attribute_889961','值'))");
+    jdbc.update("INSERT INTO finished_product_guide_prices(finished_product_id,sku_id,variant_label,cost_price,price_coefficient,price) VALUES(889961,889961,'规格',10,2,20)");
+    identity(889961L);
+    assertThat(products.poolDetail(889961L).attributeNames()).containsEntry("attribute_889961","绑定版本原名");
+    var selected=products.select(List.of(889961L)).getFirst();
+    jdbc.update("UPDATE product_attributes SET name='再次改名' WHERE id=889961");
+    var detail=products.detail(selected.id());
+    assertThat(detail.attributeNames()).containsEntry("attribute_889961","绑定版本原名");
+    assertThat(detail.attributeDisplayOrder().get("sales")).containsExactly("attribute_889961");
+  }
+
 }

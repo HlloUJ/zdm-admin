@@ -19,7 +19,7 @@
     >
     <template v-if="paymentAction">
       <t-form-item label="金额" required v-bind="fb.field('amount', form.amount)"
-        ><t-input-number v-model="form.amount" placeholder="请输入金额" :min="0.01" :decimal-places="2" suffix="元"
+        ><DecimalInput v-model="form.amount" placeholder="请输入金额" :min="0" :decimal-places="2" suffix="元"
       /></t-form-item>
       <t-form-item v-if="paymentKind === 'receipt'" label="款项名称" required v-bind="fb.field('nature', form.nature)"
         ><t-select v-model="form.nature" :options="options('nature')" placeholder="请选择款项名称"
@@ -62,7 +62,7 @@
           placeholder="请选择商品"
       /></t-form-item>
       <t-form-item label="安排数量" required v-bind="fb.field('quantity', form.quantity)"
-        ><t-input-number v-model="form.quantity" placeholder="请输入安排数量" :min="1" :decimal-places="0"
+        ><DecimalInput v-model="form.quantity" placeholder="请输入安排数量" :min="0" :decimal-places="0"
       /></t-form-item>
       <t-form-item v-if="action === 'supply'" label="交付路径"
         ><t-radio-group v-model="form.route"
@@ -89,10 +89,10 @@
         :label="action === 'correct-shipment' ? '更正后数量' : '本次数量'"
         required
         v-bind="fb.field('quantity', form.quantity)"
-        ><t-input-number
+        ><DecimalInput
           v-model="form.quantity"
           :placeholder="controlPlaceholder(action === 'correct-shipment' ? '更正后数量' : '本次数量', 'input')"
-          :min="action === 'correct-shipment' ? 0 : 1"
+          :min="0"
           :decimal-places="0"
       /></t-form-item>
       <t-form-item label="实际时间" required v-bind="fb.field('at', form.at)"
@@ -112,7 +112,7 @@
       >
         <template #remaining="{ row }">{{ remaining(row) }}</template>
         <template #quantity="{ row }"
-          ><t-input-number
+          ><DecimalInput
             v-model="form.cancelQuantities[row.sku]"
             placeholder="请输入取消件数"
             :min="0"
@@ -121,15 +121,15 @@
             :aria-label="`${row.name}取消件数`"
         /></template>
         <template #billing="{ row }"
-          ><t-input-number
+          ><DecimalInput
             v-model="form.billings[row.sku]"
             placeholder="请输入剩余计价数量"
             :min="0"
-            :decimal-places="3"
+            :decimal-places="2"
             :aria-label="`${row.name}剩余计价数量`"
         /></template>
         <template #discount="{ row }"
-          ><t-input-number
+          ><DecimalInput
             v-model="form.lineDiscounts[row.sku]"
             placeholder="请输入剩余商品折扣"
             :disabled="form.discountMode !== 'items'"
@@ -146,7 +146,7 @@
         ></t-form-item
       >
       <t-form-item label="剩余整单折扣"
-        ><t-input-number
+        ><DecimalInput
           v-model="form.discount"
           placeholder="请输入剩余整单折扣"
           :disabled="form.discountMode !== 'order'"
@@ -155,18 +155,18 @@
           suffix="%"
       /></t-form-item>
       <t-form-item label="减免金额"
-        ><t-input-number
+        ><DecimalInput
           v-model="form.reduction"
           placeholder="请输入减免金额"
           :min="0"
           :decimal-places="2" /></t-form-item
       ><t-form-item label="抹零金额"
-        ><t-input-number v-model="form.rounding" placeholder="请输入抹零金额" :min="0" :decimal-places="2"
+        ><DecimalInput v-model="form.rounding" placeholder="请输入抹零金额" :min="0" :decimal-places="2"
       /></t-form-item>
     </template>
     <template v-if="action === 'terms'">
       <t-form-item label="运费"
-        ><t-input-number v-model="form.freight" placeholder="请输入运费" :min="0" :decimal-places="2" suffix="元"
+        ><DecimalInput v-model="form.freight" placeholder="请输入运费" :min="0" :decimal-places="2" suffix="元"
       /></t-form-item>
       <t-form-item label="预计发完日期"
         ><t-date-picker v-model="form.due" clearable placeholder="请选择日期"
@@ -195,6 +195,8 @@
   </AdminFormDialog>
 </template>
 <script setup lang="ts">
+import DecimalInput from '@/components/DecimalInput.vue';
+import { validateNumericControls } from '@/utils/numericInputValidation';
 import { computed, ref, watch } from 'vue';
 import { AdminListPage, AdminFormDialog, AdminMediaUpload, type AdminMediaValue } from '@/components/foundation';
 import { operationConfirmation } from '@/components/foundation/actions/confirmation';
@@ -315,6 +317,7 @@ function uploadProof(file: File): Promise<AdminMediaValue> {
   });
 }
 async function submit() {
+  if (!(await validateNumericControls(dialog.value))) return;
   fb.clear();
   error.value = '';
   try {

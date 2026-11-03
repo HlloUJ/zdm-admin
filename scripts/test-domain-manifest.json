@@ -154,7 +154,7 @@
       "dynamicImports": 0
     },
     "scripts/business-regression-contracts.json": {
-      "digest": "3e36be673f521c38d5577e5316557e5a65fb081bc7dce38138e2d1539ae9fcdd",
+      "digest": "cb85d437627391ca1e1cf30a02e8da411c3f6dbf0a5240f80d86fc0340b3288d",
       "imports": [],
       "dynamicImports": 0
     },
@@ -571,18 +571,28 @@
       "imports": [],
       "dynamicImports": 0
     },
+    "scripts/e2e-shards-integration.test.mjs": {
+      "digest": "e10d49a8efca8c0c2e50fb403a5a4a0539529e34b411fd04e75f449fcf4c1349",
+      "imports": [
+        "node_modules/@playwright/test/cli.js",
+        "node_modules/@playwright/test/index.mjs",
+        "scripts/e2e-shards.mjs",
+        "scripts/shared-cases"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/e2e-shards.mjs": {
-      "digest": "9875ad9f1cafe500d0b97eacece49eeb9a36679c399d4b5c33d4a9fad4515b3c",
+      "digest": "f7e537fc761c7e27cc69fbea6e4c60c3a2a6eea18473962f920d583a05073030",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/e2e-shards.test.mjs": {
-      "digest": "97c1ca3cedb76e69ad769799f02e7f9eb93b810c754fcb48f9c7e7f3bf08e213",
+      "digest": "da020c85f3871d5a1b1f75c219f698806e3b1af7e9150cb93b05a92066223397",
       "imports": ["scripts/e2e-performance.mjs", "scripts/e2e-shards.mjs"],
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "9b20a4fe3c46b0354808e068024e3effb124e806a5e8538a61f945e4dd10e87f",
+      "digest": "fd7160e402c09a722149ff69c2799d43c20071f6a42148fd56ca787881e1ac3c",
       "imports": [
         "scripts/absent.mjs",
         "scripts/affected-test-inputs.mjs",
@@ -651,6 +661,7 @@
         "scripts/e2e-app.test.mjs",
         "scripts/e2e-performance.mjs",
         "scripts/e2e-resources.mjs",
+        "scripts/e2e-shards-integration.test.mjs",
         "scripts/e2e-shards.mjs",
         "scripts/e2e-shards.test.mjs",
         "scripts/engineering-impact.mjs",

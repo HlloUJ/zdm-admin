@@ -22,24 +22,29 @@
 
 .batch-filter-list {
   display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
   gap: var(--td-comp-margin-s);
 }
 
 .batch-filter-row {
   display: grid;
-  grid-template-columns: 100px minmax(0, 1fr);
+  grid-template-columns: subgrid;
+  grid-column: 1 / -1;
   gap: var(--td-comp-margin-s);
   align-items: flex-start;
 }
 
 .batch-filter-label {
+  margin: 0;
   padding-top: 0;
+  white-space: nowrap;
 }
 
 .batch-filter-values {
   display: flex;
   flex-wrap: wrap;
   gap: var(--td-comp-margin-s);
+  padding-block: calc((var(--td-line-height-body-medium) - var(--td-comp-size-xxs)) / 2);
 }
 
 .batch-match-tip {
@@ -66,6 +71,12 @@
 .batch-field-grid :is(.t-input-number) {
   width: 100%;
   max-width: 100%;
+}
+
+/* Own one feedback line so the shared negative tip margin cannot consume
+   the native Card body padding; additional error lines grow naturally. */
+:is(.batch-fill-panel--source, .batch-fill-panel--store) .batch-field-grid > .t-form__item {
+  padding-bottom: var(--td-line-height-body-small);
 }
 
 /* Ordinary single-column create/edit dialogs use native 480px Dialog and 100px labels. */

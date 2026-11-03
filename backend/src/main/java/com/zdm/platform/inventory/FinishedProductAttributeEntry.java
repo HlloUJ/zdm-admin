@@ -15,7 +15,7 @@ public class FinishedProductAttributeEntry extends BaseEntity {
   @NotBlank
   private String attributeName;
 
-  @NotBlank
+  @NotNull
   private String value;
 
   public Long getFinishedProductId() { return finishedProductId; }

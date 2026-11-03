@@ -210,6 +210,7 @@ interface DetailProduct {
   partnerPrices?: { skuId: number; price: number }[];
   salePrices?: { skuId: number; price: number | null; mode: 'auto' | 'manual' }[];
   specDimensions?: FinishedSpecDimension[];
+  attributeDisplayOrder?: { product: string[]; sales: string[] };
 }
 const props = withDefaults(
   defineProps<{
@@ -272,12 +273,21 @@ const levels = computed(() => [
 const columns = computed<PrimaryTableCol[]>(() => {
   const dimensionColumns = dimensions.value.map((dimension) => ({
     colKey: dimension.key,
-    title: dimension.name,
+    title: props.attributeNames[dimension.key] || dimension.name,
     minWidth: 120,
   }));
   const attributeColumns = [
     { colKey: 'stock', title: '库存', minWidth: 80 },
-    ...extraFields.value.map((key) => ({ colKey: key, title: props.attributeNames[key] || key, minWidth: 120 })),
+    ...[...extraFields.value]
+      .sort((a, b) => {
+        const keys = props.product.attributeDisplayOrder?.sales ?? [];
+        const index = (key: string) => {
+          const n = keys.indexOf(key);
+          return n < 0 ? Number.MAX_SAFE_INTEGER : n;
+        };
+        return index(a) - index(b);
+      })
+      .map((key) => ({ colKey: key, title: props.attributeNames[key] || key, minWidth: 120 })),
   ];
   const priceColumns = [
     ...(props.poolMode

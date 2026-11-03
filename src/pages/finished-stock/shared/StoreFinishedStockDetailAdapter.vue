@@ -72,6 +72,7 @@ const detail = computed(() => ({
   videoUrl: props.product.videoUrl,
   detail: props.product.detail || '',
   attributes: props.product.attributes,
+  attributeDisplayOrder: props.product.attributeDisplayOrder,
   specDimensions: props.product.specDimensions,
   variants: props.product.skus.map((sku) => ({
     id: sku.skuId,

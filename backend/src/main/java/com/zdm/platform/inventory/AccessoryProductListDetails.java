@@ -96,6 +96,14 @@ final class AccessoryProductListDetails {
       product.setGuidePrices(guidePrices.getOrDefault(product.getId(), List.of()));
       product.setVariants(variants.getOrDefault(product.getId(), List.of()));
       product.setAttributes(attributes.getOrDefault(product.getId(), List.of()));
+      if (product.getAttributeTemplateSnapshot() != null) {
+        var boundNames = ProductAttributeVersionService.names(product.getAttributeTemplateSnapshot());
+        var entries = new ArrayList<>(product.getAttributes());
+        entries.forEach(entry -> { var name = boundNames.get("attribute_" + entry.getAttributeId()); if (name != null) { entry.setAttributeName(name); } });
+        var order = product.getAttributeDisplayOrder() == null ? List.<String>of() : product.getAttributeDisplayOrder().getOrDefault("product", List.of());
+        entries.sort(java.util.Comparator.comparingInt(entry -> { int index = order.indexOf(String.valueOf(entry.getAttributeId())); return index < 0 ? Integer.MAX_VALUE : index; }));
+        product.setAttributes(entries);
+      }
     });
     return products;
   }

@@ -13,9 +13,11 @@ import org.springframework.util.StringUtils;
 @Service
 public class FinishedProductGuidePriceService {
   private final FinishedProductGuidePriceMapper mapper;
+  private final FinishedGuidePriceSettingMapper settingMapper;
 
-  public FinishedProductGuidePriceService(FinishedProductGuidePriceMapper mapper) {
+  public FinishedProductGuidePriceService(FinishedProductGuidePriceMapper mapper, FinishedGuidePriceSettingMapper settingMapper) {
     this.mapper = mapper;
+    this.settingMapper = settingMapper;
   }
 
   public List<FinishedProductGuidePrice> listPrices(Long productId) {
@@ -40,8 +42,25 @@ public class FinishedProductGuidePriceService {
     if (requestedPrices == null || requestedPrices.isEmpty()) {
       throw new IllegalArgumentException("请完善每个成品规格的指导价");
     }
+    var previous = listPrices(productId).stream().collect(Collectors.toMap(FinishedProductGuidePrice::getSkuId, java.util.function.Function.identity()));
+    var setting = settingMapper.selectById(1L);
     List<FinishedProductGuidePrice> normalized = requestedPrices.stream()
-        .map(price -> normalize(productId, price))
+        .map(price -> {
+          var normalizedPrice = normalize(productId, price);
+          var existing = previous.get(price.getSkuId());
+          String source = price.getPriceSource() == null
+              ? (existing == null || existing.getPriceSource() == null ? "manual" : existing.getPriceSource())
+              : price.getPriceSource();
+          if (!List.of("auto", "manual").contains(source)) {
+            throw new IllegalArgumentException("指导价来源不正确");
+          }
+          if ("auto".equals(source) && (setting == null
+              || normalizedPrice.getPriceCoefficient().compareTo(setting.getPriceCoefficient()) != 0)) {
+            throw new IllegalArgumentException("跟随配置指导价必须使用当前有效系数");
+          }
+          normalizedPrice.setPriceSource(source);
+          return normalizedPrice;
+        })
         .toList();
     long distinctVariants = normalized.stream().map(FinishedProductGuidePrice::getSkuId).distinct().count();
     if (distinctVariants != normalized.size()) {
