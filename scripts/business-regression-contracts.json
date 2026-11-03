@@ -349,15 +349,15 @@
         "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java"
       ],
       "protectedTests": {
-        "tests/e2e/product-state-activity.spec.ts": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
+        "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
         "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
         "tests/e2e/slab-collaboration.spec.ts": "8d937a9d33911c18986b1004a0b63b049789b704c4d7a84c4470cdd79a2aac44",
         "tests/e2e/store-finished-stock.spec.ts": "49ecdf64ee80f2af34c4c24b110b32abec8b8900527f9cf421156dbc4cb3aa1d",
         "tests/e2e/store-accessory-management.spec.ts": "7e77cbe7e8533ed41d1c3009b91532fb50bb8d6e605a7beff9d230ca42b5a1df",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "f30e0fcac5182b16a15af8af9e3811352d8b9b551625c2f559e329e6d31a4276",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "4039e8369af0719300c4538dba93c641d1d36ce322e6e9fb35b9a164f45abbd9",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "745c3e836d109798b17ae7c77d6321acddfdc087ecec1fb5908633ad26ec7af2",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "c31cf35c840adba094a22a9c3b10176cabcb88e4dc2838c1a57bfc6a4370739f",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "dc7e166f9b9fc08c5fc4699b2454c789097cee57a95702f8d532de41cee39faa",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
@@ -373,7 +373,7 @@
         "tests/e2e/permission-center.spec.ts": "0667262a2650c67c0aff2103cbc42df26e9a7b34bc635ed63e4a395795f7a516",
         "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
         "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
-        "tests/e2e/slab-publish-layout.spec.ts": "72c9f702531a2f9b23dc674633356d31d5c7df049dbfa67c7b2c5fed9e36a970",
+        "tests/e2e/slab-publish-layout.spec.ts": "83fae189da20ab3113dbb2f7eb7a4b6aa19d3b10140aec002c7a90c77ccd06f3",
         "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
         "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
         "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
@@ -381,15 +381,15 @@
         "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java": "f245b9dd1fc458b657a2ffdbb0679ed97547e8f74d6e6a895fa1e986cdb3aff9",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java": "24637bff45722355d31fd78e75a37e5533b7c8411a9ed94f4558a30a8e62dca7",
-        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "c144f45995267956d54ff58068be134a793807b1f0e5c28ca244a4ebe337f861",
-        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "e80adada95be2e20996dad23b7d6508b0c262e94968b9a7f00709c61db445b1f",
+        "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java": "ef8c884c161b3178d256752a9053b200382fd1205fbfbaf833bdced6e7fce0f7",
+        "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "8d7ab48d39c5f13836ad577e079ebacc573c42f84f887dc77da585c41bcdd176",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
         "tests/e2e/accessory-api-mocks.ts": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
         "tests/e2e/pagination-responsive.spec.ts": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
         "tests/e2e/store-order-prototype.spec.ts": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
-        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
+        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
         "tests/e2e/product-all-view.spec.ts": "8f9a3694189b65e6250f49f97ce662e5a78e97f4d033de20e54b231575d6574e",
@@ -409,7 +409,7 @@
         "src/services/terminalAllBatchShelf.test.ts": "881bed04c4aee9012b955ef337bbebe759bde5e7e8a6435d22bd461070453113",
         "src/services/productGlobalPermissions.test.ts": "e1ebf3f1474e2395d41ef84e2e232558955bf3f0680adc6fb6e5d4d560552860",
         "src/services/functionCatalog.test.ts": "00b57bef779983c25d62af6586fc4b32a9ace41bc3b6e6a7fb91ae8073135ffd",
-        "src/components/WarehouseEntryInformation.test.ts": "df107925fa93ed62ca3fe202b3706f32f246b41f7e0751516abe87decbdd99a3",
+        "src/components/WarehouseEntryInformation.test.ts": "f3adf3ec76f669c060b743ca193fabac68bbb9d3f6c56b0872963eed91cc32c7",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java": "4d8b280890870833713fede0af7ce8efb6811bf13db596d5e0552b5661e6f8ec",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java": "2e597d98526786b6070e1b94ff9c87c04ac94785d1843db6aa3456c3aa0368a4",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java": "14f84fbce6075e6b7ae87d86da56d5247d7a9a05c79184ce383aab561641d6a0",
@@ -2344,6 +2344,60 @@
           "before": "a235030fa07ecbdc4f418ce2428b727a6c1dcbd41dacbd6f96ff35b8b464f91b",
           "after": "62190c505726220afce7e76fb7560ee838faa1c156f40a27ec764f6636e4a4a5",
           "reason": "用户确认只补修运营成品现货/配件缺历史规格顺序的回退：仅绑定版本及原SKU、临时展示排序、零值筛选、保留原标签，提示供应链核对；不补写历史、不改其他端及价格规则。仅增加六项页面回归，保留所有旧用例、断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-state-activity.spec.ts",
+          "before": "464eb5d1e0fe2beed7b9b22119e2c1952c14d0d11aa0c2a6d96c25ef08eb0e25",
+          "after": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
+        },
+        {
+          "file": "tests/e2e/slab-publish-layout.spec.ts",
+          "before": "72c9f702531a2f9b23dc674633356d31d5c7df049dbfa67c7b2c5fed9e36a970",
+          "after": "83fae189da20ab3113dbb2f7eb7a4b6aa19d3b10140aec002c7a90c77ccd06f3",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
+          "before": "04a41534266c147981522c4e2a67fbd2c16608ada359354b958275f233e3e808",
+          "after": "745c3e836d109798b17ae7c77d6321acddfdc087ecec1fb5908633ad26ec7af2",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "f30e0fcac5182b16a15af8af9e3811352d8b9b551625c2f559e329e6d31a4276",
+          "after": "c31cf35c840adba094a22a9c3b10176cabcb88e4dc2838c1a57bfc6a4370739f",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "4039e8369af0719300c4538dba93c641d1d36ce322e6e9fb35b9a164f45abbd9",
+          "after": "dc7e166f9b9fc08c5fc4699b2454c789097cee57a95702f8d532de41cee39faa",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/FinishedProductRichTextApiTest.java",
+          "before": "c144f45995267956d54ff58068be134a793807b1f0e5c28ca244a4ebe337f861",
+          "after": "ef8c884c161b3178d256752a9053b200382fd1205fbfbaf833bdced6e7fce0f7",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java",
+          "before": "e80adada95be2e20996dad23b7d6508b0c262e94968b9a7f00709c61db445b1f",
+          "after": "8d7ab48d39c5f13836ad577e079ebacc573c42f84f887dc77da585c41bcdd176",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java",
+          "before": "6ab40c5b2ade908db0099329cbe4dc3dab0a2119602cb874b15c7972091ac3fa",
+          "after": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
+        },
+        {
+          "file": "src/components/WarehouseEntryInformation.test.ts",
+          "before": "df107925fa93ed62ca3fe202b3706f32f246b41f7e0751516abe87decbdd99a3",
+          "after": "f3adf3ec76f669c060b743ca193fabac68bbb9d3f6c56b0872963eed91cc32c7",
+          "reason": "用户确认的三项限定变更：入库次数改为途径、删除冗余重新入仓原因、仅供应链大板去掉指定卡片；保留其余断言、超时和零重试"
         }
       ],
       "routes": [

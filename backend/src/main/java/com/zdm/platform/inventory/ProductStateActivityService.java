@@ -42,7 +42,7 @@ public class ProductStateActivityService {
    item.setStateOperatedAt(StateActivityTime.read(row.get("occurred_at")));
    item.setStateOperatorName((String)row.get("operator_name"));
    if ("warehouse".equals(state)) {
-    item.setWarehouseEntryType((String)row.get("warehouse_entry_type"));
+    item.setWarehouseEntryType(WarehouseEntryInformation.currentType((String)row.get("warehouse_entry_type"),business));
     item.setWarehouseEntryReason((String)row.get("warehouse_entry_reason"));
     item.setWarehouseEntryDetail((String)row.get("warehouse_entry_detail"));
    }

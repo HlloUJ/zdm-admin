@@ -30,6 +30,8 @@ test('发布直接进入三段整页表单，导航固定且返回保留列表�
   await page.getByRole('button', { name: '发布商品', exact: true }).click();
   const form = page.locator('.slab-publish-page');
   await expect(form).toBeVisible();
+  await expect(form.getByRole('region', { name: '发布商品信息', exact: true })).toHaveCount(0);
+  await expect(form.getByRole('button', { name: '返回列表', exact: true })).toHaveCount(0);
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
   await expect(form.getByRole('heading', { level: 2 })).toHaveText(['图文描述', '基础信息', '销售信息']);
   for (const title of await form.locator('.form-section-title').all()) {
@@ -67,7 +69,7 @@ test('发布直接进入三段整页表单，导航固定且返回保留列表�
   await expect(form.getByRole('navigation')).toBeInViewport();
   expect(await form.evaluate((el) => el.scrollWidth <= el.clientWidth)).toBe(true);
   expect(errors).toEqual([]);
-  await form.getByRole('button', { name: '返回列表', exact: true }).click();
+  await form.getByRole('button', { name: '取消', exact: true }).click();
   await expect(form).toHaveCount(0);
   await expect(page.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' })).toHaveClass(/t-is-active/);
 });
@@ -122,6 +124,9 @@ test('供应链编辑复用发布页三段表单并回填数据', async ({ page 
     .click();
   const dialog = page.locator('.slab-publish-page');
   await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('region', { name: '发布商品信息', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '返回列表', exact: true })).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: '取消', exact: true })).toBeVisible();
   await expect(page.getByText('本次入库信息', { exact: true })).toHaveCount(0);
   await expect(dialog.getByRole('heading', { level: 2 })).toHaveText(['图文描述', '基础信息', '销售信息']);
   await expect(page.locator('.t-dialog:visible')).toHaveCount(0);

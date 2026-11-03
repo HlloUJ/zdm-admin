@@ -160,7 +160,7 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
     }
   }
   @ParameterizedTest @ValueSource(strings = {"finished", "accessory", "slab"})
-  void reentryKeepsRealTriggerReasonAndHistoricalLogs(String kind) throws Exception {
+  void sourceArrivalKeepsRealActorAndHistoricalLogsWithoutRedundantReason(String kind) throws Exception {
     identity("admin"); product(kind, "selling");
     jdbc.update("UPDATE stores SET store_level_id=NULL");
     jdbc.update("UPDATE store_levels SET status='disabled'");
@@ -181,11 +181,11 @@ class ProductStateActivityApiTest extends SpringContainerTestSupport {
         .containsEntry("operation_source", "MANUAL").containsEntry("after_status", "warehouse");
     assertThat(((Number) log.get("operator_account_id")).longValue()).isEqualTo(1L);
     assertThat(log.get("operation_summary")).isEqualTo(FinishedOperationLogService.SOURCE_SHELF_SUMMARY);
-    assertThat(json.readTree((String) log.get("change_details")).path("重新入仓原因").path("after").asText()).isEqualTo(FinishedOperationLogService.REENTRY_SUMMARY);
+    assertThat(json.readTree((String) log.get("change_details")).has("重新入仓原因")).isFalse();
     assertThat(jdbc.queryForObject("SELECT status FROM " + table(kind) + " WHERE id=99880", String.class)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT operations_deleted FROM " + table(kind) + " WHERE id=99880", Boolean.class)).isFalse();
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM " + logs(kind) + " WHERE " + key(kind) + "=99880 AND operation_type='SOURCE_SHELF'", Long.class)).isEqualTo(2L);
-    assertThat(jdbc.queryForObject("SELECT warehouse_entry_type FROM product_state_activity WHERE kind=? AND business_client_code='admin' AND record_id=99880", String.class, kind)).isNull();
+    assertThat(jdbc.queryForObject("SELECT warehouse_entry_type FROM product_state_activity WHERE kind=? AND business_client_code='admin' AND record_id=99880", String.class, kind)).isEqualTo("sourceShelfEntry");
     jdbc.update("UPDATE " + logs(kind) + " SET operation_type='REENTRY' WHERE id=?", log.get("id"));
     String body = mvc.perform(get("/api/admin/" + endpoint(kind) + "/operation-logs").param("operationType", "SOURCE_SHELF")).andExpect(status().isOk()).andReturn().getResponse().getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
     assertThat(json.readTree(body).path("data").path("records")).hasSize(2);

@@ -278,6 +278,7 @@
           :mode="productMode"
           :title="productDialogTitle"
           :hide-breadcrumb="productMode === 'create'"
+          hide-heading
           :loading="saving"
           @confirm="handleProductSubmit"
           @close="closeProductDialog"

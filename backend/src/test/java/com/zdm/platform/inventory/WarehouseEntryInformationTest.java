@@ -3,11 +3,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.Test;
 class WarehouseEntryInformationTest {
  @Test void classifiesKnownIngressAndDoesNotGuessUnknownCreation() {
-  for (String operation : java.util.List.of("CREATE","SELECT","SOURCE_SHELF")) {
-   assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse",operation,null,null).type()).isEqualTo("firstEntry");
-  }
+  assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse","CREATE",null,null).type()).isEqualTo("createEntry");
+  assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse","SELECT",null,null).type()).isEqualTo("productCenterSelect");
+  assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse","SOURCE_SHELF",null,null).type()).isEqualTo("sourceShelfEntry");
   assertThat(WarehouseEntryInformation.fromEvent("recycle","warehouse","RESTORE",null,null).type()).isEqualTo("recycleRestore");
-  assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse","REENTRY",null,null).type()).isNull();
+  assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse","REENTRY",null,null).type()).isEqualTo("sourceShelfEntry");
   assertThat(WarehouseEntryInformation.fromEvent("selling","warehouse","UPDATE",null,null).type()).isNull();
   assertThat(WarehouseEntryInformation.fromEvent(null,"warehouse",null,null,null).type()).isNull();
  }
@@ -20,5 +20,14 @@ class WarehouseEntryInformationTest {
    assertThat(entry.reason()).isNull(); assertThat(entry.detail()).isNull();
   }
   assertThat(WarehouseEntryInformation.fromEvent("warehouse","selling","SHELF","旧原因","旧说明")).isEqualTo(new WarehouseEntryInformation(null,null,null));
+ }
+ @Test void readsKnownLegacyOriginsWithoutGuessingMissingData() {
+  assertThat(WarehouseEntryInformation.currentType("firstEntry","supply-chain")).isEqualTo("createEntry");
+  assertThat(WarehouseEntryInformation.currentType("firstEntry","admin")).isEqualTo("sourceShelfEntry");
+  assertThat(WarehouseEntryInformation.currentType("firstEntry","store")).isEqualTo("productCenterSelect");
+  assertThat(WarehouseEntryInformation.currentType("sourceReentry","admin")).isEqualTo("sourceShelfEntry");
+  assertThat(WarehouseEntryInformation.currentType(null,"admin")).isNull();
+  assertThat(WarehouseEntryInformation.currentType("unknown","admin")).isEqualTo("unknown");
+  assertThat(WarehouseEntryInformation.currentType("offShelf","store")).isEqualTo("offShelf");
  }
 }
