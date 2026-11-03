@@ -1,0 +1,23 @@
+name: Accepted source verifier
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, synchronize, reopened, ready_for_review]
+permissions:
+  contents: read
+  checks: write
+jobs:
+  accepted_source:
+    name: Verify accepted source from trusted base
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22.23.4
+      - run: node scripts/accepted-source-ci.mjs
+        env:
+          GH_TOKEN: ${{ github.token }}

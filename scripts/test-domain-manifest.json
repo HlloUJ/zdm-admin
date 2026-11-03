@@ -7,6 +7,11 @@
       "imports": [],
       "dynamicImports": 0
     },
+    ".github/workflows/accepted-source.yml": {
+      "digest": "a72dec1a289814e35617311e87b8c25e2865afe00bb4d38e437fdc7abca2a64e",
+      "imports": [],
+      "dynamicImports": 0
+    },
     ".github/workflows/browser-image.yml": {
       "digest": "3ae6d5c36014004ee042fb5ca1832ec350ec83fb41c5ee827de092e130a89e08",
       "imports": [],
@@ -65,6 +70,50 @@
     "playwright.config.ts": {
       "digest": "8dba517383128d692e5f05ec7563fe158371cecb51973c77e4d9a79db4f71a6a",
       "imports": ["scripts/e2e-app.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/accepted-source-ci.mjs": {
+      "digest": "93ba9fcf4193e506decfdf6afcb5f3e80e0df6e60a8f9dc6022b98ac6189a88b",
+      "imports": ["scripts/accepted-source-policy.mjs", "scripts/accepted-source.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/accepted-source-hook.mjs": {
+      "digest": "67237e260cce05a6f3cb9bab5ecc68f449cb4d31d735251e385a4f1ddc2bb138",
+      "imports": ["scripts/accepted-source.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/accepted-source-policy.mjs": {
+      "digest": "1f64d537086e3b035499e5dfde313666ace1cfafab170727a69c3b4b1490f4de",
+      "imports": [
+        "scripts/accepted-source-ci.mjs",
+        "scripts/accepted-source-hook.mjs",
+        "scripts/accepted-source-policy.mjs",
+        "scripts/accepted-source-readiness.mjs",
+        "scripts/accepted-source.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/accepted-source-readiness.mjs": {
+      "digest": "c10249ab536d20595bfc1c78c67d2c417dfa5c33915ce951551857f5f70a4b03",
+      "imports": ["scripts/accepted-source-policy.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/accepted-source.mjs": {
+      "digest": "a193bbb30c03ac5258960dd72a9863af2880990ab7062783ee324d92dad15687",
+      "imports": ["scripts/accepted-source-policy.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/accepted-source.test.mjs": {
+      "digest": "b8db3dd31d56beb351dc2ba630354b2b9e0c2afe2b11b45d1f1937d2fde5e048",
+      "imports": [
+        "scripts/accepted-source-ci.mjs",
+        "scripts/accepted-source-hook.mjs",
+        "scripts/accepted-source-policy.mjs",
+        "scripts/accepted-source-readiness.mjs",
+        "scripts/accepted-source.mjs",
+        "scripts/check.mjs",
+        "scripts/new-business.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/affected-test-inputs.mjs": {
@@ -367,8 +416,9 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "642100fb6502f54bfbb658f6437913a6c9693f4996e5fc6a93f1179d993ceee5",
+      "digest": "634f8c37e63d5d6f20379aeeec3373a59620190485242bddd883b44541a39c92",
       "imports": [
+        "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
         "scripts/batch-timing-store.mjs",
         "scripts/completion-ci-evidence.mjs",
@@ -400,8 +450,13 @@
       "dynamicImports": 0
     },
     "scripts/completion-flow.mjs": {
-      "digest": "a63431ceaea5b9830d4f08a9405bb5b0662349b7e290b1d4e2385700e7a44ee4",
-      "imports": ["scripts/completion-session.mjs", "scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
+      "digest": "3079be3cb3c193be5ac6f47f4134653bb10ceec93c8ffb1ddd446f58fe2d38b2",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/task-batch.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-handoff.mjs": {
@@ -459,8 +514,13 @@
       "dynamicImports": 0
     },
     "scripts/completion-session.test.mjs": {
-      "digest": "273b6201a5acaa23edab0efe9b7ef38b61efa7ae8375eb4faae31413b1b81f89",
-      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-session.mjs", "scripts/wait-quality.mjs"],
+      "digest": "2cc2b128ab65a061955fe2b4effbab8e50127c2da2f24ec0bfc23aeaf79a73fe",
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/wait-quality.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-status.mjs": {
@@ -592,9 +652,14 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "d88cdcd8829926be3f9fd6dfc416a5de94e7103ecaa72d9070821021d4d8fbc6",
+      "digest": "5c3c870c952fd1518a5f71b8aa01587fa933ed60805ff6eaa006d752e4e8ce15",
       "imports": [
         "scripts/absent.mjs",
+        "scripts/accepted-source-ci.mjs",
+        "scripts/accepted-source-hook.mjs",
+        "scripts/accepted-source-readiness.mjs",
+        "scripts/accepted-source.mjs",
+        "scripts/accepted-source.test.mjs",
         "scripts/affected-test-inputs.mjs",
         "scripts/affected-test-inputs.test.mjs",
         "scripts/backend-runtime.mjs",
@@ -1031,7 +1096,7 @@
       "dynamicImports": 1
     },
     "scripts/script-test-plan.mjs": {
-      "digest": "b916d5effe5c71fad031c122d97732b976d761c3094ecca6dff5870468c3292d",
+      "digest": "4002a2703ad632649c3dd0645198e511e8462d5d2ee56665ed850fe3aaa17805",
       "imports": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
       "dynamicImports": 0
     },
@@ -1091,7 +1156,7 @@
       "dynamicImports": 0
     },
     "scripts/task-completion.mjs": {
-      "digest": "057a376e11bc48dee4aaf30bdd35c9ddc36415ae8f8af7d585852a5df5d0a449",
+      "digest": "8e8e7613b8e7ae07ec0fe00ad491a96e6938dc98c7ab9a0b6a4fd59c76c52601",
       "imports": ["scripts/completion-cli.mjs", "scripts/dev-task.mjs", "scripts/task-batch.mjs", "scripts/verify.mjs"],
       "dynamicImports": 1
     },

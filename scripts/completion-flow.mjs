@@ -1,3 +1,4 @@
+import { assertAcceptedSource, publishAcceptance } from './accepted-source.mjs';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -33,6 +34,7 @@ export async function runCompletionFlow(
     git(root, 'fetch', 'origin');
     assert.equal(git(batch.worktree, 'rev-parse', 'HEAD'), head);
     assert.equal(git(batch.worktree, 'status', '--porcelain'), '');
+    assertAcceptedSource(batch.worktree, batch.id, head);
     assert.equal(git(anchor, 'status', '--porcelain'), '');
     planBatchDelivery(root);
     const assets = inventoryAssets(batch.worktree);
@@ -65,9 +67,13 @@ export async function runCompletionFlow(
     return { head, protectionChecked: true, runtimePreflight: true, assets };
   });
   await phase('push', head, () => {
+    publishAcceptance(batch.worktree, batch.id);
     const remote = git(root, 'ls-remote', 'origin', 'refs/heads/' + batch.branch);
-    if (remote) assert.ok(remote.startsWith(head + '\t'), 'Remote task differs; never force push');
-    else git(batch.worktree, 'push', '--set-upstream', 'origin', batch.branch);
+    if (remote && !remote.startsWith(head + '\t')) {
+      const before = remote.split(/\s/)[0];
+      git(root, 'merge-base', '--is-ancestor', before, head);
+      git(batch.worktree, 'push', 'origin', batch.branch);
+    } else if (!remote) git(batch.worktree, 'push', '--set-upstream', 'origin', batch.branch);
     assert.ok(git(root, 'ls-remote', 'origin', 'refs/heads/' + batch.branch).startsWith(head + '\t'));
     return { head };
   });
@@ -121,14 +127,19 @@ export async function runCompletionFlow(
       execute(root, 'gh', ['pr', 'view', String(pull.number), '--json', 'headRefOid,baseRefOid,state,mergeCommit']),
     );
     assert.equal(current.headRefOid, head);
+    assertAcceptedSource(batch.worktree, batch.id, head);
     git(root, 'fetch', 'origin');
     if (current.state === 'OPEN') {
       assert.equal(current.baseRefOid, git(root, 'rev-parse', 'origin/main'));
+      // Strict server-side up-to-date protection then blocks a concurrent base advance.
+      git(root, 'merge-base', '--is-ancestor', current.baseRefOid, head);
+      const mergeTree = git(root, 'merge-tree', '--write-tree', current.baseRefOid, head).split('\n')[0];
+      assertAcceptedSource(root, batch.id, mergeTree);
       execute(root, 'gh', ['pr', 'merge', String(pull.number), '--merge', '--match-head-commit', head]);
     } else assert.equal(current.state, 'MERGED');
     git(root, 'fetch', 'origin');
     const sha = git(root, 'rev-parse', 'origin/main');
-    assert.equal(git(root, 'rev-parse', sha + '^{tree}'), git(root, 'rev-parse', head + '^{tree}'));
+    assertAcceptedSource(root, batch.id, sha);
     const parents = git(root, 'rev-list', '--parents', '-n', '1', sha).split(' ');
     assert.equal(parents.length, 3);
     assert.equal(parents[2], head);
