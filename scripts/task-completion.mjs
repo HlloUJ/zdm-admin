@@ -18,6 +18,39 @@ function git(root, args) {
   assert.equal(result.status, 0, `Cannot verify Git state: ${args[0]}`);
   return args.includes('-z') ? result.stdout : result.stdout.trim();
 }
+// Husky 9.1.7 generated runtime only: exact official bytes, never source hook scripts.
+// Unknown names, changed contents and links continue to block preservation/cleanup.
+const huskyGeneratedHooks = new Set([
+  'pre-commit',
+  'pre-merge-commit',
+  'prepare-commit-msg',
+  'commit-msg',
+  'post-commit',
+  'applypatch-msg',
+  'pre-applypatch',
+  'post-applypatch',
+  'pre-rebase',
+  'post-rewrite',
+  'post-checkout',
+  'post-merge',
+  'pre-push',
+  'pre-auto-gc',
+]);
+const huskyGeneratedDigests = {
+  '.gitignore': '684888c0ebb17f374298b65ee2807526c066094c701bcc7ebbe1c1095f494fc1',
+  h: '70200b200ca709b0622784f93839a5b2872333a917a09afddefd7dc2d8cdc680',
+  'husky.sh': '21122903fca7209a13c991e5be68780636e28f1b8f0ae7ea07ed0065dfe37268',
+};
+function generatedHuskyAsset(name, entry, root) {
+  if (!name.startsWith('.husky/_/') || !entry.isFile() || entry.isSymbolicLink()) return false;
+  const file = name.slice('.husky/_/'.length);
+  const expected = huskyGeneratedHooks.has(file)
+    ? '34fe496008be71d8fdd446b2cce81e4bb0406109c130eafc583fbd9fe33244e2'
+    : huskyGeneratedDigests[file];
+  if (!expected) return false;
+  const absolute = path.join(root, name);
+  return realpathSync(absolute).startsWith(realpathSync(root) + path.sep) && sha(readFileSync(absolute)) === expected;
+}
 export function assetKind(name, entry, root) {
   if (name === 'node_modules' && entry.isSymbolicLink()) {
     const target = realpathSync(path.join(root, name));
@@ -26,7 +59,7 @@ export function assetKind(name, entry, root) {
   if (entry.isSymbolicLink() || !entry.isFile() || privateInput.test(name)) return 'blocked';
   if (knownOutput.test(name) && !realpathSync(path.join(root, name)).startsWith(realpathSync(root) + path.sep))
     return 'blocked';
-  return knownOutput.test(name) ? 'generated-output' : 'blocked';
+  return knownOutput.test(name) || generatedHuskyAsset(name, entry, root) ? 'generated-output' : 'blocked';
 }
 export function inventoryAssets(root) {
   const files = git(root, ['ls-files', '--others', '--ignored', '--exclude-standard', '-z'])
@@ -148,6 +181,8 @@ async function main(args) {
       'handoff-plan',
       'final-handoff',
       'begin',
+      'freeze',
+      'check-source',
       'measure',
       'repair-start',
       'repair-finish',

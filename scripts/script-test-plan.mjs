@@ -13,6 +13,7 @@ export const ENGINEERING_EXTRA_INPUTS = [
   'docker-compose.task.yml',
   '.codex/zdm-project-workflow.yaml',
   '.github/workflows/quality.yml',
+  '.github/workflows/accepted-source.yml',
   'playwright.config.ts',
   'vite.e2e.config.mjs',
   'ci/e2e-app.json',
