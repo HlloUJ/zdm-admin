@@ -13,6 +13,7 @@ async function openEditor(
   variantCount = 2,
   client = 'supply-chain',
   guideFixture?: { coefficient: number | null },
+  historicalFixture?: 'bound' | 'unknown' | 'saved',
 ) {
   await page.addInitScript(() => localStorage.setItem('zdm-admin-token', 'dev-token'));
   await install(page);
@@ -99,6 +100,12 @@ async function openEditor(
       },
     })),
   };
+  if (historicalFixture) {
+    if (historicalFixture !== 'saved') product.specDimensions = [];
+    if (historicalFixture === 'unknown') product.attributeTemplateSnapshot = [];
+    product.variants[0]!.salesAttributes.attribute_2 = '0';
+    Object.assign(product, { attributeDisplayOrder: { product: ['1'], sales: ['attribute_3', 'attribute_2'] } });
+  }
   const writes: Record<string, unknown>[] = [];
   await page.route(`**/api/admin/${resource}`, (route) => route.fulfill({ json: { code: 0, data: [product] } }));
   await page.route(new RegExp(`/api/admin/${resource}/95(?:/edit)?$`), (route) => {
@@ -110,7 +117,24 @@ async function openEditor(
     route.fulfill({ json: { code: 0, data: [] } }),
   );
   await page.route(`**/api/admin/${resource}/attribute-template-options`, (route) =>
-    route.fulfill({ json: { code: 0, data: [{ versionId: 2, revision: 0, categoryId: 5, content: [] }] } }),
+    route.fulfill({
+      json: {
+        code: 0,
+        data: [
+          {
+            versionId: 2,
+            revision: 0,
+            categoryId: 5,
+            content: historicalFixture
+              ? [
+                  ...snapshot.map((field) => ({ ...field, skuFlag: false })),
+                  { ...snapshot[1]!, attributeId: 4, name: '当前新增维度', skuFlag: true },
+                ]
+              : [],
+          },
+        ],
+      },
+    }),
   );
   if (guideFixture) {
     const setting = resource === 'finished-products' ? 'finished-guide-price-setting' : 'accessory-guide-price-setting';
@@ -154,6 +178,65 @@ async function switchToLayered(page: Page) {
 }
 
 export function registerAttributeFeedbackTests(resource: Resource, install: (page: Page) => Promise<void>) {
+  for (const historical of ['bound', 'unknown', 'saved'] as const) {
+    test(`operations historical specifications preserve version fields and SKU labels, ${historical}`, async ({
+      page,
+    }) => {
+      const { table, writes, product } = await openEditor(
+        page,
+        resource,
+        install,
+        true,
+        '销售数字属性',
+        2,
+        'admin',
+        { coefficient: 2 },
+        historical,
+      );
+      const originals = structuredClone(product.variants);
+      const headers = table.locator('thead th');
+      if (historical === 'unknown') {
+        await expect(headers.first()).toHaveText('商品规格');
+        await expect(table.locator('tbody tr').first()).toContainText('规格1');
+      } else {
+        await expect(headers.first()).toHaveText(historical === 'saved' ? '销售数字属性' : '销售选项属性');
+        await expect(headers.nth(1)).toHaveText(historical === 'saved' ? '销售选项属性' : '销售数字属性');
+      }
+      await expect(table.getByRole('columnheader', { name: '当前新增维度', exact: true })).toHaveCount(0);
+      if (historical !== 'saved') {
+        await expect(
+          page.getByText('此商品缺少历史规格顺序，已保留原规格；如需调整规格，请在供应链端核对。', { exact: true }),
+        ).toBeVisible();
+      }
+      await page.getByRole('button', { name: '批量填写', exact: true }).click();
+      const drawer = page.locator('.t-drawer:visible');
+      if (historical !== 'unknown') {
+        await expect(drawer.getByText('销售数字属性', { exact: true })).toBeVisible();
+        await drawer.getByText('0', { exact: true }).click();
+        await expect(drawer.getByText('当前将批量填充 1 条规格', { exact: true })).toBeVisible();
+      } else {
+        await expect(drawer.getByText('当前将批量填充 2 条规格', { exact: true })).toBeVisible();
+      }
+      await drawer.getByPlaceholder('请输入价格', { exact: true }).first().fill('50');
+      await drawer.getByRole('button', { name: '确认保存', exact: true }).click();
+      await page.locator('.form-submit-bar').getByRole('button', { name: '确认保存', exact: true }).click();
+      await expect.poll(() => writes.length).toBe(1);
+      expect(writes[0]!.guidePrices).toEqual([
+        expect.objectContaining({ skuId: 951, variantLabel: '规格1', price: 50 }),
+        expect.objectContaining({ skuId: 952, variantLabel: '规格2', price: historical === 'unknown' ? 50 : 60 }),
+      ]);
+      for (const field of [
+        'variants',
+        'attributes',
+        'specDimensions',
+        'templateVersionId',
+        'attributeTemplateSnapshot',
+      ])
+        expect(writes[0]).not.toHaveProperty(field);
+      expect(product.variants).toEqual(originals);
+    });
+  }
+
   test('guide source preserves formatting, supports confirmed switching and batch manual prices per SKU', async ({
     page,
   }) => {

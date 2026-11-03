@@ -677,6 +677,7 @@
 </template>
 
 <script setup lang="ts">
+import { operationsHistoricalLayeredFields } from './historicalSpecification';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';
 const batchShelfResultVisible = ref(false);
@@ -1095,19 +1096,6 @@ const layeredFieldLabels = computed<Record<string, string>>(() => ({
   ...Object.fromEntries(confirmedSpecDimensions.value.map((dimension) => [dimension.key, dimension.name])),
   ...Object.fromEntries(salesAttributeFields.value.map((field) => [field.key, field.label])),
 }));
-const skuAttributeFields = computed(() =>
-  salesAttributeFields.value.filter(
-    (field) =>
-      confirmedLayeredFields.value.includes(field.key) ||
-      categoryAttributeBindings.value.some(
-        (binding) =>
-          binding.categoryId === selectedCategoryId.value &&
-          binding.attributeId === field.attributeId &&
-          binding.attributeRole === 'sales' &&
-          binding.skuFlag === true,
-      ),
-  ),
-);
 
 const salesAttributeByKey = (key: LayeredSpecField) => salesAttributeFields.value.find((field) => field.key === key);
 const reasonState = reactive<{
@@ -1449,7 +1437,7 @@ const baseSpecColumns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     title: field.label,
   });
   const orderedSpecColumns: PrimaryTableCol<TableRowData>[] =
-    confirmedSpecMode.value === 'single'
+    confirmedSpecMode.value === 'single' || !confirmedLayeredFields.value.length
       ? [{ colKey: 'specText', title: '商品规格', minWidth: 100 }]
       : confirmedLayeredFields.value.map((key) => {
           const field = salesAttributeByKey(key);
@@ -1496,7 +1484,7 @@ const batchFilterOptions = computed(() =>
   batchFilterFields.value.map((field) => ({
     field,
     label: field === 'specText' ? '商品规格' : layeredFieldLabels.value[field],
-    values: Array.from(new Set(specRows.value.map((row) => String(row[field] || '')).filter(Boolean))),
+    values: Array.from(new Set(specRows.value.map((row) => String(row[field] ?? '')).filter(Boolean))),
   })),
 );
 const isBatchFilterValueSelected = (field: BatchFilterField, value: string) =>
@@ -1505,7 +1493,7 @@ const batchFillMatchedRows = computed(() =>
   specRows.value.filter((row) =>
     batchFilterFields.value.every((field) => {
       const selectedValues = batchFillFilters[field] ?? [];
-      return selectedValues.length === 0 || selectedValues.includes(String(row[field] || ''));
+      return selectedValues.length === 0 || selectedValues.includes(String(row[field] ?? ''));
     }),
   ),
 );
@@ -1654,21 +1642,18 @@ const openFormPage = (row: StockItem) => {
     });
     selectedCategoryId.value = row.categoryId;
     selectedCategoryPath.value = row.category.replaceAll('/', ' > ');
-    specRows.value = createEditSpecRows(row);
+    specRows.value = createEditSpecRows(row).map((spec) => ({
+      ...spec,
+      specText: row.variants.find((variant) => variant.id === spec.skuId)?.variantLabel ?? spec.specText,
+    }));
     confirmedSpecMode.value = row.variants[0]?.displayMode ?? 'single';
     confirmedSpecDimensions.value = copySpecDimensions(row.specDimensions);
     if (confirmedSpecMode.value === 'layered') {
       specRows.value = orderLayeredRows(specRows.value, confirmedSpecDimensions.value);
     }
-    confirmedLayeredFields.value = (
-      row.specDimensions?.length
-        ? row.specDimensions.map((dimension) => dimension.key)
-        : skuAttributeFields.value
-            .map((field) => field.key)
-            .filter((field) => row.variants.some((variant) => variant.salesAttributes?.[field]))
-    ) as LayeredSpecField[];
+    confirmedLayeredFields.value = operationsHistoricalLayeredFields(row);
     if (confirmedSpecMode.value === 'layered' && !row.specDimensions?.length) {
-      adminFeedback.warning('此商品缺少历史规格顺序，请在编辑规格中核对后保存');
+      adminFeedback.warning('此商品缺少历史规格顺序，已保留原规格；如需调整规格，请在供应链端核对。');
     }
   }
 };
