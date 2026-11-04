@@ -123,7 +123,9 @@
                   :selected-count="selectedKeys.length"
                   :has-batch-actions="
                     batchButtons.some((button) =>
-                      ['batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(button.action),
+                      ['batchDelete', 'batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(
+                        button.action,
+                      ),
                     )
                   "
                   :has-auxiliary="canViewOperationLogs"
@@ -662,6 +664,7 @@
     <FinishedOperationLogs v-if="canViewOperationLogs" v-model:visible="operationLogsVisible" />
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="saving"
       :function="buttonFunctionFor('stock', confirmState.type)"
       :action="confirmAction"
       object-type="商品"
@@ -672,14 +675,22 @@
     >
       {{ confirmState.content }}
     </AdminConfirmDialog>
-    <OperationsBatchShelfResult v-model:visible="batchShelfResultVisible" :result="batchShelfResult" />
+    <OperationsBatchShelfResult
+      v-model:visible="batchShelfResultVisible"
+      :result="batchShelfResult"
+      :operation="batchOperation"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import { operationsHistoricalLayeredFields } from './historicalSpecification';
+import { deleteProductsBatch } from '@/services/productBatchDelete';
+import { canBatchDelete } from '@/services/productBatchPermissions';
+import { batchRequestError } from '@/services/productBatchFeedback';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { batchShelfProducts, type BatchShelfResult } from '@/services/operationsBatchShelf';
+const batchOperation = ref<'上架' | '删除'>('上架');
 const batchShelfResultVisible = ref(false);
 const batchShelfResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
 import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
@@ -809,6 +820,7 @@ const { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermi
     (tab.value !== 'all' || hasFinishedAction('view', 'warehouse') || hasFinishedAction('view', 'selling')),
 });
 const finishedActionCodes: Record<string, string> = {
+  batchDelete: 'delete',
   batchShelf: 'batch-shelf',
   batchOffShelf: 'batch-off-shelf',
   batchRestore: 'batch-restore',
@@ -1124,6 +1136,7 @@ const confirmAction = computed(() => {
     delete: '删除',
     restore: '放回',
     purge: '彻底删除',
+    batchDelete: '批量删除',
     batchShelf: '批量上架',
     batchRestore: '批量放回到仓库',
     batchPurge: '批量彻底删除',
@@ -1334,7 +1347,7 @@ const pageAllSelected = computed(
 const pagePartiallySelected = computed(
   () => pageData.value.some((item) => selectedKeySet.value.has(item.id)) && !pageAllSelected.value,
 );
-const batchButtons = computed(() => {
+const baseBatchButtons = computed(() => {
   if (activeTab.value === 'all')
     return hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`)
       ? [{ action: 'batchShelf' as const, label: '批量上架', icon: 'upload' }]
@@ -1368,6 +1381,12 @@ const batchButtons = computed(() => {
         ),
   );
 });
+const batchButtons = computed(() => [
+  ...baseBatchButtons.value,
+  ...(canBatchDelete(activeTab.value, (state, action) => hasFinishedAction(action, state))
+    ? [{ action: 'batchDelete' as const, label: '批量删除', icon: 'delete' }]
+    : []),
+]);
 const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
   batchButtons.value.map((button) => ({
     id: button.action,
@@ -1397,7 +1416,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
   ];
   if (
     activeTab.value !== 'soldOut' &&
-    (activeTab.value !== 'all' || hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`))
+    (activeTab.value !== 'all' ||
+      hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`) ||
+      canBatchDelete(activeTab.value, (state, action) => hasFinishedAction(action, state)))
   ) {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
@@ -1543,6 +1564,10 @@ const toggleCurrentPage = (checked: boolean) => {
 const handleBatchAction = (action: BatchAction) => {
   if (action !== 'clearRecycle' && selectedKeys.value.length === 0) {
     adminFeedback.warning('请先选择商品');
+    return;
+  }
+  if (action === 'batchDelete') {
+    openConfirm('batchDelete', null, `是否批量删除所选${commodity.label}？删除成功的商品将进入回收站。`);
     return;
   }
   if (action === 'batchShelf') {
@@ -2010,6 +2035,7 @@ const updateProductStatus = async (id: number, status: StockStatus | 'offShelf',
   upsertStockItem(updated);
 };
 const handleConfirm = async () => {
+  if (saving.value) return;
   const type = confirmState.type;
   const product = confirmState.product;
   const selectedCount = selectedKeys.value.length;
@@ -2026,12 +2052,24 @@ const handleConfirm = async () => {
       await deleteFinishedProduct(product.id);
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
       if (sourceBlocked(product)) await loadInventoryData();
-    } else if (type === 'batchShelf') {
+    } else if (type === 'batchShelf' || type === 'batchDelete') {
       const ids = [...selectedKeys.value];
-      batchShelfResult.value = await batchShelfProducts(
-        commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
-        ids,
-      );
+      batchOperation.value = type === 'batchDelete' ? '删除' : '上架';
+      try {
+        batchShelfResult.value =
+          type === 'batchDelete'
+            ? await deleteProductsBatch(
+                commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
+                ids,
+              )
+            : await batchShelfProducts(
+                commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
+                ids,
+              );
+      } catch (error) {
+        adminFeedback.error(batchRequestError(error, batchOperation.value));
+        return;
+      }
       selectedKeys.value = [];
       ids.forEach((id) => delete shelfErrors[id]);
       closeConfirmDialog();

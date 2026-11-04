@@ -90,10 +90,7 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
             label: '大板管理页',
             value: 'admin.slab-management',
             audiences: ['admin'],
-            actions: [
-              { label: '批量上架', value: 'admin.slab-management.batch-shelf' },
-              { label: '操作日志', value: 'admin.slab-management.operation-log.view' },
-            ],
+            actions: [{ label: '操作日志', value: 'admin.slab-management.operation-log.view' }],
             tabs: [
               {
                 label: '仓库中',
@@ -108,7 +105,6 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '已上架',
                 value: 'admin.slab-management.selling',
                 actions: [
-                  { label: '批量下架', value: 'admin.slab-management.selling.batch-off-shelf' },
                   { label: '下架', value: 'admin.slab-management.selling.off-shelf' },
                   { label: '编辑', value: 'admin.slab-management.selling.edit' },
                   { label: '删除', value: 'admin.slab-management.selling.delete' },
@@ -123,8 +119,6 @@ export const verifiedFunctionCatalog: FunctionModule[] = [
                 label: '回收站',
                 value: 'admin.slab-management.recycle',
                 actions: [
-                  { label: '批量放回到仓库', value: 'admin.slab-management.recycle.batch-restore' },
-                  { label: '批量彻底删除', value: 'admin.slab-management.recycle.batch-purge' },
                   { label: '清空回收站', value: 'admin.slab-management.recycle.clear' },
                   { label: '详情', value: 'admin.slab-management.recycle.detail' },
                   { label: '放回仓库', value: 'admin.slab-management.recycle.restore' },

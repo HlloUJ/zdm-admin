@@ -589,7 +589,9 @@ public class StoreAccessoryProductService {
       invalidationMedia.render(snapshot, true);
       for (String field : List.of("type", "reason", "detail")) {
         String property = "warehouseEntry" + Character.toUpperCase(field.charAt(0)) + field.substring(1);
-        snapshot.set(property, json.valueToTree("warehouse".equals(listing.get("status")) ? listing.get("warehouse_entry_" + field) : null));
+        Object value = "warehouse".equals(listing.get("status")) ? listing.get("warehouse_entry_" + field) : null;
+        if ("type".equals(field)) { value = WarehouseEntryInformation.currentType((String) value, "store"); }
+        snapshot.set(property, json.valueToTree(value));
       }
       snapshot.put("sourceMessage", AccessorySourceMessage.normalize((String) listing.get("invalidated_reason")));
       return json.treeToValue(snapshot, ProductView.class);
@@ -685,7 +687,7 @@ public class StoreAccessoryProductService {
         effective.equals(listing.get("activity_state")) ? (String) listing.get("state_operator_name") : null,
         effective.equals(listing.get("activity_state")) ? timestamp(listing.get("state_operated_at")) : null,
 
-        "warehouse".equals(status) ? (String)listing.get("warehouse_entry_type") : null,
+        "warehouse".equals(status) ? WarehouseEntryInformation.currentType((String)listing.get("warehouse_entry_type"),"store") : null,
         "warehouse".equals(status) ? (String)listing.get("warehouse_entry_reason") : null,
         "warehouse".equals(status) ? (String)listing.get("warehouse_entry_detail") : null);
     return legacyHistoricalView(listing, rendered);

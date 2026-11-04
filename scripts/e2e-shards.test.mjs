@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { readShardPlan, selectShardArgs } from './e2e-shards.mjs';
 import { performanceSummary } from './e2e-performance.mjs';
 function fixture(t) {
@@ -88,4 +89,8 @@ test('performance observations retain category limitations and resource deltas w
   assert.equal(r.containerCpuDelta.usage_usec, 50);
   assert.match(r.interpretation, /may overlap/);
   assert.equal(performanceSummary([], { containerCpu: null }, { containerCpu: null }).containerCpuDelta, null);
+});
+
+test('reviewed repository shard plan includes every real E2E file exactly once', () => {
+  readShardPlan(fileURLToPath(new URL('../', import.meta.url)));
 });

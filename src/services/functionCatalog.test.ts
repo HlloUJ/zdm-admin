@@ -56,13 +56,13 @@ describe('full function catalog', () => {
     expect(page.actions).toEqual([]);
     expect(page.tabs.map((tab) => tab.label)).toEqual(['日常客户', '归档客户']);
     const codes = [
-      ['view', 'create', 'batch-assign', 'batch-archive', 'detail', 'followup', 'edit', 'archive'],
-      ['view', 'batch-assign', 'batch-restore', 'batch-purge', 'detail', 'followup', 'edit', 'restore', 'purge'],
+      ['view', 'create', 'batch-assign', 'detail', 'followup', 'edit', 'archive'],
+      ['view', 'batch-assign', 'detail', 'followup', 'edit', 'restore', 'purge'],
     ];
     page.tabs.forEach((tab, index) =>
       expect(tab.actions.map((action) => action.value)).toEqual(codes[index].map((code) => `${tab.value}.${code}`)),
     );
-    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(17);
+    expect(getFunctionCatalogPermissionValues([module])).toHaveLength(14);
     expect(
       normalizeFunctionCatalogPermissions([module], [`${prefix}.daily.assign`, `${prefix}.archived.assign`]),
     ).toEqual([]);
@@ -133,9 +133,9 @@ describe('full function catalog', () => {
       expect(sourcePage.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);
       expect(sourcePage.tabs.slice(1).map((tab) => tab.actions.map((action) => action.label))).toEqual([
         ['查看', '上架', '编辑', '删除'],
-        ['查看', '批量下架', '下架', '编辑', '删除'],
+        ['查看', '下架', '编辑', '删除'],
         ['查看', '详情'],
-        ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],
+        ['查看', '清空回收站', '详情', '放回仓库', '彻底删除'],
       ]);
       expect(source).toContain(`supply-chain.${module}.publish`);
       expect(source).toContain(`supply-chain.${module}.warehouse.shelf`);
@@ -202,11 +202,11 @@ describe('full function catalog', () => {
     expect(storeValues).toContain('store.finished-stock-management.select');
     expect(stock.menus[0].pages[0].tabs.slice(1, 3).map((tab) => tab.actions.map((action) => action.label))).toEqual([
       ['查看', '上架', '编辑', '删除'],
-      ['查看', '批量下架', '下架', '编辑', '删除'],
+      ['查看', '下架', '编辑', '删除'],
     ]);
     expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');
     expect(storeValues).toContain('store.finished-stock-management.selling.delete');
-    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['商品中心', '批量上架', '操作日志']);
+    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['商品中心', '操作日志']);
     expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');
     const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;
     expect(pricing.menus[0].direct).toBe(true);
@@ -221,7 +221,7 @@ describe('full function catalog', () => {
       expect(tab.actions).toEqual([
         { label: '查看', value: `${tab.value}.view` },
         ...(tab.value.includes('.discount.') ? [{ label: '新增', value: `${tab.value}.create` }] : []),
-        ...(!tab.value.includes('.discount.') ? [{ label: '批量设置', value: `${tab.value}.batch-set` }] : []),
+        ...(!tab.value.includes('.discount.') ? [{ label: '设置价格系数', value: `${tab.value}.batch-set` }] : []),
         ...(tab.value.includes('.discount.')
           ? [
               { label: '编辑', value: `${tab.value}.edit` },
@@ -486,7 +486,6 @@ describe('finished stock catalog contract', () => {
         'admin.finished-stock-management.selling',
         [
           ['查看', 'admin.finished-stock-management.selling.view'],
-          ['批量下架', 'admin.finished-stock-management.selling.batch-off-shelf'],
           ['下架', 'admin.finished-stock-management.selling.off-shelf'],
           ['编辑', 'admin.finished-stock-management.selling.edit'],
           ['删除', 'admin.finished-stock-management.selling.delete'],
@@ -505,8 +504,6 @@ describe('finished stock catalog contract', () => {
         'admin.finished-stock-management.recycle',
         [
           ['查看', 'admin.finished-stock-management.recycle.view'],
-          ['批量放回到仓库', 'admin.finished-stock-management.recycle.batch-restore'],
-          ['批量彻底删除', 'admin.finished-stock-management.recycle.batch-purge'],
           ['清空回收站', 'admin.finished-stock-management.recycle.clear'],
           ['详情', 'admin.finished-stock-management.recycle.detail'],
           ['放回仓库', 'admin.finished-stock-management.recycle.restore'],
@@ -514,16 +511,13 @@ describe('finished stock catalog contract', () => {
         ],
       ],
     ]);
-    expect(page.tabs.slice(1).flatMap((tab) => tab.actions)).toHaveLength(18);
-    expect(page.actions).toEqual([
-      { label: '批量上架', value: 'admin.finished-stock-management.batch-shelf' },
-      { label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' },
-    ]);
+    expect(page.tabs.slice(1).flatMap((tab) => tab.actions)).toHaveLength(15);
+    expect(page.actions).toEqual([{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }]);
     const values = getFunctionCatalogPermissionValues(fullFunctionCatalog).filter((value) =>
       value.startsWith('admin.finished-stock-management.'),
     );
-    expect(values).toHaveLength(21);
-    expect(new Set(values).size).toBe(21);
+    expect(values).toHaveLength(17);
+    expect(new Set(values).size).toBe(17);
     expect(page.tabs.flatMap((tab) => tab.actions).some((action) => ['查询', '重置'].includes(action.label))).toBe(
       false,
     );
@@ -590,7 +584,7 @@ describe('slab operations details', () => {
     expect(page.tabs.map((tab) => tab.label)).toEqual(['全部', '仓库中', '已上架', '已售完', '回收站']);
     expect(page.tabs.slice(1, 3).map((tab) => tab.actions.map((action) => action.label))).toEqual([
       ['查看', '上架', '编辑', '删除'],
-      ['查看', '批量下架', '下架', '编辑', '删除'],
+      ['查看', '下架', '编辑', '删除'],
     ]);
     for (const tab of page.tabs.filter((tab) => !tab.value.endsWith('.all'))) {
       const active = tab.value.endsWith('.warehouse') || tab.value.endsWith('.selling');

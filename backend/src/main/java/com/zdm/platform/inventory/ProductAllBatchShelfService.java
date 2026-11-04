@@ -11,7 +11,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 
-/** Used only by All-tab batch shelving; existing warehouse flows are retained. */
+/** Shared supply-chain/store batch execution, with an independent transaction per product. */
 @Service
 public class ProductAllBatchShelfService {
   private final PermissionGuard guard;
@@ -37,6 +37,12 @@ public class ProductAllBatchShelfService {
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
   public OperationsBatchShelfService.Result shelf(String resource, List<Long> requested) {
+    return execute(resource, requested, false);
+  }
+  public OperationsBatchShelfService.Result delete(String resource, List<Long> requested) {
+    return execute(resource, requested, true);
+  }
+  private OperationsBatchShelfService.Result execute(String resource, List<Long> requested, boolean deleting) {
     boolean store=resource.startsWith("store-");
     String kind=switch(resource) {
       case "finished-products", "store-finished-products" -> "finished-stock-management";
@@ -45,17 +51,19 @@ public class ProductAllBatchShelfService {
       default -> throw new IllegalArgumentException("商品模块不正确");
     };
     if (store) { scopes.require(); }
-    else if (!"supply-chain".equals(guard.identity().clientCode())) { throw new AccessDeniedException("此操作属于供应链协同系统"); }
-    String prefix=(store?"store.":"supply-chain.")+kind;
-    guard.requirePermission(prefix+".batch-shelf"); guard.requireDataPermission();
+    else if (!("supply-chain".equals(guard.identity().clientCode()) || deleting && "admin".equals(guard.identity().clientCode()))) { throw new AccessDeniedException("此操作属于供应链协同系统"); }
+    String prefix=(store?"store.":guard.identity().clientCode()+".")+kind;
+    if (deleting) { guard.requireAnyPermission(prefix + ".warehouse.delete", prefix + ".selling.delete"); }
+    else { guard.requirePermission(prefix + ".warehouse.shelf"); }
+    guard.requireDataPermission();
     if(requested==null || requested.isEmpty() || requested.stream().anyMatch(id -> id==null || id<=0)) { throw new IllegalArgumentException("请选择商品"); }
     var ids=new LinkedHashSet<>(requested);
     var failures=new ArrayList<OperationsBatchShelfService.Failure>();
     for(Long id:ids) {
       try {
         transaction.executeWithoutResult(status -> {
-          if(store) { shelfStore(resource,prefix,id); }
-          else { shelfSource(resource,prefix,id); }
+          if(store) { shelfStore(resource,prefix,id,deleting); }
+          else { shelfSource(resource,prefix,id,deleting); }
         });
       } catch(AccessDeniedException error) {
         failures.add(new OperationsBatchShelfService.Failure(id,"NOT_ACCESSIBLE","商品不存在或无权操作"));
@@ -63,39 +71,46 @@ public class ProductAllBatchShelfService {
         String reason=error.getMessage();
         if(List.of("商品不存在或已被彻底删除","本门店商品不存在或不可访问").contains(reason==null?"":reason)) {
           failures.add(new OperationsBatchShelfService.Failure(id,"NOT_ACCESSIBLE","商品不存在或无权操作"));
-        } else { failures.add(new OperationsBatchShelfService.Failure(id,"VALIDATION_FAILED",reason==null || reason.isBlank()?"商品不满足上架条件":reason)); }
+        } else { failures.add(new OperationsBatchShelfService.Failure(id,"VALIDATION_FAILED",reason==null || reason.isBlank()?(deleting ? "商品不满足删除条件" : "商品不满足上架条件"):reason)); }
       } catch(RuntimeException error) {
-        failures.add(new OperationsBatchShelfService.Failure(id,"EXECUTION_FAILED","上架失败，请稍后重试"));
+        failures.add(new OperationsBatchShelfService.Failure(id,"EXECUTION_FAILED",deleting ? "删除失败，请稍后重试" : "上架失败，请稍后重试"));
       }
     }
     return new OperationsBatchShelfService.Result(ids.size(),ids.size()-failures.size(),failures.size(),failures);
   }
-  private void shelfSource(String resource,String prefix,Long id) {
+  private void shelfSource(String resource,String prefix,Long id,boolean deleting) {
+    boolean supply = "supply-chain".equals(guard.identity().clientCode());
     String state;
     switch(resource) {
       case "finished-products" -> {
         lifecycle.lock(ProductLifecycleService.Kind.FINISHED,id);
-        FinishedProduct product=finished.getById(id); guard.requireData(product); state=product.getSourceStatus();
+        FinishedProduct product=finished.getById(id); guard.requireData(product); state=supply ? product.getSourceStatus() : product.getStatus();
       }
       case "accessory-products" -> {
         accessoryLifecycle.lock(AccessoryLifecycleService.Kind.ACCESSORY,id);
-        AccessoryProduct product=accessory.getById(id); guard.requireData(product); state=product.getSourceStatus();
+        AccessoryProduct product=accessory.getById(id); guard.requireData(product); state=supply ? product.getSourceStatus() : product.getStatus();
       }
       case "slabs" -> {
         lifecycle.lock(ProductLifecycleService.Kind.SLAB,id);
-        SlabInventory product=slabs.getById(id); guard.requireData(product); state=product.getSourceStatus();
+        SlabInventory product=slabs.getById(id); guard.requireData(product); state=supply ? product.getSourceStatus() : product.getStatus();
       }
       default -> throw new IllegalArgumentException("商品模块不正确");
     }
-    requireStateView(prefix,state); requireWarehouse(state);
+    requireStateView(prefix,state); requireAction(prefix,state,deleting);
     switch(resource) {
-      case "finished-products" -> finished.sourceTransition(id,"selling",null,null);
-      case "accessory-products" -> accessory.sourceTransition(id,"selling",null,null);
-      case "slabs" -> slabs.updateStatuses(List.of(id),"selling",null,null);
+      case "finished-products" -> {
+        if (supply) { finished.sourceTransition(id, deleting ? "recycle" : "selling", null, null); }
+        else { FinishedProduct request = new FinishedProduct(); request.setStatus(deleting ? "recycle" : "selling"); finished.updateOperationWithDetails(id, request, false); }
+      }
+      case "accessory-products" -> {
+        if (supply) { accessory.sourceTransition(id, deleting ? "recycle" : "selling", null, null); }
+        else { AccessoryProduct request = new AccessoryProduct(); request.setStatus(deleting ? "recycle" : "selling"); accessory.updateOperationWithDetails(id, request, false); }
+      }
+      case "slabs" -> { if (deleting) { slabs.deleteFromManagement(id,null,null); } else { slabs.updateStatuses(List.of(id),"selling",null,null); } }
       default -> throw new IllegalArgumentException("商品模块不正确");
     }
   }
-  private void shelfStore(String resource,String prefix,Long id) {
+  private void shelfStore(String resource,String prefix,Long id,boolean deleting) {
     var store=scopes.require();
     boolean isAccessory="store-accessory-products".equals(resource);
     String kind=isAccessory?"accessory":"finished";
@@ -107,12 +122,19 @@ public class ProductAllBatchShelfService {
     if(states.isEmpty() || stocks.isEmpty()) { throw new AccessDeniedException("商品不存在或无权操作"); }
     String state=states.getFirst();
     if("selling".equals(state) && stocks.getFirst()!=null && stocks.getFirst()<=0) { state="soldOut"; }
-    requireStateView(prefix,state); requireWarehouse(state);
-    if(isAccessory) { storeAccessory.changeStatus(id,"selling",null,null); }
-    else { storeFinished.changeStatus(id,"selling",null,null); }
+    requireStateView(prefix,state); requireAction(prefix,state,deleting);
+    if(isAccessory) { storeAccessory.changeStatus(id,deleting ? "recycle" : "selling",null,null); }
+    else { storeFinished.changeStatus(id,deleting ? "recycle" : "selling",null,null); }
   }
   private void requireStateView(String prefix,String state) {
     guard.requireAnyPermission(prefix+".view",prefix+"."+("soldOut".equals(state)?"sold-out":state)+".view");
+  }
+  private void requireAction(String prefix, String state, boolean deleting) {
+    if (!deleting) { guard.requirePermission(prefix + ".warehouse.shelf"); requireWarehouse(state); return; }
+    if (!List.of("warehouse", "selling").contains(state)) {
+      throw new IllegalArgumentException("recycle".equals(state) ? "商品已在回收站，不能重复删除" : "商品当前状态不允许删除");
+    }
+    guard.requirePermission(prefix + "." + state + ".delete");
   }
   private void requireWarehouse(String state) {
     if("selling".equals(state)) { throw new IllegalArgumentException("已处于上架状态，不能重复上架"); }

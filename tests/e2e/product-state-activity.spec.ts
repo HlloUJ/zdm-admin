@@ -26,6 +26,10 @@ const surfaces = [
 const states = ['warehouse', 'selling', 'soldOut', 'recycle'];
 const titles = ['仓库中', '已上架', '已售完', '回收站'];
 const actorTitles = ['入库人', '上架人', '', '移入人'];
+const originType = (client: string) =>
+  client === 'supply-chain' ? 'createEntry' : client === 'admin' ? 'sourceShelfEntry' : 'productCenterSelect';
+const originLabel = (client: string) =>
+  client === 'supply-chain' ? '创建入库' : client === 'admin' ? '供应链上架入库' : '商品中心选入';
 const timeTitles = ['入库时间', '上架时间', '售完时间', '移入时间'];
 
 for (const surface of surfaces) {
@@ -65,7 +69,7 @@ for (const surface of surfaces) {
         createdAt: recent ? '2020-01-01T00:00:00' : '2026-10-01T00:00:00',
         stateOperatedAt: recent ? '2026-10-12T02:00:00.000000Z' : '2026-10-01T02:00:00.000000Z',
         stateOperatorName: '状态操作员',
-        warehouseEntryType: state === 'warehouse' ? (recent ? 'offShelf' : 'firstEntry') : null,
+        warehouseEntryType: state === 'warehouse' ? (recent ? 'offShelf' : originType(surface.client)) : null,
         warehouseEntryReason: state === 'warehouse' && recent ? '价格调整' : null,
         warehouseEntryDetail: null,
         variants: [],
@@ -418,7 +422,7 @@ for (const surface of surfaces) {
       sourceUnavailable: false,
       stateOperatorName: '入库操作人',
       stateOperatedAt: `2026-10-${String(index + 1).padStart(2, '0')}T02:00:00Z`,
-      warehouseEntryType: index === 13 ? 'offShelf' : index === 12 ? 'recycleRestore' : 'firstEntry',
+      warehouseEntryType: index === 13 ? 'offShelf' : index === 12 ? 'recycleRestore' : originType(surface.client),
       warehouseEntryReason: index === 13 ? '价格调整' : null,
       warehouseEntryDetail: null,
       variants: [],
@@ -460,7 +464,7 @@ for (const surface of surfaces) {
         .filter({ hasText: name })
         .locator('td')
         .filter({ has: page.locator('.t-tag') });
-    await expect(cell('入库验证商品-14')).toHaveText('首次入库');
+    await expect(cell('入库验证商品-14')).toHaveText(originLabel(surface.client));
     await expect(cell('入库验证商品-12')).toHaveText('回收恢复');
     await expect(cell('入库验证商品-13')).toContainText('下架入库');
     await expect(cell('入库验证商品-13')).toContainText('价格调整');

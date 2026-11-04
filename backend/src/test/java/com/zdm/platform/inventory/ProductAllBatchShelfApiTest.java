@@ -180,11 +180,12 @@ class ProductAllBatchShelfApiTest extends SpringContainerTestSupport {
     }
   }
   @ParameterizedTest @ValueSource(strings={"finished-products","accessory-products","slabs","store-finished-products","store-accessory-products"})
-  void onlyTheGlobalBatchGrantCanInvokeAllAndStateViewsAreStillRequired(String resource) throws Exception {
+  void mergedShelfGrantInvokesBatchAndStateViewsAreStillRequired(String resource) throws Exception {
     long id=resource.startsWith("store-")?storeReady(resource):sourceReady(resource);String p=terminalPrefix(resource);
     List<String> noBatch=List.of(p+".warehouse.view",p+".warehouse.shelf");
     if(resource.startsWith("store-")) { storeIdentity(1,99591,noBatch); } else { identity("supply-chain","all",noBatch); }
-    mvc.perform(post("/api/admin/"+resource+"/all-batch-shelf").contentType("application/json").content("{\"ids\":["+id+"]}")).andExpect(status().isForbidden());
+    assertThat(batches.shelf(resource,List.of(id)).successCount()).isEqualTo(1);
+    jdbc.update("UPDATE "+table(resource)+" SET "+(resource.startsWith("store-")?"status":"source_status")+"='warehouse' WHERE id=?",id);
     if(resource.startsWith("store-")) { storeIdentity(1,99591,List.of(p+".batch-shelf")); } else { identity("supply-chain","all",List.of(p+".batch-shelf")); }
     assertThat(batches.shelf(resource,List.of(id)).failures().getFirst().reason()).isEqualTo("商品不存在或无权操作");
     identity("admin","all",List.of("all"));
@@ -245,6 +246,66 @@ class ProductAllBatchShelfApiTest extends SpringContainerTestSupport {
     assertThat(shelfLogs(resource,id)).isEqualTo(before);
   }
 
+  @ParameterizedTest @ValueSource(strings={"finished-products","accessory-products","slabs","store-finished-products","store-accessory-products"})
+  void batchDeleteContinuesAfterBadStateWithoutAReasonAndDeduplicates(String resource) throws Exception {
+    boolean store=resource.startsWith("store-");
+    long first=store?storeReady(resource):sourceReady(resource),bad=store?storeReady(resource):sourceReady(resource),last=store?storeReady(resource):sourceReady(resource);
+    String state=store?"status":"source_status";
+    jdbc.update("UPDATE "+table(resource)+" SET "+state+"='recycle' WHERE id=?",bad);
+    String p=terminalPrefix(resource);var grants=List.of(p+".warehouse.view",p+".warehouse.delete");
+    if(store) { storeIdentity(1,99591,grants); } else { identity("supply-chain","all",grants); }
+    var response=mvc.perform(post("/api/admin/"+resource+"/batch-delete").contentType("application/json").content(json.writeValueAsBytes(java.util.Map.of("ids",List.of(first,bad,last,first))))).andExpect(status().isOk()).andReturn().getResponse();
+    JsonNode result=json.readTree(response.getContentAsByteArray()).path("data");
+    assertThat(result.path("total").asInt()).isEqualTo(3);
+    assertThat(result.path("successCount").asInt()).as(result.toString()).isEqualTo(2);
+    assertThat(result.path("failureCount").asInt()).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT "+state+" FROM "+table(resource)+" WHERE id=?",String.class,first)).isEqualTo("recycle");
+    assertThat(jdbc.queryForObject("SELECT "+state+" FROM "+table(resource)+" WHERE id=?",String.class,last)).isEqualTo("recycle");
+  }
+  @ParameterizedTest @ValueSource(strings={"finished-products","accessory-products","slabs"})
+  void operationDeleteUsesOwnStateAndDoesNotDeleteSource(String resource) throws Exception {
+    long first=ready(resource),selling=ready(resource),last=ready(resource);
+    jdbc.update("UPDATE "+table(resource)+" SET status='selling' WHERE id=?",selling);
+    String p=prefix(resource);identity("admin","all",List.of(p+".warehouse.view",p+".selling.view",p+".warehouse.delete"));
+    var result=batches.delete(resource,List.of(first,selling,last));
+    assertThat(result.successCount()).as(result.toString()).isEqualTo(2);
+    assertThat(result.failures()).extracting(OperationsBatchShelfService.Failure::id).containsExactly(selling);
+    assertThat(jdbc.queryForObject("SELECT status FROM "+table(resource)+" WHERE id=?",String.class,first)).isEqualTo("recycle");
+    assertThat(jdbc.queryForObject("SELECT source_status FROM "+table(resource)+" WHERE id=?",String.class,first)).isEqualTo("selling");
+    assertThat(jdbc.queryForObject("SELECT status FROM "+table(resource)+" WHERE id=?",String.class,selling)).isEqualTo("selling");
+  }
+  @ParameterizedTest @ValueSource(strings={"store-finished-products","store-accessory-products"})
+  void deleteCannotCrossStoreAndDoesNotExposeSource(String resource) throws Exception {
+    long id=storeReady(resource);String p=terminalPrefix(resource);
+    jdbc.update("INSERT IGNORE INTO stores(id,tenant_id,name,type,status) VALUES(99592,1,'删除隔离门店','cityPartner','enabled')");
+    storeIdentity(1,99592,List.of(p+".warehouse.view",p+".warehouse.delete"));
+    var result=batches.delete(resource,List.of(id));
+    assertThat(result.successCount()).isZero();
+    assertThat(result.failures().getFirst().reason()).isEqualTo("商品不存在或无权操作");
+    assertThat(jdbc.queryForObject("SELECT status FROM "+table(resource)+" WHERE id=?",String.class,id)).isEqualTo("warehouse");
+  }
+  @ParameterizedTest @ValueSource(strings={"finished-products","accessory-products","slabs"})
+  void deleteRejectsMissingDeleteGrantAndCreatorScope(String resource) throws Exception {
+    long id=sourceReady(resource);String p=terminalPrefix(resource);
+    identity("supply-chain","all",List.of(p+".warehouse.view",p+".warehouse.shelf"));
+    mvc.perform(post("/api/admin/"+resource+"/batch-delete").contentType("application/json").content("{\"ids\":["+id+"]}")).andExpect(status().isForbidden());
+    jdbc.update("UPDATE "+table(resource)+" SET created_by_account_id=2 WHERE id=?",id);
+    identity("supply-chain","self",List.of(p+".warehouse.view",p+".warehouse.delete"));
+    var result=batches.delete(resource,List.of(id));
+    assertThat(result.successCount()).isZero();
+    assertThat(result.failures().getFirst().reason()).isEqualTo("商品不存在或无权操作");
+    assertThat(jdbc.queryForObject("SELECT source_status FROM "+table(resource)+" WHERE id=?",String.class,id)).isEqualTo("warehouse");
+  }
+  @Test void deleteFailureRollsBackStateAndLogsAndContinues() throws Exception {
+    long bad=sourceReady("finished-products"),good=sourceReady("finished-products");
+    doAnswer(invocation -> { invocation.callRealMethod(); throw new IllegalStateException("模拟删除联动后异常"); }).when(finishedProducts).sourceTransition(org.mockito.ArgumentMatchers.eq(bad),any(),any(),any());
+    String p=terminalPrefix("finished-products");identity("supply-chain","all",List.of(p+".warehouse.view",p+".warehouse.delete"));
+    long logs=jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=?",Long.class,bad);
+    var result=batches.delete("finished-products",List.of(bad,good));
+    assertThat(result.successCount()).isEqualTo(1);assertThat(result.failureCount()).isEqualTo(1);
+    assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?",String.class,bad)).isEqualTo("warehouse");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=?",Long.class,bad)).isEqualTo(logs);
+  }
   @Test void exceptionAfterSourceShelfRollsBackThatProductAndKeepsFollowingProduct() throws Exception {
     long bad=sourceReady("finished-products"),good=sourceReady("finished-products");long before=shelfLogs("finished-products",bad);
     doAnswer(invocation -> { invocation.callRealMethod(); throw new IllegalStateException("模拟上架后异常"); }).when(finishedProducts).sourceTransition(org.mockito.ArgumentMatchers.eq(bad),any(),any(),any());

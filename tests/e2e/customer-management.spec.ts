@@ -449,10 +449,19 @@ test('customer list follows standard spacing with bounded horizontal scrolling a
   await reference.close();
   const operationRow = (await page.locator('.zdm-official-list-page__operations').boundingBox())!;
   expect(Math.abs(operationRow.y - formBox.y - formBox.height - sectionGap)).toBeLessThanOrEqual(1);
-  const buttons = await page.locator('.zdm-official-list-page__operations .t-button').all();
+  const buttons = await page.locator('.zdm-official-list-page__operations .t-button').evaluateAll((elements) =>
+    elements.map((element) => {
+      const { x, y, width, height } = element.getBoundingClientRect();
+      return { x, y, width, height };
+    }),
+  );
+  buttons.forEach((box) => {
+    expect(box.width).toBeGreaterThan(0);
+    expect(box.height).toBeGreaterThan(0);
+  });
   for (let i = 1; i < buttons.length; i++) {
-    const previous = (await buttons[i - 1].boundingBox())!;
-    const next = (await buttons[i].boundingBox())!;
+    const previous = buttons[i - 1];
+    const next = buttons[i];
     expect(Math.abs(next.x - previous.x - previous.width - 8)).toBeLessThanOrEqual(1);
   }
   for (const [label, image] of [
@@ -517,19 +526,45 @@ async function nativeDialogVisuals(page: Page, testInfo: TestInfo) {
     await page.mouse.move(0, 0);
     await reference.mouse.move(0, 0);
     await page.bringToFront();
-    for (const selector of ['.t-dialog__header', '.t-dialog__body', '.t-dialog__footer', '.t-button--variant-base'])
-      await expect.poll(() => styleOf(dialog.locator(selector))).toEqual(await styleOf(native.locator(selector)));
+    const selectors = ['.t-dialog__header', '.t-dialog__body', '.t-dialog__footer', '.t-button--variant-base'];
+    if (fields) {
+      selectors.push('.t-form__label');
+      for (const selector of ['.t-input', '.t-textarea__inner', '.t-upload', '.t-date-picker', '.t-select'])
+        if (await dialog.locator(selector).count()) selectors.push(selector);
+    }
+    // One consistent DOM snapshot per page preserves every native-style comparison without repeated cross-page IPC.
+    const stylesOf = (root: ReturnType<Page['locator']>) =>
+      root.evaluate(
+        (element, selectors) =>
+          Object.fromEntries(
+            selectors.map((selector) => {
+              const node = element.querySelector(selector);
+              if (!node) return [selector, null];
+              const s = getComputedStyle(node);
+              return [
+                selector,
+                {
+                  font: s.font,
+                  color: s.color,
+                  background: s.backgroundColor,
+                  padding: node.matches('textarea') ? `${s.paddingTop} ${s.paddingRight} ${s.paddingLeft}` : s.padding,
+                  border: s.border,
+                  radius: s.borderRadius,
+                  lineHeight: s.lineHeight,
+                  smoothing: s.getPropertyValue('-webkit-font-smoothing'),
+                },
+              ];
+            }),
+          ),
+        selectors,
+      );
+    const expectedStyles = await stylesOf(native);
+    expect(Object.values(expectedStyles).every((style) => style !== null)).toBe(true);
+    await expect.poll(() => stylesOf(dialog)).toEqual(expectedStyles);
     const confirmationContent = dialog.locator('.zdm-admin-confirm-dialog__content');
     if (await confirmationContent.count()) {
       await expect(dialog).toHaveCSS('width', await native.evaluate((element) => getComputedStyle(element).width));
       await expect(confirmationContent).toHaveCSS('color', (await styleOf(native.locator('.t-dialog__body'))).color);
-    }
-    if (fields) {
-      expect(await styleOf(dialog.locator('.t-form__label'))).toEqual(await styleOf(native.locator('.t-form__label')));
-      for (const selector of ['.t-input', '.t-textarea__inner', '.t-upload', '.t-date-picker', '.t-select']) {
-        if (await dialog.locator(selector).count())
-          await expect.poll(() => styleOf(dialog.locator(selector))).toEqual(await styleOf(native.locator(selector)));
-      }
     }
     await dialog.screenshot({ path: testInfo.outputPath(image + '.png'), animations: 'disabled' });
     return dialog;

@@ -191,9 +191,11 @@ watch(
     if (visible) void load();
   },
 );
-const changes = computed<Record<string, { before: unknown; after: unknown; hint?: string; complete?: boolean }>>(() => {
+type LoggedChange = { before: unknown; after: unknown; hint?: string; complete?: boolean };
+const changes = computed<Record<string, LoggedChange>>(() => {
   try {
-    return JSON.parse(detail.value?.changeDetails || '{}');
+    const parsed = JSON.parse(detail.value?.changeDetails || '{}') as Record<string, LoggedChange>;
+    return Object.fromEntries(Object.entries(parsed).filter(([field]) => field !== '重新入仓原因'));
   } catch {
     return {};
   }

@@ -156,7 +156,7 @@ test('操作时来源已下架会刷新遮罩并清除旧选择', async ({ page 
   });
   await page.reload();
   await page.getByRole('main').locator('tbody tr').first().locator('.t-checkbox').click();
-  await expect(page.locator('.selection-info')).toHaveCount(0);
+  await expect(page.locator('.selection-info')).toHaveText('已选 1 项');
   await expect(page.getByRole('main').locator('tbody tr').first().getByRole('checkbox')).toBeChecked();
   await page.getByRole('main').locator('.table-actions').getByText('下架', { exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
