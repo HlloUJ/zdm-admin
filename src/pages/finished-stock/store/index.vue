@@ -84,7 +84,7 @@
                 :has-batch-actions="
                   Boolean(batchAction) ||
                   canBatchDelete(activeTab, can) ||
-                  (activeTab === 'recycle' && (can('recycle', 'purge') || can('recycle', 'clear')))
+                  (activeTab === 'recycle' && can('recycle', 'purge'))
                 "
                 :has-auxiliary="canGlobal('operation-log.view')"
                 ><t-button
