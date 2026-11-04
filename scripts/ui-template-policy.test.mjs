@@ -1271,3 +1271,336 @@ test('selection policy traces bound values, members, aliases and computed return
     1,
   );
 });
+
+// Permanent regressions from the complete guard audit; both accepting safe inputs and rejecting unsafe inputs matter.
+const auditedSelectionCases = [
+  {
+    name: 'plain raw props',
+    source:
+      "<template><t-table v-bind=\"props\" /></template><script setup>const props={columns:[{colKey:'pick',type:'multiple'}]};</script>",
+    blocked: true,
+  },
+  {
+    name: 'computed raw props v-bind',
+    source:
+      "<template><t-table v-bind=\"props\" /></template><script setup>const props=computed(()=>({columns:[{colKey:'pick',type:'multiple'}]}));</script>",
+    blocked: true,
+  },
+  {
+    name: 'computed raw props member',
+    source:
+      "<template><t-table :columns=\"props.columns\" /></template><script setup>const props=computed(()=>({columns:[{colKey:'pick',type:'multiple'}]}));</script>",
+    blocked: true,
+  },
+  {
+    name: 'ref raw props member',
+    source:
+      "<template><t-table :columns=\"props.columns\" /></template><script setup>const props=ref({columns:[{colKey:'pick',type:'multiple'}]});</script>",
+    blocked: true,
+  },
+  {
+    name: 'computed safe props',
+    source:
+      "<template><t-table v-bind=\"props\" /></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const props=computed(()=>({columns:selectionColumns([{colKey:'pick',type:'multiple'}])}));</script>",
+    blocked: false,
+  },
+  {
+    name: 'ref safe props',
+    source:
+      "<template><t-table v-bind=\"props\" /></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const props=ref({columns:selectionColumns([{colKey:'pick',type:'multiple'}])});</script>",
+    blocked: false,
+  },
+  {
+    name: 'custom missing key',
+    source:
+      "<template><t-table :columns=\"columns\"><template #select><t-checkbox /></template></t-table></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const columns=computed(()=>selectionColumns([{colKey:'select'}]));</script>",
+    blocked: true,
+  },
+  {
+    name: 'custom wrong key',
+    source:
+      "<template><t-table :columns=\"columns\"><template #select><t-checkbox /></template></t-table></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const columns=computed(()=>selectionColumns([{colKey:'select'}],'other'));</script>",
+    blocked: true,
+  },
+  {
+    name: 'custom right key',
+    source:
+      "<template><t-table :columns=\"columns\"><template #select><t-checkbox /></template></t-table></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const columns=computed(()=>selectionColumns([{colKey:'select'}],'select'));</script>",
+    blocked: false,
+  },
+  {
+    name: 'ordinary field contains select',
+    source:
+      '<template><AdminListPage :table-props="table"><template #selectionStatus="{row}"><t-checkbox v-model="row.selectionStatus" /></template></AdminListPage></template><script setup></script>',
+    blocked: false,
+  },
+  {
+    name: 'shadowed helper',
+    source:
+      "<template><t-table :columns=\"columns\" /></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const columns=computed(()=>{const selectionColumns=(cols)=>cols;return selectionColumns([{colKey:'pick',type:'multiple'}]);});</script>",
+    blocked: true,
+  },
+  {
+    name: 'bracket raw member',
+    source:
+      "<template><t-table :columns=\"props['columns']\" /></template><script setup>const props={columns:[{type:'multiple'}]};</script>",
+    blocked: true,
+  },
+  {
+    name: 'spread raw column',
+    source:
+      "<template><t-table :columns=\"columns\" /></template><script setup>const selection={colKey:'pick',type:'multiple'};const columns=[{...selection}];</script>",
+    blocked: true,
+  },
+  {
+    name: 'correct hook object method',
+    source:
+      '<template><t-table :columns="columns" :selected-row-keys="selected" /></template><script setup>import {useListBatchSelection} from \'@/components/foundation\';const list=useListBatchSelection(actions,selected);const columns=computed(()=>list.selectionColumns([{type:\'multiple\'}]));</script>',
+    blocked: false,
+  },
+  {
+    name: 'ordinary field named selected',
+    source:
+      '<template><AdminListPage :table-props="table"><template #selected="{row}"><t-checkbox v-model="row.selected" /></template></AdminListPage></template><script setup></script>',
+    blocked: false,
+  },
+  {
+    name: 'normal fields multiple checkbox slots',
+    source:
+      '<template><t-table :columns="columns"><template #enabledTitle><t-checkbox v-model="allEnabled" /></template><template #enabled="{row}"><t-checkbox v-model="row.enabled" /></template></t-table></template><script setup>const columns=[{colKey:\'enabled\',title:\'enabledTitle\'}];</script>',
+    blocked: false,
+  },
+  {
+    name: 'safe inline native filtering',
+    source:
+      "<template><t-table :columns=\"selectionColumns([{type: 'multiple'}])\" /></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);</script>",
+    blocked: false,
+  },
+  {
+    name: 'raw aliased conditional',
+    source:
+      '<template><t-table :columns="columns" /></template><script setup>const raw=[{type:\'multiple\'}];const columns=computed(()=>condition?raw:[]);</script>',
+    blocked: true,
+  },
+  {
+    name: 'safe conditional',
+    source:
+      "<template><t-table :columns=\"columns\" /></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const raw=[{type:'multiple'}];const columns=computed(()=>condition?selectionColumns(raw):[]);</script>",
+    blocked: false,
+  },
+  {
+    name: 'raw pushed',
+    source:
+      "<template><t-table :columns=\"columns\" /></template><script setup>const columns=[{colKey:'name'}];columns.push({type:'multiple'});</script>",
+    blocked: true,
+  },
+  {
+    name: 'safe array plus raw spread',
+    source:
+      "<template><t-table :columns=\"columns\" /></template><script setup>import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const raw=[{type:'multiple'}];const columns=computed(()=>[...selectionColumns(raw),...raw]);</script>",
+    blocked: true,
+  },
+];
+for (const entry of auditedSelectionCases)
+  test('list selection guard audit: ' + entry.name, () => {
+    assert.equal(listSelectionViolations('src/pages/new/index.vue', entry.source).length > 0, entry.blocked);
+  });
+
+test('selection guard resolves only real helper bindings and supports ordinary Vue value/configuration forms', () => {
+  const file = 'src/pages/new/index.vue';
+  const hook =
+    "import {useListBatchSelection as useBatch} from '@/components/foundation'; const list=useBatch(actions,selected); const {selectionColumns:filterColumns}=list;";
+  const sfc = (script, table = '<t-table :columns="columns" />') =>
+    '<template>' + table + '</template><script setup>' + script + '</script>';
+  const check = (script, blocked, table) =>
+    assert.equal(listSelectionViolations(file, sfc(script, table)).length > 0, blocked, script);
+  check(hook + "const columns=computed(()=>filterColumns([{type:'multiple'}]));", false);
+  check(hook + "const clean=list['selectionColumns']; const columns=clean([{type:'multiple'}]);", false);
+  check(
+    hook + "const key='select';const columns=filterColumns([{colKey:'select'}],key);",
+    false,
+    '<t-table :columns="columns"><template #select><t-checkbox /></template></t-table>',
+  );
+  check(
+    hook +
+      "import {ref as box, computed as derive} from 'vue'; const props=derive(()=>box({columns:filterColumns([{type:'multiple'}])}));",
+    false,
+    '<t-table v-bind="props" />',
+  );
+  check(
+    hook + "const props={value:{columns:filterColumns([{type:'multiple'}])}};",
+    false,
+    '<t-table :columns="props.value.columns" />',
+  );
+  check(
+    hook + "const props=ref({columns:filterColumns([{type:'multiple'}])});",
+    false,
+    '<t-table :columns="props.value.columns" />',
+  );
+  check(
+    hook + "const props=reactive({value:{columns:filterColumns([{type:'multiple'}])}});",
+    false,
+    '<t-table :columns="props.value.columns" />',
+  );
+  check('const columns=externalColumns;', true);
+  check('const props=externalConfiguration;', true, '<t-table :columns="props.columns" />');
+  check("const props={columns:[{type:'multiple'}]}; const key=unknownKey;", true, '<t-table :columns="props[key]" />');
+  check(
+    "import {useListBatchSelection} from '@/fake/useListBatchSelection';const {selectionColumns}=useListBatchSelection(actions,selected);const columns=selectionColumns([{type:'multiple'}]);",
+    true,
+  );
+  check(
+    hook +
+      "const columns=computed(()=>{const filterColumns=(items)=>items;return filterColumns([{type:'multiple'}]);});",
+    true,
+  );
+  check(
+    hook +
+      "const columns=computed(()=>{ {const filterColumns=(items)=>items; return filterColumns([{type:'multiple'}]);} });",
+    true,
+  );
+  check(
+    hook +
+      "const columns=computed(()=>{const useBatch=()=>({selectionColumns:(items)=>items});const {selectionColumns}=useBatch();return selectionColumns([{type:'multiple'}]);});",
+    true,
+  );
+  check(
+    hook + "const columns=ref([{type:'single'}]);",
+    false,
+    '<t-table :columns="columns" :selected-row-keys="selected" />',
+  );
+  check(hook + "const columns=computed(()=>condition?filterColumns([{type:'multiple'}]):[{type:'multiple'}]);", true);
+  check(hook + "const props={...{columns:filterColumns([{type:'multiple'}])}};", false, '<t-table v-bind="props" />');
+  check(
+    hook + "const props={columns:filterColumns([{type:'multiple'}]),...{columns:[{type:'multiple'}]}};",
+    true,
+    '<t-table v-bind="props" />',
+  );
+  check(
+    hook + "const props={...{columns:[{type:'multiple'}]},columns:filterColumns([{type:'multiple'}])};",
+    false,
+    '<t-table v-bind="props" />',
+  );
+});
+
+test('selection guard uses checkbox data bindings rather than field labels or slot naming', () => {
+  const sfc = (template) =>
+    '<template>' +
+    template +
+    '</template><script setup>const selectedIds=ref([]);const columns=[{colKey:"enabled"}];</script>';
+  const check = (template, blocked) =>
+    assert.equal(listSelectionViolations('src/pages/new/index.vue', sfc(template)).length > 0, blocked, template);
+  check('<t-table :columns="columns" :selected-row-keys="highlightedRows" />', false);
+  check(
+    '<t-table :columns="columns"><template #enabled="{row}"><t-checkbox :checked="row.enabled" disabled /></template></t-table>',
+    false,
+  );
+  check(
+    '<AdminListPage :table-props="table"><template #selectionStatus="{row: record}"><t-checkbox v-model="record.selectionStatus" /></template></AdminListPage>',
+    false,
+  );
+  check(
+    '<t-table :columns="columns"><template #enabled="{row}"><t-checkbox :checked="row.enabled" @change="row.enabled=$event" /></template></t-table>',
+    false,
+  );
+  check(
+    '<AdminListPage :table-props="table"><template #select="{row}"><t-checkbox v-model="selectedIds" :value="row.id" /></template></AdminListPage>',
+    true,
+  );
+  check(
+    '<AdminListPage selection-column-key="wrong" :table-props="table"><template #select><t-checkbox /></template></AdminListPage>',
+    true,
+  );
+  check(
+    '<AdminListPage selection-column-key="select" :table-props="table"><template #selectTitle><t-checkbox /></template><template #select><t-checkbox /></template></AdminListPage>',
+    false,
+  );
+  check(
+    '<AdminListPage :selection-column-key="\'select\'" :table-props="table"><template #select><t-checkbox /></template></AdminListPage>',
+    false,
+  );
+});
+
+test('unresolved existing display/editor tables are retained only at exact reviewed bindings and source bytes', () => {
+  const entries = [
+    'src/pages/finished-stock/store/StoreFinishedEditor.vue',
+    'src/pages/finished-stock/supply-chain/index.vue',
+    'src/pages/finished-stock/management/components/FinishedSalesLogTable.vue',
+    'src/pages/finished-stock/management/components/ProductDetail.vue',
+    'src/pages/finished-stock/management/components/FinishedLogValue.vue',
+    'src/pages/finished-stock/management/index.vue',
+  ];
+  for (const file of entries) {
+    const source = read(file);
+    assert.deepEqual(listSelectionViolations(file, source), [], file);
+    assert.ok(
+      listSelectionViolations(file, source + '\n<!-- changed source requires a new column review -->').length > 0,
+      file,
+    );
+    assert.ok(
+      listSelectionViolations('src/pages/new/index.vue', source).length > 0,
+      file + ' is not a file-wide or new-module exemption',
+    );
+  }
+});
+
+test('selection guard respects Vue prop merge order and canonical component name variants', () => {
+  const hook =
+    "import {useListBatchSelection} from '@/components/foundation'; const {selectionColumns}=useListBatchSelection(actions,selected);const safe=selectionColumns([{type:'multiple'}]);const raw={columns:[{type:'multiple'}]};const safeProps={columns:safe};const options={bordered:true};";
+  const check = (table, blocked) =>
+    assert.equal(
+      listSelectionViolations('src/pages/new/index.vue', `<template>${table}</template><script setup>${hook}</script>`)
+        .length > 0,
+      blocked,
+      table,
+    );
+  check('<t-table :columns="safe" v-bind="raw" />', true);
+  check('<t-table v-bind="raw" :columns="safe" />', false);
+  check('<t-table :columns="safe" v-bind="unknownProps" />', true);
+  check('<t-table :columns="safe" v-bind="options" />', false);
+  check('<TTable v-bind="raw" />', true);
+  check('<TTable v-bind="safeProps" />', false);
+  check(
+    '<admin-list-page :table-props="table"><template #pick="{row}"><TCheckbox v-model="externalSelectedIds" :value="row.id" /></template></admin-list-page>',
+    true,
+  );
+  check(
+    '<admin-list-page :table-props="table"><template #selectionStatus="{row}"><TCheckbox v-model="row.selectionStatus" /></template></admin-list-page>',
+    false,
+  );
+});
+
+test('selection guard rejects untracked imperative replacements rather than trusting only an initializer', () => {
+  const hook =
+    "import {useListBatchSelection} from '@/components/foundation';const {selectionColumns}=useListBatchSelection(actions,selected);";
+  const check = (script, table = '<t-table :columns="columns" />') =>
+    assert.ok(
+      listSelectionViolations(
+        'src/pages/new/index.vue',
+        `<template>${table}</template><script setup>${hook}${script}</script>`,
+      ).length > 0,
+      script,
+    );
+  check("let clean=selectionColumns;clean=(items)=>items;const columns=clean([{type:'multiple'}]);");
+  check(
+    "let {selectionColumns:clean}=useListBatchSelection(actions,selected);clean=(items)=>items;const columns=clean([{type:'multiple'}]);",
+  );
+  check(
+    "let useBatch=useListBatchSelection;useBatch=()=>({selectionColumns:(items)=>items});const {selectionColumns:clean}=useBatch();const columns=clean([{type:'multiple'}]);",
+  );
+  check("let columns=selectionColumns([{type:'multiple'}]);columns=[{type:'multiple'}];");
+  check(
+    "const props={columns:selectionColumns([{type:'multiple'}])};props.columns=[{type:'multiple'}];",
+    '<t-table v-bind="props" />',
+  );
+  check(
+    "const props={columns:selectionColumns([{type:'multiple'}])};const alias=props;alias.columns=[{type:'multiple'}];",
+    '<t-table v-bind="props" />',
+  );
+  check("const columns=ref(selectionColumns([{type:'multiple'}]));columns.value.push({type:'multiple'});");
+  check("const columns=selectionColumns([{type:'multiple'}]);columns.splice(0,0,{type:'multiple'});");
+  check(
+    "const props={columns:selectionColumns([{type:'multiple'}])};Object.assign(props,{columns:[{type:'multiple'}]});",
+    '<t-table v-bind="props" />',
+  );
+});
