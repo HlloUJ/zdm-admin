@@ -10,9 +10,10 @@ const sourceBlockMessage = (source: string) =>
     : source === 'recycle'
       ? '该商品已被供应链删除至回收站'
       : '该商品已被供应链下架';
-async function setup(page: Page, status: string, sourceStatus = 'selling', detail = true) {
+async function setup(page: Page, status: string, sourceStatus = 'selling', detail = true, batch = false) {
   await installAdminApiMocks(page);
   const permissions = [prefix + scope(status) + '.view', prefix + 'recycle.purge'];
+  if (batch) permissions.push(prefix + scope(status) + '.batch-off-shelf');
   if (detail)
     permissions.push(prefix + scope(status) + (['warehouse', 'selling'].includes(status) ? '.edit' : '.detail'));
   await page.addInitScript((permissions) => {
@@ -93,11 +94,21 @@ for (const source of ['offShelf', 'recycle', 'purged', 'warehouse']) {
     await expect(overlay).toContainText(sourceBlockMessage(source));
     await expect(overlay.getByRole('button')).toHaveText(['详情', '彻底删除']);
     await expect(main.locator('tr[data-source-id="99601"]')).toHaveAttribute('inert', '');
-    await expect(main.locator('tr[data-source-id="99601"] input[type="checkbox"]')).toBeDisabled();
+    await expect(main.locator('tr[data-source-id="99601"] input[type="checkbox"]')).toHaveCount(0);
     await overlay.getByRole('button', { name: '详情', exact: true }).click();
     await expect(page.locator('.t-drawer:visible').getByText('最新协同大板', { exact: true })).toBeVisible();
   });
 }
+test('来源失效时有当前批量权限仍保留禁选保护', async ({ page }) => {
+  await setup(page, 'selling', 'offShelf', true, true);
+  const main = page.getByRole('main');
+  await expect(main.locator('.source-unavailable-overlay')).toContainText(sourceBlockMessage('offShelf'));
+  await expect(main.locator('tr[data-source-id="99601"]')).toHaveAttribute('inert', '');
+  await expect(main.locator('tr[data-source-id="99601"] input[type="checkbox"]')).toBeDisabled();
+  await main.locator('thead .t-checkbox__input').click();
+  await expect(main.locator('.selection-info')).toHaveCount(0);
+  await expect(main.getByRole('button', { name: '批量下架', exact: true })).toBeDisabled();
+});
 test('无详情权限时普通行与遮罩都不显示详情', async ({ page }) => {
   await setup(page, 'selling', 'offShelf', false);
   const overlay = page.getByRole('main').locator('.source-unavailable-overlay');
@@ -452,7 +463,7 @@ for (const reason of ['该商品已被供应链下架', '该商品已被供应�
     const overlay = main.locator('.source-unavailable-overlay');
     await expect(overlay).toContainText(reason);
     await expect(overlay.getByRole('button')).toHaveCount(2);
-    await expect(main.locator('tbody input[type="checkbox"]')).toBeDisabled();
+    await expect(main.locator('tbody input[type="checkbox"]')).toHaveCount(0);
     await overlay.getByRole('button', { name: '详情', exact: true }).click();
     const drawer = page.locator('.t-drawer--open').filter({ hasText: '大板详情' });
     await expect(drawer).toContainText(reason);

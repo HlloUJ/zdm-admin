@@ -81,11 +81,7 @@
               <AdminListToolbar
                 :has-actions="storeToolbarActions.length > 0"
                 :selected-count="selected.length"
-                :has-batch-actions="
-                  Boolean(batchAction) ||
-                  canBatchDelete(activeTab, can) ||
-                  (activeTab === 'recycle' && can('recycle', 'purge'))
-                "
+                :has-batch-actions="hasBatchActions"
                 :has-auxiliary="canGlobal('operation-log.view')"
                 ><t-button
                   v-for="action in storeToolbarActions"
@@ -491,6 +487,7 @@
 </template>
 
 <script setup lang="ts">
+import { useListBatchSelection } from '@/components/foundation';
 import { deleteProductsBatch } from '@/services/productBatchDelete';
 import { canBatchDelete } from '@/services/productBatchPermissions';
 import { batchRequestError } from '@/services/productBatchFeedback';
@@ -830,6 +827,7 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
     ? [
         {
           id: 'batch',
+          batch: true,
           label: batchAction.value.label,
           disabled: !selected.value.length,
 
@@ -844,12 +842,13 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
       ]
     : []),
   ...(canBatchDelete(activeTab.value, can)
-    ? [{ id: 'batch-delete', label: '批量删除', icon: 'delete', disabled: !selected.value.length }]
+    ? [{ id: 'batch-delete', batch: true, label: '批量删除', icon: 'delete', disabled: !selected.value.length }]
     : []),
   ...(activeTab.value === 'recycle' && can('recycle', 'batch-purge')
     ? [
         {
           id: 'batch-purge',
+          batch: true,
           label: '批量彻底删除',
           disabled: !selected.value.length,
 
@@ -863,6 +862,7 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
     ? [{ id: 'clear', label: '清空回收站', variant: 'base' as const, icon: 'clear' }]
     : []),
 ]);
+const { hasBatchActions, selectionColumns } = useListBatchSelection(storeToolbarActions, selected, activeTab);
 const storeRowButtons = (row: StoreFinishedProduct): FinishedStockRowAction[] =>
   finishedStockActions[row.effectiveStatus]
     .filter((action) => can(row.effectiveStatus === 'soldOut' ? 'sold-out' : row.effectiveStatus, action.permission))
@@ -899,13 +899,7 @@ const operationWidths: Record<StoreFinishedTab, number> = {
   recycle: 208,
 };
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...baseColumns.filter(
-    (column) =>
-      activeTab.value !== 'all' ||
-      canGlobal('batch-shelf') ||
-      canBatchDelete(activeTab.value, can) ||
-      column.colKey !== 'select',
-  ),
+  ...selectionColumns(baseColumns, 'select'),
   ...(['all', 'warehouse'].includes(activeTab.value)
     ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]
     : []),

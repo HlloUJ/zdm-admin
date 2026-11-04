@@ -1,3 +1,4 @@
+import { listSelectionViolations } from './list-selection-policy.mjs';
 import { displayTextViolations } from './display-text-policy.mjs';
 import { confirmationRegistryViolations, confirmationViolations } from './confirmation-policy.mjs';
 import { parse as parseSfc } from '@vue/compiler-sfc';
@@ -1142,5 +1143,49 @@ test('batch shelf result acknowledgement has an explicit narrow registry', () =>
       'src/components/Result.vue',
       `<template><AdminDialog :confirmation="{ kind: 'acknowledgement', action: 'unregistered' }" /></template>`,
     ).length > 0,
+  );
+});
+
+test('all selectable business tables use batch capability, with exact dialog-picker exceptions only', () => {
+  const pages = files('src').filter((file) => file.endsWith('.vue') && !file.startsWith('src/components/foundation/'));
+  assert.deepEqual(
+    pages.flatMap((file) => listSelectionViolations(file, read(file))),
+    [],
+  );
+  const raw = `<template><t-table :columns="columns" :selected-row-keys="selected" /></template><script setup>const columns = [{ colKey: 'row-select', type: 'multiple' }];</script>`;
+  assert.equal(listSelectionViolations('src/pages/new/index.vue', raw).length, 1);
+  const shared = raw.replace(
+    "const columns = [{ colKey: 'row-select', type: 'multiple' }];",
+    "const { selectionColumns } = useListBatchSelection(actions, selected); const columns = computed(() => selectionColumns([{ colKey: 'row-select', type: 'multiple' }]));",
+  );
+  assert.deepEqual(listSelectionViolations('src/pages/new/index.vue', shared), []);
+  assert.equal(
+    listSelectionViolations('src/pages/new/index.vue', shared.replace('selectionColumns([', 'unprotectedColumns(['))
+      .length,
+    1,
+  );
+  const picker = raw
+    .replace('<t-table', '<AdminDialog><t-table')
+    .replace('/></template>', '/></AdminDialog></template>')
+    .replace(':columns="columns"', ':columns="poolColumns"')
+    .replace('const columns =', 'const poolColumns =');
+  assert.deepEqual(listSelectionViolations('src/pages/finished-stock/store/index.vue', picker), []);
+  assert.equal(listSelectionViolations('src/pages/new/index.vue', picker).length, 1);
+  assert.equal(
+    listSelectionViolations('src/pages/finished-stock/store/index.vue', picker.replaceAll('AdminDialog', 'div')).length,
+    1,
+  );
+});
+
+test('custom checkbox slots cannot bypass official list selection policy', () => {
+  const raw =
+    '<template><AdminListPage :table-props="table"><template #select><t-checkbox /></template></AdminListPage></template>';
+  assert.equal(listSelectionViolations('src/pages/new/index.vue', raw).length, 1);
+  assert.deepEqual(
+    listSelectionViolations(
+      'src/pages/new/index.vue',
+      raw.replace('<AdminListPage ', '<AdminListPage selection-column-key="select" '),
+    ),
+    [],
   );
 });

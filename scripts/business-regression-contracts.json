@@ -337,7 +337,8 @@
         "tests/e2e/store-price-rules.spec.ts",
         "tests/e2e/product-batch-delete.spec.ts",
         "tests/e2e/customer-management.spec.ts",
-        "tests/e2e/store-recycle-selection.spec.ts"
+        "tests/e2e/store-recycle-selection.spec.ts",
+        "tests/e2e/list-batch-selection.spec.ts"
       ],
       "backendTests": [
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
@@ -377,7 +378,7 @@
         "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
         "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
-        "tests/e2e/slab-collaboration.spec.ts": "cc5d03961633a4409b79b38d38f17314088ab422af036f9ab781257c8b8686e1",
+        "tests/e2e/slab-collaboration.spec.ts": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
         "tests/e2e/store-finished-stock.spec.ts": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
         "tests/e2e/store-accessory-management.spec.ts": "e569ce847f6f3bfb25850aecff1b356d425ef21f39c28ad5674d11d6b33f5b2a",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "480ec0600c494a8b4649fcb29291ab87ed018638052c479ebbd405a6ba5236a4",
@@ -387,11 +388,11 @@
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
-        "tests/e2e/accessory-permissions.spec.ts": "7bf96cd4c0933d55bfb95e9575c919dbca56df36d14420daf68eda62853a4635",
+        "tests/e2e/accessory-permissions.spec.ts": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
         "tests/e2e/admin-foundation.spec.ts": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
         "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
         "tests/e2e/feedback-foundation.spec.ts": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
-        "tests/e2e/finished-stock-permissions.spec.ts": "1797add2761139831ecfec8f83c43b6908b1593fd801c08fe9314356bceec5ae",
+        "tests/e2e/finished-stock-permissions.spec.ts": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
         "tests/e2e/login.spec.ts": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
         "tests/e2e/markup-configuration.spec.ts": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
         "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
@@ -460,8 +461,9 @@
         "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
         "src/services/batchActionPermissions.test.ts": "f4ed67b265dc6f436c0ed4ddddf80ccf55eb3a1517b28d35eaafbed783ab9751",
         "src/services/customerCatalog.test.ts": "e9e75039913cba436a051ab9f8ab4fea31cc757f4699140c5e15b116d4a1753b",
-        "tests/e2e/customer-management.spec.ts": "88f71df6e42189efd7b38138ab7c9646c041fd853a9f3ad45987638a20bdf4b0",
-        "tests/e2e/store-recycle-selection.spec.ts": "af9d2ef6e42aa113651bd735f05ec900931bd40645873f6e73764b94e4c9744d"
+        "tests/e2e/customer-management.spec.ts": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
+        "tests/e2e/store-recycle-selection.spec.ts": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
+        "tests/e2e/list-batch-selection.spec.ts": "757c4bc90b237ac1b1e4a3c06e1bb8d7f2e874e931d255eb1ae080b8c7e6ed44"
       },
       "testChanges": [
         {
@@ -2598,6 +2600,36 @@
           "before": "c9fd47c983d67d5e1dcb8e541e81e80e6da577ba723d10a09caf21e3fea9047d",
           "after": "6cfceece42727cd0ac7d0499c9f62592ed65aef52b19384d2487061432306204",
           "reason": "用户确认修复门店成品现货/配件批量上架锁顺序：新增4项真实MySQL并发回归，覆盖清除价格配置时上架不得提前锁经营记录、批量删除不受分类锁阻塞，并验证两件状态、日志、冻结售价和配置清除结果。旧生产代码2项NOWAIT冲突已复现；既有用例和断言全部保留。"
+        },
+        {
+          "file": "tests/e2e/accessory-permissions.spec.ts",
+          "before": "7bf96cd4c0933d55bfb95e9575c919dbca56df36d14420daf68eda62853a4635",
+          "after": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/finished-stock-permissions.spec.ts",
+          "before": "1797add2761139831ecfec8f83c43b6908b1593fd801c08fe9314356bceec5ae",
+          "after": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "cc5d03961633a4409b79b38d38f17314088ab422af036f9ab781257c8b8686e1",
+          "after": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/customer-management.spec.ts",
+          "before": "88f71df6e42189efd7b38138ab7c9646c041fd853a9f3ad45987638a20bdf4b0",
+          "after": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/store-recycle-selection.spec.ts",
+          "before": "af9d2ef6e42aa113651bd735f05ec900931bd40645873f6e73764b94e4c9744d",
+          "after": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
         }
       ],
       "routes": [
@@ -2620,6 +2652,7 @@
         "tests/e2e/feedback-foundation.spec.ts",
         "tests/e2e/finished-stock-permissions.spec.ts",
         "tests/e2e/finished-stock.spec.ts",
+        "tests/e2e/list-batch-selection.spec.ts",
         "tests/e2e/login.spec.ts",
         "tests/e2e/markup-configuration.spec.ts",
         "tests/e2e/media-upload-standard.spec.ts",

@@ -43,7 +43,7 @@
       "dynamicImports": 0
     },
     "ci/e2e-shards.json": {
-      "digest": "ec711d3ae6b7b7bbfa144011ed871f74a6f0c008727e86edc38bf348854d5213",
+      "digest": "2c3874fd4c298dc6e10bfceaca5f22dd2f76fb81cafb61e171fe1468cc3b6a0b",
       "imports": [],
       "dynamicImports": 0
     },
@@ -209,7 +209,7 @@
       "dynamicImports": 4
     },
     "scripts/business-regression-contracts.json": {
-      "digest": "8f0c539be9952ec250232ccfa3c38e891758030fabccf4b946b9015bb660cf2c",
+      "digest": "47b54457ac13004b724a1f0d575fc2603c78da392b7c9131550f89aef6453f27",
       "imports": [],
       "dynamicImports": 0
     },
@@ -698,7 +698,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "a1a479c7e1cd12116ede32ea5d25230852477e3e0fe5c5a32910dd1305f3e9a3",
+      "digest": "696f491c3ce91259a96c6e55ae9c16c0c481f2a3e8b1cea8870ac213a4ce456f",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -942,6 +942,11 @@
     },
     "scripts/lint-policy.test.mjs": {
       "digest": "8b986d61c1a5329838876480e702cab9346e2e751991c2c21a29d38f95dc21af",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/list-selection-policy.mjs": {
+      "digest": "a884733454ca73fecf929e195672b1eb1505cc7b52529182af307cdf5922c834",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1278,11 +1283,12 @@
       "dynamicImports": 0
     },
     "scripts/ui-template-policy.test.mjs": {
-      "digest": "a13b071c2335ab914c731ee62e4f271fc815b299f19a68fe7b755d9355ce7868",
+      "digest": "8934d6cbc3750fc3454860ab433031871a44432105e5cb2fe01ac5a7c202641b",
       "imports": [
         "scripts/button-color-policy.mjs",
         "scripts/confirmation-policy.mjs",
         "scripts/display-text-policy.mjs",
+        "scripts/list-selection-policy.mjs",
         "scripts/placeholder-policy.mjs",
         "scripts/typography-policy.mjs",
         "scripts/ui-template-policy.mjs",

@@ -95,13 +95,7 @@
               <AdminListToolbar
                 :has-actions="batchButtons.length > 0"
                 :selected-count="selectedKeys.length"
-                :has-batch-actions="
-                  batchButtons.some((button) =>
-                    ['batchDelete', 'batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(
-                      button.action,
-                    ),
-                  )
-                "
+                :has-batch-actions="hasBatchActions"
                 :has-auxiliary="canViewOperationLogs"
                 ><t-button
                   v-for="button in batchButtons"
@@ -1171,6 +1165,7 @@
 </template>
 
 <script setup lang="ts">
+import { useListBatchSelection } from '@/components/foundation';
 import DecimalInput from '@/components/DecimalInput.vue';
 import { numericError } from '@/utils/numericInput';
 import { deleteProductsBatch } from '@/services/productBatchDelete';
@@ -1831,11 +1826,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     align: 'left',
     fixed: 'right',
   });
-  return activeTab.value === 'all' &&
-    !hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`) &&
-    !canBatchDelete(activeTab.value, hasSlabAction)
-    ? baseColumns.filter((col) => col.colKey !== 'select')
-    : baseColumns;
+  return selectionColumns(baseColumns, 'select');
 });
 const currentFilter = computed(() => filters[activeTab.value]);
 const currentAppliedFilter = computed(() => appliedFilters[activeTab.value]);
@@ -1884,12 +1875,18 @@ const baseBatchButtons = computed(() =>
       ),
 );
 
-const batchButtons = computed(() => [
-  ...baseBatchButtons.value,
-  ...(canBatchDelete(activeTab.value, hasSlabAction)
-    ? [{ action: 'batchDelete' as const, label: '批量删除', icon: 'delete' }]
-    : []),
-]);
+const batchButtons = computed(() =>
+  [
+    ...baseBatchButtons.value,
+    ...(canBatchDelete(activeTab.value, hasSlabAction)
+      ? [{ action: 'batchDelete' as const, label: '批量删除', icon: 'delete' }]
+      : []),
+  ].map((button) => ({
+    ...button,
+    batch: ['batchDelete', 'batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(button.action),
+  })),
+);
+const { hasBatchActions, selectionColumns } = useListBatchSelection(batchButtons, selectedKeys, activeTab);
 const tabLabel = (tab: { label: string; value: SlabTab }) => {
   const count = tableData.value.filter((item) =>
     tab.value === 'all'

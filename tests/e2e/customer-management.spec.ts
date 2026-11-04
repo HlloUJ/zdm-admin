@@ -1152,6 +1152,24 @@ test('all data never grants missing edit or archive functions', async ({ page })
   await expect(other.getByText('编辑', { exact: true })).toHaveCount(0);
   await expect(other.getByText('归档', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '批量归档', exact: true })).toHaveCount(0);
+  await expect(page.getByRole('main').getByRole('checkbox')).toHaveCount(0);
+});
+test('customer selection requires a batch capability in the current tab and clears selection on tab switch', async ({
+  page,
+}) => {
+  await setup(page, ['daily.view', 'daily.detail', 'daily.archive', 'archived.view']);
+  await page.goto('/store/customer-management');
+  const main = page.getByRole('main');
+  await expect(main.getByText('王先生1', { exact: true })).toBeVisible();
+  const batch = main.getByRole('button', { name: '批量归档', exact: true });
+  await expect(batch).toBeDisabled();
+  await main.locator('tbody tr').filter({ hasText: '王先生1' }).locator('.t-checkbox__input').click();
+  await expect(batch).toBeEnabled();
+  await main.locator('.t-tabs').getByText('归档客户', { exact: true }).click();
+  await expect(main.getByText('王先生3', { exact: true })).toBeVisible();
+  await expect(main.getByRole('checkbox')).toHaveCount(0);
+  await main.locator('.t-tabs').getByText('日常客户', { exact: true }).click();
+  await expect(batch).toBeDisabled();
 });
 test('ordinary staff archives another owner customer without transferring ownership', async ({ page }) => {
   const requests = await setup(page, [...daily, ...archived]);

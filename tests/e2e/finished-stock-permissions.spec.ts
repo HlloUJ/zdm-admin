@@ -589,7 +589,7 @@ for (const client of ['supply-chain', 'admin']) {
           await expect(log).toBeVisible();
         } else {
           await expect(main.locator('.status-tabs')).toHaveCount(0);
-          await main.locator('tbody .t-checkbox').first().click();
+          await expect(main.locator('thead input[type="checkbox"], tbody input[type="checkbox"]')).toHaveCount(0);
           await expect(main.locator('.selection-info')).toHaveCount(0);
         }
       } else {
@@ -611,7 +611,7 @@ test('supply-chain publish alone does not display selected count', async ({ page
   const main = page.getByRole('main');
   await expect(main.getByRole('button', { name: '发布商品', exact: true })).toBeVisible();
   await expect(main.getByRole('button', { name: '批量上架', exact: true })).toHaveCount(0);
-  await main.locator('tbody .t-checkbox').first().click();
+  await expect(main.locator('thead input[type="checkbox"], tbody input[type="checkbox"]')).toHaveCount(0);
   await expect(main.locator('.selection-info')).toHaveCount(0);
   await expect(main.getByRole('button', { name: '操作日志', exact: true })).toHaveCount(0);
 });

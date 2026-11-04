@@ -258,6 +258,11 @@
       "file": "store-recycle-selection.spec.ts",
       "shard": 1,
       "estimatedMs": 4312
+    },
+    {
+      "file": "list-batch-selection.spec.ts",
+      "shard": 2,
+      "estimatedMs": 29700
     }
   ]
 }
