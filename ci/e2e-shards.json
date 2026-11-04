@@ -248,6 +248,16 @@
       "file": "terminal-all-batch-shelf.spec.ts",
       "shard": 1,
       "estimatedMs": 15042
+    },
+    {
+      "file": "product-batch-delete.spec.ts",
+      "shard": 1,
+      "estimatedMs": 49044
+    },
+    {
+      "file": "store-recycle-selection.spec.ts",
+      "shard": 1,
+      "estimatedMs": 4312
     }
   ]
 }
