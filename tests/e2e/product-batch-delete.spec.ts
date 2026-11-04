@@ -100,6 +100,11 @@ for (const [client, path, resource] of surfaces) {
       const confirm = page.locator('.t-dialog:visible').filter({ hasText: '是否批量删除所选' });
       await expect(confirm.locator('input, textarea')).toHaveCount(0);
       await expect(confirm).toBeVisible();
+      // The result opens before the list refresh finishes; keep its async options mock alive.
+      const optionsReady =
+        resource === 'finished-products'
+          ? page.waitForResponse((response) => response.url().endsWith('/api/admin/finished-products/form-options'))
+          : null;
       const responseReady = page.waitForResponse(
         (response) =>
           response.request().method() === 'POST' && response.url().endsWith(`/api/admin/${resource}/batch-delete`),
@@ -114,6 +119,7 @@ for (const [client, path, resource] of surfaces) {
       await expect(result.locator('tbody tr')).toHaveCount(1);
       await expect(result.locator('tbody')).toContainText(client === 'store' ? '1072、1073' : '72、73');
       await expect(main.locator('tbody input[type="checkbox"]:checked')).toHaveCount(0);
+      if (optionsReady) expect(await (await optionsReady).finished()).toBeNull();
       expect(requests).toBe(1);
     });
   }
@@ -238,6 +244,11 @@ for (const scenario of ['unknown-result', 'refresh-failure', 'duplicate-confirm'
     await main.locator('thead .t-checkbox__input').click();
     await main.getByRole('button', { name: '批量删除', exact: true }).click();
     const button = page.locator('.t-dialog:visible').getByRole('button', { name: '确认批量删除', exact: true });
+    // Successful deletion starts a separate list/options refresh after showing the result.
+    const optionsReady =
+      scenario === 'unknown-result'
+        ? null
+        : page.waitForResponse((response) => response.url().endsWith('/api/admin/finished-products/form-options'));
     await button.click();
     if (scenario === 'duplicate-confirm') {
       await expect(button).toHaveClass(/t-is-loading/);
@@ -253,6 +264,7 @@ for (const scenario of ['unknown-result', 'refresh-failure', 'duplicate-confirm'
       );
       if (scenario === 'refresh-failure') await expect(page.getByText('列表刷新失败', { exact: true })).toBeVisible();
     }
+    if (optionsReady) expect(await (await optionsReady).finished()).toBeNull();
     expect(requests).toBe(1);
   });
 }
