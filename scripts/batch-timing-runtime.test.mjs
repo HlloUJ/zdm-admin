@@ -14,7 +14,7 @@ import {
   reconcileInterruptedValidationTiming,
   inspectValidationProcesses,
 } from './batch-timing-runtime.mjs';
-import { timingWriterLock } from './batch-timing-io.mjs';
+import { timingWriterLock } from './delivery-repairs/batch-timing-io.mjs';
 import { runVerificationTask } from './verification-runner.mjs';
 function fixture(t) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'batch-timing-entry-')));

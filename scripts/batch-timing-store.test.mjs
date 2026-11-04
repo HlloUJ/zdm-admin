@@ -299,13 +299,15 @@ test('collector upgrade replaces only its proven owned stale bundle and retains 
   for (const name of [
     'batch-timing-core.mjs',
     'batch-timing-store.mjs',
-    'batch-timing-io.mjs',
+    'delivery-repairs/batch-timing-io.mjs',
     'batch-timing-observer.mjs',
-  ])
+  ]) {
+    mkdirSync(path.dirname(path.join(oldCode, name)), { recursive: true });
     writeFileSync(
       path.join(oldCode, name),
       readFileSync(new URL(name, import.meta.url), 'utf8') + '\n// Previous collector version\n',
     );
+  }
   const { pathToFileURL } = await import('node:url');
   const previous = await import(pathToFileURL(path.join(oldCode, 'batch-timing-store.mjs')).href);
   const owner = f.trackObserver(previous.ensureObserver(f.directory));
@@ -381,7 +383,7 @@ test('v1 history migrates with immutable backups and the real legacy reader cann
   for (const name of ['batch-timing-core.mjs', 'batch-timing-store.mjs'])
     writeFileSync(
       path.join(legacyDirectory, name),
-      readFileSync(new URL('./test-support/fixtures/timing-v1/' + name + '.txt', import.meta.url)),
+      readFileSync(new URL('./delivery-repairs/fixtures/timing-v1/' + name + '.txt', import.meta.url)),
     );
   const { pathToFileURL } = await import('node:url');
   const legacy = await import(pathToFileURL(path.join(legacyDirectory, 'batch-timing-store.mjs')).href);

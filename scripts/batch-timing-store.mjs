@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
-import { atomicTimingJson, preserveTimingSnapshot, safeTimingPath, timingWriterLock } from './batch-timing-io.mjs';
+import {
+  atomicTimingJson,
+  preserveTimingSnapshot,
+  safeTimingPath,
+  timingWriterLock,
+} from './delivery-repairs/batch-timing-io.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -351,7 +356,12 @@ export function ensureObserver(directory) {
   return lock(directory, () => startObserver(directory));
 }
 function startObserver(directory) {
-  const names = ['batch-timing-core.mjs', 'batch-timing-store.mjs', 'batch-timing-io.mjs', 'batch-timing-observer.mjs'];
+  const names = [
+    'batch-timing-core.mjs',
+    'batch-timing-store.mjs',
+    'delivery-repairs/batch-timing-io.mjs',
+    'batch-timing-observer.mjs',
+  ];
   const content = names.map((name) => [name, readFileSync(new URL(name, import.meta.url))]);
   const digest = hash(Buffer.concat(content.map(([, bytes]) => bytes)));
   const lease = path.join(directory, 'observer.json');
@@ -398,6 +408,8 @@ function startObserver(directory) {
   for (const [name, bytes] of content) {
     const file = path.join(bundle, name);
     safe(file);
+    safe(path.dirname(file));
+    mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
     if (existsSync(file)) assert.deepEqual(readFileSync(file), bytes);
     else writeFileSync(file, bytes, { flag: 'wx', mode: 0o600 });
   }

@@ -8,7 +8,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
 import { syncBuiltinESMExports } from 'node:module';
 import { pathToFileURL } from 'node:url';
-import { newTimeline } from './batch-timing-core.mjs';
+import { newTimeline } from '../batch-timing-core.mjs';
 import { timingWriterLock, preserveTimingSnapshot, atomicTimingJson } from './batch-timing-io.mjs';
 import {
   refreshTimeline,
@@ -18,7 +18,7 @@ import {
   recordValidationTiming,
   recordValidationInterruptions,
   timingRequiredFile,
-} from './batch-timing-store.mjs';
+} from '../batch-timing-store.mjs';
 const at = 1700000000000;
 const digest = (b) => createHash('sha256').update(b).digest('hex');
 const json = (value) => Buffer.from(JSON.stringify(value, null, 2) + '\n');
@@ -309,7 +309,7 @@ function childScript(code) {
 for (const target of ['timeline.json', 'summary.json', 'publication.json']) {
   test(`SIGKILL after ${target} leaves an unreadable partial publication and a safely recoverable dead lease`, async (t) => {
     const f = fixture(t),
-      store = new URL('./batch-timing-store.mjs', import.meta.url).href;
+      store = new URL('../batch-timing-store.mjs', import.meta.url).href;
     const script = `import fs from'node:fs';import{refreshTimeline}from${JSON.stringify(store)};const rename=fs.renameSync;fs.renameSync=(a,b)=>{rename(a,b);if(b===${JSON.stringify(path.join(f.directory, target))})process.kill(process.pid,'SIGKILL')};refreshTimeline(${JSON.stringify(f.common)},${JSON.stringify(f.batch)});`;
     const child = childScript(script);
     const [code, signal] = await once(child, 'exit');
@@ -487,10 +487,7 @@ for (const version of [1, 2]) {
     const legacy = path.join(f.root, 'legacy');
     fs.mkdirSync(legacy);
     for (const name of ['batch-timing-core.mjs', 'batch-timing-store.mjs'])
-      fs.copyFileSync(
-        new URL(`./test-support/fixtures/timing-v${version}/${name}.txt`, import.meta.url),
-        path.join(legacy, name),
-      );
+      fs.copyFileSync(new URL(`./fixtures/timing-v${version}/${name}.txt`, import.meta.url), path.join(legacy, name));
     const old = await import(pathToFileURL(path.join(legacy, 'batch-timing-store.mjs')));
     const before = fs.readFileSync(f.timeline),
       summary = fs.readFileSync(f.summary);
