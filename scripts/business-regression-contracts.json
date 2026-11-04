@@ -401,7 +401,7 @@
         "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
         "tests/e2e/slab-publish-layout.spec.ts": "83fae189da20ab3113dbb2f7eb7a4b6aa19d3b10140aec002c7a90c77ccd06f3",
         "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
-        "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
+        "tests/e2e/admin-api-mocks.ts": "e52244efd21250ee95987836d645ee4afb70b7f9566ae912882018e1f3f031b4",
         "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
         "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156",
         "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
@@ -412,7 +412,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
-        "tests/e2e/accessory-api-mocks.ts": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
+        "tests/e2e/accessory-api-mocks.ts": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
         "tests/e2e/pagination-responsive.spec.ts": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
         "tests/e2e/store-order-prototype.spec.ts": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
@@ -463,7 +463,8 @@
         "src/services/customerCatalog.test.ts": "e9e75039913cba436a051ab9f8ab4fea31cc757f4699140c5e15b116d4a1753b",
         "tests/e2e/customer-management.spec.ts": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
         "tests/e2e/store-recycle-selection.spec.ts": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
-        "tests/e2e/list-batch-selection.spec.ts": "0c2e4bf392fadbe30ef6c3c7b7a485bff0a7d143221499da316ab6be9326d6bb"
+        "tests/e2e/list-batch-selection.spec.ts": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
+        "tests/e2e/form-options-mock.ts": "5222586ea7707540bac57fdcbae795d5e214b3d6d0b3e482d85e1a75ec640b21"
       },
       "testChanges": [
         {
@@ -2636,6 +2637,24 @@
           "before": "757c4bc90b237ac1b1e4a3c06e1bb8d7f2e874e931d255eb1ae080b8c7e6ed44",
           "after": "0c2e4bf392fadbe30ef6c3c7b7a485bff0a7d143221499da316ab6be9326d6bb",
           "reason": "用户授权补齐三类批量选择缺口回归；仅新增延迟回包行选/全选及Tab往返断言，保留原权限、状态、无业务写请求断言。"
+        },
+        {
+          "file": "tests/e2e/admin-api-mocks.ts",
+          "before": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
+          "after": "e52244efd21250ee95987836d645ee4afb70b7f9566ae912882018e1f3f031b4",
+          "reason": "正式本地门禁09a0c62e-d89b-49c9-a81b-07369dde4e6c确认导航销毁旧文档的选项聚合RPC；只将该旧请求abort，其他错误原样抛出，不重试，保持原业务断言及动态集合覆盖，并新增两个确定性导航和一个错误传播回归。"
+        },
+        {
+          "file": "tests/e2e/accessory-api-mocks.ts",
+          "before": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
+          "after": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
+          "reason": "正式本地门禁09a0c62e-d89b-49c9-a81b-07369dde4e6c确认导航销毁旧文档的选项聚合RPC；只将该旧请求abort，其他错误原样抛出，不重试，保持原业务断言及动态集合覆盖，并新增两个确定性导航和一个错误传播回归。"
+        },
+        {
+          "file": "tests/e2e/list-batch-selection.spec.ts",
+          "before": "0c2e4bf392fadbe30ef6c3c7b7a485bff0a7d143221499da316ab6be9326d6bb",
+          "after": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
+          "reason": "正式本地门禁09a0c62e-d89b-49c9-a81b-07369dde4e6c确认导航销毁旧文档的选项聚合RPC；只将该旧请求abort，其他错误原样抛出，不重试，保持原业务断言及动态集合覆盖，并新增两个确定性导航和一个错误传播回归。"
         }
       ],
       "routes": [
@@ -2703,7 +2722,8 @@
         "tests/e2e/price-table-feedback.ts",
         "src/pages/finished-stock/shared/guidePriceSource.test.ts",
         "src/services/batchActionPermissions.test.ts",
-        "src/services/customerCatalog.test.ts"
+        "src/services/customerCatalog.test.ts",
+        "tests/e2e/form-options-mock.ts"
       ]
     }
   ]

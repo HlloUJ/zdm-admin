@@ -37,7 +37,63 @@ const reviewedDisplayTables = new Map([
     { columns: 'specColumns', digest: 'eb08f195b1aa64cd889f68d480b68817e39177546244f73af819fb3cb89e4a34' },
   ],
 ]);
-export function listSelectionViolations(file, source) {
+// These imported factories have fixed, non-selection column schemas. Verify the actual
+// module bytes through the scanner's reader; name alone is never a readonly proof.
+const reviewedColumnFactories = [
+  {
+    file: 'src/services/productAllView.ts',
+    module: '@/services/productAllView',
+    exportName: 'productCreationColumns',
+    digest: '66990839bf6243b51c2892627c85ba74314845d2579831f7e12708f22cb196a4',
+    facts: [
+      {
+        key: 'createdByName',
+        title: '创建人',
+      },
+      {
+        key: 'createdAt',
+        title: '创建时间',
+      },
+    ],
+  },
+  {
+    file: 'src/services/productStateActivity.ts',
+    module: '@/services/productStateActivity',
+    exportName: 'stateActivityColumns',
+    digest: '695d00faf1a7d45a4b43e0bc1e4a8eb62fdf9b1b7e8e3394e32d6ebc69b45b6e',
+    facts: [
+      {
+        key: 'stateOperatorName',
+        title: '入库人',
+      },
+      {
+        key: 'stateOperatorName',
+        title: '上架人',
+      },
+      {
+        key: 'stateOperatorName',
+        title: '移入人',
+      },
+      {
+        key: 'stateOperatedAt',
+        title: '入库时间',
+      },
+      {
+        key: 'stateOperatedAt',
+        title: '上架时间',
+      },
+      {
+        key: 'stateOperatedAt',
+        title: '售完时间',
+      },
+      {
+        key: 'stateOperatedAt',
+        title: '移入时间',
+      },
+    ],
+  },
+];
+export function listSelectionViolations(file, source, { readSource } = {}) {
   const { descriptor } = parseSfc(source);
   if (!descriptor.template) return [];
   const script = descriptor.scriptSetup?.content ?? descriptor.script?.content ?? '';
@@ -118,7 +174,12 @@ export function listSelectionViolations(file, source) {
           // Direct pushes on the declared array are traced by columns(); indirect mutations
           // and other imperative rewrites require a reviewed, declarative column source.
           if (
-            !['push', 'unshift'].includes(method) ||
+            !['push', 'unshift', 'splice'].includes(method) ||
+            (method === 'splice' &&
+              (!declared.initializer ||
+                !ts.isArrayLiteralExpression(unwrap(declared.initializer)) ||
+                node.arguments.length < 2 ||
+                node.arguments.slice(0, 2).some(ts.isSpreadElement))) ||
             !ts.isIdentifier(receiver) ||
             definition(receiver.text, receiver) !== declared
           )
@@ -188,6 +249,28 @@ export function listSelectionViolations(file, source) {
       return owner && ts.isCallExpression(owner) && publicHook(owner.expression);
     }
     return false;
+  }
+  function importedFactory(node, seen = new Set()) {
+    node = unwrap(node);
+    if (!node || !ts.isIdentifier(node)) return undefined;
+    const declared = definition(node.text, node);
+    if (!declared || seen.has(declared) || untrackedWrites(declared)) return undefined;
+    if (ts.isVariableDeclaration(declared)) return importedFactory(declared.initializer, new Set([...seen, declared]));
+    if (!ts.isImportSpecifier(declared)) return undefined;
+    const imported = declared.parent.parent.parent;
+    const record = reviewedColumnFactories.find(
+      (entry) =>
+        entry.module === imported.moduleSpecifier.text &&
+        entry.exportName === (declared.propertyName ?? declared.name).text,
+    );
+    if (!record || !readSource) return undefined;
+    try {
+      return createHash('sha256').update(readSource(record.file)).digest('hex') === record.digest
+        ? record.facts.map((fact) => ({ ...fact }))
+        : undefined;
+    } catch {
+      return undefined;
+    }
   }
   function vueWrapper(node, seen = new Set()) {
     node = unwrap(node);
@@ -261,7 +344,8 @@ export function listSelectionViolations(file, source) {
           : 'text' in prop.name
             ? prop.name.text
             : undefined;
-        if (name === key) {
+        if (ts.isComputedPropertyName(prop.name) && name === undefined) return [undefined];
+        if (Array.isArray(key) ? key.includes(name) : name === key) {
           if (ts.isPropertyAssignment(prop)) return [prop.initializer];
           if (ts.isShorthandPropertyAssignment(prop)) return [prop.name];
           return [undefined];
@@ -307,9 +391,13 @@ export function listSelectionViolations(file, source) {
           ts.isIdentifier(child.expression.expression) &&
           child.expression.expression.text === node.text &&
           definition(node.text, child.expression.expression) === declaration &&
-          ['push', 'unshift'].includes(child.expression.name.text)
+          ['push', 'unshift', 'splice'].includes(child.expression.name.text)
         )
-          result.push(...child.arguments.flatMap((argument) => columns(argument, next)));
+          result.push(
+            ...(child.expression.name.text === 'splice' ? child.arguments.slice(2) : child.arguments).flatMap(
+              (argument) => columns(argument, next),
+            ),
+          );
         ts.forEachChild(child, mutations);
       }
       if (scope) mutations(scope);
@@ -317,21 +405,68 @@ export function listSelectionViolations(file, source) {
     }
     const resolved = resolve(node);
     if (resolved !== node) return columns(resolved, next);
+    if (ts.isSpreadElement(node)) return columns(node.expression, next);
     if (ts.isArrayLiteralExpression(node))
       return node.elements.flatMap((item) => columns(ts.isSpreadElement(item) ? item.expression : item, next));
     if (ts.isConditionalExpression(node)) return [...columns(node.whenTrue, next), ...columns(node.whenFalse, next)];
     if (ts.isPropertyAccessExpression(node) || ts.isElementAccessExpression(node))
       return members(node.expression, memberName(node)).flatMap((value) => columns(value, next));
     if (ts.isObjectLiteralExpression(node)) {
-      const values = (key) => members(node, key).map((value) => (value === null ? undefined : literal(value)));
-      const keys = values('colKey'),
-        types = values('type');
-      const unknown = ['type', 'colKey'].some((key) =>
-        members(node, key).some((value) => value === undefined || (value !== null && literal(value) === undefined)),
+      function strings(value, seen = new Set()) {
+        value = resolve(value);
+        if (!value || seen.has(value)) return [undefined];
+        if (ts.isConditionalExpression(value))
+          return [
+            ...strings(value.whenTrue, new Set([...seen, value])),
+            ...strings(value.whenFalse, new Set([...seen, value])),
+          ];
+        return [literal(value)];
+      }
+      const values = (key) => members(node, key).flatMap((value) => (value === null ? [undefined] : strings(value)));
+      const unknownField = (key) =>
+        members(node, key).some(
+          (value) => value === undefined || (value !== null && strings(value).includes(undefined)),
+        );
+      const slotValues = (key) =>
+        members(node, key).flatMap((value) => {
+          if (value === null) return [undefined];
+          const resolved = resolve(value);
+          return resolved && (ts.isArrowFunction(resolved) || ts.isFunctionExpression(resolved))
+            ? [undefined]
+            : strings(value);
+        });
+      const unknownSlot = (key) =>
+        members(node, key).some((value) => {
+          if (value === null) return false;
+          const resolved = resolve(value);
+          return (
+            !resolved ||
+            (!(ts.isArrowFunction(resolved) || ts.isFunctionExpression(resolved)) && strings(value).includes(undefined))
+          );
+        });
+      return values('colKey').flatMap((key) =>
+        values('type').flatMap((type) =>
+          slotValues('cell').flatMap((cell) =>
+            slotValues('title').map((title) => ({
+              key,
+              type,
+              cell,
+              title,
+              unknownType: unknownField('type'),
+              unknownKey: unknownField('colKey'),
+              unknownSlot: unknownSlot('cell') || unknownSlot('title'),
+              cellRenderer: members(node, 'cell').some((value) => {
+                const resolved = resolve(value);
+                return resolved && (ts.isArrowFunction(resolved) || ts.isFunctionExpression(resolved));
+              }),
+            })),
+          ),
+        ),
       );
-      return keys.flatMap((key) => types.map((type) => ({ key, type, ...(unknown ? { unknown: true } : {}) })));
     }
     if (ts.isCallExpression(node)) {
+      const imported = importedFactory(node.expression);
+      if (imported) return imported;
       if (helper(node.expression)) {
         const key = literal(node.arguments[1]);
         // Prove the absent-capability result for every individual source value.
@@ -339,7 +474,7 @@ export function listSelectionViolations(file, source) {
         return columns(node.arguments[0], next)
           .filter((fact) => fact.type !== 'multiple' && (!key || fact.key !== key))
           .map((fact) =>
-            fact.unknown
+            fact.unknown || fact.unknownKey || fact.unknownType || fact.unknownSlot
               ? {
                   ...fact,
                   removesMultiple: true,
@@ -368,6 +503,29 @@ export function listSelectionViolations(file, source) {
     if (result) result.parent = parsed;
     return result;
   };
+  function effectiveProp(node, camel, kebab = camel) {
+    const normalize = (value) => value.replaceAll('-', '').toLowerCase();
+    let current = [{ value: undefined, label: undefined }];
+    for (const prop of node.props) {
+      if (prop.type === NodeTypes.ATTRIBUTE && normalize(prop.name) === normalize(camel)) {
+        current = [{ value: expression(JSON.stringify(prop.value?.content ?? '')), label: prop.value?.content }];
+      } else if (prop.type === NodeTypes.DIRECTIVE && prop.name === 'bind' && prop.exp?.content) {
+        if (prop.arg) {
+          const key = prop.arg.isStatic === false ? literal(expression(prop.arg.content)) : prop.arg.content;
+          if (key === undefined) current = [{ value: undefined, label: '(unresolved dynamic binding)' }];
+          else if (normalize(key) === normalize(camel))
+            current = [{ value: expression(prop.exp.content), label: prop.exp.content }];
+        } else {
+          const values = members(expression(prop.exp.content), [camel, kebab]);
+          if (values.some((value) => value !== null))
+            current = values.flatMap((value) =>
+              value === null ? current : [{ value, label: `(${prop.exp.content}).${camel}` }],
+            );
+        }
+      }
+    }
+    return current;
+  }
   const tagIs = (node, tag) => node.tag?.replaceAll('-', '').toLowerCase() === tag.replaceAll('-', '').toLowerCase();
   function selectionSlots(node) {
     const result = [];
@@ -427,44 +585,76 @@ export function listSelectionViolations(file, source) {
         for (const nested of value.children ?? []) walk(nested);
       }
       walk(child);
-      if (selectable) result.push(slot.arg?.content);
+      if (selectable)
+        result.push(
+          slot.arg?.isStatic === false
+            ? (literal(expression(slot.arg.content)) ?? '(dynamic checkbox slot)')
+            : slot.arg?.content,
+        );
     }
     return result.filter(Boolean);
+  }
+  const slotNames = (node) =>
+    (node.children ?? [])
+      .flatMap((child) =>
+        child.type === NodeTypes.ELEMENT
+          ? child.props
+              .filter((prop) => prop.type === NodeTypes.DIRECTIVE && prop.name === 'slot')
+              .map((prop) => (prop.arg?.isStatic === false ? literal(expression(prop.arg.content)) : prop.arg?.content))
+          : [],
+      )
+      .filter(Boolean);
+  const matchesSlot = (fact, slot, available) =>
+    fact.title === slot ||
+    (fact.key !== 'serial-number' &&
+      !fact.cellRenderer &&
+      (available.includes(fact.key) ? fact.key === slot : fact.cell === slot));
+  function uncertain(fact, slots) {
+    if (slots.includes('(dynamic checkbox slot)')) return true;
+    if (fact.unknown) return !fact.removesMultiple || slots.length > 0;
+    if (fact.unknownType && !fact.removesMultiple) return true;
+    if (!slots.length) return false;
+    return fact.unknownSlot || (fact.unknownKey && slots.some((slot) => !fact.removedKeys?.includes(slot)));
   }
   function visit(node, inDialog = false) {
     if (node.type === NodeTypes.ELEMENT) {
       const customSelection = selectionSlots(node);
+      const availableSlots = slotNames(node);
       if (tagIs(node, 'AdminListPage') && customSelection.length) {
-        const declared =
-          node.props.find((prop) => prop.type === NodeTypes.ATTRIBUTE && prop.name === 'selection-column-key')?.value
-            ?.content ?? literal(expression(binding(node, 'selection-column-key') ?? 'undefined'));
-        const keys = customSelection.filter(
-          (slot) => !customSelection.some((other) => other !== slot && slot === `${other}Title`),
+        const declaredValues = effectiveProp(node, 'selectionColumnKey', 'selection-column-key').map((entry) =>
+          literal(entry.value),
         );
-        if (!declared || keys.some((key) => key !== declared))
-          problems.push(`${file}: custom list selection must declare its matching selection-column-key`);
+        const declared =
+          declaredValues[0] && declaredValues.every((value) => value === declaredValues[0])
+            ? declaredValues[0]
+            : undefined;
+        const facts = effectiveProp(node, 'tableProps', 'table-props').flatMap((entry) =>
+          members(entry.value, 'columns').flatMap((value) => (value === null ? [] : columns(value))),
+        );
+        const keys = [
+          ...new Set(
+            facts
+              .filter((fact) => customSelection.some((slot) => matchesSlot(fact, slot, availableSlots)))
+              .map((fact) => fact.key),
+          ),
+        ];
+        if (!declared || facts.some((fact) => uncertain(fact, customSelection)) || keys.some((key) => key !== declared))
+          problems.push(`${file}: custom list selection must declare its actual column key and prove the slot mapping`);
       }
       if (tagIs(node, 't-table')) {
         const direct = binding(node, 'columns');
-        let text;
-        // Vue applies v-bind and explicit props in source order. A later object may
-        // replace a previously normalized columns value, including an unknown spread.
-        for (const prop of node.props) {
-          if (prop.type !== NodeTypes.DIRECTIVE || prop.name !== 'bind' || !prop.exp?.content) continue;
-          if (prop.arg?.content === 'columns') text = prop.exp.content;
-          else if (!prop.arg) {
-            const values = members(expression(prop.exp.content), 'columns');
-            if (values.some((value) => value !== null)) text = `(${prop.exp.content}).columns`;
-          }
-        }
-        const facts = text ? columns(expression(text)) : [{ unknown: true }];
+        const sources = effectiveProp(node, 'columns');
+        const text = sources.map((entry) => entry.label).join(' | ');
+        const facts = sources.flatMap((entry) => columns(entry.value));
         const picker = inDialog && businessPickers.get(file)?.has(direct);
         const columnSelection = customSelection.filter(
           (slot) =>
             facts.some((fact) => fact.key === slot) ||
             !customSelection.some((other) => other !== slot && slot === `${other}Title`),
         );
-        const rawSelection = facts.some((fact) => fact.type === 'multiple' || columnSelection.includes(fact.key));
+        const rawSelection = facts.some(
+          (fact) => fact.type === 'multiple' || customSelection.some((slot) => matchesSlot(fact, slot, availableSlots)),
+        );
         const selectionEvidence =
           customSelection.length ||
           (binding(node, 'selected-row-keys') &&
@@ -476,12 +666,7 @@ export function listSelectionViolations(file, source) {
           !rawSelection &&
           reviewed?.columns === text &&
           createHash('sha256').update(source).digest('hex') === reviewed.digest;
-        const unproven =
-          facts.some(
-            (fact) =>
-              fact.unknown &&
-              !(fact.removesMultiple && columnSelection.every((key) => fact.removedKeys?.includes(key))),
-          ) && !reviewedDisplay;
+        const unproven = facts.some((fact) => uncertain(fact, columnSelection)) && !reviewedDisplay;
         if (!picker && (rawSelection || unproven))
           problems.push(
             `${file}: selectable table ${text ?? '(unbound columns)'} must return columns from the shared batch capability`,

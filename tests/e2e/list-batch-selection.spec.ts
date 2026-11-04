@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFormOptionsMock } from './form-options-mock';
 import { installAdminApiMocks } from './admin-api-mocks';
 import { installAdminApiMocks as installAccessoryApiMocks } from './accessory-api-mocks';
 
@@ -164,3 +165,73 @@ for (const [client, path, resource] of surfaces) {
     expect(writes).toBe(0);
   });
 }
+
+for (const resource of ['finished-products', 'accessory-products'] as const) {
+  test(`${resource} form options abort only an obsolete document and preserve collection overrides`, async ({
+    page,
+  }) => {
+    await (resource === 'accessory-products' ? installAccessoryApiMocks : installAdminApiMocks)(page);
+    let entered!: () => void;
+    let release!: () => void;
+    const requested = new Promise<void>((resolve) => {
+      entered = resolve;
+    });
+    const pending = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    let first = true;
+    const categories = [{ id: 777, name: '当前文档分类', parentId: null, status: 'enabled' }];
+    await page.route('**/api/admin/product-categories', async (route) => {
+      if (first) {
+        first = false;
+        entered();
+        await pending;
+        await route.abort('aborted');
+      } else await route.fulfill({ json: { code: 0, data: categories } });
+    });
+    await page.route('**/fixture-options-start', (route) =>
+      route.fulfill({
+        contentType: 'text/html',
+        body: `<!doctype html><script>fetch('/api/admin/${resource}/form-options')</script>`,
+      }),
+    );
+    await page.route('**/fixture-options-next', (route) =>
+      route.fulfill({ contentType: 'text/html', body: '<!doctype html><p>current document</p>' }),
+    );
+    await page.goto('/fixture-options-start');
+    await requested;
+    await page.goto('/fixture-options-next');
+    release();
+    const options = await page.evaluate(
+      async (resource) => (await (await fetch(`/api/admin/${resource}/form-options`)).json()).data,
+      resource,
+    );
+    expect(options.categories).toEqual(categories);
+    expect(Array.isArray(options.attributes)).toBe(true);
+    expect(Array.isArray(options.suppliers)).toBe(true);
+    await expect(page.getByText('current document', { exact: true })).toBeVisible();
+  });
+}
+
+test('form options mock propagates real fixture errors without aborting or retrying', async () => {
+  const failure = new Error('fixture response is invalid');
+  let evaluations = 0;
+  let aborts = 0;
+  await expect(
+    readFormOptionsMock(
+      {
+        evaluate: async () => {
+          evaluations++;
+          throw failure;
+        },
+      },
+      {
+        abort: async () => {
+          aborts++;
+        },
+      },
+    ),
+  ).rejects.toBe(failure);
+  expect(evaluations).toBe(1);
+  expect(aborts).toBe(0);
+});
