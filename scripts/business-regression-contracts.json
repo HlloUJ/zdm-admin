@@ -336,7 +336,8 @@
         "tests/e2e/terminal-all-batch-shelf.spec.ts",
         "tests/e2e/store-price-rules.spec.ts",
         "tests/e2e/product-batch-delete.spec.ts",
-        "tests/e2e/customer-management.spec.ts"
+        "tests/e2e/customer-management.spec.ts",
+        "tests/e2e/store-recycle-selection.spec.ts"
       ],
       "backendTests": [
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
@@ -459,7 +460,8 @@
         "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
         "src/services/batchActionPermissions.test.ts": "f4ed67b265dc6f436c0ed4ddddf80ccf55eb3a1517b28d35eaafbed783ab9751",
         "src/services/customerCatalog.test.ts": "e9e75039913cba436a051ab9f8ab4fea31cc757f4699140c5e15b116d4a1753b",
-        "tests/e2e/customer-management.spec.ts": "88f71df6e42189efd7b38138ab7c9646c041fd853a9f3ad45987638a20bdf4b0"
+        "tests/e2e/customer-management.spec.ts": "88f71df6e42189efd7b38138ab7c9646c041fd853a9f3ad45987638a20bdf4b0",
+        "tests/e2e/store-recycle-selection.spec.ts": "af9d2ef6e42aa113651bd735f05ec900931bd40645873f6e73764b94e4c9744d"
       },
       "testChanges": [
         {
@@ -2621,6 +2623,7 @@
         "tests/e2e/store-accessory-management.spec.ts",
         "tests/e2e/store-finished-stock.spec.ts",
         "tests/e2e/store-product-menu.spec.ts",
+        "tests/e2e/store-recycle-selection.spec.ts",
         "tests/e2e/terminal-all-batch-shelf.spec.ts"
       ],
       "supportFiles": [
