@@ -209,6 +209,10 @@ const emit = defineEmits<{
   pageChange: [info: PageInfo];
   selectChange: [keys: (string | number)[]];
 }>();
+const managesBatchSelection = computed(
+  () =>
+    Boolean(props.selectionColumnKey) || (props.tableProps.columns ?? []).some((column) => column.type === 'multiple'),
+);
 const selection = computed({
   get: () => props.tableProps.selectedRowKeys ?? [],
   set: (keys: (string | number)[]) => emit('selectChange', keys),
@@ -217,11 +221,14 @@ const { hasBatchActions, selectionColumns } = useListBatchSelection(
   () => props.actions,
   selection,
   () => props.activeTab,
+  managesBatchSelection,
 );
 const selectableTableProps = computed<TableProps>(() => ({
   ...props.tableProps,
-  columns: selectionColumns(props.tableProps.columns ?? [], props.selectionColumnKey),
-  ...(!hasBatchActions.value ? { selectedRowKeys: [] } : {}),
+  columns: managesBatchSelection.value
+    ? selectionColumns(props.tableProps.columns ?? [], props.selectionColumnKey)
+    : props.tableProps.columns,
+  ...(managesBatchSelection.value && !hasBatchActions.value ? { selectedRowKeys: [] } : {}),
 }));
 function setFilter(key: string, value: unknown) {
   const scalar = typeof value === 'string' || typeof value === 'number' ? value : undefined;

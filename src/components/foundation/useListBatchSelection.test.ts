@@ -43,4 +43,25 @@ describe('permission-filtered list batch selection', () => {
     });
     scope.stop();
   });
+  it('invalidates pending writes across tab round trips, capability loss and disposal', () => {
+    const scope = effectScope();
+    const actions = ref<{ batch: boolean; disabled?: boolean }[]>([{ batch: true }]);
+    const selected = ref([1]);
+    const tab = ref('warehouse');
+    const list = scope.run(() => useListBatchSelection(actions, selected, tab))!;
+    const original = list.captureSelectionContext();
+    actions.value = [{ batch: true, disabled: true }];
+    expect(original()).toBe(true);
+    tab.value = 'selling';
+    tab.value = 'warehouse';
+    expect(original()).toBe(false);
+    const beforeLoss = list.captureSelectionContext();
+    actions.value = [];
+    actions.value = [{ batch: true }];
+    expect(beforeLoss()).toBe(false);
+    const beforeDispose = list.captureSelectionContext();
+    expect(beforeDispose()).toBe(true);
+    scope.stop();
+    expect(beforeDispose()).toBe(false);
+  });
 });

@@ -65,4 +65,25 @@ describe('official list default selection behavior', () => {
     expect(wrapper.find('[data-column="row-select"]').exists()).toBe(false);
     wrapper.unmount();
   });
+  it.each(['single', undefined] as const)(
+    'preserves non-batch %s selection and emits no clearing event',
+    async (type) => {
+      const state = reactive({
+        actions: [],
+        activeTab: 'warehouse',
+        tableProps: {
+          rowKey: 'id',
+          columns: [{ colKey: 'pick', type }, { colKey: 'enabled' }],
+          selectedRowKeys: [7],
+        },
+      });
+      const wrapper = mount(ListSelectionHost, { props: { state }, global });
+      expect(wrapper.findComponent(ListSelectionTable).props('selectedRowKeys')).toEqual([7]);
+      state.activeTab = 'selling';
+      await nextTick();
+      expect(wrapper.emitted('selectChange')).toBeUndefined();
+      expect(wrapper.findComponent(ListSelectionTable).props('selectedRowKeys')).toEqual([7]);
+      wrapper.unmount();
+    },
+  );
 });

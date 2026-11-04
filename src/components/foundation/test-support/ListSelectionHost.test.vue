@@ -11,7 +11,7 @@ defineProps<{
     selectionColumnKey?: string;
     tableProps: {
       rowKey: string;
-      columns: { colKey: string; type?: 'multiple' }[];
+      columns: { colKey: string; type?: 'single' | 'multiple' }[];
       selectedRowKeys: (string | number)[];
     };
   };
