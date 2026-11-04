@@ -5,6 +5,7 @@ import { parse as parseSfc } from '@vue/compiler-sfc';
 import { parse as parseTemplate, NodeTypes } from '@vue/compiler-dom';
 import test from 'node:test';
 import { createRequire } from 'node:module';
+import * as tableRendererUtils from 'lodash-es';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -1150,7 +1151,7 @@ test('batch shelf result acknowledgement has an explicit narrow registry', () =>
 test('all selectable business tables use batch capability, with exact dialog-picker exceptions only', () => {
   const pages = files('src').filter((file) => file.endsWith('.vue') && !file.startsWith('src/components/foundation/'));
   assert.deepEqual(
-    pages.flatMap((file) => listSelectionViolations(file, read(file))),
+    pages.flatMap((file) => listSelectionViolations(file, read(file), { readSource: read })),
     [],
   );
   const raw = `<template><t-table :columns="columns" :selected-row-keys="selected" /></template><script setup>const columns = [{ colKey: 'row-select', type: 'multiple' }];</script>`;
@@ -1179,8 +1180,7 @@ test('all selectable business tables use batch capability, with exact dialog-pic
 });
 
 test('custom checkbox slots cannot bypass official list selection policy', () => {
-  const raw =
-    '<template><AdminListPage :table-props="table"><template #select><t-checkbox /></template></AdminListPage></template>';
+  const raw = `<template><AdminListPage :table-props="table"><template #select><t-checkbox /></template></AdminListPage></template><script setup>const table={columns:[{colKey:'select'}]};</script>`;
   assert.equal(listSelectionViolations('src/pages/new/index.vue', raw).length, 1);
   assert.deepEqual(
     listSelectionViolations(
@@ -1488,7 +1488,7 @@ test('selection guard uses checkbox data bindings rather than field labels or sl
   const sfc = (template) =>
     '<template>' +
     template +
-    '</template><script setup>const selectedIds=ref([]);const columns=[{colKey:"enabled"}];</script>';
+    '</template><script setup>const selectedIds=ref([]);const columns=[{colKey:"enabled"}];const table={columns:[{colKey:"select"}]};</script>';
   const check = (template, blocked) =>
     assert.equal(listSelectionViolations('src/pages/new/index.vue', sfc(template)).length > 0, blocked, template);
   check('<t-table :columns="columns" :selected-row-keys="highlightedRows" />', false);
@@ -1533,7 +1533,7 @@ test('unresolved existing display/editor tables are retained only at exact revie
   ];
   for (const file of entries) {
     const source = read(file);
-    assert.deepEqual(listSelectionViolations(file, source), [], file);
+    assert.deepEqual(listSelectionViolations(file, source, { readSource: read }), [], file);
     assert.ok(
       listSelectionViolations(file, source + '\n<!-- changed source requires a new column review -->').length > 0,
       file,
@@ -1631,11 +1631,11 @@ test('selection guard proves every branch and input instead of borrowing an unre
     "const columns=computed(()=>[...selectionColumns(unknownColumns,'other'),...selectionColumns([], 'select')]);",
     true,
   );
-  check("const columns=selectionColumns(unknownColumns,'select');", false);
+  check("const columns=selectionColumns(unknownColumns,'select');", true);
   check("const columns=selectionColumns([{colKey:unknownKey}], 'other');", true);
 });
 
-test('selection guard composition agrees with the real public helper for branches spreads and nested filters', () => {
+test('selection guard composition agrees with real helper and installed TDesign slot rendering', () => {
   const load = createRequire(import.meta.url);
   const ts = load('typescript'),
     vue = load('vue');
@@ -1644,6 +1644,23 @@ test('selection guard composition agrees with the real public helper for branche
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
   }).outputText;
   new Function('require', 'exports', compiled)(load, module);
+  const utils = tableRendererUtils;
+  const renderer = (file, name) => {
+    const source = read(file),
+      tree = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
+    const fn = tree.statements.find((node) => ts.isFunctionDeclaration(node) && node.name?.text === name);
+    assert.ok(fn, 'Installed renderer entry must exist');
+    return new Function('h', 'get', 'isFunction', 'isString', `return (${fn.getText(tree)});`)(
+      vue.h,
+      utils.get,
+      utils.isFunction,
+      utils.isString,
+    );
+  };
+  const renderCell = renderer('node_modules/tdesign-vue-next/es/table/components/tr.mjs', 'renderCell');
+  const renderTitle = renderer('node_modules/tdesign-vue-next/es/table/hooks/useTableHeader.mjs', 'renderTitle');
+  const selectionMarker = Symbol('record-selection');
+  const slots = { select: () => selectionMarker, select2: () => selectionMarker, name: () => 'ordinary-data' };
   const scope = vue.effectScope();
   try {
     const runtime = scope.run(() => module.useListBatchSelection(vue.ref([]), vue.ref([])));
@@ -1652,6 +1669,16 @@ test('selection guard composition agrees with the real public helper for branche
       'other',
       'native',
       'plain',
+      'alias',
+      'heading',
+      'shadow',
+      'renderer',
+      'both',
+      'serial',
+      "filter(alias,'select')",
+      "filter(alias,'target')",
+      "filter(heading,'select2')",
+      "filter(heading,'head')",
       '[]',
       "filter(raw,'select')",
       'filter(raw)',
@@ -1668,9 +1695,23 @@ test('selection guard composition agrees with the real public helper for branche
     for (const inner of variants)
       for (const key of ['select', 'select2', 'wrong']) expressions.push(`filter((${inner}), '${key}')`);
     const schema =
-      "const raw=[{colKey:'select'}],other=[{colKey:'select2'}],native=[{colKey:'native',type:'multiple'}],plain=[{colKey:'name'}];";
+      "const raw=[{colKey:'select'}],other=[{colKey:'select2'}],native=[{colKey:'native',type:'multiple'}],plain=[{colKey:'name'}],alias=[{colKey:'target',cell:'select'}],heading=[{colKey:'head',title:'select2'}],shadow=[{colKey:'name',cell:'select'}],renderer=[{colKey:'select',cell:()=> 'ordinary-data'}],both=[{colKey:'name',cell:'select',title:'select2'}],serial=[{colKey:'serial-number',cell:'select'}];";
     for (const expression of expressions) {
-      const evaluate = new Function('filter', 'raw', 'other', 'native', 'plain', 'enabled', `return (${expression});`);
+      const evaluate = new Function(
+        'filter',
+        'raw',
+        'other',
+        'native',
+        'plain',
+        'alias',
+        'heading',
+        'shadow',
+        'renderer',
+        'both',
+        'serial',
+        'enabled',
+        `return (${expression});`,
+      );
       const shouldBlock = [false, true].some((enabled) =>
         evaluate(
           runtime.selectionColumns,
@@ -1678,14 +1719,189 @@ test('selection guard composition agrees with the real public helper for branche
           [{ colKey: 'select2' }],
           [{ colKey: 'native', type: 'multiple' }],
           [{ colKey: 'name' }],
+          [{ colKey: 'target', cell: 'select' }],
+          [{ colKey: 'head', title: 'select2' }],
+          [{ colKey: 'name', cell: 'select' }],
+          [{ colKey: 'select', cell: () => 'ordinary-data' }],
+          [{ colKey: 'name', cell: 'select', title: 'select2' }],
+          [{ colKey: 'serial-number', cell: 'select' }],
           enabled,
-        ).some((column) => column.type === 'multiple' || ['select', 'select2'].includes(column.colKey)),
+        ).some(
+          (column) =>
+            column.type === 'multiple' ||
+            renderCell({ col: column, row: { name: 'ordinary-data' }, rowIndex: 0, colIndex: 0 }, slots, {}) ===
+              selectionMarker ||
+            renderTitle(slots, column, 0) === selectionMarker,
+        ),
       );
-      const source = `<template><t-table :columns="columns"><template #select><t-checkbox /></template><template #select2><t-checkbox /></template></t-table></template><script setup>import {useListBatchSelection} from '@/components/foundation';const {selectionColumns:filter}=useListBatchSelection(actions,selected);${schema}const columns=computed(()=>${expression});</script>`;
+      const source = `<template><t-table :columns="columns"><template #select><t-checkbox /></template><template #select2><t-checkbox /></template><template #name="{row}">{{row.name}}</template></t-table></template><script setup>import {useListBatchSelection} from '@/components/foundation';const {selectionColumns:filter}=useListBatchSelection(actions,selected);${schema}const columns=computed(()=>${expression});</script>`;
       assert.equal(listSelectionViolations('src/pages/new/index.vue', source).length > 0, shouldBlock, expression);
     }
-    assert.equal(expressions.length, 240);
+    assert.equal(expressions.length, 880);
   } finally {
     scope.stop();
   }
+});
+
+test('custom checkbox slots resolve their actual cell/title column keys and reject unknown overrides', () => {
+  const check = (script, template, blocked) =>
+    assert.equal(
+      listSelectionViolations(
+        'src/pages/new/index.vue',
+        `<template>${template}</template><script setup>${script}</script>`,
+      ).length > 0,
+      blocked,
+      template + ' ' + script,
+    );
+  const hook =
+    "import {useListBatchSelection} from '@/components/foundation';const {selectionColumns:filter}=useListBatchSelection(actions,selected);";
+  const raw = '<t-table :columns="columns"><template #pick><t-checkbox /></template></t-table>';
+  check("const columns=[{colKey:'target',cell:'pick'}];", raw, true);
+  check(hook + "const columns=filter([{colKey:'target',cell:'pick'}],'pick');", raw, true);
+  check(hook + "const columns=filter([{colKey:'target',cell:'pick'}],'target');", raw, false);
+  check("const columns=[{colKey:'target',title:'pick'}];", raw, true);
+  check(hook + "const columns=filter([{colKey:'target',title:'pick'}],'target');", raw, false);
+  check(hook + "const columns=filter([{colKey:'target',cell:unknownCell}],'pick');", raw, true);
+  check(hook + "const columns=filter([{colKey:'target',cell:unknownCell}],'target');", raw, false);
+  check("const field=externalField;const columns=[{[field]:'multiple'}];", '<t-table :columns="columns" />', true);
+  check("const field='type';const columns=[{[field]:'multiple'}];", '<t-table :columns="columns" />', true);
+  check(hook + "const columns=filter(unknownColumns,'pick');", raw, true);
+  const state =
+    "const table={columns:[{colKey:'target',cell:'pick',title:'pickTitle'}]};const state={tableProps:table,selectionColumnKey:'target'};";
+  const slots = '<template #pickTitle><t-checkbox /></template><template #pick><t-checkbox /></template>';
+  check(state, `<AdminListPage :table-props="table" selection-column-key="target">${slots}</AdminListPage>`, false);
+  check(state, `<AdminListPage :table-props="table" selection-column-key="pick">${slots}</AdminListPage>`, true);
+  check(state, `<AdminListPage v-bind="state">${slots}</AdminListPage>`, false);
+  check(state, `<AdminListPage v-bind="state" selection-column-key="wrong">${slots}</AdminListPage>`, true);
+  check(state, `<AdminListPage selection-column-key="wrong" v-bind="state">${slots}</AdminListPage>`, false);
+  check(state, `<AdminListPage v-bind="state" v-bind:selection-column-key="unknownKey">${slots}</AdminListPage>`, true);
+  check(state, `<AdminListPage v-bind="state" v-bind:[unknownProp]="unknownValue">${slots}</AdminListPage>`, true);
+  check(
+    hook + "const columns=filter([{type:'multiple'}]);",
+    '<t-table :columns="columns" v-bind:[unknownProp]="unknownValue" />',
+    true,
+  );
+  check(
+    hook + "const columns=filter([{type:'multiple'}]);",
+    '<t-table v-bind:[unknownProp]="unknownValue" :columns="columns" />',
+    false,
+  );
+  check(
+    hook +
+      "const base=[{colKey:'select'}];base.splice(base.findIndex(col=>col.colKey==='select')+1,0,{colKey:'name'});const columns=filter(base,'select');",
+    '<t-table :columns="columns"><template #select><t-checkbox /></template></t-table>',
+    false,
+  );
+});
+
+test('reviewed imported column schemas require the real module bytes and actual imported symbol', () => {
+  const script =
+    "import {useListBatchSelection} from '@/components/foundation';import {productCreationColumns as creation} from '@/services/productAllView';const {selectionColumns:filter}=useListBatchSelection(actions,selected);const columns=filter([{colKey:'pick'},...creation()],'pick');";
+  const source = `<template><t-table :columns="columns"><template #pick><t-checkbox /></template></t-table></template><script setup>${script}</script>`;
+  assert.deepEqual(listSelectionViolations('src/pages/new/index.vue', source, { readSource: read }), []);
+  assert.ok(listSelectionViolations('src/pages/new/index.vue', source).length > 0);
+  assert.ok(
+    listSelectionViolations('src/pages/new/index.vue', source, {
+      readSource: (file) => read(file) + '\n// changed factory must be reviewed',
+    }).length > 0,
+  );
+  assert.ok(
+    listSelectionViolations('src/pages/new/index.vue', source, {
+      readSource: () => {
+        throw Error('unavailable');
+      },
+    }).length > 0,
+  );
+  assert.ok(
+    listSelectionViolations(
+      'src/pages/new/index.vue',
+      source.replace('@/services/productAllView', '@/fake/productAllView'),
+      { readSource: read },
+    ).length > 0,
+  );
+  const keyAlias = source.replaceAll('pick', 'createdByName');
+  assert.deepEqual(listSelectionViolations('src/pages/new/index.vue', keyAlias, { readSource: read }), []);
+  const wrong = source.replaceAll('#pick', '#createdByName');
+  assert.ok(
+    listSelectionViolations('src/pages/new/index.vue', wrong, { readSource: read }).length > 0,
+    'factory columns cannot be treated as an empty whitelist',
+  );
+});
+
+test('reviewed column factory schemas agree with their real exports for every current state', () => {
+  const load = createRequire(import.meta.url),
+    ts = load('typescript');
+  const compile = (file) => {
+    const module = {};
+    new Function(
+      'require',
+      'exports',
+      ts.transpileModule(read(file), {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+      }).outputText,
+    )((name) => (name.endsWith('.css') ? {} : load(name)), module);
+    return module;
+  };
+  const creation = compile('src/services/productAllView.ts');
+  const activity = compile('src/services/productStateActivity.ts');
+  const labels = {
+    warehouse: ['入库人', '入库时间'],
+    selling: ['上架人', '上架时间'],
+    soldOut: ['', '售完时间'],
+    recycle: ['移入人', '移入时间'],
+  };
+  for (const callback of [undefined, () => {}]) {
+    const columns = creation.productCreationColumns(callback);
+    assert.deepEqual(
+      columns.map((col) => col.colKey),
+      ['createdByName', 'createdAt'],
+    );
+    assert.equal(columns[0].title, '创建人');
+    if (callback) {
+      const title = columns[1].title();
+      assert.equal(title.type, 'button');
+      assert.equal(title.children, '创建时间');
+    } else assert.equal(columns[1].title, '创建时间');
+    for (const col of columns) {
+      assert.equal(col.type, undefined);
+      assert.equal(col.cell, undefined);
+    }
+    for (const state of ['warehouse', 'selling', 'soldOut', 'recycle']) {
+      const entries = activity.stateActivityColumns(state, callback);
+      assert.deepEqual(
+        entries.map((col) => col.colKey),
+        state === 'soldOut' ? ['stateOperatedAt'] : ['stateOperatorName', 'stateOperatedAt'],
+      );
+      if (state !== 'soldOut') assert.equal(entries[0].title, labels[state][0]);
+      if (callback) {
+        const title = entries.at(-1).title(load('vue').h);
+        assert.equal(title.type, 'button');
+        assert.equal(title.children, labels[state][1]);
+      } else assert.equal(entries.at(-1).title, labels[state][1]);
+      for (const col of entries) {
+        assert.equal(col.type, undefined);
+        assert.equal(col.cell, undefined);
+      }
+    }
+  }
+});
+
+test('slot checks retain native key precedence and reject unresolved dynamic selector slots', () => {
+  const script = "const columns=[{colKey:'name',cell:'pick'}];";
+  const source = (slots) =>
+    `<template><t-table :columns="columns">${slots}</t-table></template><script setup>${script}</script>`;
+  assert.deepEqual(
+    listSelectionViolations(
+      'src/pages/new/index.vue',
+      source('<template #name="{row}">{{row.name}}</template><template #pick><t-checkbox /></template>'),
+    ),
+    [],
+  );
+  assert.ok(
+    listSelectionViolations('src/pages/new/index.vue', source('<template #pick><t-checkbox /></template>')).length > 0,
+  );
+  assert.ok(
+    listSelectionViolations('src/pages/new/index.vue', source('<template #[unknownSlot]><t-checkbox /></template>'))
+      .length > 0,
+  );
 });
