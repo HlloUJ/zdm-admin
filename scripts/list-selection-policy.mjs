@@ -326,11 +326,28 @@ export function listSelectionViolations(file, source) {
       const values = (key) => members(node, key).map((value) => (value === null ? undefined : literal(value)));
       const keys = values('colKey'),
         types = values('type');
-      const unknown = members(node, 'type').some((value) => value === undefined);
+      const unknown = ['type', 'colKey'].some((key) =>
+        members(node, key).some((value) => value === undefined || (value !== null && literal(value) === undefined)),
+      );
       return keys.flatMap((key) => types.map((type) => ({ key, type, ...(unknown ? { unknown: true } : {}) })));
     }
     if (ts.isCallExpression(node)) {
-      if (helper(node.expression)) return [{ protected: true, customKey: literal(node.arguments[1]) }];
+      if (helper(node.expression)) {
+        const key = literal(node.arguments[1]);
+        // Prove the absent-capability result for every individual source value.
+        // A correct call elsewhere cannot certify a different branch or spread.
+        return columns(node.arguments[0], next)
+          .filter((fact) => fact.type !== 'multiple' && (!key || fact.key !== key))
+          .map((fact) =>
+            fact.unknown
+              ? {
+                  ...fact,
+                  removesMultiple: true,
+                  removedKeys: [...new Set([...(fact.removedKeys ?? []), ...(key ? [key] : [])])],
+                }
+              : fact,
+          );
+      }
       if (wrapper(node)) {
         const arg = node.arguments[0];
         return arg && (ts.isArrowFunction(arg) || ts.isFunctionExpression(arg))
@@ -447,9 +464,7 @@ export function listSelectionViolations(file, source) {
             facts.some((fact) => fact.key === slot) ||
             !customSelection.some((other) => other !== slot && slot === `${other}Title`),
         );
-        const rawSelection = facts.some(
-          (fact) => !fact.protected && (fact.type === 'multiple' || columnSelection.includes(fact.key)),
-        );
+        const rawSelection = facts.some((fact) => fact.type === 'multiple' || columnSelection.includes(fact.key));
         const selectionEvidence =
           customSelection.length ||
           (binding(node, 'selected-row-keys') &&
@@ -461,19 +476,13 @@ export function listSelectionViolations(file, source) {
           !rawSelection &&
           reviewed?.columns === text &&
           createHash('sha256').update(source).digest('hex') === reviewed.digest;
-        const unproven = facts.some((fact) => fact.unknown) && !reviewedDisplay;
-        const missingCustomFilter = columnSelection.some(
-          (key) => !facts.some((fact) => fact.protected && fact.customKey === key),
-        );
-        if (
-          !picker &&
-          (rawSelection ||
-            unproven ||
-            missingCustomFilter ||
-            (selectionEvidence &&
-              !facts.some((fact) => fact.protected) &&
-              !facts.some((fact) => fact.type === 'single')))
-        )
+        const unproven =
+          facts.some(
+            (fact) =>
+              fact.unknown &&
+              !(fact.removesMultiple && columnSelection.every((key) => fact.removedKeys?.includes(key))),
+          ) && !reviewedDisplay;
+        if (!picker && (rawSelection || unproven))
           problems.push(
             `${file}: selectable table ${text ?? '(unbound columns)'} must return columns from the shared batch capability`,
           );

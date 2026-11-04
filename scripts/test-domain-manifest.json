@@ -698,7 +698,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "c6ada538aecfeec1cf54a11a6ea38fdbd7f99f67de4608cc566c6ed6ae1330cb",
+      "digest": "c332272075438e800cbb8271c9ef1fb77db7dd4d388f816bee8d694e7bd0a35e",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -946,7 +946,7 @@
       "dynamicImports": 0
     },
     "scripts/list-selection-policy.mjs": {
-      "digest": "b20d8e21c9df13aa742026a110dc564445121c5157a8392032117fae469d0c89",
+      "digest": "007138c87d01f6e03e7b7456672291aba09bacae79be6b8532bad89cf5eba50b",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1283,7 +1283,7 @@
       "dynamicImports": 0
     },
     "scripts/ui-template-policy.test.mjs": {
-      "digest": "a34157209a7a6d4ce42d76681d443553a6f126c5856b4c6f1bf1980954071213",
+      "digest": "db09fff5ddda8cbdd145f686b6a678baf801efae75d340b988fc9cd789495ca9",
       "imports": [
         "scripts/button-color-policy.mjs",
         "scripts/confirmation-policy.mjs",

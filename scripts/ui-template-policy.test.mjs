@@ -4,6 +4,7 @@ import { confirmationRegistryViolations, confirmationViolations } from './confir
 import { parse as parseSfc } from '@vue/compiler-sfc';
 import { parse as parseTemplate, NodeTypes } from '@vue/compiler-dom';
 import test from 'node:test';
+import { createRequire } from 'node:module';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
@@ -1603,4 +1604,88 @@ test('selection guard rejects untracked imperative replacements rather than trus
     "const props={columns:selectionColumns([{type:'multiple'}])};Object.assign(props,{columns:[{type:'multiple'}]});",
     '<t-table v-bind="props" />',
   );
+});
+
+test('selection guard proves every branch and input instead of borrowing an unrelated successful filter', () => {
+  const hook =
+    "import {useListBatchSelection} from '@/components/foundation';const {selectionColumns}=useListBatchSelection(actions,selected);const raw=[{colKey:'select'}];";
+  const check = (body, blocked) =>
+    assert.equal(
+      listSelectionViolations(
+        'src/pages/new/index.vue',
+        `<template><t-table :columns="columns"><template #select><t-checkbox /></template></t-table></template><script setup>${hook}${body}</script>`,
+      ).length > 0,
+      blocked,
+      body,
+    );
+  check("const columns=computed(()=>condition?selectionColumns(raw,'select'):selectionColumns(raw,'other'));", true);
+  check("const columns=computed(()=>condition?selectionColumns(raw,'select'):selectionColumns(raw));", true);
+  check(
+    "const columns=computed(()=>[...selectionColumns(raw),...selectionColumns([{colKey:'name'}],'select')]);",
+    true,
+  );
+  check("const columns=computed(()=>condition?selectionColumns(raw,'select'):[]);", false);
+  check("const columns=selectionColumns(selectionColumns(raw,'other'),'select');", false);
+  check("const columns=selectionColumns(selectionColumns(raw,'select'),'other');", false);
+  check(
+    "const columns=computed(()=>[...selectionColumns(unknownColumns,'other'),...selectionColumns([], 'select')]);",
+    true,
+  );
+  check("const columns=selectionColumns(unknownColumns,'select');", false);
+  check("const columns=selectionColumns([{colKey:unknownKey}], 'other');", true);
+});
+
+test('selection guard composition agrees with the real public helper for branches spreads and nested filters', () => {
+  const load = createRequire(import.meta.url);
+  const ts = load('typescript'),
+    vue = load('vue');
+  const module = {};
+  const compiled = ts.transpileModule(read('src/components/foundation/useListBatchSelection.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+  }).outputText;
+  new Function('require', 'exports', compiled)(load, module);
+  const scope = vue.effectScope();
+  try {
+    const runtime = scope.run(() => module.useListBatchSelection(vue.ref([]), vue.ref([])));
+    const variants = [
+      'raw',
+      'other',
+      'native',
+      'plain',
+      '[]',
+      "filter(raw,'select')",
+      'filter(raw)',
+      "filter(raw,'wrong')",
+      'filter(native)',
+      "filter(other,'select2')",
+    ];
+    const expressions = [...variants];
+    for (const left of variants)
+      for (const right of variants) {
+        expressions.push(`enabled ? (${left}) : (${right})`);
+        expressions.push(`[...(${left}), ...(${right})]`);
+      }
+    for (const inner of variants)
+      for (const key of ['select', 'select2', 'wrong']) expressions.push(`filter((${inner}), '${key}')`);
+    const schema =
+      "const raw=[{colKey:'select'}],other=[{colKey:'select2'}],native=[{colKey:'native',type:'multiple'}],plain=[{colKey:'name'}];";
+    for (const expression of expressions) {
+      const evaluate = new Function('filter', 'raw', 'other', 'native', 'plain', 'enabled', `return (${expression});`);
+      const shouldBlock = [false, true].some((enabled) =>
+        evaluate(
+          runtime.selectionColumns,
+          [{ colKey: 'select' }],
+          [{ colKey: 'select2' }],
+          [{ colKey: 'native', type: 'multiple' }],
+          [{ colKey: 'name' }],
+          enabled,
+        ).some((column) => column.type === 'multiple' || ['select', 'select2'].includes(column.colKey)),
+      );
+      const source = `<template><t-table :columns="columns"><template #select><t-checkbox /></template><template #select2><t-checkbox /></template></t-table></template><script setup>import {useListBatchSelection} from '@/components/foundation';const {selectionColumns:filter}=useListBatchSelection(actions,selected);${schema}const columns=computed(()=>${expression});</script>`;
+      assert.equal(listSelectionViolations('src/pages/new/index.vue', source).length > 0, shouldBlock, expression);
+    }
+    assert.equal(expressions.length, 240);
+  } finally {
+    scope.stop();
+  }
 });
