@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-export const BATCH_TIMING_VERSION = 1;
+export const BATCH_TIMING_VERSION = 3;
 export const milliseconds = (value) => (typeof value === 'number' ? value : Date.parse(value));
 const finite = (value) => Number.isFinite(value);
 export function ranges(intervals) {
@@ -107,9 +107,10 @@ export function ingestNative(state, record, source) {
   }
   const turn = state.turns.find((t) => t.thread === source.thread && t.id === p.turn_id);
   if (!turn) return;
-  if (p.type === 'task_complete') {
+  if (p.type === 'task_complete' || p.type === 'turn_aborted') {
     if (at < turn.startedAt) issue(state, 'negative-turn');
     immutable(state, turn, 'finishedAt', at);
+    immutable(state, turn, 'termination', p.type === 'turn_aborted' ? 'interrupted' : 'completed');
   }
   if (p.type !== 'item_completed') return;
   const item = p.item ?? {};
@@ -161,7 +162,7 @@ export function interruptedValidationIds(state) {
   return ids;
 }
 export function summarizeBatch(state, { now = Date.now(), completion = null } = {}) {
-  assert.equal(state.version, BATCH_TIMING_VERSION);
+  assert.ok([1, 2, BATCH_TIMING_VERSION].includes(state.version), 'Unsupported batch timing format');
   const interrupted = interruptedValidationIds(state);
   const unresolved = (state.validations ?? []).filter((v) => v.finishedAt == null && !interrupted.has(v.id));
   const delivery = state.delivery;
@@ -172,7 +173,12 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
         .sort((a, b) => a.startedAt - b.startedAt)
         .at(-1)
     : null;
-  const sealed = Boolean(delivery && closing?.finishedAt != null && closing.finishedAt >= delivery.closedAt);
+  const sealed = Boolean(
+    delivery &&
+    closing?.termination !== 'interrupted' &&
+    closing?.finishedAt != null &&
+    closing.finishedAt >= delivery.closedAt,
+  );
   const end = sealed ? closing.finishedAt : now;
   assert.ok(end >= state.authorizedAt);
   const clip = (list) =>
@@ -185,10 +191,21 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
   const pauseOnly = subtract(pauses, active);
   const gap = subtract([[state.authorizedAt, end]], [...active, ...human, ...pauseOnly]);
   const problems = [...state.issues];
+  const invalidBoundary =
+    Number.isFinite(state.registeredAt) &&
+    bound.some(
+      (t) =>
+        t.thread === state.initialThread &&
+        t.id === state.initialTurn &&
+        t.finishedAt != null &&
+        t.finishedAt < state.registeredAt,
+    );
+  if (invalidBoundary) problems.push('authorization-turn-ended-before-registration');
   if (!state.sources.length || !bound.length) problems.push('missing-bound-execution');
   if (bound.some((t) => !t.projectVerified)) problems.push('unverified-project-turn');
   if (bound.some((t) => t.finishedAt == null && t !== closing) && delivery) problems.push('unclosed-earlier-turn');
   if (delivery && !closing) problems.push('missing-closing-turn');
+  if (delivery && closing?.termination === 'interrupted') problems.push('closing-turn-interrupted');
   if (delivery && unresolved.length) problems.push('unfinished-local-validation');
   if (sealed && questions.some((q) => q.answeredAt == null)) problems.push('unanswered-question-at-close');
   const partition = {
@@ -207,15 +224,18 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
   );
   return {
     version: 1,
-    timingVersion: 3,
+    timingVersion: 5,
     batch: state.batch,
     status: problems.length ? 'incomplete' : sealed ? 'completed' : delivery ? 'awaiting-turn-end' : 'snapshot',
     authorizedAt: new Date(state.authorizedAt).toISOString(),
     observedUntil: new Date(end).toISOString(),
     deliveryCompleteAt: delivery ? new Date(delivery.closedAt).toISOString() : null,
     finalReplyCompleteAt: sealed ? new Date(closing.finishedAt).toISOString() : null,
-    wallMs: end - state.authorizedAt,
-    ...partition,
+    wallMs: invalidBoundary ? null : end - state.authorizedAt,
+    ...Object.fromEntries(Object.entries(partition).map(([key, value]) => [key, invalidBoundary ? null : value])),
+    interruptedTurnIds: bound
+      .filter((t) => t.termination === 'interrupted')
+      .map((t) => ({ thread: t.thread, id: t.id })),
     approvalResponseLatencyMs: duration(response),
     ciWaitMs: duration(ci),
     localValidationMs: duration(
@@ -234,14 +254,22 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
     turnIds: bound.map((t) => ({ thread: t.thread, id: t.id })),
     issues: [...new Set(problems)],
     unknownIntervals: gap,
-    meaning: sealed
-      ? 'Authorization through the verified closing execution turn; CI and approval latency are overlays, never added to wall time.'
-      : 'Snapshot only; an unfinished final reply has no completion timestamp.',
+    meaning: invalidBoundary
+      ? 'The original authorization source predates registration; whole-batch duration is unavailable, original timestamps retained.'
+      : sealed
+        ? 'Authorization through the verified closing execution turn; CI and approval latency are overlays, never added to wall time.'
+        : 'Snapshot only; an unfinished final reply has no completion timestamp.',
   };
 }
-export function assertTimingReady(state, { now = Date.now(), completion = null } = {}) {
+export function assertTimingReady(
+  state,
+  { now = Date.now(), completion = null, allowHistoricalBoundary = false } = {},
+) {
   const summary = summarizeBatch(state, { now, completion });
-  assert.equal(summary.issues.length, 0, 'Batch timing boundary proof incomplete: ' + summary.issues.join(', '));
+  const blocking = summary.issues.filter(
+    (code) => !(allowHistoricalBoundary && code === 'authorization-turn-ended-before-registration'),
+  );
+  assert.equal(blocking.length, 0, 'Batch timing boundary proof incomplete: ' + blocking.join(', '));
   // A current open turn is expected before final reply; older open turns cannot be silently sealed.
   const open = state.turns.filter((t) => t.finishedAt == null);
   assert.ok(open.length <= 1, 'Multiple open execution turns');

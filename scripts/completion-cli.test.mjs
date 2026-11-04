@@ -771,3 +771,47 @@ test('batch report automatically seals after real closure and final native event
   assert.equal(report.batchTiming.status, 'completed');
   assert.equal(report.deliveryStatus.timingComplete, true);
 });
+
+test('actual settlement retains historical timing gaps and authorization proof while completing every delivery guard', async (t) => {
+  const f = fixture(t);
+  await prepare(f);
+  const batch = readActiveBatch(f.task),
+    sessions = path.join(f.common, 'historical-native');
+  mkdirSync(sessions);
+  const thread = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+    source = path.join(sessions, 'rollout-historical-' + thread + '.jsonl');
+  const at = Date.parse(batch.createdAt) - 1000;
+  const row = (type, payload, time) =>
+    JSON.stringify({ timestamp: new Date(time).toISOString(), type, payload }) + '\n';
+  writeFileSync(
+    source,
+    row('session_meta', { id: thread, cwd: f.anchor }, at - 1) +
+      row('event_msg', { type: 'task_started', turn_id: 'legacy' }, at) +
+      row('turn_context', { turn_id: 'legacy', cwd: f.task }, at) +
+      row(
+        'event_msg',
+        {
+          type: 'item_completed',
+          turn_id: 'legacy',
+          item: { type: 'UserMessage', id: 'original-request', content: [] },
+        },
+        at + 1,
+      ),
+  );
+  bindBatchTiming(f.task, batch, { sessionsRoot: sessions, env: { CODEX_THREAD_ID: thread }, observer: false });
+  appendFileSync(source, row('event_msg', { type: 'turn_aborted', turn_id: 'legacy' }, at + 100));
+  const marker = timingRequiredFile(f.common, 'example'),
+    proof = readFileSync(marker);
+  const result = await completionCommand(f.task, ['settle', 'example', f.main, '42'], f.options);
+  assert.equal(result.results.cleanup.result.worktreeRemoved, true);
+  assert.equal(readActiveBatch(f.anchor), null);
+  assert.equal(result.deliveryStatus.formalDeliveryComplete, true);
+  assert.equal(result.deliveryStatus.timingComplete, false);
+  assert.equal(result.batchTiming.status, 'incomplete');
+  assert.equal(result.batchTiming.wallMs, null);
+  assert.ok(result.batchTiming.issues.includes('authorization-turn-ended-before-registration'));
+  assert.deepEqual(readFileSync(marker), proof);
+  assert.equal(f.git(f.anchor, 'rev-parse', 'HEAD'), f.main);
+  assert.equal(f.downloads(), 1);
+  assert.equal(f.checks(), 1);
+});

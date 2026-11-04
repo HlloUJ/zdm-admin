@@ -10,13 +10,14 @@ import { fileURLToPath } from 'node:url';
 import { readTimeline, refreshTimeline, recordValidationTiming } from './batch-timing-store.mjs';
 import {
   requireBatchTiming,
+  requireBatchTimingForCleanup,
   reconcileInterruptedValidationTiming,
   inspectValidationProcesses,
 } from './batch-timing-runtime.mjs';
+import { timingWriterLock } from './delivery-repairs/batch-timing-io.mjs';
 import { runVerificationTask } from './verification-runner.mjs';
 function fixture(t) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'batch-timing-entry-')));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
   const anchor = path.join(root, 'main'),
     task = path.join(root, 'task');
   mkdirSync(anchor);
@@ -58,13 +59,25 @@ function fixture(t) {
   const registration = cli('./task-batch.mjs', ['register', '--id', 'timing', '--kind', 'infrastructure']);
   assert.equal(registration.status, 0, registration.stderr);
   const common = path.join(anchor, '.git');
-  t.after(() => {
+  const registeredObserver = JSON.parse(readFileSync(path.join(common, 'task-timing/timing/observer.json')));
+  t.after(async () => {
     try {
-      const owner = JSON.parse(readFileSync(path.join(common, 'task-timing/timing/observer.json')));
-      process.kill(owner.pid, 'SIGTERM');
-    } catch {
-      /* stopped collector */
+      process.kill(registeredObserver.pid, 'SIGTERM');
+    } catch (error) {
+      if (error.code !== 'ESRCH') throw error;
     }
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      try {
+        process.kill(registeredObserver.pid, 0);
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error;
+        break;
+      }
+      assert.ok(Date.now() < deadline, 'Fixture observer did not exit before directory cleanup');
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    rmSync(root, { recursive: true, force: true });
   });
   return { root, anchor, task, common, cli, env, file, row, at };
 }
@@ -84,17 +97,24 @@ test('actual registration CLI automatically starts timing; real failed verificat
     { report: () => {} },
   );
   assert.equal(result.exitCode, 7);
-  const { summary, state } = refreshTimeline(f.common, 'timing');
-  assert.equal(state.validations.length, 1);
-  assert.equal(summary.localFailedAttempts, 1);
-  assert.equal(summary.localPendingAttempts, 0);
-  assert.ok(summary.localValidationMs >= 0);
-  assert.equal(summary.localRepairMs, null);
-  const report = f.cli('./task-timing.mjs', ['--batch', 'timing', '--json']);
-  assert.equal(report.status, 0, report.stderr);
-  assert.equal(JSON.parse(report.stdout).batch, 'timing');
-  assert.equal(JSON.parse(report.stdout).localFailedAttempts, 1);
-  assertTimingReadyWithUnfinished(f);
+  const observer = JSON.parse(readFileSync(path.join(f.common, 'task-timing/timing/observer.json')));
+  // Pause between writes so this test asserts the committed CLI report; publication races have fault-injection coverage.
+  timingWriterLock(path.join(f.common, 'task-timing/timing'), () => process.kill(observer.pid, 'SIGSTOP'));
+  try {
+    const { summary, state } = refreshTimeline(f.common, 'timing');
+    assert.equal(state.validations.length, 1);
+    assert.equal(summary.localFailedAttempts, 1);
+    assert.equal(summary.localPendingAttempts, 0);
+    assert.ok(summary.localValidationMs >= 0);
+    assert.equal(summary.localRepairMs, null);
+    const report = f.cli('./task-timing.mjs', ['--batch', 'timing', '--json']);
+    assert.equal(report.status, 0, report.stderr);
+    assert.equal(JSON.parse(report.stdout).batch, 'timing');
+    assert.equal(JSON.parse(report.stdout).localFailedAttempts, 1);
+    assertTimingReadyWithUnfinished(f);
+  } finally {
+    process.kill(observer.pid, 'SIGCONT');
+  }
 });
 function assertTimingReadyWithUnfinished(f) {
   recordValidationTiming(f.common, 'timing', {
@@ -268,4 +288,107 @@ test('unknown process inspection, damaged preservation and real completion never
   assert.throws(() => reconcileInterruptedValidationTiming(f.common, 'timing', f.options));
   assert.equal(readTimeline(f.common, 'timing').validationInterruptions, undefined);
   assert.equal(readFileSync(path.join(f.task, f.file), 'utf8'), f.bytes);
+});
+
+test('optional timing observation reports errors without hiding actual verification failures', async (t) => {
+  const f = fixture(t);
+  const { observeCurrentTiming } = await import('./batch-timing-runtime.mjs');
+  const reports = [];
+  const observed = observeCurrentTiming(f.task, { env: { ...f.env, CODEX_THREAD_ID: 'unbound' } }, (s) =>
+    reports.push(s),
+  );
+  assert.equal(observed.status, 'unavailable');
+  assert.equal(
+    observeCurrentTiming(f.task, { env: { ...f.env, CODEX_THREAD_ID: 'unbound' } }, () => {
+      throw new Error('report unavailable');
+    }).status,
+    'unavailable',
+  );
+  assert.match(reports[0], /not bound/);
+  const result = await runVerificationTask(
+    {
+      root: f.task,
+      name: 'quality still fails',
+      command: process.execPath,
+      args: ['-e', 'process.exit(9)'],
+      env: f.env,
+      reuse: false,
+    },
+    { report: () => {} },
+  );
+  assert.equal(result.exitCode, 9);
+  assert.equal(readTimeline(f.common, 'timing').sources.length, 1);
+});
+
+test('another worktree never observes or writes the active business timeline', async (t) => {
+  const f = fixture(t);
+  const { refreshCurrentTiming, observeValidationTiming, currentTimingSummary } =
+    await import('./batch-timing-runtime.mjs');
+  const before = readFileSync(path.join(f.common, 'task-timing/timing/timeline.json'), 'utf8');
+  assert.equal(refreshCurrentTiming(f.anchor, { env: f.env }).status, 'outside-active-batch');
+  observeValidationTiming(
+    f.anchor,
+    { attemptId: 'foreign', startedAt: new Date().toISOString(), status: 'running' },
+    f.env,
+  );
+  assert.equal(currentTimingSummary(f.anchor), null);
+  assert.equal(readFileSync(path.join(f.common, 'task-timing/timing/timeline.json'), 'utf8'), before);
+});
+
+test('actual changed-check CLI continues after timing damage and preserves its quality exit code', (t) => {
+  const f = fixture(t);
+  writeFileSync(
+    path.join(f.task, 'package.json'),
+    JSON.stringify({ scripts: { 'verify:local': 'node -e "process.exit(7)"' } }),
+  );
+  const env = { ...f.env, CODEX_THREAD_ID: 'unbound' };
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./check-changed.mjs', import.meta.url)), 'package.json'],
+    { cwd: f.task, env, encoding: 'utf8' },
+  );
+  assert.equal(result.status, 1);
+  assert.match(result.stderr, /Batch timing observation unavailable/);
+  assert.match(result.stdout, /shared configuration checks/);
+  assert.doesNotMatch(result.stdout, /Missing script/);
+  const failedAttempt = refreshTimeline(f.common, 'timing').state.validations.find((v) => v.status === 'failed');
+  assert.ok(failedAttempt);
+  assert.doesNotMatch(result.stderr, /AssertionError/);
+});
+
+test('cleanup accepts only a proved historical boundary gap while strict reports, identity and concurrency checks remain intact', (t) => {
+  const f = fixture(t),
+    file = path.join(f.common, 'task-timing/timing/timeline.json');
+  appendFileSync(f.file, f.row('event_msg', { type: 'turn_aborted', turn_id: 'one' }, f.at + 20));
+  const state = refreshTimeline(f.common, 'timing').state;
+  state.registeredAt = f.at + 50;
+  writeFileSync(file, JSON.stringify(state));
+  assert.throws(() => requireBatchTiming(f.common, 'timing'), /authorization-turn-ended-before-registration/);
+  const result = requireBatchTimingForCleanup(f.common, 'timing');
+  assert.equal(result.status, 'incomplete');
+  assert.equal(result.wallMs, null);
+  assert.ok(result.issues.includes('authorization-turn-ended-before-registration'));
+  const original = readFileSync(file);
+  const tampered = JSON.parse(original);
+  tampered.authorizedAt += 1;
+  writeFileSync(file, JSON.stringify(tampered));
+  assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /Authorization boundary changed/);
+  writeFileSync(file, original);
+  const concurrent = JSON.parse(original);
+  concurrent.turns.push(
+    ...['two', 'three'].map((id) => ({
+      id,
+      thread: 'foreign',
+      startedAt: Date.now(),
+      finishedAt: null,
+      projectVerified: true,
+    })),
+  );
+  writeFileSync(file, JSON.stringify(concurrent));
+  assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /Multiple open execution turns/);
+  writeFileSync(file, original);
+  const damaged = JSON.parse(original);
+  damaged.issues.push('native-source-unavailable:ENOENT');
+  writeFileSync(file, JSON.stringify(damaged));
+  assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /native-source-unavailable/);
 });

@@ -23,10 +23,27 @@ export function timingCommon(root) {
   assert.equal(value.status, 0, 'Batch timing repository unavailable');
   return path.resolve(root, value.stdout.trim());
 }
+const belongsToBatch = (root, batch) => realpathSync(root) === realpathSync(batch.worktree);
+
+// Observation is optional; strict binding and authorization checks remain separate.
+export function observeCurrentTiming(root, options = {}, report = console.error) {
+  try {
+    return refreshCurrentTiming(root, options);
+  } catch (error) {
+    try {
+      report('Batch timing observation unavailable: ' + error.message);
+    } catch {
+      /* Observation reporting cannot block quality checks. */
+    }
+    return { status: 'unavailable', reason: error.message };
+  }
+}
+
 export function refreshCurrentTiming(root, { env = process.env, bind = false, resume = false } = {}) {
   if (env.CI || env.GITHUB_ACTIONS === 'true') return { status: 'not-required' };
   const batch = readActiveBatch(root);
   if (!batch) return { status: 'no-active-batch' };
+  if (!belongsToBatch(root, batch)) return { status: 'outside-active-batch' };
   if (bind) return bindBatchTiming(root, batch, { env, resume });
   const common = batch.repository.commonDir,
     state = readTimeline(common, batch.id);
@@ -48,7 +65,11 @@ export function refreshCurrentTiming(root, { env = process.env, bind = false, re
     file: path.join(timingDirectory(common, batch.id), 'summary.json'),
   };
 }
-export function requireBatchTiming(common, batch, { now = Date.now(), legacyAllowed = true } = {}) {
+export function requireBatchTiming(
+  common,
+  batch,
+  { now = Date.now(), legacyAllowed = true, allowHistoricalBoundary = false } = {},
+) {
   const state = readTimeline(common, batch);
   if (!state) {
     assert.ok(legacyAllowed && !existsSync(timingRequiredFile(common, batch)), 'New batch timing proof missing');
@@ -62,15 +83,20 @@ export function requireBatchTiming(common, batch, { now = Date.now(), legacyAllo
     assert.equal(proof.requestId, state.requestId, 'Authorization identity changed');
   }
   const result = refreshTimeline(common, batch, { now });
-  const summary = assertTimingReady(result.state, { now, completion: result.completion });
+  const summary = assertTimingReady(result.state, { now, completion: result.completion, allowHistoricalBoundary });
   return summary;
+}
+
+// Cleanup may retain a proved legacy timing gap; identity, source and concurrent-write checks stay strict.
+export function requireBatchTimingForCleanup(common, batch, options = {}) {
+  return requireBatchTiming(common, batch, { ...options, allowHistoricalBoundary: true });
 }
 
 export function observeValidationTiming(root, attempt, env = process.env) {
   if (env.CI || env.GITHUB_ACTIONS === 'true') return;
   try {
     const batch = readActiveBatch(root);
-    if (batch && readTimeline(batch.repository.commonDir, batch.id))
+    if (batch && belongsToBatch(root, batch) && readTimeline(batch.repository.commonDir, batch.id))
       recordValidationTiming(batch.repository.commonDir, batch.id, attempt);
   } catch (error) {
     console.error('Batch validation timing unavailable: ' + error.message);
@@ -79,7 +105,7 @@ export function observeValidationTiming(root, attempt, env = process.env) {
 
 export function currentTimingSummary(root) {
   const batch = readActiveBatch(root);
-  if (!batch) return null;
+  if (!batch || !belongsToBatch(root, batch)) return null;
   return readTimingSummaryFor(batch.repository.commonDir, batch.id);
 }
 
