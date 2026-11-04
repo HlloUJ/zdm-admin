@@ -42,7 +42,7 @@ public class OperationsBatchShelfService {
       default -> throw new IllegalArgumentException("商品模块不正确");
     };
     String prefix = "admin." + module;
-    guard.requirePermission(prefix + ".batch-shelf");
+    guard.requirePermission(prefix + ".warehouse.shelf");
     guard.requireDataPermission();
     if (requested == null || requested.isEmpty() || requested.stream().anyMatch(id -> id == null || id <= 0)) {
       throw new IllegalArgumentException("请选择商品");

@@ -1,3 +1,4 @@
+import { canonicalBatchPermission } from './batchActionPermissions';
 import { expandLegacyProductGlobalPermission } from './productGlobalPermissions';
 
 const legacyScopedPermissionPrefixes = [
@@ -24,6 +25,7 @@ const legacyAttributeActionMap: Record<string, string> = {
 };
 
 export const expandLegacyScopedPermission = (permission: string) => {
+  permission = canonicalBatchPermission(permission);
   const productGlobal = expandLegacyProductGlobalPermission(permission);
   if (productGlobal) return productGlobal;
   const categorySortPrefix = ['finished', 'accessory']

@@ -23,7 +23,7 @@
       "dynamicImports": 0
     },
     "ci/browser-image.lock.json": {
-      "digest": "93ede5cef08586e55a64904832b50bb56bc301bbf70b72e5d958e46fe0451904",
+      "digest": "974f3c68de7d428eae39b03c1034c6a943989b7a757a51a023a023f25c160050",
       "imports": [],
       "dynamicImports": 0
     },
@@ -43,7 +43,7 @@
       "dynamicImports": 0
     },
     "ci/e2e-shards.json": {
-      "digest": "d27e289c5a1ca1908ade5c55f9abd5a7203b59bcf3ff397e9768690fc7305a21",
+      "digest": "ec711d3ae6b7b7bbfa144011ed871f74a6f0c008727e86edc38bf348854d5213",
       "imports": [],
       "dynamicImports": 0
     },
@@ -215,7 +215,11 @@
       "dynamicImports": 4
     },
     "scripts/business-regression-contracts.json": {
+<<<<<<< HEAD
       "digest": "365d578acfe9f25027d3a6dcfdbdbd4aeffc12b923e2a7c8ee08a8f72602116d",
+=======
+      "digest": "111898e3ec075f5641aad139ec7373dcc8c5f31fa6e5fd769e226ce7d4e0edbc",
+>>>>>>> origin/main
       "imports": [],
       "dynamicImports": 0
     },
@@ -659,12 +663,16 @@
       "dynamicImports": 0
     },
     "scripts/e2e-shards.test.mjs": {
-      "digest": "da020c85f3871d5a1b1f75c219f698806e3b1af7e9150cb93b05a92066223397",
+      "digest": "624458ed4ddf7b6ee8968734c6751914e75f068e0a64e15cdb6b4564b3430fe8",
       "imports": ["scripts/e2e-performance.mjs", "scripts/e2e-shards.mjs"],
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
+<<<<<<< HEAD
       "digest": "f545c79f4327478ce77c7f0e2d12f1fcfbdfba25b1d60031fe4045d518f84d13",
+=======
+      "digest": "10fa998bea3cbfd08883d65b13384a68dc0dd272210903a1afe1feb3cd3a244b",
+>>>>>>> origin/main
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",

@@ -2,7 +2,7 @@ import type { SlabStatus } from '@/services/slabs';
 
 export type SlabRowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
 export type SlabBatchAction =
-  'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
+  'publish' | 'batchDelete' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 
 type PermissionCheck = (status: SlabStatus, action: string) => boolean;
 interface BatchButton {
@@ -37,7 +37,8 @@ export function slabBatchButtons(status: SlabStatus, hasAction: PermissionCheck)
   };
   const permissions: Record<SlabBatchAction, string> = {
     publish: 'publish',
-    batchShelf: 'batch-shelf',
+    batchDelete: 'delete',
+    batchShelf: 'shelf',
     batchOffShelf: 'batch-off-shelf',
     batchRestore: 'batch-restore',
     batchPurge: 'batch-purge',

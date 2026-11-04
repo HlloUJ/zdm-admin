@@ -97,7 +97,9 @@
                 :selected-count="selectedKeys.length"
                 :has-batch-actions="
                   batchButtons.some((button) =>
-                    ['batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(button.action),
+                    ['batchDelete', 'batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(
+                      button.action,
+                    ),
                   )
                 "
                 :has-auxiliary="canViewOperationLogs"
@@ -278,6 +280,7 @@
           :mode="productMode"
           :title="productDialogTitle"
           :hide-breadcrumb="productMode === 'create'"
+          hide-heading
           :loading="saving"
           @confirm="handleProductSubmit"
           @close="closeProductDialog"
@@ -872,6 +875,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="saving"
       :function="buttonFunctionFor('stock', confirmState.type)"
       :action="confirmAction"
       :title="confirmTitle"
@@ -955,16 +959,24 @@
       </t-table>
       <t-empty v-else description="暂无下架记录" />
     </AdminDialog>
-    <OperationsBatchShelfResult v-model:visible="allBatchResultVisible" :result="allBatchResult" />
+    <OperationsBatchShelfResult
+      v-model:visible="allBatchResultVisible"
+      :result="allBatchResult"
+      :operation="batchOperation"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import DecimalInput from '@/components/DecimalInput.vue';
 import { numericError } from '@/utils/numericInput';
+import { deleteProductsBatch } from '@/services/productBatchDelete';
+import { canBatchDelete } from '@/services/productBatchPermissions';
+import { batchRequestError } from '@/services/productBatchFeedback';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
 import type { BatchShelfResult } from '@/services/operationsBatchShelf';
+const batchOperation = ref<'上架' | '删除'>('上架');
 const allBatchResultVisible = ref(false);
 const allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
 import { useRoute } from 'vue-router';
@@ -1066,6 +1078,7 @@ type ConfirmType =
   | 'delete'
   | 'restore'
   | 'savePrice'
+  | 'batchDelete'
   | 'batchShelf'
   | 'batchRestore'
   | 'purge'
@@ -1459,6 +1472,7 @@ const confirmAction = computed(() => {
     delete: '删除',
     restore: '放回',
     savePrice: '保存价格',
+    batchDelete: '批量删除',
     batchShelf: '批量上架',
     batchRestore: '批量放回',
     purge: '彻底删除',
@@ -1569,7 +1583,9 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     align: 'left',
     fixed: 'right',
   });
-  return activeTab.value === 'all' && !hasSlabAction('warehouse', 'batch-shelf')
+  return activeTab.value === 'all' &&
+    !hasSlabAction('warehouse', 'batch-shelf') &&
+    !canBatchDelete(activeTab.value, hasSlabAction)
     ? baseColumns.filter((col) => col.colKey !== 'select')
     : baseColumns;
 });
@@ -1610,7 +1626,7 @@ const pageData = computed(() => {
 const shelfErrors = reactive<Record<number, string>>({});
 const paginationTotal = computed(() => filteredData.value.length);
 const pageCount = computed(() => Math.max(Math.ceil(paginationTotal.value / currentPagination.value.pageSize), 1));
-const batchButtons = computed(() =>
+const baseBatchButtons = computed(() =>
   activeTab.value === 'all'
     ? [
         ...(hasSlabAction('warehouse', 'publish')
@@ -1622,6 +1638,13 @@ const batchButtons = computed(() =>
       ]
     : slabBatchButtons(activeTab.value, hasSlabAction),
 );
+
+const batchButtons = computed(() => [
+  ...baseBatchButtons.value,
+  ...(canBatchDelete(activeTab.value, hasSlabAction)
+    ? [{ action: 'batchDelete' as const, label: '批量删除', icon: 'delete' }]
+    : []),
+]);
 const tabLabel = (tab: { label: string; value: SlabTab }) => {
   const count = tableData.value.filter((item) =>
     tab.value === 'all'
@@ -2157,6 +2180,14 @@ const handleBatchAction = async (action: BatchAction) => {
     openProductDialog('create');
     return;
   }
+  if (action === 'batchDelete') {
+    if (!selectedKeys.value.length) {
+      adminFeedback.warning('请先选择大板');
+      return;
+    }
+    openConfirm('batchDelete', null, '是否批量删除所选大板？删除成功的商品将进入回收站。');
+    return;
+  }
   if (action === 'batchShelf') {
     if (!selectedKeys.value.length) {
       adminFeedback.warning('请先选择大板');
@@ -2251,48 +2282,22 @@ const handleConfirmSubmit = async () => {
     if (type === 'batchRestore') {
       await updateSelectedSlabStatuses('warehouse');
     }
-    if (type === 'batchShelf' && activeTab.value === 'all') {
-      allBatchResult.value = await shelfProductsFromAll('slabs', [...selectedKeys.value]);
+    if (type === 'batchShelf' || type === 'batchDelete') {
+      const ids = [...selectedKeys.value];
+      batchOperation.value = type === 'batchDelete' ? '删除' : '上架';
+      try {
+        allBatchResult.value =
+          type === 'batchDelete' ? await deleteProductsBatch('slabs', ids) : await shelfProductsFromAll('slabs', ids);
+      } catch (error) {
+        adminFeedback.error(batchRequestError(error, batchOperation.value));
+        return;
+      }
       selectedKeys.value = [];
+      ids.forEach((id) => delete shelfErrors[id]);
       closeConfirmDialog();
       allBatchResultVisible.value = true;
       await loadSlabs();
       ensureCurrentPage();
-      return;
-    }
-    if (type === 'batchShelf') {
-      const ids = [...selectedKeys.value];
-      const failed = new Map<number, string>();
-      let succeeded = 0;
-      for (const id of ids) {
-        delete shelfErrors[id];
-        try {
-          await updateSlabStatus(id, 'selling');
-          succeeded++;
-        } catch (error) {
-          failed.set(id, error instanceof Error ? error.message : '上架失败，请重试');
-        }
-      }
-      await loadSlabs();
-      for (const [id, message] of failed) {
-        const latest = tableData.value.find((item) => item.id === id);
-        if (latest?.status === 'selling') {
-          succeeded++;
-          failed.delete(id);
-        } else if (latest && !sourceBlocked(latest)) {
-          shelfErrors[id] = message;
-        }
-      }
-      selectedKeys.value = ids.filter(
-        (id) =>
-          failed.has(id) &&
-          tableData.value.some((item) => item.id === id && !sourceBlocked(item) && item.status === 'warehouse'),
-      );
-      ensureCurrentPage();
-      closeConfirmDialog();
-      const message = `已上架 ${succeeded} 个大板，未上架 ${failed.size} 个大板`;
-      if (failed.size) adminFeedback.warning(message);
-      else adminFeedback.success(message);
       return;
     }
     if (type === 'purge' && row) {

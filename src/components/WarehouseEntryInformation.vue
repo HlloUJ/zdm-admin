@@ -6,7 +6,7 @@
       :theme="
         entry.warehouseEntryType === 'offShelf'
           ? 'warning'
-          : entry.warehouseEntryType === 'firstEntry'
+          : ['createEntry', 'sourceShelfEntry', 'productCenterSelect'].includes(entry.warehouseEntryType || '')
             ? 'primary'
             : 'default'
       "
@@ -39,7 +39,12 @@ import { warehouseEntryLabel, type WarehouseEntryInformation } from '@/services/
 const props = defineProps<{ entry: WarehouseEntryInformation; tooltipDisabled?: boolean }>();
 const summary = computed(() => {
   const entry = props.entry;
-  if (['firstEntry', 'recycleRestore'].includes(entry.warehouseEntryType || '')) return '';
+  if (
+    ['createEntry', 'sourceShelfEntry', 'productCenterSelect', 'recycleRestore'].includes(
+      entry.warehouseEntryType || '',
+    )
+  )
+    return '';
   const detail = entry.warehouseEntryDetail || (entry.warehouseEntryType === 'offShelf' ? '未填写详细说明' : '');
   return [entry.warehouseEntryReason, detail].filter(Boolean).join('；');
 });

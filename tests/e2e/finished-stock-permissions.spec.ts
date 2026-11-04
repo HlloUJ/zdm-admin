@@ -369,7 +369,7 @@ for (const [client, retryFailure] of [
   ['supply-chain', true],
   ['admin', false],
 ] as const) {
-  test(`batch shelf serializes ${client} requests and retains only unfinished selections retry=${retryFailure}`, async ({
+  test(`batch shelf processes all ${client} selections and clears selection retry=${retryFailure}`, async ({
     page,
   }) => {
     await setup(page, ['all'], client);
@@ -394,34 +394,42 @@ for (const [client, retryFailure] of [
     let maximumActive = 0;
     let failedOnce = false;
     await page.route('**/api/admin/finished-products', (route) => route.fulfill({ json: { code: 0, data: products } }));
-    await page.route(/\/api\/admin\/finished-products\/8[123]$/, async (route) => {
-      const id = Number(route.request().url().split('/').pop());
-      if (route.request().method() !== 'PUT') throw new Error('Unexpected method');
-      expect(route.request().postDataJSON().status).toBe('selling');
-      attempts.push(id);
-      active++;
-      maximumActive = Math.max(maximumActive, active);
-      await new Promise((resolve) => setTimeout(resolve, 100));
-      active--;
-      if (retryFailure && id === 82 && !failedOnce) {
-        failedOnce = true;
-        await route.fulfill({ status: 400, json: { code: 1, message: '第二个商品校验失败，请重试' } });
-        return;
-      }
-      const product = products.find((item) => item.id === id)!;
-      if (client === 'supply-chain') product.sourceStatus = 'selling';
-      else product.status = 'selling';
-      await route.fulfill({ json: { code: 0, data: product } });
-    });
     let batchRequests = 0;
-    if (client === 'admin')
-      await page.route('**/api/admin/finished-products/batch-shelf', (route) => {
+    await page.route(
+      `**/api/admin/finished-products/${client === 'admin' ? 'batch-shelf' : 'all-batch-shelf'}`,
+      async (route) => {
         batchRequests++;
         const ids = route.request().postDataJSON().ids as number[];
-        expect(ids).toEqual([83, 82, 81]);
-        products.forEach((product) => (product.status = 'selling'));
-        return route.fulfill({ json: { code: 0, data: { total: 3, successCount: 3, failureCount: 0, failures: [] } } });
-      });
+        expect(ids).toEqual(batchRequests === 1 ? [83, 82, 81] : [82]);
+        const failures: { id: number; code: string; reason: string }[] = [];
+        for (const id of ids) {
+          attempts.push(id);
+          active++;
+          maximumActive = Math.max(maximumActive, active);
+          await new Promise((resolve) => setTimeout(resolve, 100));
+          active--;
+          if (retryFailure && id === 82 && !failedOnce) {
+            failedOnce = true;
+            failures.push({ id, code: 'VALIDATION_FAILED', reason: '第二个商品校验失败，请重试' });
+            continue;
+          }
+          const product = products.find((item) => item.id === id)!;
+          if (client === 'supply-chain') product.sourceStatus = 'selling';
+          else product.status = 'selling';
+        }
+        return route.fulfill({
+          json: {
+            code: 0,
+            data: {
+              total: ids.length,
+              successCount: ids.length - failures.length,
+              failureCount: failures.length,
+              failures,
+            },
+          },
+        });
+      },
+    );
     await page.goto(
       productWarehouseUrl(
         client === 'admin' ? '/finished-stock-management' : '/supply-chain/finished-stock-management',
@@ -436,24 +444,26 @@ for (const [client, retryFailure] of [
     await main.getByRole('button', { name: '批量上架', exact: true }).click();
     const dialog = page.locator('.t-dialog:visible').filter({ hasText: '是否批量上架' });
     await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
+    const result = page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' });
+    await expect(result).toContainText(retryFailure ? '成功上架2件，失败1件。' : '成功上架3件，失败0件。');
     if (retryFailure) {
-      await expect(page.getByText('第二个商品校验失败，请重试', { exact: true })).toBeVisible();
-      expect(attempts).toEqual([83, 82]);
-      await expect(main.locator('.selection-info')).toHaveText('已选 2 项');
+      await expect(result.locator('tbody')).toContainText('第二个商品校验失败，请重试');
+      expect(attempts).toEqual([83, 82, 81]);
+      await expect(main.locator('.selection-info')).toHaveCount(0);
       await expect(main.getByText('批量上架验收83', { exact: true })).toHaveCount(0);
-      await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
-    }
-    if (client === 'admin') {
-      const result = page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' });
-      await expect(result).toContainText('成功上架3件，失败0件。');
       await result.getByRole('button', { name: '确认', exact: true }).click();
-      await expect(result).toBeHidden();
-      expect(batchRequests).toBe(1);
+      await main.locator('thead .t-checkbox__input').click();
+      await main.getByRole('button', { name: '批量上架', exact: true }).click();
+      await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
+      await expect(result).toContainText('成功上架1件，失败0件。');
     }
+    await result.getByRole('button', { name: '确认', exact: true }).click();
+    await expect(result).toBeHidden();
     await expect(dialog).toBeHidden();
     await expect(main.locator('.selection-info')).toHaveCount(0);
-    expect(attempts).toEqual(client === 'admin' ? [] : retryFailure ? [83, 82, 82, 81] : [83, 82, 81]);
-    expect(maximumActive).toBe(client === 'admin' ? 0 : 1);
+    expect(batchRequests).toBe(retryFailure ? 2 : 1);
+    expect(attempts).toEqual(retryFailure ? [83, 82, 81, 82] : [83, 82, 81]);
+    expect(maximumActive).toBe(1);
     await main.locator('.status-tabs .t-tabs__nav-item').filter({ hasText: '已上架' }).click();
     for (const product of products) await expect(main.getByText(product.name, { exact: true })).toBeVisible();
   });

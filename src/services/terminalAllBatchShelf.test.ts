@@ -14,34 +14,32 @@ const prefixes = [
 ];
 describe('terminal All batch permissions', () => {
   for (const prefix of prefixes)
-    it(prefix + ' has one global batch grant and preserves the legacy warehouse grant only', () => {
+    it(prefix + ' shares the warehouse shelf grant with both entries', () => {
       const terminal = prefix.startsWith('store.') ? 'store' : 'supply-chain';
       const page = terminalFunctionTrees[terminal]
         .flatMap((m) => m.menus)
         .flatMap((m) => m.pages)
         .find((p) => p.value === prefix)!;
-      expect(page.actions.filter((a) => a.value === prefix + '.batch-shelf')).toEqual([
-        { label: '批量上架', value: prefix + '.batch-shelf' },
-      ]);
+      expect(page.actions.filter((a) => a.value === prefix + '.batch-shelf')).toEqual([]);
       expect(page.tabs.flatMap((t) => t.actions).some((a) => a.value.endsWith('.batch-shelf'))).toBe(false);
       expect(page.tabs[0].actions).toEqual([{ label: '查看', value: prefix + '.all.view' }]);
-      expect(isProductGlobalAction(prefix + '.batch-shelf')).toBe(true);
+      expect(isProductGlobalAction(prefix + '.batch-shelf')).toBe(false);
       expect(normalizeFunctionCatalogPermissions(fullFunctionCatalog, [prefix + '.batch-shelf'])).toEqual([
-        prefix + '.batch-shelf',
+        prefix + '.warehouse.view',
+        prefix + '.warehouse.shelf',
       ]);
       expect(normalizeFunctionCatalogPermissions(fullFunctionCatalog, [prefix + '.warehouse.batch-shelf'])).toEqual([
-        prefix + '.batch-shelf',
         prefix + '.warehouse.view',
+        prefix + '.warehouse.shelf',
       ]);
       expect(expandLegacyProductGlobalPermission(prefix + '.warehouse.batch-shelf')).toEqual([
-        prefix + '.warehouse.batch-shelf',
         prefix + '.warehouse.view',
-        prefix + '.batch-shelf',
+        prefix + '.warehouse.shelf',
       ]);
       const previous = getLoginUser();
       try {
         setLoginUser({ ...previous, permissions: [prefix + '.batch-shelf'] });
-        expect(getLoginUser().permissions).toEqual([prefix + '.batch-shelf']);
+        expect(getLoginUser().permissions).toEqual([prefix + '.warehouse.view', prefix + '.warehouse.shelf']);
       } finally {
         setLoginUser(previous);
       }
@@ -70,4 +68,20 @@ it('uses record IDs for the API and preserves displayed IDs for missing or faile
     body: JSON.stringify({ ids: [71, 72] }),
   });
   expect(result.failures.map((failure) => failure.id)).toEqual([1071, 1072]);
+});
+
+it('batch delete preserves displayed store IDs and does not send reasons', async () => {
+  const { deleteProductsBatch } = await import('./productBatchDelete');
+  vi.mocked(request).mockResolvedValueOnce({
+    total: 1,
+    successCount: 0,
+    failureCount: 1,
+    failures: [{ id: 71, code: 'STATE', reason: '商品已失效' }],
+  });
+  const result = await deleteProductsBatch('store-finished-products', [71], { 71: 1071 });
+  expect(request).toHaveBeenLastCalledWith('/admin/store-finished-products/batch-delete', {
+    method: 'POST',
+    body: JSON.stringify({ ids: [71] }),
+  });
+  expect(result.failures[0].id).toBe(1071);
 });

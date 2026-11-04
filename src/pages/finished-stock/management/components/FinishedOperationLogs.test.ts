@@ -3,11 +3,18 @@ import { describe, expect, it, vi } from 'vitest';
 import FinishedOperationLogs from './FinishedOperationLogs.vue';
 import FinishedLogValue from './FinishedLogValue.vue';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
+import { commodityScopeKey } from '@/composables/useCommodityModule';
+import { getFinishedOperationLog as getAccessoryLog } from '@/services/accessoryOperationLogs';
 import { getLoginUser } from '@/services/auth';
 import { listFinishedOperationLogs, getFinishedOperationLog } from '@/services/finishedOperationLogs';
 vi.mock('@/services/auth', async (original) => ({
   ...(await original<typeof import('@/services/auth')>()),
   getLoginUser: vi.fn(() => ({ clientCode: 'admin' })),
+}));
+vi.mock('@/services/accessoryOperationLogs', async (original) => ({
+  ...(await original<typeof import('@/services/accessoryOperationLogs')>()),
+  listFinishedOperationLogs: vi.fn().mockResolvedValue({ records: [], total: 0 }),
+  getFinishedOperationLog: vi.fn(),
 }));
 vi.mock('@/services/finishedOperationLogs', async (original) => ({
   ...(await original<typeof import('@/services/finishedOperationLogs')>()),
@@ -184,3 +191,45 @@ it('renders reentry as a complete snapshot while keeping the real trigger summar
     operationSummary: reason,
   });
 });
+
+for (const scope of ['finished', 'accessory'] as const) {
+  for (const complete of [true, false]) {
+    it(`${scope} omits the old reentry reason from ${complete ? 'complete' : 'legacy partial'} arrival details without altering history`, async () => {
+      vi.mocked(getLoginUser).mockReturnValue({ clientCode: 'admin' } as ReturnType<typeof getLoginUser>);
+      const history = {
+        id: 28,
+        productId: 9,
+        productName: '历史商品',
+        operationType: 'SOURCE_SHELF',
+        operationSummary: '供应链已上架，商品进入运营管理平台仓库',
+        operatorName: '真实触发人',
+        operationSource: 'MANUAL',
+        operatedAt: '2026-11-03T08:00:00',
+        changeDetails: JSON.stringify({
+          ...(complete
+            ? { 商品ID: { after: 9 }, 销售规格: { after: [] }, 层级价格: { after: [], complete: true } }
+            : { 保留字段: { after: '原信息' } }),
+          重新入仓原因: { after: '历史自动重新入仓说明' },
+        }),
+      };
+      vi.mocked(scope === 'finished' ? getFinishedOperationLog : getAccessoryLog).mockResolvedValueOnce(history);
+      const wrapper = mount(FinishedOperationLogs, {
+        props: { visible: false },
+        shallow: true,
+        global: { provide: { [commodityScopeKey as symbol]: scope } },
+      });
+      const vm = wrapper.vm as unknown as {
+        showDetail: (id: number) => Promise<void>;
+        changes: Record<string, unknown>;
+        displayChanges: Record<string, unknown>;
+        fullSnapshot: boolean;
+      };
+      await vm.showDetail(28);
+      expect(vm.fullSnapshot).toBe(complete);
+      expect(vm.changes).not.toHaveProperty('重新入仓原因');
+      expect(vm.displayChanges).not.toHaveProperty('重新入仓原因');
+      if (!complete) expect(vm.displayChanges).toHaveProperty('保留字段');
+      expect(JSON.parse(history.changeDetails).重新入仓原因.after).toBe('历史自动重新入仓说明');
+    });
+  }
+}
