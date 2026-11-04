@@ -247,3 +247,14 @@ test('proved interrupted validation keeps end and duration unknown without count
     assert.throws(() => assertTimingReady(copy, { now: start + 400000000 }));
   }
 });
+
+test('an aborted closing turn cannot claim a successful final reply or completed report', () => {
+  const s = state();
+  begin(s, 'one', 0);
+  s.delivery = { closedAt: start + 100 };
+  put(s, row('turn_aborted', 'one', 200));
+  const summary = summarizeBatch(s, { now: start + 300 });
+  assert.equal(summary.status, 'incomplete');
+  assert.equal(summary.finalReplyCompleteAt, null);
+  assert.ok(summary.issues.includes('closing-turn-interrupted'));
+});

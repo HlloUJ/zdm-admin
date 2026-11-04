@@ -1,5 +1,5 @@
 import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
-import { requireBatchTiming, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
+import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
 import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs';
 import { createHash } from 'node:crypto';
@@ -453,7 +453,7 @@ export async function completionCommand(
       cleanup: {
         run: () => {
           reconcileInterruptedValidationTiming(common, batch.id, { root: batch.worktree, completion: state, key });
-          requireBatchTiming(common, batch.id);
+          requireBatchTimingForCleanup(common, batch.id);
           if (existsSync(batch.worktree)) assert.equal(execute(batch.worktree, 'git', ['status', '--porcelain']), '');
           process.chdir(anchor);
           if (existsSync(batch.worktree)) execute(anchor, 'git', ['worktree', 'remove', batch.worktree]);

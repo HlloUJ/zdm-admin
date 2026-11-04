@@ -455,7 +455,7 @@
         "src/pages/finished-stock/shared/guidePriceSource.test.ts": "78b7b219cb169c86b10590cef5faaf1394ec3c00e27101c4b784001e224f2fad",
         "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java": "8f4a40ce5c9d7b76b6c2b11a5afaea0554d45a4907cafd6f19c31412a97effff",
         "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java": "a2ea4de0623f1b0338db2d0cf2bd9c9b27c64bce5c64fdbceeb5c6df393ee1f9",
-        "tests/e2e/product-batch-delete.spec.ts": "5512140a67734a04ce60f56e57b7ba40352814f6267f2870294e741d4933998e",
+        "tests/e2e/product-batch-delete.spec.ts": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
         "backend/src/test/java/com/zdm/platform/customer/CustomerApiTest.java": "780f04ab359cc37f12f6d0deeca2c4f6e7ee5b4cb67d98f3b6a9f3545dff8557",
         "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
         "src/services/batchActionPermissions.test.ts": "f4ed67b265dc6f436c0ed4ddddf80ccf55eb3a1517b28d35eaafbed783ab9751",
@@ -2586,6 +2586,12 @@
           "before": "eb5c508ce1db17ebdc6e8c6afa6dec32a57251a8366c79da96e0d165b6829b8b",
           "after": "88f71df6e42189efd7b38138ab7c9646c041fd853a9f3ad45987638a20bdf4b0",
           "reason": "保留全部原生视觉字段、交互、截图与断言，批量读取同一页面快照以减少已诊断的跨页调用超时；不改超时、重试、业务或视觉标准"
+        },
+        {
+          "file": "tests/e2e/product-batch-delete.spec.ts",
+          "before": "5512140a67734a04ce60f56e57b7ba40352814f6267f2870294e741d4933998e",
+          "after": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
+          "reason": "任务完成技术收尾：首次 CI 41784515652 证实结果弹窗早于列表刷新完成，测试关闭页面时异步 form-options Mock 被中断。仅等待既有刷新响应完成并校验传输成功，原有全部业务断言、用例、超时及零重试不变。"
         }
       ],
       "routes": [
