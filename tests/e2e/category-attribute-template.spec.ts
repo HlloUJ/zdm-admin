@@ -176,8 +176,8 @@ test('tabs retain automatically saved drafts', async ({ page }) => {
   const versions = await setup(page);
   await page.goto('/category-attribute-template');
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
-  await page.waitForLoadState('networkidle');
-  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(continueDraft).toBeVisible();
+  await continueDraft.click();
   await expect(page.getByText('成品现货模板', { exact: true })).toBeVisible();
   await expect(page.getByText('配件模板', { exact: true })).toBeVisible();
   await expect(page.locator('.exit-edit')).toHaveText('草稿箱');
@@ -213,9 +213,7 @@ test('published snapshots stay read only without inner template tabs', async ({ 
 test('only an authorized scope is visible and cannot create versions', async ({ page }) => {
   await setup(page, ['admin.product-data-center.category-attribute-template.accessory.attributes.view']);
   await page.goto('/category-attribute-template');
-  const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
-  await page.waitForLoadState('networkidle');
-  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(page.getByRole('button', { name: '继续编辑草稿', exact: true })).toHaveCount(0);
   await expectAccessoryCategorySelected(page);
   await expect(page.getByRole('main').locator('.t-tabs__nav-item')).toHaveCount(0);
   await expect(page.getByRole('button', { name: '创建新版本草稿', exact: true })).toHaveCount(0);
@@ -239,8 +237,8 @@ test('attribute list paginates without dropping draft rows on save', async ({ pa
   }));
   await page.goto('/category-attribute-template');
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
-  await page.waitForLoadState('networkidle');
-  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(continueDraft).toBeVisible();
+  await continueDraft.click();
   const list = page.locator('.attribute-table');
   await expect(list.locator('tbody tr')).toHaveCount(10);
   await expect(list.locator('tbody tr').first().locator('td').nth(1)).toHaveText('1');
@@ -270,8 +268,8 @@ test('category panel matches the content panel without growing from page scroll'
   await page.setViewportSize({ width: 1393, height: 650 });
   await page.goto('/category-attribute-template');
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
-  await page.waitForLoadState('networkidle');
-  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(continueDraft).toBeVisible();
+  await continueDraft.click();
   const panel = page.locator('.category-panel');
   await expect(page.locator('.attribute-table tbody tr')).toHaveCount(10);
   const initialHeight = (await panel.boundingBox())!.height;
@@ -308,8 +306,8 @@ test('add attributes paginates and retains selections across search and pages', 
   );
   await page.goto('/category-attribute-template');
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
-  await page.waitForLoadState('networkidle');
-  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(continueDraft).toBeVisible();
+  await continueDraft.click();
   await page.getByRole('button', { name: '添加属性', exact: true }).click();
   const dialog = page.locator('.t-dialog:visible');
   await expect(dialog.getByRole('columnheader', { name: '来源', exact: true })).toHaveCount(0);
@@ -346,8 +344,8 @@ test('publish highlights missing roles and dropdown options', async ({ page }) =
   row.options = [];
   await page.goto('/category-attribute-template');
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
-  await page.waitForLoadState('networkidle');
-  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(continueDraft).toBeVisible();
+  await continueDraft.click();
   const table = page.locator('.attribute-table');
   await expect(table.getByRole('columnheader', { name: '属性角色 *', exact: true })).toBeVisible();
   await expect(table.getByRole('columnheader', { name: '选项值 *', exact: true })).toBeVisible();
@@ -374,6 +372,12 @@ test('publish highlights missing roles and dropdown options', async ({ page }) =
 
 test('option values support row selection and pagination without applying on cancel', async ({ page }) => {
   await setup(page);
+  // An unrelated pending request must not prevent interaction with the loaded draft.
+  await page.route('**/readiness-background', () => {});
+  await page.addInitScript(() => {
+    void fetch('/readiness-background');
+  });
+  const backgroundRequest = page.waitForRequest('**/readiness-background');
   await page.route('**/value-options?**', (route) =>
     route.fulfill({
       json: {
@@ -383,9 +387,10 @@ test('option values support row selection and pagination without applying on can
     }),
   );
   await page.goto('/category-attribute-template');
+  await backgroundRequest;
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
-  await page.waitForLoadState('networkidle');
-  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(continueDraft).toBeVisible();
+  await continueDraft.click();
   const link = page.locator('.attribute-table tbody tr').first().locator('.t-link').first();
   const originalCount = await link.innerText();
   await link.click();
@@ -414,8 +419,8 @@ test('exit edit waits for auto-save before returning to published view', async (
   const versions = await setup(page);
   await page.goto('/category-attribute-template');
   const continueDraft = page.getByRole('button', { name: '继续编辑草稿', exact: true });
-  await page.waitForLoadState('networkidle');
-  if (await continueDraft.isVisible()) await continueDraft.click();
+  await expect(continueDraft).toBeVisible();
+  await continueDraft.click();
   await expect(page.locator('.exit-edit')).toHaveText('草稿箱');
   await expect(page.locator('.version-panel .t-tabs')).toHaveCount(0);
   await page.locator('.attribute-table .required-switch').first().click();
