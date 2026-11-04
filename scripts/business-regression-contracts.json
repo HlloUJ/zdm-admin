@@ -463,7 +463,7 @@
         "src/services/customerCatalog.test.ts": "e9e75039913cba436a051ab9f8ab4fea31cc757f4699140c5e15b116d4a1753b",
         "tests/e2e/customer-management.spec.ts": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
         "tests/e2e/store-recycle-selection.spec.ts": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
-        "tests/e2e/list-batch-selection.spec.ts": "757c4bc90b237ac1b1e4a3c06e1bb8d7f2e874e931d255eb1ae080b8c7e6ed44"
+        "tests/e2e/list-batch-selection.spec.ts": "0c2e4bf392fadbe30ef6c3c7b7a485bff0a7d143221499da316ab6be9326d6bb"
       },
       "testChanges": [
         {
@@ -2630,6 +2630,12 @@
           "before": "af9d2ef6e42aa113651bd735f05ec900931bd40645873f6e73764b94e4c9744d",
           "after": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
           "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/list-batch-selection.spec.ts",
+          "before": "757c4bc90b237ac1b1e4a3c06e1bb8d7f2e874e931d255eb1ae080b8c7e6ed44",
+          "after": "0c2e4bf392fadbe30ef6c3c7b7a485bff0a7d143221499da316ab6be9326d6bb",
+          "reason": "用户授权补齐三类批量选择缺口回归；仅新增延迟回包行选/全选及Tab往返断言，保留原权限、状态、无业务写请求断言。"
         }
       ],
       "routes": [

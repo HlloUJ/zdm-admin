@@ -104,6 +104,63 @@ for (const [client, path, resource] of surfaces) {
     await page.goto(`${path}?tab=warehouse`);
     await expect(main.getByText('选择规则商品warehouse', { exact: true })).toBeVisible();
     await expect(main.getByRole('checkbox')).toHaveCount(0);
+    if (client === 'store') {
+      await page.evaluate(() => localStorage.setItem('selection-test-granted', 'yes'));
+      for (const target of ['row', 'page'] as const) {
+        for (const roundTrip of [false, true]) {
+          await page.goto(`${path}?tab=warehouse`);
+          await expect(main.getByText('选择规则商品warehouse', { exact: true })).toBeVisible();
+          let release!: () => void;
+          let entered!: () => void;
+          const pending = new Promise<void>((resolve) => {
+            release = resolve;
+          });
+          const requested = new Promise<void>((resolve) => {
+            entered = resolve;
+          });
+          const endpoint = `**/api/admin/${resource}`;
+          const delayed = async (route: import('@playwright/test').Route) => {
+            entered();
+            await pending;
+            await route.fulfill({
+              json: { code: 0, data: products.map((product) => ({ ...product, name: `过期回包${product.status}` })) },
+            });
+          };
+          await page.route(endpoint, delayed);
+          await main.locator(`${target === 'row' ? 'tbody' : 'thead'} .t-checkbox__input`).click();
+          await requested;
+          await main
+            .locator('.t-tabs__nav-item')
+            .filter({ hasText: /^已上架/ })
+            .click();
+          if (roundTrip)
+            await main
+              .locator('.t-tabs__nav-item')
+              .filter({ hasText: /^仓库中/ })
+              .click();
+          const returned = page.waitForResponse((response) => response.url().endsWith(`/api/admin/${resource}`));
+          release();
+          await (await returned).finished();
+          // Let the response continuation and Vue rendering finish before checking stale writes.
+          await page.evaluate(
+            () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+          );
+          await expect(
+            main.getByText(`选择规则商品${roundTrip ? 'warehouse' : 'selling'}`, { exact: true }),
+          ).toBeVisible();
+          await expect(main.getByText(/^过期回包/)).toHaveCount(0);
+          await expect(main.locator('input[type=checkbox]:checked')).toHaveCount(0);
+          await expect(main.getByText('已选 1 项', { exact: true })).toHaveCount(0);
+          if (!roundTrip)
+            await main
+              .locator('.t-tabs__nav-item')
+              .filter({ hasText: /^仓库中/ })
+              .click();
+          await expect(batchDelete).toBeDisabled();
+          await page.unroute(endpoint, delayed);
+        }
+      }
+    }
     expect(writes).toBe(0);
   });
 }

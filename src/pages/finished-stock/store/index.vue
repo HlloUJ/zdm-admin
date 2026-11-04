@@ -862,7 +862,11 @@ const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
     ? [{ id: 'clear', label: '清空回收站', variant: 'base' as const, icon: 'clear' }]
     : []),
 ]);
-const { hasBatchActions, selectionColumns } = useListBatchSelection(storeToolbarActions, selected, activeTab);
+const { hasBatchActions, selectionColumns, captureSelectionContext } = useListBatchSelection(
+  storeToolbarActions,
+  selected,
+  activeTab,
+);
 const storeRowButtons = (row: StoreFinishedProduct): FinishedStockRowAction[] =>
   finishedStockActions[row.effectiveStatus]
     .filter((action) => can(row.effectiveStatus === 'soldOut' ? 'sold-out' : row.effectiveStatus, action.permission))
@@ -898,16 +902,21 @@ const operationWidths: Record<StoreFinishedTab, number> = {
   soldOut: 104,
   recycle: 208,
 };
-const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...selectionColumns(baseColumns, 'select'),
-  ...(['all', 'warehouse'].includes(activeTab.value)
-    ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]
-    : []),
-  ...(activeTab.value === 'all'
-    ? productCreationColumns(toggleTimeSort)
-    : stateActivityColumns(activeTab.value, toggleTimeSort)),
-  { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },
-]);
+const columns = computed<PrimaryTableCol<TableRowData>[]>(() =>
+  selectionColumns(
+    [
+      ...baseColumns,
+      ...(['all', 'warehouse'].includes(activeTab.value)
+        ? [{ colKey: 'warehouseEntry', title: '入库类型 / 详细说明', minWidth: 140 }]
+        : []),
+      ...(activeTab.value === 'all'
+        ? productCreationColumns(toggleTimeSort)
+        : stateActivityColumns(activeTab.value, toggleTimeSort)),
+      { colKey: 'operation', title: '操作', width: operationWidths[activeTab.value], align: 'left', fixed: 'right' },
+    ],
+    'select',
+  ),
+);
 const poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
   { colKey: 'select', title: 'poolSelectTitle', width: 48 },
   { colKey: 'imageUrl', title: '商品主图', width: 96 },
@@ -952,9 +961,10 @@ function resetFilter() {
   filter.category = undefined;
   searchList();
 }
-async function refreshAvailability(ids: number[], allowBlocked = false) {
+async function refreshAvailability(ids: number[], allowBlocked = false, isCurrent: () => boolean = () => true) {
   try {
     const latest = await listStoreFinishedProducts();
+    if (!isCurrent()) return false;
     rows.value = latest;
     selected.value = selected.value.filter((id) => latest.some((item) => item.id === id && !item.sourceUnavailable));
     const missing = ids.some((id) => !latest.some((item) => item.id === id));
@@ -963,7 +973,7 @@ async function refreshAvailability(ids: number[], allowBlocked = false) {
     if (blocked && current.value && ids.includes(current.value.id) && editingId.value) void closeEdit();
     return !missing && (!blocked || allowBlocked);
   } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '商品状态核验失败，请重试'));
+    if (isCurrent()) adminFeedback.error(getSafeErrorMessage(error, '商品状态核验失败，请重试'));
     return false;
   }
 }
@@ -973,12 +983,14 @@ async function previewRowImage(row: StoreFinishedProduct) {
   if (latest?.imageUrl) imagePreview.value = latest.imageUrl;
 }
 async function toggleRow(id: number, checked: boolean) {
-  if (!(await refreshAvailability([id]))) return;
+  const isCurrent = captureSelectionContext();
+  if (!isCurrent() || !(await refreshAvailability([id], false, isCurrent)) || !isCurrent()) return;
   selected.value = checked ? [...new Set([...selected.value, id])] : selected.value.filter((item) => item !== id);
 }
 async function togglePage(checked: boolean) {
+  const isCurrent = captureSelectionContext();
   const ids = pageRows.value.map((item) => item.id);
-  if (!(await refreshAvailability(ids, true))) return;
+  if (!isCurrent() || !(await refreshAvailability(ids, true, isCurrent)) || !isCurrent()) return;
   if (checked) {
     const available = ids.filter((id) => rows.value.some((item) => item.id === id && !item.sourceUnavailable));
     selected.value = [...new Set([...selected.value, ...available])];

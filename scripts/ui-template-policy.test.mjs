@@ -1156,7 +1156,7 @@ test('all selectable business tables use batch capability, with exact dialog-pic
   assert.equal(listSelectionViolations('src/pages/new/index.vue', raw).length, 1);
   const shared = raw.replace(
     "const columns = [{ colKey: 'row-select', type: 'multiple' }];",
-    "const { selectionColumns } = useListBatchSelection(actions, selected); const columns = computed(() => selectionColumns([{ colKey: 'row-select', type: 'multiple' }]));",
+    "import { useListBatchSelection } from '@/components/foundation'; const { selectionColumns } = useListBatchSelection(actions, selected); const columns = computed(() => selectionColumns([{ colKey: 'row-select', type: 'multiple' }]));",
   );
   assert.deepEqual(listSelectionViolations('src/pages/new/index.vue', shared), []);
   assert.equal(
@@ -1187,5 +1187,87 @@ test('custom checkbox slots cannot bypass official list selection policy', () =>
       raw.replace('<AdminListPage ', '<AdminListPage selection-column-key="select" '),
     ),
     [],
+  );
+});
+
+test('selection policy traces bound values, members, aliases and computed returns without confusing field checkboxes', () => {
+  const file = 'src/pages/new/index.vue';
+  const sfc = (script, table = '<t-table v-bind="tableProps" />') =>
+    `<template>${table}</template><script setup>${script}</script>`;
+  const config = "const tableProps = { columns: [{ colKey: 'pick', type: 'multiple' }] };";
+  assert.equal(listSelectionViolations(file, sfc(config)).length, 1);
+  assert.equal(listSelectionViolations(file, sfc(config, '<t-table :columns="tableProps.columns" />')).length, 1);
+  assert.equal(listSelectionViolations(file, sfc('const tableProps = externalConfig;')).length, 1);
+  const hook =
+    "import { useListBatchSelection } from '@/components/foundation'; const { selectionColumns: filterColumns } = useListBatchSelection(actions, selected);";
+  const raw =
+    "const columns = computed(() => { const cols = [{ colKey: 'select' }]; filterColumns(cols, 'select'); return cols; });";
+  const table =
+    '<t-table :columns="columns"><template #selectTitle><t-checkbox /></template><template #select><t-checkbox /></template></t-table>';
+  assert.equal(listSelectionViolations(file, sfc(hook + raw, table)).length, 1);
+  assert.deepEqual(
+    listSelectionViolations(
+      file,
+      sfc(
+        hook + raw.replace("filterColumns(cols, 'select'); return cols;", "return filterColumns(cols, 'select');"),
+        table,
+      ),
+    ),
+    [],
+  );
+  assert.equal(
+    listSelectionViolations(
+      file,
+      sfc(
+        hook +
+          "const raw = [{type: 'multiple'}]; const columns = computed(() => condition ? filterColumns(raw) : raw);",
+        table,
+      ),
+    ).length,
+    1,
+  );
+  assert.deepEqual(
+    listSelectionViolations(
+      file,
+      sfc(
+        hook +
+          "const cols = [{type: 'multiple'}]; const alias = computed(() => filterColumns(cols)); const tableProps = {columns: alias};",
+      ),
+    ),
+    [],
+  );
+  assert.deepEqual(
+    listSelectionViolations(file, sfc("const tableProps = { columns: [{type: 'single'}], selectedRowKeys: [7] };")),
+    [],
+  );
+  assert.deepEqual(
+    listSelectionViolations(
+      file,
+      sfc(
+        '',
+        '<AdminListPage :table-props="table"><template #enabled="{row}"><t-checkbox v-model="row.enabled" /></template></AdminListPage>',
+      ),
+    ),
+    [],
+  );
+  assert.deepEqual(
+    listSelectionViolations(
+      file,
+      sfc(
+        "const columns = [{colKey: 'enabled'}];",
+        '<t-table :columns="columns"><template #enabled="{row}"><t-checkbox v-model="row.enabled" /></template></t-table>',
+      ),
+    ),
+    [],
+  );
+  // Same name without the public import cannot certify filtered columns.
+  assert.equal(
+    listSelectionViolations(
+      file,
+      sfc(
+        "const {selectionColumns} = useListBatchSelection(actions, selected); const tableProps = {columns: selectionColumns([{type: 'multiple'}])};",
+      ),
+    ).length,
+    1,
   );
 });
