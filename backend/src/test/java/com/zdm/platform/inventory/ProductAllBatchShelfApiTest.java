@@ -19,6 +19,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.junit.jupiter.params.provider.CsvSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -52,6 +53,9 @@ class ProductAllBatchShelfApiTest extends SpringContainerTestSupport {
   @Autowired private StorePriceRuleService priceRules;
   @Autowired private com.zdm.platform.media.MediaAssetService media;
   @SpyBean private FinishedProductService finishedProducts;
+  @SpyBean private StoreFinishedSalePriceService finishedSalePrices;
+  @SpyBean private StoreAccessorySalePriceService accessorySalePrices;
+  @Autowired private org.springframework.transaction.PlatformTransactionManager transactions;
   private static final AtomicLong COUNTER = new AtomicLong(10000);
   @BeforeEach void setup() {
     jdbc.update("UPDATE stores SET store_level_id=NULL");
@@ -73,7 +77,7 @@ class ProductAllBatchShelfApiTest extends SpringContainerTestSupport {
       jdbc.update("INSERT INTO " + kind + "_guide_price_settings(id,price_coefficient) VALUES(1,2) ON DUPLICATE KEY UPDATE price_coefficient=2");
     }
   }
-  @AfterEach void clear() { reset(finishedProducts); SecurityContextHolder.clearContext(); }
+  @AfterEach void clear() { reset(finishedProducts, finishedSalePrices, accessorySalePrices); SecurityContextHolder.clearContext(); }
   private String prefix(String resource) { return "admin." + ("slabs".equals(resource) ? "slab-management" : resource.replace("-products", "").equals("finished") ? "finished-stock-management" : "accessory-management"); }
   private String table(String resource) { return "slabs".equals(resource) ? "slab_inventory" : resource.replace('-', '_'); }
   private String logTable(String resource) { return "slabs".equals(resource) ? "slab_operation_logs" : resource.replace("-products", "") + "_operation_logs"; }
@@ -305,6 +309,77 @@ class ProductAllBatchShelfApiTest extends SpringContainerTestSupport {
     assertThat(result.successCount()).isEqualTo(1);assertThat(result.failureCount()).isEqualTo(1);
     assertThat(jdbc.queryForObject("SELECT source_status FROM finished_products WHERE id=?",String.class,bad)).isEqualTo("warehouse");
     assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM finished_operation_logs WHERE product_id=?",Long.class,bad)).isEqualTo(logs);
+  }
+  @ParameterizedTest
+  @CsvSource({"store-finished-products,false", "store-accessory-products,false",
+      "store-finished-products,true", "store-accessory-products,true"})
+  void storeBatchKeepsSingleItemLockOrderDuringPriceConfiguration(String resource, boolean deleting) throws Exception {
+    long first=storeReady(resource), second=storeReady(resource);
+    String kind=resource.substring(6).replace("-products", "");
+    String listings="store_"+kind+"_products", prices="store_"+kind+"_sale_prices";
+    long category=jdbc.queryForObject("SELECT store_category_id FROM "+listings+" WHERE id=?",Long.class,first);
+    var beforePrice=jdbc.queryForObject("SELECT sale_price FROM "+prices+" WHERE listing_id=?",java.math.BigDecimal.class,first);
+    long beforeLogs=shelfLogs(resource,first);
+    var configurationLocked=new java.util.concurrent.CountDownLatch(1);
+    var finishConfiguration=new java.util.concurrent.CountDownLatch(1);
+    var batchReachedCategories=new java.util.concurrent.CountDownLatch(1);
+    org.mockito.stubbing.Answer<Object> pauseFreeze=invocation -> {
+      configurationLocked.countDown();
+      assertThat(finishConfiguration.await(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+      return invocation.callRealMethod();
+    };
+    doAnswer(pauseFreeze).when(finishedSalePrices).freezeCategories(any(),any());
+    doAnswer(pauseFreeze).when(accessorySalePrices).freezeCategories(any(),any());
+    var actor=SecurityContextHolder.getContext().getAuthentication();
+    try(var executor=java.util.concurrent.Executors.newVirtualThreadPerTaskExecutor()) {
+      var configuration=executor.submit(() -> {
+        SecurityContextHolder.getContext().setAuthentication(actor);
+        try { return priceRules.clearPriceBatch(kind,List.of(category)); }
+        finally { SecurityContextHolder.clearContext(); }
+      });
+      try {
+        assertThat(configurationLocked.await(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+        org.mockito.stubbing.Answer<Object> beforeCategoryLock=invocation -> {
+          batchReachedCategories.countDown();
+          return invocation.callRealMethod();
+        };
+        doAnswer(beforeCategoryLock).when(finishedSalePrices).lockCategories(any());
+        doAnswer(beforeCategoryLock).when(accessorySalePrices).lockCategories(any());
+        var change=executor.submit(() -> {
+          SecurityContextHolder.getContext().setAuthentication(actor);
+          try { return deleting ? batches.delete(resource,List.of(first,second)) : batches.shelf(resource,List.of(first,second)); }
+          finally { SecurityContextHolder.clearContext(); }
+        });
+        OperationsBatchShelfService.Result result;
+        if (deleting) {
+          // Deletion must complete while price configuration still holds its category locks.
+          result=change.get(10,java.util.concurrent.TimeUnit.SECONDS);
+          assertThat(batchReachedCategories.getCount()).isEqualTo(1);
+          finishConfiguration.countDown();
+        } else {
+          assertThat(batchReachedCategories.await(10,java.util.concurrent.TimeUnit.SECONDS)).isTrue();
+          // A shelving transaction waiting for categories must not already own the listing lock.
+          var probe=new org.springframework.transaction.support.TransactionTemplate(transactions);
+          Long unlocked=probe.execute(status -> jdbc.queryForObject(
+              "SELECT id FROM "+listings+" WHERE id=? FOR UPDATE NOWAIT",Long.class,first));
+          assertThat(unlocked).isEqualTo(first);
+          finishConfiguration.countDown();
+          result=change.get(10,java.util.concurrent.TimeUnit.SECONDS);
+        }
+        configuration.get(10,java.util.concurrent.TimeUnit.SECONDS);
+        assertThat(result.total()).isEqualTo(2);
+        assertThat(result.successCount()).as(result.toString()).isEqualTo(2);
+        assertThat(result.failures()).isEmpty();
+        for(long listing : List.of(first,second)) {
+          assertThat(jdbc.queryForObject("SELECT status FROM "+listings+" WHERE id=?",String.class,listing))
+              .isEqualTo(deleting ? "recycle" : "selling");
+        }
+        assertThat(shelfLogs(resource,first)).isEqualTo(beforeLogs+(deleting ? 0 : 1));
+        assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_price_rules WHERE store_id=99591 AND kind='price' AND scope=? AND category_id=?",Long.class,kind,category)).isZero();
+        assertThat(jdbc.queryForObject("SELECT price_mode FROM "+prices+" WHERE listing_id=?",String.class,first)).isEqualTo("manual");
+        assertThat(jdbc.queryForObject("SELECT sale_price FROM "+prices+" WHERE listing_id=?",java.math.BigDecimal.class,first)).isEqualByComparingTo(beforePrice);
+      } finally { finishConfiguration.countDown(); }
+    }
   }
   @Test void exceptionAfterSourceShelfRollsBackThatProductAndKeepsFollowingProduct() throws Exception {
     long bad=sourceReady("finished-products"),good=sourceReady("finished-products");long before=shelfLogs("finished-products",bad);

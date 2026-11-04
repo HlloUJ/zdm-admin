@@ -430,7 +430,7 @@
         "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
         "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7",
         "tests/e2e/terminal-all-batch-shelf.spec.ts": "e739fdfd2f7a102510c2ecab6846589c5cda0f3e7beb984bd768b782c47c4d63",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "c9fd47c983d67d5e1dcb8e541e81e80e6da577ba723d10a09caf21e3fea9047d",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "6cfceece42727cd0ac7d0499c9f62592ed65aef52b19384d2487061432306204",
         "src/services/terminalAllBatchShelf.test.ts": "828b4696e37f842f0aff071949dd6efeac4c55e142f668a3429727ee14da7b33",
         "src/services/productGlobalPermissions.test.ts": "4c53fe18f81d2b1382ab6676008ea259ff454dc78bc004457fffd75dbb44d6a7",
         "src/services/functionCatalog.test.ts": "a0aeedbb80f8c9a4fbf5fe22570d74adecacf7bf5dd0009ff46d42a44cae09ef",
@@ -2592,6 +2592,12 @@
           "before": "5512140a67734a04ce60f56e57b7ba40352814f6267f2870294e741d4933998e",
           "after": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
           "reason": "任务完成技术收尾：首次 CI 41784515652 证实结果弹窗早于列表刷新完成，测试关闭页面时异步 form-options Mock 被中断。仅等待既有刷新响应完成并校验传输成功，原有全部业务断言、用例、超时及零重试不变。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java",
+          "before": "c9fd47c983d67d5e1dcb8e541e81e80e6da577ba723d10a09caf21e3fea9047d",
+          "after": "6cfceece42727cd0ac7d0499c9f62592ed65aef52b19384d2487061432306204",
+          "reason": "用户确认修复门店成品现货/配件批量上架锁顺序：新增4项真实MySQL并发回归，覆盖清除价格配置时上架不得提前锁经营记录、批量删除不受分类锁阻塞，并验证两件状态、日志、冻结售价和配置清除结果。旧生产代码2项NOWAIT冲突已复现；既有用例和断言全部保留。"
         }
       ],
       "routes": [
