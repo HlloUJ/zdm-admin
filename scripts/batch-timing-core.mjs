@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-export const BATCH_TIMING_VERSION = 1;
+export const BATCH_TIMING_VERSION = 2;
 export const milliseconds = (value) => (typeof value === 'number' ? value : Date.parse(value));
 const finite = (value) => Number.isFinite(value);
 export function ranges(intervals) {
@@ -162,7 +162,7 @@ export function interruptedValidationIds(state) {
   return ids;
 }
 export function summarizeBatch(state, { now = Date.now(), completion = null } = {}) {
-  assert.equal(state.version, BATCH_TIMING_VERSION);
+  assert.ok([1, BATCH_TIMING_VERSION].includes(state.version), 'Unsupported batch timing format');
   const interrupted = interruptedValidationIds(state);
   const unresolved = (state.validations ?? []).filter((v) => v.finishedAt == null && !interrupted.has(v.id));
   const delivery = state.delivery;
@@ -224,7 +224,7 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
   );
   return {
     version: 1,
-    timingVersion: 3,
+    timingVersion: 4,
     batch: state.batch,
     status: problems.length ? 'incomplete' : sealed ? 'completed' : delivery ? 'awaiting-turn-end' : 'snapshot',
     authorizedAt: new Date(state.authorizedAt).toISOString(),
@@ -261,9 +261,15 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
         : 'Snapshot only; an unfinished final reply has no completion timestamp.',
   };
 }
-export function assertTimingReady(state, { now = Date.now(), completion = null } = {}) {
+export function assertTimingReady(
+  state,
+  { now = Date.now(), completion = null, allowHistoricalBoundary = false } = {},
+) {
   const summary = summarizeBatch(state, { now, completion });
-  assert.equal(summary.issues.length, 0, 'Batch timing boundary proof incomplete: ' + summary.issues.join(', '));
+  const blocking = summary.issues.filter(
+    (code) => !(allowHistoricalBoundary && code === 'authorization-turn-ended-before-registration'),
+  );
+  assert.equal(blocking.length, 0, 'Batch timing boundary proof incomplete: ' + blocking.join(', '));
   // A current open turn is expected before final reply; older open turns cannot be silently sealed.
   const open = state.turns.filter((t) => t.finishedAt == null);
   assert.ok(open.length <= 1, 'Multiple open execution turns');

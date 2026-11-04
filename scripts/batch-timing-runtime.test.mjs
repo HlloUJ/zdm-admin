@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 import { readTimeline, refreshTimeline, recordValidationTiming } from './batch-timing-store.mjs';
 import {
   requireBatchTiming,
+  requireBatchTimingForCleanup,
   reconcileInterruptedValidationTiming,
   inspectValidationProcesses,
 } from './batch-timing-runtime.mjs';
@@ -334,4 +335,41 @@ test('actual changed-check CLI continues after timing damage and preserves its q
   const failedAttempt = refreshTimeline(f.common, 'timing').state.validations.find((v) => v.status === 'failed');
   assert.ok(failedAttempt);
   assert.doesNotMatch(result.stderr, /AssertionError/);
+});
+
+test('cleanup accepts only a proved historical boundary gap while strict reports, identity and concurrency checks remain intact', (t) => {
+  const f = fixture(t),
+    file = path.join(f.common, 'task-timing/timing/timeline.json');
+  appendFileSync(f.file, f.row('event_msg', { type: 'turn_aborted', turn_id: 'one' }, f.at + 20));
+  const state = refreshTimeline(f.common, 'timing').state;
+  state.registeredAt = f.at + 50;
+  writeFileSync(file, JSON.stringify(state));
+  assert.throws(() => requireBatchTiming(f.common, 'timing'), /authorization-turn-ended-before-registration/);
+  const result = requireBatchTimingForCleanup(f.common, 'timing');
+  assert.equal(result.status, 'incomplete');
+  assert.equal(result.wallMs, null);
+  assert.ok(result.issues.includes('authorization-turn-ended-before-registration'));
+  const original = readFileSync(file);
+  const tampered = JSON.parse(original);
+  tampered.authorizedAt += 1;
+  writeFileSync(file, JSON.stringify(tampered));
+  assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /Authorization boundary changed/);
+  writeFileSync(file, original);
+  const concurrent = JSON.parse(original);
+  concurrent.turns.push(
+    ...['two', 'three'].map((id) => ({
+      id,
+      thread: 'foreign',
+      startedAt: Date.now(),
+      finishedAt: null,
+      projectVerified: true,
+    })),
+  );
+  writeFileSync(file, JSON.stringify(concurrent));
+  assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /Multiple open execution turns/);
+  writeFileSync(file, original);
+  const damaged = JSON.parse(original);
+  damaged.issues.push('native-source-unavailable:ENOENT');
+  writeFileSync(file, JSON.stringify(damaged));
+  assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /native-source-unavailable/);
 });

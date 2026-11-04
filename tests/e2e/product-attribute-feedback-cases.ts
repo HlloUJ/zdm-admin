@@ -591,6 +591,7 @@ export function registerAttributeFeedbackTests(resource: Resource, install: (pag
       const { writes } = await openEditor(page, resource, install, true, '配件专属销售属性2（共享）', 2, client);
       await page.getByRole('button', { name: '批量填写', exact: true }).click();
       const drawer = page.locator('.t-drawer--open').filter({ hasText: '批量填写' });
+      await expect(drawer.locator('.batch-filter-row')).toHaveCount(2);
       const rows = await drawer.locator('.batch-filter-row').evaluateAll((elements) =>
         elements.map((element) => {
           const label = element.querySelector('.batch-filter-label')!;

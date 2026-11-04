@@ -18,6 +18,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+  BATCH_TIMING_VERSION,
   newTimeline,
   ingestNative,
   ingestContext,
@@ -133,7 +134,32 @@ function lock(directory, run) {
 export function readTimeline(common, batch) {
   const file = path.join(timingDirectory(common, batch), 'timeline.json');
   safe(file);
-  return existsSync(file) ? JSON.parse(readFileSync(file)) : null;
+  if (!existsSync(file)) return null;
+  const state = JSON.parse(readFileSync(file));
+  assert.ok([1, BATCH_TIMING_VERSION].includes(state.version), 'Unsupported batch timing format');
+  return state;
+}
+function saveTimeline(directory, state) {
+  const file = path.join(directory, 'timeline.json');
+  if (existsSync(file)) {
+    const bytes = readFileSync(file),
+      prior = JSON.parse(bytes);
+    if (prior.version === 1) {
+      const backup = path.join(directory, 'timeline-v1-' + hash(bytes) + '.json');
+      safe(backup);
+      if (!existsSync(backup)) writeFileSync(backup, bytes, { flag: 'wx', mode: 0o600 });
+      const summary = path.join(directory, 'summary.json');
+      if (existsSync(summary)) {
+        safe(summary);
+        const summaryBytes = readFileSync(summary),
+          summaryBackup = path.join(directory, 'summary-v1-' + hash(summaryBytes) + '.json');
+        safe(summaryBackup);
+        if (!existsSync(summaryBackup)) writeFileSync(summaryBackup, summaryBytes, { flag: 'wx', mode: 0o600 });
+      }
+    }
+  }
+  state.version = BATCH_TIMING_VERSION;
+  atomic(file, state);
 }
 export function completionFor(state) {
   const file = path.join(state.common, 'task-delivery', state.batch, 'completion-session.json');
@@ -161,7 +187,7 @@ export function consumeSource(state, source) {
       'Native source identity changed',
     );
     // Repair only terminal metadata already consumed by older collectors. Never replay messages or guess an end.
-    if (source.terminalReplayVersion !== 1) {
+    if (source.terminalReplayVersion !== 1 || source.verifiedOffset == null) {
       const prefix = readFileSync(source.file).subarray(0, source.offset).toString('utf8');
       for (const line of prefix.split('\n').filter(Boolean)) {
         const row = JSON.parse(line),
@@ -174,14 +200,17 @@ export function consumeSource(state, source) {
           ingestNative(state, row, source);
       }
       source.terminalReplayVersion = 1;
+      source.verifiedOffset ??= source.offset;
     }
+    // A v1 tool can advance its legacy cursor without understanding aborts. Only trust this reader's cursor.
+    const start = source.verifiedOffset ?? source.offset;
     const size = lstatSync(source.file).size;
-    assert.ok(size >= source.offset, 'Native source truncated');
+    assert.ok(size >= start && size >= source.offset, 'Native source truncated');
     const fd = openSync(source.file, 'r');
     let buffer;
     try {
-      buffer = Buffer.alloc(size - source.offset);
-      readSync(fd, buffer, 0, buffer.length, source.offset);
+      buffer = Buffer.alloc(size - start);
+      readSync(fd, buffer, 0, buffer.length, start);
     } finally {
       closeSync(fd);
     }
@@ -196,7 +225,8 @@ export function consumeSource(state, source) {
       ingestNative(state, row, source);
       ingestContext(state, row, source);
     }
-    source.offset += last + 1;
+    source.offset = start + last + 1;
+    source.verifiedOffset = source.offset;
   } catch (error) {
     const reason = 'native-source-unavailable:' + (error.code ?? error.name ?? 'unknown');
     if (!state.issues.includes(reason)) state.issues.push(reason);
@@ -212,7 +242,7 @@ export function refreshTimeline(common, batch, { now = Date.now() } = {}) {
     const completion = completionFor(state);
     for (const source of state.sources) consumeSource(state, source);
     const summary = summarizeBatch(state, { now, completion });
-    atomic(path.join(directory, 'timeline.json'), state);
+    saveTimeline(directory, state);
     atomic(path.join(directory, 'summary.json'), summary);
     return { state, summary, completion };
   });
@@ -271,11 +301,12 @@ export function bindBatchTiming(
         file,
         thread: env.CODEX_THREAD_ID,
         offset: identity.offset,
+        verifiedOffset: identity.offset,
         device: identity.device,
         inode: identity.inode,
       });
     }
-    atomic(path.join(directory, 'timeline.json'), state);
+    saveTimeline(directory, state);
     const markerDirectory = path.dirname(marker);
     safe(markerDirectory);
     mkdirSync(markerDirectory, { recursive: true, mode: 0o700 });
@@ -388,7 +419,7 @@ export function recordValidationTiming(common, batch, attempt) {
       if (prior.finishedAt != null) assert.deepEqual(prior, next, 'Immutable validation timing differs');
       else Object.assign(prior, next);
     } else state.validations.push(next);
-    atomic(path.join(directory, 'timeline.json'), state);
+    saveTimeline(directory, state);
     atomic(path.join(directory, 'observations.json'), { id: next.id, finishedAt: next.finishedAt });
   });
 }
@@ -412,7 +443,7 @@ export function recordValidationInterruptions(common, batch, interruptions) {
       state.validationInterruptions.push(item);
     }
     interruptedValidationIds(state);
-    atomic(path.join(directory, 'timeline.json'), state);
+    saveTimeline(directory, state);
     atomic(path.join(directory, 'observations.json'), { interrupted: interruptions.map((v) => v.id) });
   });
 }

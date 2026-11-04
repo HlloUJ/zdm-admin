@@ -343,3 +343,53 @@ test('a command containing collector arguments cannot authorize stopping an unre
     await exited;
   }
 });
+
+test('v1 history migrates with immutable backups and the real legacy reader cannot overwrite its summary', async (t) => {
+  const f = fixture(t);
+  f.bind();
+  const timeline = path.join(f.directory, 'timeline.json'),
+    summary = path.join(f.directory, 'summary.json');
+  const state = readTimeline(f.common, 'timing');
+  state.version = 1;
+  writeFileSync(timeline, JSON.stringify(state));
+  const original = readFileSync(timeline),
+    oldSummary = readFileSync(summary);
+  const upgraded = refreshTimeline(f.common, 'timing');
+  assert.equal(upgraded.state.version, 2);
+  const backups = readdirSync(f.directory).filter((name) => name.startsWith('timeline-v1-'));
+  assert.equal(backups.length, 1);
+  assert.deepEqual(readFileSync(path.join(f.directory, backups[0])), original);
+  const summaryBackup = readdirSync(f.directory).find((name) => name.startsWith('summary-v1-'));
+  assert.deepEqual(readFileSync(path.join(f.directory, summaryBackup)), oldSummary);
+  const legacyDirectory = path.join(f.root, 'legacy');
+  mkdirSync(legacyDirectory);
+  for (const name of ['batch-timing-core.mjs', 'batch-timing-store.mjs'])
+    writeFileSync(
+      path.join(legacyDirectory, name),
+      readFileSync(new URL('./test-support/fixtures/timing-v1/' + name + '.txt', import.meta.url)),
+    );
+  const { pathToFileURL } = await import('node:url');
+  const legacy = await import(pathToFileURL(path.join(legacyDirectory, 'batch-timing-store.mjs')).href);
+  const beforeTimeline = readFileSync(timeline),
+    beforeSummary = readFileSync(summary);
+  assert.throws(() => legacy.refreshTimeline(f.common, 'timing'), /AssertionError/);
+  assert.deepEqual(readFileSync(timeline), beforeTimeline);
+  assert.deepEqual(readFileSync(summary), beforeSummary);
+});
+
+test('a legacy writer advancing its cursor cannot hide an abort from the current reader', (t) => {
+  const f = fixture(t);
+  f.bind();
+  const file = path.join(f.directory, 'timeline.json'),
+    state = readTimeline(f.common, 'timing');
+  const verified = state.sources[0].verifiedOffset;
+  f.append(event(f, 'turn_aborted', 'one', 100));
+  // The old writer preserves unknown fields but only advances its own cursor, ignoring turn_aborted.
+  state.sources[0].offset = Buffer.byteLength(readFileSync(f.file));
+  writeFileSync(file, JSON.stringify(state));
+  const recovered = refreshTimeline(f.common, 'timing').state;
+  assert.equal(recovered.turns[0].termination, 'interrupted');
+  assert.equal(recovered.turns[0].finishedAt, epoch + 100);
+  assert.ok(recovered.sources[0].verifiedOffset > verified);
+  assert.equal(recovered.sources[0].verifiedOffset, recovered.sources[0].offset);
+});

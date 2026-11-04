@@ -65,7 +65,11 @@ export function refreshCurrentTiming(root, { env = process.env, bind = false, re
     file: path.join(timingDirectory(common, batch.id), 'summary.json'),
   };
 }
-export function requireBatchTiming(common, batch, { now = Date.now(), legacyAllowed = true } = {}) {
+export function requireBatchTiming(
+  common,
+  batch,
+  { now = Date.now(), legacyAllowed = true, allowHistoricalBoundary = false } = {},
+) {
   const state = readTimeline(common, batch);
   if (!state) {
     assert.ok(legacyAllowed && !existsSync(timingRequiredFile(common, batch)), 'New batch timing proof missing');
@@ -79,8 +83,13 @@ export function requireBatchTiming(common, batch, { now = Date.now(), legacyAllo
     assert.equal(proof.requestId, state.requestId, 'Authorization identity changed');
   }
   const result = refreshTimeline(common, batch, { now });
-  const summary = assertTimingReady(result.state, { now, completion: result.completion });
+  const summary = assertTimingReady(result.state, { now, completion: result.completion, allowHistoricalBoundary });
   return summary;
+}
+
+// Cleanup may retain a proved legacy timing gap; identity, source and concurrent-write checks stay strict.
+export function requireBatchTimingForCleanup(common, batch, options = {}) {
+  return requireBatchTiming(common, batch, { ...options, allowHistoricalBoundary: true });
 }
 
 export function observeValidationTiming(root, attempt, env = process.env) {

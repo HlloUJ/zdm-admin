@@ -418,7 +418,7 @@
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
         "src/pages/finished-stock/shared/finishedStockPayload.test.ts": "3cbda738b094beb0b4fb93376455ddfebcc4b0601741f33f9cb9015a04eaa99c",
         "src/pages/finished-stock/shared/finishedStockAttributeValidation.test.ts": "c68b320b55c02156cb5104344627d1c32f64cf012981f7aaee191b91b62bc3ba",
-        "tests/e2e/product-attribute-feedback-cases.ts": "62190c505726220afce7e76fb7560ee838faa1c156f40a27ec764f6636e4a4a5",
+        "tests/e2e/product-attribute-feedback-cases.ts": "f3ccbf7261537834a3eada8fcb48bd95671b22550ca2b8505f3317c072a9fc42",
         "tests/e2e/store-batch-sale-price-cases.ts": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
         "src/components/DecimalInput.test.ts": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
         "src/utils/numericInput.test.ts": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
@@ -2344,6 +2344,12 @@
           "before": "a235030fa07ecbdc4f418ce2428b727a6c1dcbd41dacbd6f96ff35b8b464f91b",
           "after": "62190c505726220afce7e76fb7560ee838faa1c156f40a27ec764f6636e4a4a5",
           "reason": "用户确认只补修运营成品现货/配件缺历史规格顺序的回退：仅绑定版本及原SKU、临时展示排序、零值筛选、保留原标签，提示供应链核对；不补写历史、不改其他端及价格规则。仅增加六项页面回归，保留所有旧用例、断言、超时和零重试。"
+        },
+        {
+          "file": "tests/e2e/product-attribute-feedback-cases.ts",
+          "before": "62190c505726220afce7e76fb7560ee838faa1c156f40a27ec764f6636e4a4a5",
+          "after": "f3ccbf7261537834a3eada8fcb48bd95671b22550ca2b8505f3317c072a9fc42",
+          "reason": "完整门禁已复现范围行尚未渲染就读取尺寸；补同业务分支一致的两行就绪断言，保留全部尺寸/对齐/提交断言、原超时与零重试，不改业务或视觉标准"
         }
       ],
       "routes": [
