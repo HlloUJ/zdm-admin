@@ -20,7 +20,6 @@ export const supplyChainProducts: FunctionModule = {
           audiences: ['supply-chain'],
           actions: [
             { label: '发布商品', value: `${prefix}.publish` },
-            { label: '批量上架', value: `${prefix}.batch-shelf` },
             { label: '操作日志', value: `${prefix}.operation-log.view` },
           ],
           tabs: [
@@ -37,7 +36,6 @@ export const supplyChainProducts: FunctionModule = {
               label: '已上架',
               value: `${prefix}.selling`,
               actions: actions('selling', [
-                ['batch-off-shelf', '批量下架'],
                 ['off-shelf', '下架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],
@@ -48,8 +46,6 @@ export const supplyChainProducts: FunctionModule = {
               label: '回收站',
               value: `${prefix}.recycle`,
               actions: actions('recycle', [
-                ['batch-restore', '批量放回到仓库'],
-                ['batch-purge', '批量彻底删除'],
                 ['clear', '清空回收站'],
                 ['detail', '详情'],
                 ['restore', '放回仓库'],

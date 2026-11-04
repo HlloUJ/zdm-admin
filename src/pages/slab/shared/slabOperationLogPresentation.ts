@@ -138,7 +138,11 @@ export const useSlabOperationLogPresentation = (
         if (!tierChange && comparedTiers.length) parsed['价格层级'] = {};
       }
       return Object.entries(parsed)
-        .filter(([field]) => operationLogIsCreate.value || (field !== '视频封面' && !field.endsWith('价格来源')))
+        .filter(
+          ([field]) =>
+            field !== '重新入仓原因' &&
+            (operationLogIsCreate.value || (field !== '视频封面' && !field.endsWith('价格来源'))),
+        )
         .sort(
           ([leftField], [rightField]) =>
             (operationLogFieldOrderIndex.get(leftField) ?? Number.MAX_SAFE_INTEGER) -

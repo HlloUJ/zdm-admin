@@ -30,7 +30,7 @@
       </t-breadcrumb>
     </header>
     <section class="form-shell">
-      <AdminSectionCard class="form-heading-card" aria-label="发布商品信息">
+      <AdminSectionCard v-if="!hideHeading" class="form-heading-card" aria-label="发布商品信息">
         <div class="form-title-row">
           <h1>{{ title }}</h1>
           <t-button :theme="buttonTheme('back')" variant="base" :disabled="loading" @click="emit('close')">
@@ -96,6 +96,7 @@ const props = defineProps<{
   title: string;
   loading: boolean;
   hideBreadcrumb?: boolean;
+  hideHeading?: boolean;
 }>();
 const visible = defineModel<boolean>('visible', { required: true });
 const activeSection = defineModel<string>('activeSection', { required: true });

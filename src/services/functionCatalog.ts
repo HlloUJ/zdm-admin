@@ -144,10 +144,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
               label: '成品现货管理页',
               value: 'admin.finished-stock-management',
               audiences: ['admin'],
-              actions: [
-                { label: '批量上架', value: 'admin.finished-stock-management.batch-shelf' },
-                { label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' },
-              ],
+              actions: [{ label: '操作日志', value: 'admin.finished-stock-management.operation-log.view' }],
               tabs: [
                 {
                   label: '仓库中',
@@ -164,7 +161,6 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   value: 'admin.finished-stock-management.selling',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.selling.view' },
-                    { label: '批量下架', value: 'admin.finished-stock-management.selling.batch-off-shelf' },
                     { label: '下架', value: 'admin.finished-stock-management.selling.off-shelf' },
                     { label: '编辑', value: 'admin.finished-stock-management.selling.edit' },
                     { label: '删除', value: 'admin.finished-stock-management.selling.delete' },
@@ -183,8 +179,6 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   value: 'admin.finished-stock-management.recycle',
                   actions: [
                     { label: '查看', value: 'admin.finished-stock-management.recycle.view' },
-                    { label: '批量放回到仓库', value: 'admin.finished-stock-management.recycle.batch-restore' },
-                    { label: '批量彻底删除', value: 'admin.finished-stock-management.recycle.batch-purge' },
                     { label: '清空回收站', value: 'admin.finished-stock-management.recycle.clear' },
                     { label: '详情', value: 'admin.finished-stock-management.recycle.detail' },
                     { label: '放回仓库', value: 'admin.finished-stock-management.recycle.restore' },
@@ -204,10 +198,7 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
               label: '配件管理页',
               value: 'admin.accessory-management',
               audiences: ['admin'],
-              actions: [
-                { label: '批量上架', value: 'admin.accessory-management.batch-shelf' },
-                { label: '操作日志', value: 'admin.accessory-management.operation-log.view' },
-              ],
+              actions: [{ label: '操作日志', value: 'admin.accessory-management.operation-log.view' }],
               tabs: [
                 {
                   label: '仓库中',
@@ -224,7 +215,6 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   value: 'admin.accessory-management.selling',
                   actions: [
                     { label: '查看', value: 'admin.accessory-management.selling.view' },
-                    { label: '批量下架', value: 'admin.accessory-management.selling.batch-off-shelf' },
                     { label: '下架', value: 'admin.accessory-management.selling.off-shelf' },
                     { label: '编辑', value: 'admin.accessory-management.selling.edit' },
                     { label: '删除', value: 'admin.accessory-management.selling.delete' },
@@ -243,8 +233,6 @@ const applyConfirmedNavigationStructure = (modules: FunctionModule[]): FunctionM
                   value: 'admin.accessory-management.recycle',
                   actions: [
                     { label: '查看', value: 'admin.accessory-management.recycle.view' },
-                    { label: '批量放回到仓库', value: 'admin.accessory-management.recycle.batch-restore' },
-                    { label: '批量彻底删除', value: 'admin.accessory-management.recycle.batch-purge' },
                     { label: '清空回收站', value: 'admin.accessory-management.recycle.clear' },
                     { label: '详情', value: 'admin.accessory-management.recycle.detail' },
                     { label: '放回仓库', value: 'admin.accessory-management.recycle.restore' },

@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperationLogMapper, AccessoryOperationLog> {
   static final String SOURCE_SHELF_SUMMARY = "供应链已上架，商品进入运营管理平台仓库";
-  static final String REENTRY_SUMMARY = "运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓";
   @org.springframework.beans.factory.annotation.Autowired
   private AccessoryStateActivityService stateActivities;
   private final JdbcTemplate jdbc;
@@ -270,7 +269,6 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     Map<String, Object> tierChange = (Map<String, Object>) changes.get("层级价格");
     tierChange.put("complete", true);
     changes.put("来源状态", Map.of("before", sourceStatus, "after", product.getSourceStatus()));
-    if (reentry) { changes.put("重新入仓原因", Map.of("before", "", "after", REENTRY_SUMMARY)); }
     var identity = identities.require();
     AccessoryOperationLog log = new AccessoryOperationLog();
     log.setProductCreatedByAccountId(product.getCreatedByAccountId());
@@ -292,7 +290,7 @@ public class AccessoryOperationLogService extends ServiceImpl<AccessoryOperation
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品入仓日志保存失败", error); }
     save(log);
-    stateActivities.record("accessory",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),reentry ? "REENTRY" : log.getOperationType(),log.getStandardReason(),log.getDetailReason());
+    stateActivities.record("accessory",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),log.getOperationType(),log.getStandardReason(),log.getDetailReason());
     Map<String, Long> references = new LinkedHashMap<>();
     retainMedia(snapshot, "after", references);
     history.retain("ACCESSORY_PRODUCT_LOG", log.getId(), references);

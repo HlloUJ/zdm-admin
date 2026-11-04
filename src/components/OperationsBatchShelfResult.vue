@@ -1,7 +1,7 @@
 <template>
   <AdminDialog
     :visible="visible"
-    header="批量上架结果"
+    :header="`批量${operation}结果`"
     width="max-content"
     dialog-class-name="zdm-operation-result-dialog"
     confirm-function="close"
@@ -12,7 +12,7 @@
     @close="emit('update:visible', false)"
   >
     <t-typography-paragraph
-      >成功上架{{ result.successCount }}件，失败{{ result.failureCount }}件。</t-typography-paragraph
+      >成功{{ operation }}{{ result.successCount }}件，失败{{ result.failureCount }}件。</t-typography-paragraph
     >
     <t-table v-if="rows.length" :data="rows" :columns="columns" row-key="key" table-layout="auto" />
   </AdminDialog>
@@ -21,7 +21,9 @@
 import { computed } from 'vue';
 import { AdminDialog } from '@/components/foundation';
 import { groupShelfFailures, type BatchShelfResult } from '@/services/operationsBatchShelf';
-const props = defineProps<{ visible: boolean; result: BatchShelfResult }>();
+const props = withDefaults(defineProps<{ visible: boolean; result: BatchShelfResult; operation?: '上架' | '删除' }>(), {
+  operation: '上架',
+});
 const emit = defineEmits<{ 'update:visible': [value: boolean] }>();
 const rows = computed(() => groupShelfFailures(props.result.failures));
 const columns = [

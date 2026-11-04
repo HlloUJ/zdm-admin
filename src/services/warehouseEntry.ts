@@ -4,7 +4,9 @@ export interface WarehouseEntryInformation {
   warehouseEntryDetail?: string | null;
 }
 export const warehouseEntryTypes = [
-  { value: 'firstEntry', label: '首次入库' },
+  { value: 'createEntry', label: '创建入库' },
+  { value: 'sourceShelfEntry', label: '供应链上架入库' },
+  { value: 'productCenterSelect', label: '商品中心选入' },
   { value: 'offShelf', label: '下架入库' },
   { value: 'recycleRestore', label: '回收恢复' },
 ];

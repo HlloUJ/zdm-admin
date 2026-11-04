@@ -3,7 +3,7 @@ import { terminalFunctionTrees, getRuntimeFunctionCatalog, getFunctionModulePerm
 import { adminMenuEntries } from './adminPermissions';
 
 describe('customer catalog', () => {
-  it('publishes exactly the confirmed two tabs and 17 grants on store only', () => {
+  it('publishes exactly the confirmed two tabs and 14 grants on store only', () => {
     const module = terminalFunctionTrees.store.find((item) => item.value === 'store.customer-management')!;
     expect(module.label).toBe('客户管理');
     const tabs = module.menus[0].pages[0].tabs;
@@ -12,7 +12,6 @@ describe('customer catalog', () => {
       '查看',
       '新增',
       '批量调整归属',
-      '批量归档',
       '详情',
       '跟进',
       '编辑',
@@ -21,8 +20,6 @@ describe('customer catalog', () => {
     expect(tabs[1].actions.map((action) => action.label)).toEqual([
       '查看',
       '批量调整归属',
-      '批量取消归档',
-      '批量彻底删除',
       '详情',
       '跟进',
       '编辑',
@@ -30,8 +27,8 @@ describe('customer catalog', () => {
       '彻底删除',
     ]);
     const grants = getFunctionModulePermissionValues(module);
-    expect(grants).toHaveLength(17);
-    expect(new Set(grants).size).toBe(17);
+    expect(grants).toHaveLength(14);
+    expect(new Set(grants).size).toBe(14);
     expect(grants.some((value) => /query|reset|operation-log|delegate/.test(value))).toBe(false);
     for (const audience of ['admin', 'supplier', 'supply-chain'] as const) {
       expect(getRuntimeFunctionCatalog(audience).some((item) => item.value === module.value)).toBe(false);

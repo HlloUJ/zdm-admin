@@ -107,7 +107,6 @@ const storeFinishedStock: FunctionModule = {
           value: 'store.finished-stock-management',
           actions: [
             { label: '商品中心', value: 'store.finished-stock-management.select' },
-            { label: '批量上架', value: 'store.finished-stock-management.batch-shelf' },
             { label: '操作日志', value: 'store.finished-stock-management.operation-log.view' },
           ],
           tabs: [
@@ -124,7 +123,6 @@ const storeFinishedStock: FunctionModule = {
               label: '已上架',
               value: 'store.finished-stock-management.selling',
               actions: [
-                ['batch-off-shelf', '批量下架'],
                 ['off-shelf', '下架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],
@@ -142,8 +140,6 @@ const storeFinishedStock: FunctionModule = {
               label: '回收站',
               value: 'store.finished-stock-management.recycle',
               actions: [
-                ['batch-restore', '批量放回到仓库'],
-                ['batch-purge', '批量彻底删除'],
                 ['clear', '清空回收站'],
                 ['detail', '详情'],
                 ['restore', '放回仓库'],
@@ -172,7 +168,6 @@ const storeAccessoryStock: FunctionModule = {
           value: 'store.accessory-management',
           actions: [
             { label: '商品中心', value: 'store.accessory-management.select' },
-            { label: '批量上架', value: 'store.accessory-management.batch-shelf' },
             { label: '操作日志', value: 'store.accessory-management.operation-log.view' },
           ],
           tabs: [
@@ -189,7 +184,6 @@ const storeAccessoryStock: FunctionModule = {
               label: '已上架',
               value: 'store.accessory-management.selling',
               actions: [
-                ['batch-off-shelf', '批量下架'],
                 ['off-shelf', '下架'],
                 ['edit', '编辑'],
                 ['delete', '删除'],
@@ -207,8 +201,6 @@ const storeAccessoryStock: FunctionModule = {
               label: '回收站',
               value: 'store.accessory-management.recycle',
               actions: [
-                ['batch-restore', '批量放回到仓库'],
-                ['batch-purge', '批量彻底删除'],
                 ['clear', '清空回收站'],
                 ['detail', '详情'],
                 ['restore', '放回仓库'],
@@ -253,7 +245,7 @@ export const storePriceConfiguration: FunctionModule = {
                   ? [{ label: '新增', value: `store.price-configuration.${kind}.${scope}.create` }]
                   : []),
                 ...(kind === 'price'
-                  ? [{ label: '批量设置', value: `store.price-configuration.${kind}.${scope}.batch-set` }]
+                  ? [{ label: '设置价格系数', value: `store.price-configuration.${kind}.${scope}.batch-set` }]
                   : []),
                 ...(kind === 'discount'
                   ? [
@@ -292,7 +284,6 @@ export const storeCustomerManagement: FunctionModule = {
               actions: [
                 ['create', '新增'],
                 ['batch-assign', '批量调整归属'],
-                ['batch-archive', '批量归档'],
                 ['detail', '详情'],
                 ['followup', '跟进'],
                 ['edit', '编辑'],
@@ -304,8 +295,6 @@ export const storeCustomerManagement: FunctionModule = {
               value: 'store.customer-management.archived',
               actions: [
                 ['batch-assign', '批量调整归属'],
-                ['batch-restore', '批量取消归档'],
-                ['batch-purge', '批量彻底删除'],
                 ['detail', '详情'],
                 ['followup', '跟进'],
                 ['edit', '编辑'],

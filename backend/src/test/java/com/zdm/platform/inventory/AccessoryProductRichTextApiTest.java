@@ -111,7 +111,7 @@ class AccessoryProductRichTextApiTest extends SpringContainerTestSupport {
     JsonNode created = data(mvc.perform(post("/api/admin/accessory-products").header("Authorization", token)
         .contentType("application/json").content(json.writeValueAsBytes(com.zdm.platform.support.ProductAttributeVersionFixtures.bind(jdbc,json,payload)))));
     long id = created.path("id").asLong();
-    assertThat(created.path("warehouseEntryType").asText()).isEqualTo("firstEntry");
+    assertThat(created.path("warehouseEntryType").asText()).isEqualTo("createEntry");
     assertThat(created.path("warehouseEntryReason").isNull()).isTrue();
     assertThat(created.path("warehouseEntryDetail").isNull()).isTrue();
     payload.set("variants", created.path("variants").deepCopy());

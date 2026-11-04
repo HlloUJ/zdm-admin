@@ -26,7 +26,8 @@ export type StockTab = StockStatus | 'all';
 export type StockStatus = 'warehouse' | 'selling' | 'soldOut' | 'recycle';
 export type PublisherType = '平台发布' | '接口获取';
 export type RowAction = 'detail' | 'price' | 'shelf' | 'edit' | 'delete' | 'offShelf' | 'restore' | 'purge';
-export type BatchAction = 'publish' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
+export type BatchAction =
+  'publish' | 'batchDelete' | 'batchShelf' | 'batchOffShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
 export type FormSectionKey = 'description' | 'base' | 'sales';
 export type SpecMode = 'single' | 'layered';
 export type LayeredSpecField = 'material' | 'length' | 'color' | 'size' | `attribute_${number}`;
@@ -42,7 +43,15 @@ export type DecimalField =
   | 'level3Coefficient'
   | 'level3';
 export type ConfirmType =
-  'shelf' | 'delete' | 'restore' | 'purge' | 'batchShelf' | 'batchRestore' | 'batchPurge' | 'clearRecycle';
+  | 'shelf'
+  | 'delete'
+  | 'restore'
+  | 'purge'
+  | 'batchDelete'
+  | 'batchShelf'
+  | 'batchRestore'
+  | 'batchPurge'
+  | 'clearRecycle';
 export type ProductFormMode = 'create' | 'edit';
 export interface TabConfig {
   value: StockTab;

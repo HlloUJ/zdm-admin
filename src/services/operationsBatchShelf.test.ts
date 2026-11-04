@@ -16,25 +16,26 @@ describe('operations batch shelf results and grants', () => {
     ]);
   });
   for (const module of ['finished-stock-management', 'accessory-management', 'slab-management']) {
-    it(`${module} registers one global grant without granting views or single shelf`, () => {
+    it(`${module} registers one state grant shared by single and batch shelf`, () => {
       const prefix = `admin.${module}`;
       const page = fullFunctionCatalog
         .flatMap((m) => m.menus)
         .flatMap((m) => m.pages)
         .find((p) => p.value === prefix)!;
-      expect(page.actions.filter((a) => a.value === `${prefix}.batch-shelf`)).toHaveLength(1);
+      expect(page.actions.filter((a) => a.value === `${prefix}.batch-shelf`)).toHaveLength(0);
       expect(page.tabs.flatMap((t) => t.actions).some((a) => a.value.endsWith('.batch-shelf'))).toBe(false);
       expect(normalizeFunctionCatalogPermissions(fullFunctionCatalog, [`${prefix}.batch-shelf`])).toEqual([
-        `${prefix}.batch-shelf`,
+        `${prefix}.warehouse.view`,
+        `${prefix}.warehouse.shelf`,
       ]);
       expect(normalizeFunctionCatalogPermissions(fullFunctionCatalog, [`${prefix}.warehouse.batch-shelf`])).toEqual([
-        `${prefix}.batch-shelf`,
         `${prefix}.warehouse.view`,
+        `${prefix}.warehouse.shelf`,
       ]);
       const previous = getLoginUser();
       try {
         setLoginUser({ ...previous, permissions: [`${prefix}.batch-shelf`] });
-        expect(getLoginUser().permissions).toEqual([`${prefix}.batch-shelf`]);
+        expect(getLoginUser().permissions).toEqual([`${prefix}.warehouse.view`, `${prefix}.warehouse.shelf`]);
       } finally {
         setLoginUser(previous);
       }

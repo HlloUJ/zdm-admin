@@ -21,7 +21,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLogMapper, FinishedOperationLog> {
   static final String SOURCE_SHELF_SUMMARY = "供应链已上架，商品进入运营管理平台仓库";
-  static final String REENTRY_SUMMARY = "运营端删除失效记录后，根据已重新上架的供应链商品自动重新入仓";
   @org.springframework.beans.factory.annotation.Autowired
   private ProductStateActivityService stateActivities;
   private final JdbcTemplate jdbc;
@@ -270,7 +269,6 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     Map<String, Object> tierChange = (Map<String, Object>) changes.get("层级价格");
     tierChange.put("complete", true);
     changes.put("来源状态", Map.of("before", sourceStatus, "after", product.getSourceStatus()));
-    if (reentry) { changes.put("重新入仓原因", Map.of("before", "", "after", REENTRY_SUMMARY)); }
     var identity = identities.require();
     FinishedOperationLog log = new FinishedOperationLog();
     log.setProductCreatedByAccountId(product.getCreatedByAccountId());
@@ -292,7 +290,7 @@ public class FinishedOperationLogService extends ServiceImpl<FinishedOperationLo
     try { log.setChangeDetails(json.writeValueAsString(changes)); }
     catch (com.fasterxml.jackson.core.JsonProcessingException error) { throw new IllegalStateException("商品入仓日志保存失败", error); }
     save(log);
-    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),reentry ? "REENTRY" : log.getOperationType(),log.getStandardReason(),log.getDetailReason());
+    stateActivities.record("finished",log.getBusinessClientCode(),product.getId(),log.getBeforeStatus(),log.getAfterStatus(),log.getOperatorAccountId(),log.getOperatorClientCode(),log.getOperationType(),log.getStandardReason(),log.getDetailReason());
     Map<String, Long> references = new LinkedHashMap<>();
     retainMedia(snapshot, "after", references);
     history.retain("FINISHED_PRODUCT_LOG", log.getId(), references);
