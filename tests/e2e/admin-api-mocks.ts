@@ -1,4 +1,5 @@
 import type { Page, Route } from '@playwright/test';
+import { readFormOptionsMock } from './form-options-mock';
 
 const apiOk = (data: unknown) => ({
   code: 0,
@@ -671,16 +672,8 @@ export async function installAdminApiMocks(page: Page) {
   });
   await mockCollection(page, '**/api/admin/finished-products', finishedProducts);
   await page.route('**/api/admin/finished-products/form-options', async (route) => {
-    // Resolve through the existing mocked collections so per-test overrides still apply.
-    const options = await page.evaluate(async () => {
-      const read = async (path: string) => (await (await fetch(`/api/admin/${path}`)).json()).data;
-      const [categories, attributes, suppliers] = await Promise.all([
-        read('product-categories'),
-        read('product-attributes'),
-        read('suppliers'),
-      ]);
-      return { categories, attributes, suppliers };
-    });
+    const options = await readFormOptionsMock(page, route);
+    if (!options) return;
     await fulfillJson(route, options);
   });
   await mockCollection(page, '**/api/admin/crafts', crafts);

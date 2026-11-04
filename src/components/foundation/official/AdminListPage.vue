@@ -129,7 +129,7 @@
       class="zdm-official-list-page__operations"
       :has-actions="actions.length > 0"
       :has-auxiliary="auxiliaryActions.length > 0"
-      :has-batch-actions="actions.some((action) => action.batch)"
+      :has-batch-actions="hasBatchActions"
       :selected-count="selectedCount ?? 0"
     >
       <t-button
@@ -155,7 +155,7 @@
       </template>
     </AdminListToolbar>
     <t-table
-      v-bind="tableProps"
+      v-bind="selectableTableProps"
       @page-change="emit('pageChange', $event)"
       @select-change="emit('selectChange', $event)"
     >
@@ -168,6 +168,7 @@ import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import AdminListToolbar from '../AdminListToolbar.vue';
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { computed } from 'vue';
+import { useListBatchSelection } from '../useListBatchSelection';
 import type { PageInfo, TableProps } from 'tdesign-vue-next';
 import type { FilterValues, ListAction, ListFilter, ListTab } from './types';
 defineOptions({ inheritAttrs: false });
@@ -181,11 +182,13 @@ const props = withDefaults(
     actions?: ListAction[];
     auxiliaryActions?: ListAction[];
     selectedCount?: number;
+    selectionColumnKey?: string;
     tableProps: TableProps;
   }>(),
   {
     activeTab: undefined,
     selectedCount: undefined,
+    selectionColumnKey: undefined,
     filterLayout: 'adaptive-grid',
     tabs: () => [],
     filters: () => [],
@@ -206,6 +209,27 @@ const emit = defineEmits<{
   pageChange: [info: PageInfo];
   selectChange: [keys: (string | number)[]];
 }>();
+const managesBatchSelection = computed(
+  () =>
+    Boolean(props.selectionColumnKey) || (props.tableProps.columns ?? []).some((column) => column.type === 'multiple'),
+);
+const selection = computed({
+  get: () => props.tableProps.selectedRowKeys ?? [],
+  set: (keys: (string | number)[]) => emit('selectChange', keys),
+});
+const { hasBatchActions, selectionColumns } = useListBatchSelection(
+  () => props.actions,
+  selection,
+  () => props.activeTab,
+  managesBatchSelection,
+);
+const selectableTableProps = computed<TableProps>(() => ({
+  ...props.tableProps,
+  columns: managesBatchSelection.value
+    ? selectionColumns(props.tableProps.columns ?? [], props.selectionColumnKey)
+    : props.tableProps.columns,
+  ...(managesBatchSelection.value && !hasBatchActions.value ? { selectedRowKeys: [] } : {}),
+}));
 function setFilter(key: string, value: unknown) {
   const scalar = typeof value === 'string' || typeof value === 'number' ? value : undefined;
   emit('update:filterValues', { ...props.filterValues, [key]: scalar });

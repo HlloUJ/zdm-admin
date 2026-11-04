@@ -337,7 +337,8 @@
         "tests/e2e/store-price-rules.spec.ts",
         "tests/e2e/product-batch-delete.spec.ts",
         "tests/e2e/customer-management.spec.ts",
-        "tests/e2e/store-recycle-selection.spec.ts"
+        "tests/e2e/store-recycle-selection.spec.ts",
+        "tests/e2e/list-batch-selection.spec.ts"
       ],
       "backendTests": [
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java",
@@ -377,7 +378,7 @@
         "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
         "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
-        "tests/e2e/slab-collaboration.spec.ts": "cc5d03961633a4409b79b38d38f17314088ab422af036f9ab781257c8b8686e1",
+        "tests/e2e/slab-collaboration.spec.ts": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
         "tests/e2e/store-finished-stock.spec.ts": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
         "tests/e2e/store-accessory-management.spec.ts": "e569ce847f6f3bfb25850aecff1b356d425ef21f39c28ad5674d11d6b33f5b2a",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "480ec0600c494a8b4649fcb29291ab87ed018638052c479ebbd405a6ba5236a4",
@@ -387,11 +388,11 @@
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
-        "tests/e2e/accessory-permissions.spec.ts": "7bf96cd4c0933d55bfb95e9575c919dbca56df36d14420daf68eda62853a4635",
+        "tests/e2e/accessory-permissions.spec.ts": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
         "tests/e2e/admin-foundation.spec.ts": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
         "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
         "tests/e2e/feedback-foundation.spec.ts": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
-        "tests/e2e/finished-stock-permissions.spec.ts": "1797add2761139831ecfec8f83c43b6908b1593fd801c08fe9314356bceec5ae",
+        "tests/e2e/finished-stock-permissions.spec.ts": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
         "tests/e2e/login.spec.ts": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
         "tests/e2e/markup-configuration.spec.ts": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
         "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
@@ -400,7 +401,7 @@
         "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
         "tests/e2e/slab-publish-layout.spec.ts": "83fae189da20ab3113dbb2f7eb7a4b6aa19d3b10140aec002c7a90c77ccd06f3",
         "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
-        "tests/e2e/admin-api-mocks.ts": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
+        "tests/e2e/admin-api-mocks.ts": "e52244efd21250ee95987836d645ee4afb70b7f9566ae912882018e1f3f031b4",
         "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
         "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156",
         "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
@@ -411,7 +412,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
-        "tests/e2e/accessory-api-mocks.ts": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
+        "tests/e2e/accessory-api-mocks.ts": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
         "tests/e2e/pagination-responsive.spec.ts": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
         "tests/e2e/store-order-prototype.spec.ts": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
@@ -430,7 +431,7 @@
         "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
         "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7",
         "tests/e2e/terminal-all-batch-shelf.spec.ts": "e739fdfd2f7a102510c2ecab6846589c5cda0f3e7beb984bd768b782c47c4d63",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "c9fd47c983d67d5e1dcb8e541e81e80e6da577ba723d10a09caf21e3fea9047d",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "6cfceece42727cd0ac7d0499c9f62592ed65aef52b19384d2487061432306204",
         "src/services/terminalAllBatchShelf.test.ts": "828b4696e37f842f0aff071949dd6efeac4c55e142f668a3429727ee14da7b33",
         "src/services/productGlobalPermissions.test.ts": "4c53fe18f81d2b1382ab6676008ea259ff454dc78bc004457fffd75dbb44d6a7",
         "src/services/functionCatalog.test.ts": "a0aeedbb80f8c9a4fbf5fe22570d74adecacf7bf5dd0009ff46d42a44cae09ef",
@@ -460,8 +461,10 @@
         "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
         "src/services/batchActionPermissions.test.ts": "f4ed67b265dc6f436c0ed4ddddf80ccf55eb3a1517b28d35eaafbed783ab9751",
         "src/services/customerCatalog.test.ts": "e9e75039913cba436a051ab9f8ab4fea31cc757f4699140c5e15b116d4a1753b",
-        "tests/e2e/customer-management.spec.ts": "88f71df6e42189efd7b38138ab7c9646c041fd853a9f3ad45987638a20bdf4b0",
-        "tests/e2e/store-recycle-selection.spec.ts": "af9d2ef6e42aa113651bd735f05ec900931bd40645873f6e73764b94e4c9744d"
+        "tests/e2e/customer-management.spec.ts": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
+        "tests/e2e/store-recycle-selection.spec.ts": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
+        "tests/e2e/list-batch-selection.spec.ts": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
+        "tests/e2e/form-options-mock.ts": "5222586ea7707540bac57fdcbae795d5e214b3d6d0b3e482d85e1a75ec640b21"
       },
       "testChanges": [
         {
@@ -2592,6 +2595,66 @@
           "before": "5512140a67734a04ce60f56e57b7ba40352814f6267f2870294e741d4933998e",
           "after": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
           "reason": "任务完成技术收尾：首次 CI 41784515652 证实结果弹窗早于列表刷新完成，测试关闭页面时异步 form-options Mock 被中断。仅等待既有刷新响应完成并校验传输成功，原有全部业务断言、用例、超时及零重试不变。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java",
+          "before": "c9fd47c983d67d5e1dcb8e541e81e80e6da577ba723d10a09caf21e3fea9047d",
+          "after": "6cfceece42727cd0ac7d0499c9f62592ed65aef52b19384d2487061432306204",
+          "reason": "用户确认修复门店成品现货/配件批量上架锁顺序：新增4项真实MySQL并发回归，覆盖清除价格配置时上架不得提前锁经营记录、批量删除不受分类锁阻塞，并验证两件状态、日志、冻结售价和配置清除结果。旧生产代码2项NOWAIT冲突已复现；既有用例和断言全部保留。"
+        },
+        {
+          "file": "tests/e2e/accessory-permissions.spec.ts",
+          "before": "7bf96cd4c0933d55bfb95e9575c919dbca56df36d14420daf68eda62853a4635",
+          "after": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/finished-stock-permissions.spec.ts",
+          "before": "1797add2761139831ecfec8f83c43b6908b1593fd801c08fe9314356bceec5ae",
+          "after": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/slab-collaboration.spec.ts",
+          "before": "cc5d03961633a4409b79b38d38f17314088ab422af036f9ab781257c8b8686e1",
+          "after": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/customer-management.spec.ts",
+          "before": "88f71df6e42189efd7b38138ab7c9646c041fd853a9f3ad45987638a20bdf4b0",
+          "after": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/store-recycle-selection.spec.ts",
+          "before": "af9d2ef6e42aa113651bd735f05ec900931bd40645873f6e73764b94e4c9744d",
+          "after": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
+          "reason": "2026-11-04 用户确认无选择型批量权限隐藏列表复选框。旧只读/仅发布/仅日志/来源遮罩场景改为断言无选择列；保留原日志布局、详情、遮罩、inert和零写入断言，并补有批量权限时来源失效行禁选覆盖。客户及回收站新增/适配相应覆盖，不删用例、不放宽业务校验。"
+        },
+        {
+          "file": "tests/e2e/list-batch-selection.spec.ts",
+          "before": "757c4bc90b237ac1b1e4a3c06e1bb8d7f2e874e931d255eb1ae080b8c7e6ed44",
+          "after": "0c2e4bf392fadbe30ef6c3c7b7a485bff0a7d143221499da316ab6be9326d6bb",
+          "reason": "用户授权补齐三类批量选择缺口回归；仅新增延迟回包行选/全选及Tab往返断言，保留原权限、状态、无业务写请求断言。"
+        },
+        {
+          "file": "tests/e2e/admin-api-mocks.ts",
+          "before": "5be4e9ba6f1c03b74d6dc2aad0c4489de56fe1158d8a28b79ca1d3295e7b97f6",
+          "after": "e52244efd21250ee95987836d645ee4afb70b7f9566ae912882018e1f3f031b4",
+          "reason": "正式本地门禁09a0c62e-d89b-49c9-a81b-07369dde4e6c确认导航销毁旧文档的选项聚合RPC；只将该旧请求abort，其他错误原样抛出，不重试，保持原业务断言及动态集合覆盖，并新增两个确定性导航和一个错误传播回归。"
+        },
+        {
+          "file": "tests/e2e/accessory-api-mocks.ts",
+          "before": "8e536ed603503f8679ce0d519048e0ad48e5c67844f472f124331c6eaf5b5fa5",
+          "after": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
+          "reason": "正式本地门禁09a0c62e-d89b-49c9-a81b-07369dde4e6c确认导航销毁旧文档的选项聚合RPC；只将该旧请求abort，其他错误原样抛出，不重试，保持原业务断言及动态集合覆盖，并新增两个确定性导航和一个错误传播回归。"
+        },
+        {
+          "file": "tests/e2e/list-batch-selection.spec.ts",
+          "before": "0c2e4bf392fadbe30ef6c3c7b7a485bff0a7d143221499da316ab6be9326d6bb",
+          "after": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
+          "reason": "正式本地门禁09a0c62e-d89b-49c9-a81b-07369dde4e6c确认导航销毁旧文档的选项聚合RPC；只将该旧请求abort，其他错误原样抛出，不重试，保持原业务断言及动态集合覆盖，并新增两个确定性导航和一个错误传播回归。"
         }
       ],
       "routes": [
@@ -2614,6 +2677,7 @@
         "tests/e2e/feedback-foundation.spec.ts",
         "tests/e2e/finished-stock-permissions.spec.ts",
         "tests/e2e/finished-stock.spec.ts",
+        "tests/e2e/list-batch-selection.spec.ts",
         "tests/e2e/login.spec.ts",
         "tests/e2e/markup-configuration.spec.ts",
         "tests/e2e/media-upload-standard.spec.ts",
@@ -2658,7 +2722,8 @@
         "tests/e2e/price-table-feedback.ts",
         "src/pages/finished-stock/shared/guidePriceSource.test.ts",
         "src/services/batchActionPermissions.test.ts",
-        "src/services/customerCatalog.test.ts"
+        "src/services/customerCatalog.test.ts",
+        "tests/e2e/form-options-mock.ts"
       ]
     }
   ]

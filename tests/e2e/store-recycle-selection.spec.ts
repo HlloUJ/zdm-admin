@@ -65,8 +65,12 @@ for (const [kind, path] of [
       const clear = main.getByRole('button', { name: '清空回收站', exact: true });
       await expect(clear).toBeEnabled();
       await expect(main.getByText('已选 1 项', { exact: true })).toHaveCount(0);
-      await main.locator('thead .t-checkbox__input').click();
-      await expect(main.locator('tbody input[type="checkbox"]:checked')).toHaveCount(1);
+      if (batchPurge) {
+        await main.locator('thead .t-checkbox__input').click();
+        await expect(main.locator('tbody input[type="checkbox"]:checked')).toHaveCount(1);
+      } else {
+        await expect(main.getByRole('checkbox')).toHaveCount(0);
+      }
       await expect(main.getByText('已选 1 项', { exact: true })).toHaveCount(batchPurge ? 1 : 0);
       const purge = main.getByRole('button', { name: '批量彻底删除', exact: true });
       if (batchPurge) await expect(purge).toBeEnabled();
