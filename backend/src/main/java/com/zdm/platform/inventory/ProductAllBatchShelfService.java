@@ -22,6 +22,8 @@ public class ProductAllBatchShelfService {
   private final SlabInventoryService slabs;
   private final StoreFinishedProductService storeFinished;
   private final StoreAccessoryProductService storeAccessory;
+  private final StoreFinishedSalePriceService finishedSalePrices;
+  private final StoreAccessorySalePriceService accessorySalePrices;
   private final CityPartnerStoreScope scopes;
   private final JdbcTemplate jdbc;
   private final TransactionTemplate transaction;
@@ -29,10 +31,12 @@ public class ProductAllBatchShelfService {
       AccessoryLifecycleService accessoryLifecycle, FinishedProductService finished,
       AccessoryProductService accessory, SlabInventoryService slabs,
       StoreFinishedProductService storeFinished, StoreAccessoryProductService storeAccessory,
+      StoreFinishedSalePriceService finishedSalePrices, StoreAccessorySalePriceService accessorySalePrices,
       CityPartnerStoreScope scopes, JdbcTemplate jdbc, PlatformTransactionManager manager) {
     this.guard=guard; this.lifecycle=lifecycle; this.accessoryLifecycle=accessoryLifecycle;
     this.finished=finished; this.accessory=accessory; this.slabs=slabs;
     this.storeFinished=storeFinished; this.storeAccessory=storeAccessory; this.scopes=scopes; this.jdbc=jdbc;
+    this.finishedSalePrices=finishedSalePrices; this.accessorySalePrices=accessorySalePrices;
     transaction=new TransactionTemplate(manager);
     transaction.setPropagationBehavior(TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
@@ -114,10 +118,14 @@ public class ProductAllBatchShelfService {
     var store=scopes.require();
     boolean isAccessory="store-accessory-products".equals(resource);
     String kind=isAccessory?"accessory":"finished";
-    // Match the original source-before-listing lock order and enforce tenant/store ownership first.
+    // Match single-item shelving: source, category rules, then listing. Deletion does not lock pricing.
     var sourceIds=jdbc.queryForList("SELECT "+kind+"_product_id FROM store_"+kind+"_products WHERE id=? AND tenant_id=? AND store_id=?",Long.class,id,store.tenantId(),store.storeId());
     if(sourceIds.isEmpty()) { throw new AccessDeniedException("商品不存在或无权操作"); }
     var stocks=jdbc.queryForList("SELECT total_stock FROM "+kind+"_products WHERE id=? FOR UPDATE",Integer.class,sourceIds.getFirst());
+    if (!deleting) {
+      if (isAccessory) { accessorySalePrices.lockCategories(store.storeId()); }
+      else { finishedSalePrices.lockCategories(store.storeId()); }
+    }
     var states=jdbc.queryForList("SELECT status FROM store_"+kind+"_products WHERE id=? AND tenant_id=? AND store_id=? FOR UPDATE",String.class,id,store.tenantId(),store.storeId());
     if(states.isEmpty() || stocks.isEmpty()) { throw new AccessDeniedException("商品不存在或无权操作"); }
     String state=states.getFirst();

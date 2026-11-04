@@ -20,3 +20,5 @@ export { default as AdminOfficialMediaUpload } from './official/AdminOfficialMed
 export { default as AdminListToolbar } from './AdminListToolbar.vue';
 
 export { default as AdminPhoneInput } from './AdminPhoneInput.vue';
+
+export { useListBatchSelection } from './useListBatchSelection';

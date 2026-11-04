@@ -10,6 +10,7 @@ import type {
 } from '@/services/finishedProducts';
 
 export interface FinishedStockToolbarAction {
+  batch?: boolean;
   id: string;
   label: string;
 

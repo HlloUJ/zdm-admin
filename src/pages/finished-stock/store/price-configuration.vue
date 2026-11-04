@@ -58,7 +58,7 @@
                     <template #icon><t-icon name="add" /></template>新增
                   </t-button>
                 </AdminListToolbar>
-                <div v-if="activeKind === 'price' && can('batch-set')" class="price-actions">
+                <div v-if="hasBatchActions" class="price-actions">
                   <t-button
                     :theme="buttonTheme('batch-fill')"
                     variant="outline"
@@ -289,6 +289,7 @@
   </div>
 </template>
 <script setup lang="ts">
+import { useListBatchSelection } from '@/components/foundation';
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
@@ -433,16 +434,10 @@ const displayRows = computed<DisplayRow[]>(() => {
   visit(null, 0);
   return result;
 });
+const priceBatchActions = computed(() => (activeKind.value === 'price' && can('batch-set') ? [{ batch: true }] : []));
+const { hasBatchActions, selectionColumns } = useListBatchSelection(priceBatchActions, selectedIds, activeKey);
 const columns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  ...(activeKind.value === 'price' && can('batch-set')
-    ? [
-        {
-          colKey: 'categorySelect',
-          title: 'categorySelectTitle',
-          width: 48,
-        },
-      ]
-    : []),
+  ...selectionColumns([{ colKey: 'categorySelect', title: 'categorySelectTitle', width: 48 }], 'categorySelect'),
   { colKey: 'name', title: activeKind.value === 'price' ? '分类名称' : '角色', minWidth: 180 },
   {
     colKey: 'coefficient',

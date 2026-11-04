@@ -121,13 +121,7 @@
                 <AdminListToolbar
                   :has-actions="batchButtons.length > 0"
                   :selected-count="selectedKeys.length"
-                  :has-batch-actions="
-                    batchButtons.some((button) =>
-                      ['batchDelete', 'batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(
-                        button.action,
-                      ),
-                    )
-                  "
+                  :has-batch-actions="hasBatchActions"
                   :has-auxiliary="canViewOperationLogs"
                   ><t-button
                     v-for="action in managementToolbarActions"
@@ -684,6 +678,7 @@
 </template>
 
 <script setup lang="ts">
+import { useListBatchSelection } from '@/components/foundation';
 import { operationsHistoricalLayeredFields } from './historicalSpecification';
 import { deleteProductsBatch } from '@/services/productBatchDelete';
 import { canBatchDelete } from '@/services/productBatchPermissions';
@@ -1381,12 +1376,18 @@ const baseBatchButtons = computed(() => {
         ),
   );
 });
-const batchButtons = computed(() => [
-  ...baseBatchButtons.value,
-  ...(canBatchDelete(activeTab.value, (state, action) => hasFinishedAction(action, state))
-    ? [{ action: 'batchDelete' as const, label: '批量删除', icon: 'delete' }]
-    : []),
-]);
+const batchButtons = computed(() =>
+  [
+    ...baseBatchButtons.value,
+    ...(canBatchDelete(activeTab.value, (state, action) => hasFinishedAction(action, state))
+      ? [{ action: 'batchDelete' as const, label: '批量删除', icon: 'delete' }]
+      : []),
+  ].map((button) => ({
+    ...button,
+    batch: ['batchDelete', 'batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(button.action),
+  })),
+);
+const { hasBatchActions, selectionColumns } = useListBatchSelection(batchButtons, selectedKeys, activeTab);
 const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
   batchButtons.value.map((button) => ({
     id: button.action,
@@ -1414,12 +1415,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
       ? productCreationColumns(toggleTimeSort)
       : stateActivityColumns(activeTab.value, toggleTimeSort)),
   ];
-  if (
-    activeTab.value !== 'soldOut' &&
-    (activeTab.value !== 'all' ||
-      hasPermission(getLoginUser(), `${productPermissionPrefix.value}.batch-shelf`) ||
-      canBatchDelete(activeTab.value, (state, action) => hasFinishedAction(action, state)))
-  ) {
+  if (hasBatchActions.value) {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
   if (activeTab.value === 'warehouse' || activeTab.value === 'all') {
@@ -1436,7 +1432,7 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
     align: 'left',
     fixed: 'right',
   });
-  return base;
+  return selectionColumns(base, 'select');
 });
 const formatReadonlyPrice = (value: unknown) =>
   value == null || String(value).trim() === '' ? '-' : Number(value).toFixed(2);
