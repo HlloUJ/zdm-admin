@@ -461,6 +461,7 @@ for (const source of ['供应链', '运营端']) {
       await storeLogin(page);
       let unavailable = false;
       let writes = 0;
+      let batchAttempts = 0;
       const imageUrl =
         'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+j6bEAAAAASUVORK5CYII=';
       const latest = () =>
@@ -471,6 +472,17 @@ for (const source of ['供应链', '运营端']) {
         });
       await page.route('**/api/admin/store-finished-products**', (route) => {
         const path = new URL(route.request().url()).pathname;
+        if (path.endsWith('/all-batch-shelf')) {
+          batchAttempts++;
+          return route.fulfill({
+            json: ok({
+              total: 1,
+              successCount: 0,
+              failureCount: 1,
+              failures: [{ id: 41, code: 'VALIDATION_FAILED', reason: `该商品已被${source}下架` }],
+            }),
+          });
+        }
         if (route.request().method() !== 'GET') {
           writes++;
           return route.fulfill({ json: ok(true) });
@@ -497,6 +509,13 @@ for (const source of ['供应链', '运营端']) {
       else if (action === '确认上架')
         await page.locator('.t-dialog:visible').getByRole('button', { name: '确认上架', exact: true }).click();
       else await main.getByText(action, { exact: true }).click();
+      if (action === '批量上架') {
+        await page.locator('.t-dialog:visible').getByRole('button', { name: '确认批量上架', exact: true }).click();
+        const result = page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' });
+        await expect(result).toContainText('成功上架0件，失败1件。');
+        await expect(result.locator('tbody')).toContainText(`该商品已被${source}下架`);
+        await result.getByRole('button', { name: '确认', exact: true }).click();
+      }
       await expect(overlay).toContainText(`该商品已被${source}下架`);
       await expect(overlay.getByRole('button', { name: '详情', exact: true })).toBeVisible();
       await expect(overlay.getByRole('button', { name: '彻底删除', exact: true })).toBeVisible();
@@ -504,6 +523,7 @@ for (const source of ['供应链', '运营端']) {
       await expect(main.locator('tr[data-source-id="41"]')).toHaveAttribute('inert', '');
       await expect(page.locator('.t-dialog:visible, .t-drawer--open')).toHaveCount(0);
       expect(writes).toBe(0);
+      expect(batchAttempts).toBe(action === '批量上架' ? 1 : 0);
     });
   }
 }
@@ -845,15 +865,23 @@ test('store batch shelf matches shared confirmation and partial failure feedback
   const requests: number[][] = [];
   let failSecond = true;
   await page.route('**/api/admin/store-finished-products', (route) => route.fulfill({ json: ok(records) }));
-  await page.route('**/api/admin/store-finished-products/status/batch', (route) => {
+  await page.route('**/api/admin/store-finished-products/all-batch-shelf', (route) => {
     const { ids } = route.request().postDataJSON();
     requests.push(ids);
-    if (ids[0] === 42 && failSecond)
-      return route.fulfill({ status: 400, json: { code: 400, message: '请先配置门店销售价格', data: null } });
-    const item = records.find((record) => record.id === ids[0])!;
-    item.status = 'selling';
-    item.effectiveStatus = 'selling';
-    return route.fulfill({ json: ok([item]) });
+    const failed = ids.filter((id: number) => id === 42 && failSecond);
+    for (const id of ids.filter((id: number) => !failed.includes(id))) {
+      const item = records.find((record) => record.id === id)!;
+      item.status = 'selling';
+      item.effectiveStatus = 'selling';
+    }
+    return route.fulfill({
+      json: ok({
+        total: ids.length,
+        successCount: ids.length - failed.length,
+        failureCount: failed.length,
+        failures: failed.map((id: number) => ({ id, code: 'VALIDATION_FAILED', reason: '请先配置门店销售价格' })),
+      }),
+    });
   });
   await page.goto(productWarehouseUrl('/store/finished-stock-management'));
   const main = page.getByRole('main');
@@ -874,17 +902,20 @@ test('store batch shelf matches shared confirmation and partial failure feedback
   expect(requests).toEqual([]);
   await button.click();
   await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
-  await expect(page.getByText('已上架 1 个商品，未上架 1 个商品', { exact: true })).toBeVisible();
-  await expect(main.locator('.finished-row-warning')).toContainText('请先配置门店销售价格');
-  await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(1);
-  expect(requests).toEqual([[42], [41]]);
+  const result = page.locator('.t-dialog:visible').filter({ hasText: '批量上架结果' });
+  await expect(result).toContainText('成功上架1件，失败1件。');
+  await expect(result.locator('tbody')).toContainText('请先配置门店销售价格');
+  await expect(main.locator('tbody .t-checkbox.t-is-checked')).toHaveCount(0);
+  expect(requests).toEqual([[42, 41]]);
+  await result.getByRole('button', { name: '确认', exact: true }).click();
   failSecond = false;
+  await main.locator('thead .t-checkbox').click();
   await button.click();
   await dialog.getByRole('button', { name: '确认批量上架', exact: true }).click();
-  await expect(page.getByText('已上架 1 个商品，未上架 0 个商品', { exact: true })).toBeVisible();
+  await expect(result).toContainText('成功上架1件，失败0件。');
   await expect(main.locator('.finished-row-warning')).toHaveCount(0);
   await expect(main.getByText('暂无商品', { exact: true })).toBeVisible();
-  expect(requests).toEqual([[42], [41], [42]]);
+  expect(requests).toEqual([[42, 41], [42]]);
 });
 
 for (const scenario of [

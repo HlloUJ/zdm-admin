@@ -1120,12 +1120,12 @@ test('opens role permission configuration dialog', async ({ page }) => {
   const finishedRows = roleMatrix.locator('tbody tr');
   await expect(finishedRows.first()).toContainText('成品现货管理页');
   const expectedFinishedActions = [
-    ['批量上架', '操作日志'],
+    ['操作日志'],
     ['查看'],
     ['查看', '上架', '编辑', '删除'],
-    ['查看', '批量下架', '下架', '编辑', '删除'],
+    ['查看', '下架', '编辑', '删除'],
     ['查看', '详情'],
-    ['查看', '批量放回到仓库', '批量彻底删除', '清空回收站', '详情', '放回仓库', '彻底删除'],
+    ['查看', '清空回收站', '详情', '放回仓库', '彻底删除'],
   ];
   for (const [index, labels] of expectedFinishedActions.entries()) {
     await expect(finishedRows.nth(index).locator('.permission-action-grid .t-checkbox')).toHaveText(labels);
@@ -1137,10 +1137,7 @@ test('opens role permission configuration dialog', async ({ page }) => {
   await expect(roleMatrix.locator('tbody .permission-menu-cell')).toHaveText(adminProductSecondMenuLabels);
   await expect(roleMatrix.locator('tbody .permission-third-menu-cell')).toHaveText(adminProductThirdMenuLabels);
   const slabGlobalPermissionRow = roleMatrix.locator('tbody tr').filter({ hasText: '页面全局' }).last();
-  await expect(slabGlobalPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText([
-    '批量上架',
-    '操作日志',
-  ]);
+  await expect(slabGlobalPermissionRow.locator('.permission-action-grid .t-checkbox')).toHaveText(['操作日志']);
   await expect(roleMatrix.getByText('操作日志', { exact: true })).toHaveCount(3);
   await expect(roleMatrix.getByText('商品分类管理', { exact: true })).toBeVisible();
   await expect(roleMatrix.getByText('商品分类管理页', { exact: true })).toBeVisible();
@@ -1345,15 +1342,12 @@ test('filters terminal allocation to shared and terminal-only modules and persis
         '查看',
         '新增',
         '批量调整归属',
-        '批量归档',
         '详情',
         '跟进',
         '编辑',
         '归档',
         '查看',
         '批量调整归属',
-        '批量取消归档',
-        '批量彻底删除',
         '详情',
         '跟进',
         '编辑',
@@ -1885,15 +1879,12 @@ test('store role customer matrix retains bulk assignment and removes retired sta
     '查看',
     '新增',
     '批量调整归属',
-    '批量归档',
     '详情',
     '跟进',
     '编辑',
     '归档',
     '查看',
     '批量调整归属',
-    '批量取消归档',
-    '批量彻底删除',
     '详情',
     '跟进',
     '编辑',
@@ -1935,11 +1926,7 @@ for (const [terminal, action, client, modules] of [
       .filter({ has: page.locator('.permission-tab-cell').getByText('页面全局', { exact: true }) });
     await expect(globals).toHaveCount(modules.length);
     for (let i = 0; i < modules.length; i++) {
-      await expect(globals.nth(i).locator('.permission-action-grid .t-checkbox')).toHaveText([
-        action,
-        '批量上架',
-        '操作日志',
-      ]);
+      await expect(globals.nth(i).locator('.permission-action-grid .t-checkbox')).toHaveText([action, '操作日志']);
       await globals.nth(i).getByText(action, { exact: true }).click();
       await expect(globals.nth(i).getByRole('checkbox', { name: '操作日志', exact: true })).not.toBeChecked();
     }

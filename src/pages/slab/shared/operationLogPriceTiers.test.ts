@@ -64,7 +64,7 @@ it('shows missing prices with the saved reason and name without adding current l
   });
 });
 
-it('keeps reentry on the full snapshot path with its recorded reason', () => {
+it('keeps legacy source arrival snapshots while omitting the redundant reentry reason', () => {
   const detail = ref({
     operationType: 'REENTRY',
     beforeStatus: null,
@@ -79,9 +79,8 @@ it('keeps reentry on the full snapshot path with its recorded reason', () => {
     () => ({}),
   );
   expect(view.operationLogIsCreate.value).toBe(true);
-  expect(view.operationLogChangeRows.value.find((row) => row.field === '重新入仓原因')?.after).toBe(
-    '运营删除失效记录后重新入仓',
-  );
+  expect(view.operationLogChangeRows.value.some((row) => row.field === '重新入仓原因')).toBe(false);
+  expect(JSON.parse(detail.value.changeDetails || '{}').重新入仓原因.after).toBe('运营删除失效记录后重新入仓');
   expect(view.operationLogChangeRows.value.find((row) => row.field === '价格层级')?.priceTiers?.[0].afterPrice).toBe(
     '20.00',
   );

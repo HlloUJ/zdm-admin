@@ -1079,6 +1079,7 @@
     <FinishedOperationLogs v-if="canViewOperationLogs" v-model:visible="operationLogsVisible" />
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="saving"
       :function="buttonFunctionFor('stock', confirmState.type)"
       :action="confirmAction"
       object-type="商品"
@@ -1089,15 +1090,23 @@
     >
       {{ confirmState.content }}
     </AdminConfirmDialog>
-    <OperationsBatchShelfResult v-model:visible="allBatchResultVisible" :result="allBatchResult" />
+    <OperationsBatchShelfResult
+      v-model:visible="allBatchResultVisible"
+      :result="allBatchResult"
+      :operation="batchOperation"
+    />
   </div>
 </template>
 
 <script setup lang="ts">
 import DecimalInput from '@/components/DecimalInput.vue';
+import { deleteProductsBatch } from '@/services/productBatchDelete';
+import { canBatchDelete } from '@/services/productBatchPermissions';
+import { batchRequestError } from '@/services/productBatchFeedback';
 import OperationsBatchShelfResult from '@/components/OperationsBatchShelfResult.vue';
 import { shelfProductsFromAll } from '@/services/productAllBatchShelf';
 import type { BatchShelfResult } from '@/services/operationsBatchShelf';
+const batchOperation = ref<'上架' | '删除'>('上架');
 const allBatchResultVisible = ref(false);
 const allBatchResult = ref<BatchShelfResult>({ total: 0, successCount: 0, failureCount: 0, failures: [] });
 import ProductListStatusTag from '@/components/ProductListStatusTag.vue';
@@ -1246,6 +1255,7 @@ const { visibleTabs: finishedTabs, showTabRail: showFinishedTabRail } = usePermi
 });
 const finishedActionCodes: Record<string, string> = {
   publish: 'publish',
+  batchDelete: 'delete',
   batchShelf: 'batch-shelf',
   batchOffShelf: 'batch-off-shelf',
   batchRestore: 'batch-restore',
@@ -1798,6 +1808,7 @@ const confirmAction = computed(() => {
     delete: '删除',
     restore: '放回',
     purge: '彻底删除',
+    batchDelete: '批量删除',
     batchShelf: '批量上架',
     batchRestore: '批量放回到仓库',
     batchPurge: '批量彻底删除',
@@ -2020,7 +2031,7 @@ const pageAllSelected = computed(
 const pagePartiallySelected = computed(
   () => pageData.value.some((item) => selectedKeySet.value.has(item.id)) && !pageAllSelected.value,
 );
-const batchButtons = computed(() => {
+const baseBatchButtons = computed(() => {
   if (activeTab.value === 'all')
     return [
       ...(hasFinishedAction('publish') ? [{ action: 'publish' as const, label: '发布商品', icon: 'add' }] : []),
@@ -2057,9 +2068,15 @@ const batchButtons = computed(() => {
 });
 const hasSelectableBatchActions = computed(() =>
   batchButtons.value.some((button) =>
-    ['batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(button.action),
+    ['batchDelete', 'batchShelf', 'batchOffShelf', 'batchRestore', 'batchPurge'].includes(button.action),
   ),
 );
+const batchButtons = computed(() => [
+  ...baseBatchButtons.value,
+  ...(canBatchDelete(activeTab.value, (state, action) => hasFinishedAction(action, state))
+    ? [{ action: 'batchDelete' as const, label: '批量删除', icon: 'delete' }]
+    : []),
+]);
 const managementToolbarActions = computed<FinishedStockToolbarAction[]>(() =>
   batchButtons.value.map((button) => ({
     id: button.action,
@@ -2087,7 +2104,12 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() => {
       ? productCreationColumns(toggleTimeSort)
       : stateActivityColumns(activeTab.value, toggleTimeSort)),
   ];
-  if (activeTab.value !== 'soldOut' && (activeTab.value !== 'all' || hasFinishedAction('batch-shelf'))) {
+  if (
+    activeTab.value !== 'soldOut' &&
+    (activeTab.value !== 'all' ||
+      hasFinishedAction('batch-shelf') ||
+      canBatchDelete(activeTab.value, (state, action) => hasFinishedAction(action, state)))
+  ) {
     base.unshift({ colKey: 'select', title: 'selectTitle', width: 52, align: 'center' });
   }
   if (activeTab.value === 'warehouse' || activeTab.value === 'all') {
@@ -2244,6 +2266,10 @@ const handleBatchAction = (action: BatchAction) => {
   }
   if (action !== 'clearRecycle' && selectedKeys.value.length === 0) {
     adminFeedback.warning('请先选择商品');
+    return;
+  }
+  if (action === 'batchDelete') {
+    openConfirm('batchDelete', null, `是否批量删除所选${commodity.label}？删除成功的商品将进入回收站。`);
     return;
   }
   if (action === 'batchShelf') {
@@ -2956,6 +2982,7 @@ const updateProductStatus = async (id: number, status: StockStatus | 'offShelf',
   upsertStockItem(updated);
 };
 const handleConfirm = async () => {
+  if (saving.value) return;
   const type = confirmState.type;
   const product = confirmState.product;
   const selectedCount = selectedKeys.value.length;
@@ -2971,24 +2998,34 @@ const handleConfirm = async () => {
     } else if (type === 'purge' && product) {
       await deleteFinishedProduct(product.id);
       dataItems.value = dataItems.value.filter((item) => item.id !== product.id);
-    } else if (type === 'batchShelf' && activeTab.value === 'all') {
-      allBatchResult.value = await shelfProductsFromAll(
-        commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
-        [...selectedKeys.value],
-      );
+    } else if (type === 'batchShelf' || type === 'batchDelete') {
+      const ids = [...selectedKeys.value];
+      batchOperation.value = type === 'batchDelete' ? '删除' : '上架';
+      try {
+        allBatchResult.value =
+          type === 'batchDelete'
+            ? await deleteProductsBatch(
+                commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
+                ids,
+              )
+            : await shelfProductsFromAll(
+                commodity.scope === 'accessory' ? 'accessory-products' : 'finished-products',
+                ids,
+              );
+      } catch (error) {
+        adminFeedback.error(batchRequestError(error, batchOperation.value));
+        return;
+      }
       selectedKeys.value = [];
+      ids.forEach((id) => delete shelfErrors[id]);
       closeConfirmDialog();
       allBatchResultVisible.value = true;
       await loadInventoryData();
+      currentPagination.value.current = Math.min(
+        currentPagination.value.current,
+        Math.max(1, Math.ceil(filteredData.value.length / currentPagination.value.pageSize)),
+      );
       return;
-    } else if (type === 'batchShelf') {
-      {
-        // Publishing rebuilds prices; finish each transaction before starting the next product.
-        for (const id of [...selectedKeys.value]) {
-          await updateProductStatus(id, 'selling');
-          selectedKeys.value = selectedKeys.value.filter((selectedId) => selectedId !== id);
-        }
-      }
     } else if (type === 'batchRestore') {
       await Promise.all(selectedKeys.value.map((id) => updateProductStatus(id, 'warehouse')));
       selectedKeys.value = [];

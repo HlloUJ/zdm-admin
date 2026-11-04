@@ -204,12 +204,12 @@ class CustomerApiTest extends SpringContainerTestSupport {
     identity(90001,90003L,"all","all"); mvc.perform(get(BASE).param("status","daily")).andExpect(status().isForbidden());
     identity(90001,null,"all","all"); mvc.perform(get(BASE).param("status","daily")).andExpect(status().isForbidden());
   }
-  @Test void viewAndDetailAndSingleAndBatchAreIndependent() throws Exception {
+  @Test void viewAndDetailStayIndependentWhileSingleAndBatchShareArchive() throws Exception {
     long a=create(); identity(90001,90001L,"all","daily.view","daily.archive");
     mvc.perform(get(BASE+"/"+a)).andExpect(status().isForbidden());
     mvc.perform(get(BASE).param("status","archived")).andExpect(status().isForbidden());
-    mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("ids",List.of(a),"status","daily","action","archive")))).andExpect(status().isForbidden());
-    action(a,"daily","archive",null).andExpect(status().isOk());
+    mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(json.writeValueAsString(java.util.Map.of("ids",List.of(a),"status","daily","action","archive")))).andExpect(status().isOk());
+    assertThat(jdbc.queryForObject("SELECT status FROM store_customers WHERE id=?",String.class,a)).isEqualTo("archived");
   }
   @Test void allDataAllowsOrdinaryStaffToMaintainOthersWithoutChangingOwner() throws Exception {
     long a=create();identity(90002,90001L,"all","all");
@@ -231,7 +231,7 @@ class CustomerApiTest extends SpringContainerTestSupport {
     identity(90001,90001L,"self","all");
     mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
     assertThat(jdbc.queryForObject("SELECT status FROM store_customers WHERE id=?",String.class,a)).isEqualTo("daily");
-    identity(90001,90001L,"all","daily.view","daily.archive");
+    identity(90001,90001L,"all","daily.view");
     mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isForbidden());
     identity(90001,90001L,"all","daily.view","daily.batch-archive");
     mvc.perform(post(BASE+"/batch").contentType(MediaType.APPLICATION_JSON).content(body)).andExpect(status().isOk());
