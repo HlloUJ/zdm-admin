@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { atomicTimingJson, preserveTimingSnapshot, safeTimingPath, timingWriterLock } from './batch-timing-io.mjs';
 import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -7,8 +8,6 @@ import {
   mkdirSync,
   readFileSync,
   writeFileSync,
-  renameSync,
-  unlinkSync,
   readdirSync,
   openSync,
   readSync,
@@ -31,14 +30,38 @@ export const timingDirectory = (common, batch) => {
   return path.join(common, 'task-timing', batch);
 };
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
-function safe(file) {
-  if (existsSync(file)) assert.ok(!lstatSync(file).isSymbolicLink(), 'Linked timing source');
+const safe = safeTimingPath;
+const atomic = atomicTimingJson;
+const lock = timingWriterLock;
+const encode = (value) => Buffer.from(JSON.stringify(value, null, 2) + '\n');
+function unavailableSummary(batch, reason) {
+  return {
+    version: 1,
+    timingVersion: 5,
+    batch,
+    status: 'incomplete',
+    wallMs: null,
+    executionRoundsMs: null,
+    approvalBlockedMs: null,
+    explicitPauseOutsideRoundsMs: null,
+    unclassifiedBetweenRoundsMs: null,
+    issues: [reason],
+    meaning: 'No matching committed timing publication is available.',
+  };
 }
-function atomic(file, value) {
-  safe(file);
-  const temp = file + '.' + randomUUID() + '.tmp';
-  writeFileSync(temp, JSON.stringify(value, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
-  renameSync(temp, file);
+function authorizationDigest(state) {
+  const marker = timingRequiredFile(state.common, state.batch);
+  safe(marker);
+  if (!existsSync(marker)) {
+    assert.ok(!state.authorizationRequired, 'Required authorization marker missing');
+    return null;
+  }
+  const bytes = readFileSync(marker),
+    proof = JSON.parse(bytes);
+  assert.equal(proof.batch, state.batch, 'Authorization batch changed');
+  assert.equal(proof.authorizedAt, state.authorizedAt, 'Authorization boundary changed');
+  assert.equal(proof.requestId, state.requestId, 'Authorization identity changed');
+  return hash(bytes);
 }
 function gitCommon(root) {
   const r = spawnSync('git', ['rev-parse', '--git-common-dir'], { cwd: root, encoding: 'utf8' });
@@ -107,59 +130,47 @@ export function inspectNativeSource(file, { thread, common }) {
   assert.ok(meta && last && request && Number.isFinite(request.at), 'Missing native authorization-turn identity');
   return { ...last, request, terminal, ...sourceIdentity(file) };
 }
-function lock(directory, run) {
-  safe(path.dirname(directory));
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  safe(directory);
-  assert.equal(lstatSync(directory).mode & 0o077, 0);
-  const file = path.join(directory, 'writer.lock');
-  let held = false;
-  for (let i = 0; i < 100; i++) {
-    try {
-      writeFileSync(file, JSON.stringify({ pid: process.pid, host: os.hostname() }), { flag: 'wx', mode: 0o600 });
-      held = true;
-      break;
-    } catch (e) {
-      if (e.code !== 'EEXIST') throw e;
-      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 10);
-    }
-  }
-  assert.ok(held, 'Timing writer busy; preserve owner');
-  try {
-    return run();
-  } finally {
-    unlinkSync(file);
-  }
-}
 export function readTimeline(common, batch) {
   const file = path.join(timingDirectory(common, batch), 'timeline.json');
   safe(file);
   if (!existsSync(file)) return null;
   const state = JSON.parse(readFileSync(file));
-  assert.ok([1, BATCH_TIMING_VERSION].includes(state.version), 'Unsupported batch timing format');
+  assert.ok([1, 2, BATCH_TIMING_VERSION].includes(state.version), 'Unsupported batch timing format');
   return state;
 }
-function saveTimeline(directory, state) {
+function saveTimeline(directory, state, { now = Date.now(), completion = completionFor(state) } = {}) {
   const file = path.join(directory, 'timeline.json');
+  const proofDigest = authorizationDigest(state);
   if (existsSync(file)) {
     const bytes = readFileSync(file),
       prior = JSON.parse(bytes);
-    if (prior.version === 1) {
-      const backup = path.join(directory, 'timeline-v1-' + hash(bytes) + '.json');
-      safe(backup);
-      if (!existsSync(backup)) writeFileSync(backup, bytes, { flag: 'wx', mode: 0o600 });
-      const summary = path.join(directory, 'summary.json');
-      if (existsSync(summary)) {
-        safe(summary);
-        const summaryBytes = readFileSync(summary),
-          summaryBackup = path.join(directory, 'summary-v1-' + hash(summaryBytes) + '.json');
-        safe(summaryBackup);
-        if (!existsSync(summaryBackup)) writeFileSync(summaryBackup, summaryBytes, { flag: 'wx', mode: 0o600 });
+    if (prior.version < BATCH_TIMING_VERSION) {
+      preserveTimingSnapshot(path.join(directory, `timeline-v${prior.version}-${hash(bytes)}.json`), bytes);
+      const summaryFile = path.join(directory, 'summary.json');
+      safe(summaryFile);
+      if (existsSync(summaryFile)) {
+        const bytes = readFileSync(summaryFile);
+        preserveTimingSnapshot(path.join(directory, `summary-v${prior.version}-${hash(bytes)}.json`), bytes);
       }
     }
   }
   state.version = BATCH_TIMING_VERSION;
+  state.authorizationRequired = proofDigest !== null;
+  const summary = summarizeBatch(state, { now, completion });
+  // Old read-only clients must see unknown, never an obsolete total, before any state upgrade is visible.
+  atomic(path.join(directory, 'summary.json'), unavailableSummary(state.batch, 'timing-publication-pending'));
   atomic(file, state);
+  atomic(path.join(directory, 'summary.json'), summary);
+  atomic(path.join(directory, 'publication.json'), {
+    version: 1,
+    recordVersion: BATCH_TIMING_VERSION,
+    batch: state.batch,
+    common: state.common,
+    timelineDigest: hash(encode(state)),
+    summaryDigest: hash(encode(summary)),
+    authorizationDigest: proofDigest,
+  });
+  return summary;
 }
 export function completionFor(state) {
   const file = path.join(state.common, 'task-delivery', state.batch, 'completion-session.json');
@@ -241,9 +252,7 @@ export function refreshTimeline(common, batch, { now = Date.now() } = {}) {
     assert.equal(state.batch, batch, 'Timing batch identity changed');
     const completion = completionFor(state);
     for (const source of state.sources) consumeSource(state, source);
-    const summary = summarizeBatch(state, { now, completion });
-    saveTimeline(directory, state);
-    atomic(path.join(directory, 'summary.json'), summary);
+    const summary = saveTimeline(directory, state, { now, completion });
     return { state, summary, completion };
   });
 }
@@ -268,6 +277,19 @@ export function bindBatchTiming(
   const marker = timingRequiredFile(common, batch.id);
   lock(directory, () => {
     let state = readTimeline(common, batch.id);
+    const initializationFile = path.join(directory, 'initialization.json');
+    safe(initializationFile);
+    if (!state && existsSync(initializationFile)) {
+      assert.ok(
+        !existsSync(path.join(directory, 'publication.json')),
+        'Committed timing state missing; never reset authorization or history',
+      );
+      const prepared = JSON.parse(readFileSync(initializationFile));
+      assert.equal(prepared.digest, hash(encode(prepared.state)), 'Prepared timing identity damaged');
+      assert.equal(prepared.state.common, common);
+      assert.equal(prepared.state.batch, batch.id);
+      state = prepared.state;
+    }
     if (!state) {
       assert.ok(!existsSync(marker), 'Required timing state missing; never reset authorization time');
     }
@@ -306,13 +328,16 @@ export function bindBatchTiming(
         inode: identity.inode,
       });
     }
-    saveTimeline(directory, state);
     const markerDirectory = path.dirname(marker);
     safe(markerDirectory);
     mkdirSync(markerDirectory, { recursive: true, mode: 0o700 });
     const proof = { version: 1, batch: batch.id, authorizedAt: state.authorizedAt, requestId: state.requestId };
     if (existsSync(marker)) assert.deepEqual(JSON.parse(readFileSync(marker)), proof, 'Authorization marker differs');
-    else atomic(marker, proof);
+    if (!existsSync(path.join(directory, 'timeline.json')) && !existsSync(initializationFile)) {
+      preserveTimingSnapshot(initializationFile, encode({ version: 1, state, digest: hash(encode(state)) }));
+    }
+    if (!existsSync(marker)) preserveTimingSnapshot(marker, encode(proof));
+    saveTimeline(directory, state);
     atomic(
       path.join(directory, 'subscriptions.json'),
       state.sources.map((source) => source.file),
@@ -326,7 +351,7 @@ export function ensureObserver(directory) {
   return lock(directory, () => startObserver(directory));
 }
 function startObserver(directory) {
-  const names = ['batch-timing-core.mjs', 'batch-timing-store.mjs', 'batch-timing-observer.mjs'];
+  const names = ['batch-timing-core.mjs', 'batch-timing-store.mjs', 'batch-timing-io.mjs', 'batch-timing-observer.mjs'];
   const content = names.map((name) => [name, readFileSync(new URL(name, import.meta.url))]);
   const digest = hash(Buffer.concat(content.map(([, bytes]) => bytes)));
   const lease = path.join(directory, 'observer.json');
@@ -390,9 +415,36 @@ function startObserver(directory) {
   return owner;
 }
 export function readTimingSummary(common, batch) {
-  const file = path.join(timingDirectory(common, batch), 'summary.json');
-  safe(file);
-  return existsSync(file) ? JSON.parse(readFileSync(file)) : null;
+  const directory = timingDirectory(common, batch);
+  const manifestFile = path.join(directory, 'publication.json');
+  try {
+    for (const name of ['publication.json', 'timeline.json', 'summary.json']) safe(path.join(directory, name));
+    if (!['publication.json', 'timeline.json', 'summary.json'].some((name) => existsSync(path.join(directory, name))))
+      return null;
+    if (!existsSync(manifestFile)) return unavailableSummary(batch, 'timing-publication-unverified');
+    const before = readFileSync(manifestFile),
+      publication = JSON.parse(before);
+    const timelineBytes = readFileSync(path.join(directory, 'timeline.json'));
+    const summaryBytes = readFileSync(path.join(directory, 'summary.json'));
+    assert.equal(publication.version, 1);
+    assert.equal(publication.recordVersion, BATCH_TIMING_VERSION);
+    assert.equal(publication.batch, batch);
+    assert.equal(publication.common, common);
+    assert.equal(hash(timelineBytes), publication.timelineDigest);
+    assert.equal(hash(summaryBytes), publication.summaryDigest);
+    const state = JSON.parse(timelineBytes),
+      summary = JSON.parse(summaryBytes);
+    assert.equal(state.version, BATCH_TIMING_VERSION);
+    assert.equal(state.batch, batch);
+    assert.equal(state.common, common);
+    assert.equal(summary.batch, batch);
+    assert.equal(summary.timingVersion, 5);
+    assert.equal(authorizationDigest(state), publication.authorizationDigest);
+    assert.deepEqual(readFileSync(manifestFile), before, 'Timing publication changed while reading');
+    return summary;
+  } catch {
+    return unavailableSummary(batch, 'timing-publication-unavailable');
+  }
 }
 export const observerSource = fileURLToPath(new URL('./batch-timing-observer.mjs', import.meta.url));
 
@@ -437,7 +489,11 @@ export function recordValidationInterruptions(common, batch, interruptions) {
     assert.ok(state);
     state.validationInterruptions ??= [];
     for (const item of interruptions) {
-      assert.ok(!state.validationInterruptions.some((v) => v.id === item.id), 'Interruption already recorded');
+      const existing = state.validationInterruptions.find((v) => v.id === item.id);
+      if (existing) {
+        assert.deepEqual(existing, item, 'Immutable interruption differs');
+        continue;
+      }
       const original = state.validations.find((v) => v.id === item.id);
       assert.ok(original?.finishedAt == null && original?.status === 'running', 'Validation no longer pending');
       state.validationInterruptions.push(item);

@@ -14,6 +14,7 @@ import {
   reconcileInterruptedValidationTiming,
   inspectValidationProcesses,
 } from './batch-timing-runtime.mjs';
+import { timingWriterLock } from './batch-timing-io.mjs';
 import { runVerificationTask } from './verification-runner.mjs';
 function fixture(t) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'batch-timing-entry-')));
@@ -58,12 +59,23 @@ function fixture(t) {
   const registration = cli('./task-batch.mjs', ['register', '--id', 'timing', '--kind', 'infrastructure']);
   assert.equal(registration.status, 0, registration.stderr);
   const common = path.join(anchor, '.git');
-  t.after(() => {
+  const registeredObserver = JSON.parse(readFileSync(path.join(common, 'task-timing/timing/observer.json')));
+  t.after(async () => {
     try {
-      const owner = JSON.parse(readFileSync(path.join(common, 'task-timing/timing/observer.json')));
-      process.kill(owner.pid, 'SIGTERM');
-    } catch {
-      /* stopped collector */
+      process.kill(registeredObserver.pid, 'SIGTERM');
+    } catch (error) {
+      if (error.code !== 'ESRCH') throw error;
+    }
+    const deadline = Date.now() + 5000;
+    for (;;) {
+      try {
+        process.kill(registeredObserver.pid, 0);
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error;
+        break;
+      }
+      assert.ok(Date.now() < deadline, 'Fixture observer did not exit before directory cleanup');
+      await new Promise((resolve) => setTimeout(resolve, 20));
     }
     rmSync(root, { recursive: true, force: true });
   });
@@ -85,17 +97,24 @@ test('actual registration CLI automatically starts timing; real failed verificat
     { report: () => {} },
   );
   assert.equal(result.exitCode, 7);
-  const { summary, state } = refreshTimeline(f.common, 'timing');
-  assert.equal(state.validations.length, 1);
-  assert.equal(summary.localFailedAttempts, 1);
-  assert.equal(summary.localPendingAttempts, 0);
-  assert.ok(summary.localValidationMs >= 0);
-  assert.equal(summary.localRepairMs, null);
-  const report = f.cli('./task-timing.mjs', ['--batch', 'timing', '--json']);
-  assert.equal(report.status, 0, report.stderr);
-  assert.equal(JSON.parse(report.stdout).batch, 'timing');
-  assert.equal(JSON.parse(report.stdout).localFailedAttempts, 1);
-  assertTimingReadyWithUnfinished(f);
+  const observer = JSON.parse(readFileSync(path.join(f.common, 'task-timing/timing/observer.json')));
+  // Pause between writes so this test asserts the committed CLI report; publication races have fault-injection coverage.
+  timingWriterLock(path.join(f.common, 'task-timing/timing'), () => process.kill(observer.pid, 'SIGSTOP'));
+  try {
+    const { summary, state } = refreshTimeline(f.common, 'timing');
+    assert.equal(state.validations.length, 1);
+    assert.equal(summary.localFailedAttempts, 1);
+    assert.equal(summary.localPendingAttempts, 0);
+    assert.ok(summary.localValidationMs >= 0);
+    assert.equal(summary.localRepairMs, null);
+    const report = f.cli('./task-timing.mjs', ['--batch', 'timing', '--json']);
+    assert.equal(report.status, 0, report.stderr);
+    assert.equal(JSON.parse(report.stdout).batch, 'timing');
+    assert.equal(JSON.parse(report.stdout).localFailedAttempts, 1);
+    assertTimingReadyWithUnfinished(f);
+  } finally {
+    process.kill(observer.pid, 'SIGCONT');
+  }
 });
 function assertTimingReadyWithUnfinished(f) {
   recordValidationTiming(f.common, 'timing', {

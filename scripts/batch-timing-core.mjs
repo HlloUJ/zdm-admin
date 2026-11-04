@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 
-export const BATCH_TIMING_VERSION = 2;
+export const BATCH_TIMING_VERSION = 3;
 export const milliseconds = (value) => (typeof value === 'number' ? value : Date.parse(value));
 const finite = (value) => Number.isFinite(value);
 export function ranges(intervals) {
@@ -162,7 +162,7 @@ export function interruptedValidationIds(state) {
   return ids;
 }
 export function summarizeBatch(state, { now = Date.now(), completion = null } = {}) {
-  assert.ok([1, BATCH_TIMING_VERSION].includes(state.version), 'Unsupported batch timing format');
+  assert.ok([1, 2, BATCH_TIMING_VERSION].includes(state.version), 'Unsupported batch timing format');
   const interrupted = interruptedValidationIds(state);
   const unresolved = (state.validations ?? []).filter((v) => v.finishedAt == null && !interrupted.has(v.id));
   const delivery = state.delivery;
@@ -224,7 +224,7 @@ export function summarizeBatch(state, { now = Date.now(), completion = null } = 
   );
   return {
     version: 1,
-    timingVersion: 4,
+    timingVersion: 5,
     batch: state.batch,
     status: problems.length ? 'incomplete' : sealed ? 'completed' : delivery ? 'awaiting-turn-end' : 'snapshot',
     authorizedAt: new Date(state.authorizedAt).toISOString(),

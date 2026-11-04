@@ -162,7 +162,7 @@
       "dynamicImports": 0
     },
     "scripts/batch-timing-core.mjs": {
-      "digest": "ba1612eb20830fd9b7caa63634c0b477dc0f5ba7a1b7904ad9387f2703f98e8a",
+      "digest": "372e6f220b0951e70ae9ae40fdb71e29a59485dc76b1466741cc049ad4f30f36",
       "imports": [],
       "dynamicImports": 0
     },
@@ -171,10 +171,20 @@
       "imports": ["scripts/batch-timing-core.mjs"],
       "dynamicImports": 0
     },
+    "scripts/batch-timing-io.mjs": {
+      "digest": "c4a3225f7a412a7b3ed890366af56b3feba3e62e3588e160bb139bcc40d05ab6",
+      "imports": [],
+      "dynamicImports": 0
+    },
     "scripts/batch-timing-observer.mjs": {
       "digest": "087239687a3d4b18a6e618c17bde5ad5869e6a59807234c01b5b2c024915780d",
       "imports": ["scripts/batch-timing-store.mjs"],
       "dynamicImports": 0
+    },
+    "scripts/batch-timing-publication.test.mjs": {
+      "digest": "acebd8ab56e88e6dfce8660e6e4f309e827dca284796ee2748e2ea2534387063",
+      "imports": ["scripts/batch-timing-core.mjs", "scripts/batch-timing-io.mjs", "scripts/batch-timing-store.mjs"],
+      "dynamicImports": 1
     },
     "scripts/batch-timing-runtime.mjs": {
       "digest": "450d51cd8a5d37cf98535b7500f007d74142ebf49153814b639b535fab20fc00",
@@ -182,8 +192,9 @@
       "dynamicImports": 0
     },
     "scripts/batch-timing-runtime.test.mjs": {
-      "digest": "0a042cf4c2bd5e8fd61ff68b7fcc36c4f0ead1ff4e7407ead4e7dbd51022b356",
+      "digest": "b7e381decb9b9506c6410de457fad0576e03b53533ee2bdf6892f3b60c9daf02",
       "imports": [
+        "scripts/batch-timing-io.mjs",
         "scripts/batch-timing-runtime.mjs",
         "scripts/batch-timing-store.mjs",
         "scripts/check-changed.mjs",
@@ -194,12 +205,12 @@
       "dynamicImports": 2
     },
     "scripts/batch-timing-store.mjs": {
-      "digest": "8a11b39e8e9256828a048acd099921861d84c4f1e4a275a36f65e5f6290fec81",
-      "imports": ["scripts/batch-timing-core.mjs", "scripts/batch-timing-observer.mjs"],
+      "digest": "3bfb985cbaddce83c470e170ba0959490640ee3e2c4209eb456bb5804e5d468b",
+      "imports": ["scripts/batch-timing-core.mjs", "scripts/batch-timing-io.mjs", "scripts/batch-timing-observer.mjs"],
       "dynamicImports": 0
     },
     "scripts/batch-timing-store.test.mjs": {
-      "digest": "94048b33424465f079b676931e358f6577af930fdeefac8d0faede30fda91c0e",
+      "digest": "bae1f8198b33344d603849f95e6052cd473d19816209157edb330e190940294b",
       "imports": ["scripts/batch-timing-store.mjs"],
       "dynamicImports": 4
     },
@@ -653,7 +664,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "b756e19074623e53649bfd2d4e6eb5b9ce3658e2e9be3d678db84a9ecc6a0ab7",
+      "digest": "f545c79f4327478ce77c7f0e2d12f1fcfbdfba25b1d60031fe4045d518f84d13",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -671,7 +682,9 @@
         "scripts/backend-test-plan.test.mjs",
         "scripts/backend-unknown.mjs",
         "scripts/batch-timing-core.test.mjs",
+        "scripts/batch-timing-io.mjs",
         "scripts/batch-timing-observer.mjs",
+        "scripts/batch-timing-publication.test.mjs",
         "scripts/batch-timing-runtime.mjs",
         "scripts/batch-timing-runtime.test.mjs",
         "scripts/batch-timing-store.mjs",
@@ -1230,6 +1243,19 @@
       "imports": [
         "scripts/test-support/fixtures/timing-v1/batch-timing-core.mjs",
         "scripts/test-support/fixtures/timing-v1/batch-timing-observer.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/test-support/fixtures/timing-v2/batch-timing-core.mjs.txt": {
+      "digest": "ba1612eb20830fd9b7caa63634c0b477dc0f5ba7a1b7904ad9387f2703f98e8a",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/test-support/fixtures/timing-v2/batch-timing-store.mjs.txt": {
+      "digest": "8a11b39e8e9256828a048acd099921861d84c4f1e4a275a36f65e5f6290fec81",
+      "imports": [
+        "scripts/test-support/fixtures/timing-v2/batch-timing-core.mjs",
+        "scripts/test-support/fixtures/timing-v2/batch-timing-observer.mjs"
       ],
       "dynamicImports": 0
     },

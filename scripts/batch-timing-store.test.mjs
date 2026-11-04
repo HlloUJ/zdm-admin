@@ -26,7 +26,30 @@ const epoch = 1700000000000,
   thread = 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
 function fixture(t) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'batch-timing-real-')));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const observers = new Set();
+  const trackObserver = (owner) => {
+    observers.add(owner.pid);
+    return owner;
+  };
+  t.after(async () => {
+    for (const pid of observers) {
+      try {
+        process.kill(pid, 'SIGTERM');
+      } catch (error) {
+        if (error.code !== 'ESRCH') throw error;
+      }
+      await until(() => {
+        try {
+          process.kill(pid, 0);
+          return false;
+        } catch (error) {
+          if (error.code !== 'ESRCH') throw error;
+          return true;
+        }
+      });
+    }
+    rmSync(root, { recursive: true, force: true });
+  });
   for (const a of [
     ['init', '-b', 'main'],
     ['config', 'user.name', 'Fixture'],
@@ -61,6 +84,7 @@ function fixture(t) {
   const append = (text) => appendFileSync(file, text);
   return {
     root,
+    trackObserver,
     common,
     sessions,
     file,
@@ -134,14 +158,7 @@ test('real detached collector records approval, survives task carrier removal, s
   f.batch.worktree = path.join(f.root, 'task-carrier');
   mkdirSync(f.batch.worktree);
   f.bind();
-  const owner = ensureObserver(f.directory);
-  t.after(() => {
-    try {
-      process.kill(owner.pid, 'SIGTERM');
-    } catch {
-      /* already exited */
-    }
-  });
+  const owner = f.trackObserver(ensureObserver(f.directory));
   // Prove duplicate starts reuse the owned process; no second collector is created.
   assert.equal(ensureObserver(f.directory).pid, owner.pid);
   f.append(
@@ -279,14 +296,19 @@ test('collector upgrade replaces only its proven owned stale bundle and retains 
   f.bind();
   const oldCode = path.join(f.root, 'old-collector');
   mkdirSync(oldCode);
-  for (const name of ['batch-timing-core.mjs', 'batch-timing-store.mjs', 'batch-timing-observer.mjs'])
+  for (const name of [
+    'batch-timing-core.mjs',
+    'batch-timing-store.mjs',
+    'batch-timing-io.mjs',
+    'batch-timing-observer.mjs',
+  ])
     writeFileSync(
       path.join(oldCode, name),
       readFileSync(new URL(name, import.meta.url), 'utf8') + '\n// Previous collector version\n',
     );
   const { pathToFileURL } = await import('node:url');
   const previous = await import(pathToFileURL(path.join(oldCode, 'batch-timing-store.mjs')).href);
-  const owner = previous.ensureObserver(f.directory);
+  const owner = f.trackObserver(previous.ensureObserver(f.directory));
   await until(() => {
     try {
       process.kill(owner.pid, 0);
@@ -295,14 +317,7 @@ test('collector upgrade replaces only its proven owned stale bundle and retains 
       return false;
     }
   });
-  const upgraded = ensureObserver(f.directory);
-  t.after(() => {
-    try {
-      process.kill(upgraded.pid, 'SIGTERM');
-    } catch {
-      /* exited */
-    }
-  });
+  const upgraded = f.trackObserver(ensureObserver(f.directory));
   assert.notEqual(upgraded.pid, owner.pid);
   assert.notEqual(upgraded.bundleDigest, owner.bundleDigest);
   assert.equal(ensureObserver(f.directory).pid, upgraded.pid);
@@ -355,7 +370,7 @@ test('v1 history migrates with immutable backups and the real legacy reader cann
   const original = readFileSync(timeline),
     oldSummary = readFileSync(summary);
   const upgraded = refreshTimeline(f.common, 'timing');
-  assert.equal(upgraded.state.version, 2);
+  assert.equal(upgraded.state.version, 3);
   const backups = readdirSync(f.directory).filter((name) => name.startsWith('timeline-v1-'));
   assert.equal(backups.length, 1);
   assert.deepEqual(readFileSync(path.join(f.directory, backups[0])), original);
