@@ -6,6 +6,7 @@
     :width="width"
     dialog-class-name="zdm-admin-confirm-dialog"
     :confirmation="confirmation"
+    :confirm-btn="confirmLoading ? { loading: true } : undefined"
     :cancel-btn="mode === 'blocked' ? null : '取消'"
     @update:visible="emit('update:visible', $event)"
     @confirm="handleConfirm"
@@ -34,6 +35,7 @@ const props = withDefaults(
     batch?: boolean;
     description?: string;
     mode?: 'confirm' | 'blocked';
+    confirmLoading?: boolean;
     objectName?: string;
     objectType?: string;
     title?: string;
@@ -44,6 +46,7 @@ const props = withDefaults(
     batch: false,
     description: '',
     mode: 'confirm',
+    confirmLoading: false,
     objectName: '',
     objectType: '',
     title: '',

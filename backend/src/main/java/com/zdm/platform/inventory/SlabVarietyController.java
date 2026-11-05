@@ -74,4 +74,12 @@ public class SlabVarietyController extends AdminCrudController<SlabVariety> {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
     return ApiResponse.ok(service.deleteVariety(id));
   }
+  @GetMapping("/{id}/delete-check")
+  public ApiResponse<Boolean> checkDelete(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".delete");
+    permissionGuard.requireData(service.getById(id));
+    service.checkDelete(id);
+    return ApiResponse.ok(true);
+  }
+
 }

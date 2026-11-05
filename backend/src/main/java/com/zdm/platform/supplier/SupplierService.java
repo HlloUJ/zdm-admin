@@ -143,33 +143,7 @@ public class SupplierService extends CreatorAwareService<SupplierMapper, Supplie
 
   @Transactional
   public boolean deleteSupplier(Long id) {
-    CurrentIdentity identity = identityProvider.require();
-    SupplierScope scope = SupplierScope.from(identity);
-    requireScopedSupplier(id, identity, scope);
-
-    Long accessoryReferences = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accessory_products WHERE supplier_id = ?", Long.class, id);
-    if (accessoryReferences != null && accessoryReferences > 0) { throw new IllegalArgumentException("该供应商已关联配件，不能删除"); }
-    Long slabInventoryReferenceCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM slab_inventory WHERE supplier_id = ?",
-        Long.class,
-        id);
-    Long finishedProductReferenceCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM finished_products WHERE supplier_id = ?",
-        Long.class,
-        id);
-    boolean referencedBySlabInventory =
-        slabInventoryReferenceCount != null && slabInventoryReferenceCount > 0;
-    boolean referencedByFinishedProduct =
-        finishedProductReferenceCount != null && finishedProductReferenceCount > 0;
-    if (referencedBySlabInventory && referencedByFinishedProduct) {
-      throw new IllegalArgumentException(REFERENCED_MESSAGE);
-    }
-    if (referencedBySlabInventory) {
-      throw new IllegalArgumentException(SLAB_REFERENCED_MESSAGE);
-    }
-    if (referencedByFinishedProduct) {
-      throw new IllegalArgumentException(FINISHED_REFERENCED_MESSAGE);
-    }
+    checkDelete(id);
 
     try {
       return removeById(id);
@@ -322,4 +296,35 @@ public class SupplierService extends CreatorAwareService<SupplierMapper, Supplie
             && ("slab".equals(type.getCode())
                 || "大板".equals(type.getName() == null ? null : type.getName().trim())));
   }
+  public void checkDelete(Long id) {
+    CurrentIdentity identity = identityProvider.require();
+    SupplierScope scope = SupplierScope.from(identity);
+    requireScopedSupplier(id, identity, scope);
+
+    Long accessoryReferences = jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accessory_products WHERE supplier_id = ?", Long.class, id);
+    if (accessoryReferences != null && accessoryReferences > 0) { throw new IllegalArgumentException("该供应商已关联配件，不能删除"); }
+    Long slabInventoryReferenceCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM slab_inventory WHERE supplier_id = ?",
+        Long.class,
+        id);
+    Long finishedProductReferenceCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM finished_products WHERE supplier_id = ?",
+        Long.class,
+        id);
+    boolean referencedBySlabInventory =
+        slabInventoryReferenceCount != null && slabInventoryReferenceCount > 0;
+    boolean referencedByFinishedProduct =
+        finishedProductReferenceCount != null && finishedProductReferenceCount > 0;
+    if (referencedBySlabInventory && referencedByFinishedProduct) {
+      throw new IllegalArgumentException(REFERENCED_MESSAGE);
+    }
+    if (referencedBySlabInventory) {
+      throw new IllegalArgumentException(SLAB_REFERENCED_MESSAGE);
+    }
+    if (referencedByFinishedProduct) {
+      throw new IllegalArgumentException(FINISHED_REFERENCED_MESSAGE);
+    }
+
+  }
+
 }

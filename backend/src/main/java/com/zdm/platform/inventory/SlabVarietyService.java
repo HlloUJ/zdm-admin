@@ -65,11 +65,7 @@ public class SlabVarietyService extends CreatorAwareService<SlabVarietyMapper, S
     if (existing == null) {
       return false;
     }
-    Long referenceCount = slabInventoryMapper.selectCount(
-        Wrappers.<SlabInventory>lambdaQuery().eq(SlabInventory::getVarietyId, id));
-    if (referenceCount > 0) {
-      throw new IllegalArgumentException(REFERENCED_MESSAGE);
-    }
+    checkDelete(id);
 
     try {
       return removeById(id);
@@ -98,6 +94,16 @@ public class SlabVarietyService extends CreatorAwareService<SlabVarietyMapper, S
           identityProvider.require(), entity.getCreatedByAccountId());
     }
     return entity;
+  }
+
+  public void checkDelete(Long id) {
+    if (getById(id) == null) { throw new IllegalArgumentException("记录不存在或已删除"); }
+    Long referenceCount = slabInventoryMapper.selectCount(
+        Wrappers.<SlabInventory>lambdaQuery().eq(SlabInventory::getVarietyId, id));
+    if (referenceCount > 0) {
+      throw new IllegalArgumentException(REFERENCED_MESSAGE);
+    }
+
   }
 
 }

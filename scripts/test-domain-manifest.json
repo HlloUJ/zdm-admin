@@ -43,7 +43,7 @@
       "dynamicImports": 0
     },
     "ci/e2e-shards.json": {
-      "digest": "2c3874fd4c298dc6e10bfceaca5f22dd2f76fb81cafb61e171fe1468cc3b6a0b",
+      "digest": "9bc162d7fc2c7371a8a995eac726b97ace33fd138e0bbdbcf5916821eb1926dc",
       "imports": [],
       "dynamicImports": 0
     },
@@ -209,7 +209,7 @@
       "dynamicImports": 4
     },
     "scripts/business-regression-contracts.json": {
-      "digest": "0eea96481403310dd7d645b357cafb0c112fbace55fea048f406f34cb169bdeb",
+      "digest": "734dd9132bdddf7a135a2f280b21638e7917aa7e9cab99e92d6f6eedebbca486",
       "imports": [],
       "dynamicImports": 0
     },
@@ -698,7 +698,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "55bb34b93fbcb8703f0a97453c0dd1e309b33e22f099070720c294e1476376a1",
+      "digest": "b8a7e2ed05107b2704c5a97643eaac3cd523841d0b0bb74b56e72978d8f99d34",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -800,6 +800,7 @@
         "scripts/new-module.mjs",
         "scripts/new.test.mjs",
         "scripts/node-source-evidence-reporter.mjs",
+        "scripts/operation-feedback-policy.mjs",
         "scripts/playwright-evidence-reporter.mjs",
         "scripts/preview-probe.test.mjs",
         "scripts/remaining.test.mjs",
@@ -895,8 +896,8 @@
       "dynamicImports": 0
     },
     "scripts/feedback-foundation.test.mjs": {
-      "digest": "1f2ef424f1f40a1bab3de86dbb9ea63c8dda690f33e7a0b7377413313e1a44eb",
-      "imports": [],
+      "digest": "e26447479ac231d741355fe1422896ae49c045bb950f410ec42c6eee85f3a66f",
+      "imports": ["scripts/operation-feedback-policy.mjs"],
       "dynamicImports": 0
     },
     "scripts/frontend-test-evidence.mjs": {
@@ -946,7 +947,7 @@
       "dynamicImports": 0
     },
     "scripts/list-selection-policy.mjs": {
-      "digest": "204de0a5a72d031aff33ecb8c059c5e2fa8d8f7cf37f8e9e825651bacf91e6fb",
+      "digest": "807295839b2dae24e4f342283bffa2ae4a7ae794064cbedebb745c8a2a43e1e8",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1008,6 +1009,11 @@
     },
     "scripts/node-test-evidence.mjs": {
       "digest": "6e962c5fed6489d5556a05f88de087e61dc97261440261dc439db9024145589f",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/operation-feedback-policy.mjs": {
+      "digest": "847c0bc22195d7728dab2f793929fb1fcf553888ff6bfa7806c5e070fefac91c",
       "imports": [],
       "dynamicImports": 0
     },

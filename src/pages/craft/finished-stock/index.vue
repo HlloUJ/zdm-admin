@@ -181,6 +181,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
       object-type="成品工艺"
@@ -221,6 +222,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import DecimalInput from '@/components/DecimalInput.vue';
 import { numericError } from '@/utils/numericInput';
 import { AdminDialog } from '@/components/foundation';
@@ -597,7 +600,7 @@ const ensureCurrentPage = () => {
   }
 };
 
-const handleConfirm = async () => {
+const performHandleConfirm = async () => {
   if (!confirmState.row) return;
   const target = confirmState.row;
   const action = confirmState.type === 'delete' ? '删除' : confirmState.type === 'enable' ? '启用' : '停用';
@@ -628,6 +631,7 @@ const handleConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const handleConfirm = () => operationPreflight.execute(performHandleConfirm);
 
 onMounted(loadCrafts);
 </script>

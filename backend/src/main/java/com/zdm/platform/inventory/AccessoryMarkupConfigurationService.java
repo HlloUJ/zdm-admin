@@ -130,11 +130,7 @@ public class AccessoryMarkupConfigurationService {
 
   @Transactional
   public void deleteConfiguration(Long id) {
-    requirePlatformScope();
-    requireConfiguration(id);
-    if (priceSyncService.countAutoReferences(id) > 0) {
-      throw new IllegalArgumentException("该价格配置正在被配件价格使用，不能删除，请先停用");
-    }
+    checkDelete(id);
     mapper.deleteById(id);
   }
 
@@ -185,4 +181,12 @@ public class AccessoryMarkupConfigurationService {
         ? 1
         : lastConfiguration.getSortOrder() + 1;
   }
+  public void checkDelete(Long id) {
+    requirePlatformScope();
+    requireConfiguration(id);
+    if (priceSyncService.countAutoReferences(id) > 0) {
+      throw new IllegalArgumentException("该价格配置正在被配件价格使用，不能删除，请先停用");
+    }
+  }
+
 }

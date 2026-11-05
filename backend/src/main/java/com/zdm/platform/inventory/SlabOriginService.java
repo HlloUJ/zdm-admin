@@ -63,11 +63,8 @@ public class SlabOriginService extends CreatorAwareService<SlabOriginMapper, Sla
     if (existing == null) {
       return false;
     }
-    Long referenceCount = slabInventoryMapper.selectCount(
-        Wrappers.<SlabInventory>lambdaQuery().eq(SlabInventory::getOriginId, id));
-    if (referenceCount > 0) {
-      throw new IllegalArgumentException(REFERENCED_MESSAGE);
-    }
+    checkDelete(id);
+
     try {
       return removeById(id);
     } catch (DataIntegrityViolationException exception) {
@@ -95,6 +92,15 @@ public class SlabOriginService extends CreatorAwareService<SlabOriginMapper, Sla
           identityProvider.require(), entity.getCreatedByAccountId());
     }
     return entity;
+  }
+
+  public void checkDelete(Long id) {
+    if (getById(id) == null) { throw new IllegalArgumentException("记录不存在或已删除"); }
+    Long referenceCount = slabInventoryMapper.selectCount(
+        Wrappers.<SlabInventory>lambdaQuery().eq(SlabInventory::getOriginId, id));
+    if (referenceCount > 0) {
+      throw new IllegalArgumentException(REFERENCED_MESSAGE);
+    }
   }
 
 }

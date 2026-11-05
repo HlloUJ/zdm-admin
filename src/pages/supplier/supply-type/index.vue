@@ -70,7 +70,7 @@
                     @click="openStatusDialog(row)"
                     >{{ row.status === 'enabled' ? '停用' : '启用' }}</t-link
                   >
-                  <t-link v-if="can('delete')" :theme="buttonTheme('delete')" hover="color" @click="deleting = row"
+                  <t-link v-if="can('delete')" :theme="buttonTheme('delete')" hover="color" @click="prepareDelete(row)"
                     >删除</t-link
                   >
                 </t-space></template
@@ -137,6 +137,8 @@
   </div>
 </template>
 <script setup lang="ts">
+import { useOperationPreflight, blockOperation, checkOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -277,6 +279,16 @@ const confirmStatusChange = async () => {
   } finally {
     changingStatus.value = false;
   }
+};
+const prepareDelete = async (row: SupplierSupplyTypeRecord) => {
+  if (
+    !(await operationPreflight.run(async () => {
+      if (row.referenced) blockOperation('该供货类型已被供应商使用，不能删除');
+      await checkOperation('supplier-supply-types', row.id);
+    }))
+  )
+    return;
+  deleting.value = row;
 };
 const remove = async () => {
   if (!deleting.value || saving.value) return;

@@ -73,11 +73,7 @@ public class SupplierSupplyTypeService {
 
   @Transactional
   public void deleteType(Long id) {
-    requirePlatformScope();
-    SupplierSupplyType existing = requireType(id);
-    if (mapper.countSupplierReferences(id) > 0) {
-      throw new IllegalArgumentException("供货类型“" + existing.getName() + "”已被供应商使用，无法删除");
-    }
+    checkDelete(id);
     mapper.deleteById(id);
   }
 
@@ -125,4 +121,12 @@ public class SupplierSupplyTypeService {
     }
     return value.trim();
   }
+  public void checkDelete(Long id) {
+    requirePlatformScope();
+    SupplierSupplyType existing = requireType(id);
+    if (mapper.countSupplierReferences(id) > 0) {
+      throw new IllegalArgumentException("供货类型“" + existing.getName() + "”已被供应商使用，无法删除");
+    }
+  }
+
 }

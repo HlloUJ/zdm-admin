@@ -181,6 +181,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
+      :confirm-loading="operationPreflight.executing.value"
       function="delete"
       action="删除"
       object-type="价格配置"
@@ -191,6 +192,7 @@
     />
     <AdminConfirmDialog
       v-model:visible="statusConfirmVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="statusConfirmRow?.status === 'enabled' ? 'disable' : 'enable'"
       :action="statusConfirmRow?.status === 'enabled' ? '停用' : '启用'"
       :object-type="`${commodityLabel}价格配置`"
@@ -203,6 +205,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, checkOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => activeType.value);
 import { formConfirmationText } from '@/components/foundation/actions/confirmation';
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
@@ -510,7 +514,17 @@ const submitForm = async () => {
 
 const confirmVisible = ref(false);
 const confirmRow = ref<MarkupConfigurationRecord | null>(null);
-const openConfirm = (row: MarkupConfigurationRecord) => {
+const openConfirm = async (row: MarkupConfigurationRecord) => {
+  if (
+    activeType.value !== 'slab' &&
+    !(await operationPreflight.run(() =>
+      checkOperation(
+        activeType.value === 'accessory' ? 'accessory-markup-configurations' : 'finished-markup-configurations',
+        row.id,
+      ),
+    ))
+  )
+    return;
   if (activeType.value === 'slab') {
     const referenceCount = (row as SlabMarkupConfigurationRecord).autoReferenceCount ?? 0;
     if (referenceCount > 0) {
@@ -521,7 +535,7 @@ const openConfirm = (row: MarkupConfigurationRecord) => {
   confirmRow.value = row;
   confirmVisible.value = true;
 };
-const submitConfirm = async () => {
+const performSubmitConfirm = async () => {
   if (!confirmRow.value) return;
   const row = confirmRow.value;
   try {
@@ -534,6 +548,7 @@ const submitConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const submitConfirm = () => operationPreflight.execute(performSubmitConfirm);
 
 const statusConfirmVisible = ref(false);
 const statusConfirmRow = ref<MarkupConfigurationRecord | null>(null);
@@ -541,7 +556,7 @@ const openStatusConfirm = (row: MarkupConfigurationRecord) => {
   statusConfirmRow.value = row;
   statusConfirmVisible.value = true;
 };
-const submitStatusConfirm = async () => {
+const performSubmitStatusConfirm = async () => {
   if (!statusConfirmRow.value) return;
   const row = statusConfirmRow.value;
   const status = row.status === 'enabled' ? 'disabled' : 'enabled';
@@ -556,6 +571,7 @@ const submitStatusConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '状态更新失败');
   }
 };
+const submitStatusConfirm = () => operationPreflight.execute(performSubmitStatusConfirm);
 
 watch(activeType, () => {
   handleReset();

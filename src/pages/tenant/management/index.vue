@@ -178,6 +178,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmState.type === 'archive' ? '归档' : '恢复运营'"
       object-type="租户"
@@ -229,6 +230,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, blockOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => activeTab.value);
 import {
   formConfirmation,
   dialogButtonProps,
@@ -578,16 +581,18 @@ const openStatusConfirm = (row: TenantItem) => {
 };
 
 const openPurgeDialog = async (row: TenantItem) => {
+  let preview: Awaited<ReturnType<typeof getTenantPurgePreview>>;
+  if (
+    !(await operationPreflight.run(async () => {
+      preview = await getTenantPurgePreview(row.id);
+      if (!preview.eligible) blockOperation(preview.blockers.join('；') || '该租户当前不符合彻底删除条件');
+    }))
+  )
+    return;
   purgeTarget.value = row;
-  purgePreview.value = null;
+  purgePreview.value = preview!;
   purgeConfirmationName.value = '';
-  try {
-    purgePreview.value = await getTenantPurgePreview(row.id);
-    purgeDialogVisible.value = true;
-  } catch (error) {
-    purgeTarget.value = null;
-    adminFeedback.actionError({ action: '加载删除预检', target: row.tenantName, error });
-  }
+  purgeDialogVisible.value = true;
 };
 
 const closePurgeDialog = () => {
@@ -620,7 +625,7 @@ const closeConfirmDialog = () => {
   confirmState.row = null;
 };
 
-const handleConfirm = async () => {
+const performHandleConfirm = async () => {
   if (!confirmState.row) return;
   const target = confirmState.row;
   const action = confirmState.type === 'restore' ? '恢复运营' : '归档';
@@ -635,6 +640,7 @@ const handleConfirm = async () => {
     adminFeedback.actionError({ action, target: target.tenantName, error });
   }
 };
+const handleConfirm = () => operationPreflight.execute(performHandleConfirm);
 
 watch(activeTab, () => {
   pagination.current = 1;

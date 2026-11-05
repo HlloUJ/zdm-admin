@@ -237,4 +237,13 @@ public class StoreFinishedProductController {
       default -> status;
     };
   }
+  @GetMapping("/{id}/shelf-check")
+  public ApiResponse<Boolean> checkShelf(@PathVariable Long id) {
+    guard.requireDataPermission();
+    var product = service.detail(id);
+    requireTransition(product, "selling", false);
+    service.checkShelf(id);
+    return ApiResponse.ok(true);
+  }
+
 }

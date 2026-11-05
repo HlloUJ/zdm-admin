@@ -167,6 +167,7 @@
 
     <AdminConfirmDialog
       v-model:visible="colorConfirmVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', colorConfirmType)"
       :action="colorConfirmType === 'delete' ? '删除' : colorConfirmType === 'disable' ? '停用' : '启用'"
       object-type="色系"
@@ -178,6 +179,7 @@
 
     <AdminConfirmDialog
       v-model:visible="categoryDeleteVisible"
+      :confirm-loading="operationPreflight.executing.value"
       function="delete"
       action="删除"
       object-type="色系分类"
@@ -192,6 +194,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, checkOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => categoryManagementVisible.value);
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -388,7 +392,7 @@ const openColorConfirm = (row: ColorItem, type: ConfirmType) => {
   colorConfirmType.value = type;
   colorConfirmVisible.value = true;
 };
-const submitColorConfirm = async () => {
+const performSubmitColorConfirm = async () => {
   if (!colorConfirmRow.value) return;
   const target = colorConfirmRow.value;
   const action = colorConfirmType.value === 'delete' ? '删除' : colorConfirmType.value === 'enable' ? '启用' : '停用';
@@ -403,6 +407,7 @@ const submitColorConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const submitColorConfirm = () => operationPreflight.execute(performSubmitColorConfirm);
 
 const categoryManagementVisible = ref(false);
 const openCategoryManagement = async () => {
@@ -442,11 +447,12 @@ const submitCategory = async () => {
 };
 const categoryDeleteVisible = ref(false);
 const categoryDeleteRow = ref<SlabColorCategoryRecord | null>(null);
-const openCategoryDelete = (row: SlabColorCategoryRecord) => {
+const openCategoryDelete = async (row: SlabColorCategoryRecord) => {
+  if (!(await operationPreflight.run(() => checkOperation('slab-colors/categories', row.id)))) return;
   categoryDeleteRow.value = row;
   categoryDeleteVisible.value = true;
 };
-const submitCategoryDelete = async () => {
+const performSubmitCategoryDelete = async () => {
   if (!categoryDeleteRow.value) return;
   const target = categoryDeleteRow.value;
   try {
@@ -458,6 +464,7 @@ const submitCategoryDelete = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const submitCategoryDelete = () => operationPreflight.execute(performSubmitCategoryDelete);
 
 onMounted(async () => {
   await Promise.all([loadColors(), loadCategories()]);

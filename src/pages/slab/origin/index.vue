@@ -111,6 +111,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
       object-type="产地"
@@ -125,6 +126,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, checkOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -313,7 +316,8 @@ const openStatusConfirm = (row: OriginItem) => {
   confirmState.content = `是否${enabled ? '停用' : '启用'}产地“${row.name}”？`;
   confirmDialogVisible.value = true;
 };
-const openDeleteConfirm = (row: OriginItem) => {
+const openDeleteConfirm = async (row: OriginItem) => {
+  if (!(await operationPreflight.run(() => checkOperation('slab-origins', row.id)))) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除产地“${row.name}”？`;
@@ -323,7 +327,7 @@ const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
   confirmState.row = null;
 };
-const handleConfirm = async () => {
+const performHandleConfirm = async () => {
   if (!confirmState.row) return;
   const target = confirmState.row;
   const action = confirmState.type === 'delete' ? '删除' : confirmState.type === 'enable' ? '启用' : '停用';
@@ -345,6 +349,7 @@ const handleConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const handleConfirm = () => operationPreflight.execute(performHandleConfirm);
 
 onMounted(loadOrigins);
 </script>

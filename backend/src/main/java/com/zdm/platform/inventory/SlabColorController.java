@@ -81,4 +81,11 @@ public class SlabColorController {
     permissionGuard.requirePermission(PREFIX + ".manage-categories");
     return ApiResponse.ok(service.deleteCategory(id));
   }
+  @GetMapping("/categories/{id}/delete-check")
+  public ApiResponse<Boolean> checkCategoryDelete(@PathVariable Long id) {
+    permissionGuard.requirePermission(PREFIX + ".manage-categories");
+    service.checkCategoryDelete(id);
+    return ApiResponse.ok(true);
+  }
+
 }

@@ -116,6 +116,7 @@
     </AdminDialog>
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmType)"
       :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
       object-type="门店级别"
@@ -128,6 +129,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -295,22 +298,18 @@ const confirmVisible = ref(false);
 const confirmType = ref<ConfirmType>('disable');
 const confirmRow = ref<LevelItem | null>(null);
 const openConfirm = async (row: LevelItem, type: ConfirmType) => {
-  if (type === 'disable' || type === 'delete') {
-    try {
+  if (
+    !(await operationPreflight.run(async () => {
       if (type === 'disable') await previewStoreLevelDisable(row.id);
-      else await previewStoreLevelDelete(row.id);
-    } catch (error) {
-      adminFeedback.error(
-        error instanceof Error ? error.message : type === 'disable' ? '停用条件校验失败' : '删除条件校验失败',
-      );
-      return;
-    }
-  }
+      else if (type === 'delete') await previewStoreLevelDelete(row.id);
+    }))
+  )
+    return;
   confirmRow.value = row;
   confirmType.value = type;
   confirmVisible.value = true;
 };
-const submitConfirm = async () => {
+const performSubmitConfirm = async () => {
   if (!confirmRow.value) return;
   const target = confirmRow.value;
   const targetName = target.name;
@@ -326,6 +325,7 @@ const submitConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const submitConfirm = () => operationPreflight.execute(performSubmitConfirm);
 onMounted(loadLevels);
 </script>
 

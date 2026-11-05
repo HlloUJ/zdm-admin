@@ -79,4 +79,11 @@ public class AccessoryMarkupConfigurationController {
   }
 
   private String permission(String action) { return PREFIX + "." + action; }
+  @GetMapping("/{id}/delete-check")
+  public ApiResponse<Boolean> checkDelete(@PathVariable Long id) {
+    permissionGuard.requirePermission(permission("delete"));
+    service.checkDelete(id);
+    return ApiResponse.ok(true);
+  }
+
 }

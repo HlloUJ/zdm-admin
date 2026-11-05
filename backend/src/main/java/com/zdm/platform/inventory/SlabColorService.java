@@ -99,10 +99,7 @@ public class SlabColorService extends CreatorAwareService<SlabColorMapper, SlabC
 
   @Transactional
   public boolean deleteCategory(Long id) {
-    requireCategory(id);
-    if (lambdaQuery().eq(SlabColor::getCategoryId, id).count() > 0) {
-      throw new IllegalArgumentException("该色系分类已被色系引用，无法删除");
-    }
+    checkCategoryDelete(id);
     return categoryMapper.deleteById(id) > 0;
   }
 
@@ -161,6 +158,13 @@ public class SlabColorService extends CreatorAwareService<SlabColorMapper, SlabC
           identityProvider.require(), entity.getCreatedByAccountId());
     }
     return entity;
+  }
+
+  public void checkCategoryDelete(Long id) {
+    requireCategory(id);
+    if (lambdaQuery().eq(SlabColor::getCategoryId, id).count() > 0) {
+      throw new IllegalArgumentException("该色系分类已被色系引用，无法删除");
+    }
   }
 
 }

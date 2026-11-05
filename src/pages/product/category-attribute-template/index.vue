@@ -332,6 +332,7 @@
       />
     </AdminDialog>
     <AdminConfirmDialog
+      :confirm-loading="operationPreflight.executing.value"
       function="delete"
       action="删除"
       :visible="!!discardTarget"
@@ -412,6 +413,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import { operationConfirmation, formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -810,7 +813,7 @@ const discardTarget = ref<TemplateVersion>();
 const discardCategoryName = computed(
   () => categories.value.find((c) => c.id === discardTarget.value?.categoryId)?.name || '',
 );
-async function discardDraft() {
+async function performDiscardDraft() {
   const target = discardTarget.value;
   if (!target || busy.value || loading.value || !can('create') || !isDraft.value || selectedId.value !== target.id)
     return;
@@ -836,6 +839,7 @@ async function discardDraft() {
     discarding.value = false;
   }
 }
+const discardDraft = () => operationPreflight.execute(performDiscardDraft);
 const publishVisible = ref(false);
 async function preparePublish() {
   if (!(await save())) return;
@@ -852,7 +856,7 @@ async function preparePublish() {
   }
   publishVisible.value = true;
 }
-async function publish() {
+async function performPublish() {
   if (!(await save())) return;
   if (!selected.value) return;
   busy.value = true;
@@ -866,6 +870,7 @@ async function publish() {
     busy.value = false;
   }
 }
+const publish = () => operationPreflight.execute(performPublish);
 const addVisible = ref(false),
   attributeKeyword = ref(''),
   addIds = ref<number[]>([]),

@@ -177,25 +177,20 @@
 
     <AdminConfirmDialog
       v-model:visible="deleteVisible"
+      :confirm-loading="operationPreflight.executing.value"
       function="delete"
       action="删除"
       object-type="分类"
       :object-name="deleteTarget?.name"
-      :mode="deleteBlocked ? 'blocked' : 'confirm'"
+      mode="confirm"
       @confirm="handleDeleteConfirm"
     >
-      <template v-if="deleteTarget?.productCount">
-        分类“{{ deleteTarget.name }}”已关联
-        {{ deleteTarget.productCount }} 个商品，不能删除。请停用该分类，避免新商品继续使用。
-      </template>
-      <template v-else-if="deleteTarget?.children.length">
-        分类“{{ deleteTarget.name }}”包含下级分类，请先删除或转移下级分类。
-      </template>
-      <template v-else>是否删除分类“{{ deleteTarget?.name }}”？删除后不可恢复。</template>
+      是否删除分类“{{ deleteTarget?.name }}”？
     </AdminConfirmDialog>
 
     <AdminConfirmDialog
       v-model:visible="statusConfirmVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="statusTarget?.status === 'enabled' ? 'disable' : 'enable'"
       :action="statusTarget?.status === 'enabled' ? '停用' : '启用'"
       object-type="分类"
@@ -209,6 +204,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, blockOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => activeScope.value);
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -593,7 +590,7 @@ const closeStatusConfirm = () => {
   statusTarget.value = null;
 };
 
-const handleStatusConfirm = async () => {
+const performHandleStatusConfirm = async () => {
   try {
     if (statusTarget.value) await applyStatusChange(statusTarget.value);
     closeStatusConfirm();
@@ -601,6 +598,7 @@ const handleStatusConfirm = async () => {
     showError(error, '分类状态更新失败');
   }
 };
+const handleStatusConfirm = () => operationPreflight.execute(performHandleStatusConfirm);
 
 let dragDestination: { row: CategoryRow; after: boolean } | null = null;
 function rowFromDragElement(element: HTMLElement) {
@@ -661,12 +659,19 @@ async function handleCategoryDragSort(context: { current: CategoryRow }) {
   }
 }
 
-const openDeleteDialog = (node: CategoryNode) => {
+const openDeleteDialog = async (node: CategoryNode) => {
+  if (
+    !(await operationPreflight.run(async () => {
+      if (node.productCount) blockOperation('该分类已关联商品，不能删除，请先停用该分类');
+      if (node.children.length) blockOperation('该分类包含下级分类，请先删除或转移下级分类');
+    }))
+  )
+    return;
   deleteTarget.value = node;
   deleteVisible.value = true;
 };
 
-const handleDeleteConfirm = async () => {
+const performHandleDeleteConfirm = async () => {
   if (!deleteTarget.value) return;
   if (deleteBlocked.value) {
     deleteVisible.value = false;
@@ -685,6 +690,7 @@ const handleDeleteConfirm = async () => {
     return;
   }
 };
+const handleDeleteConfirm = () => operationPreflight.execute(performHandleDeleteConfirm);
 
 watch(
   [activeScope, scopeTabs, loginUser],

@@ -65,4 +65,11 @@ public class SupplierSupplyTypeController {
     service.deleteType(id);
     return ApiResponse.ok(true);
   }
+  @GetMapping("/{id}/delete-check")
+  public ApiResponse<Boolean> checkDelete(@PathVariable Long id) {
+    permissionGuard.requirePermission(PREFIX + ".delete");
+    service.checkDelete(id);
+    return ApiResponse.ok(true);
+  }
+
 }

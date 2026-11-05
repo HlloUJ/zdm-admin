@@ -107,4 +107,12 @@ public class ProductCategoryController extends AdminCrudController<ProductCatego
     }
     return PERMISSION_PREFIX + "." + scope;
   }
+  @GetMapping("/{id}/delete-check")
+  public ApiResponse<Boolean> checkDelete(@PathVariable Long id) {
+    ProductCategory category = requireCategory(id);
+    requireCategoryPermission(category.getScope(), "delete");
+    service.checkDelete(id);
+    return ApiResponse.ok(true);
+  }
+
 }

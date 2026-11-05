@@ -263,6 +263,11 @@
       "file": "list-batch-selection.spec.ts",
       "shard": 2,
       "estimatedMs": 29700
+    },
+    {
+      "file": "operation-preflight.spec.ts",
+      "shard": 1,
+      "estimatedMs": 7500
     }
   ]
 }
