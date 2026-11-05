@@ -5,6 +5,10 @@ description: 为装点猫管理后台新增页面、结构性改版、列表、�
 
 # 官方 UI 整页复用
 
+## 效果图模式优先路由
+
+收到“帮我出一份效果图”或明确同义请求，或继续该任务的选版实施时，先读取 [效果图设计与同源开发工作流](../../../docs/ui/effect-design-workflow.md)，使用 `zdm-ui-effect-design`。默认五方案、仅轻量展示、选定后复用源代码。该模式允许必要定制布局，不强制整页套用下面的模板结构；基础组件外观、专项规范、业务保护和验证仍保留。普通“UI 设计”“页面设计方案”不自动进入此模式。未触发时继续下述官方整页复用流程。
+
 1. 读取项目 `docs/ui/standard.md` 与 `docs/ui/official-sources.json`，选择登记入口。新增普通列表查询区必须同时读取 `docs/ui/query-standard.md`，直接使用 `AdminListPage` 默认 `adaptive-grid`；不再重新解释列数和间距，不选择旧布局，不复制页面查询 CSS。官方模板及配套样式是视觉依据，现有业务页、旧 foundation 和外部 zdm-admin-ui 不是替代标准。
 2. 通过 `@/components/foundation` 使用 `AdminListPage`、`AdminFormDialog`、`AdminDetailPage`；业务页只配置字段、列、权限过滤后的操作、数据、事件和单元格，不重复创建通用区域和分页。
 3. 不能表达时先明确官方来源及缺口，组合登记为项目扩展，不称为完整官方模板；不擅自组合、恢复旧尺寸或添加视觉数值。
