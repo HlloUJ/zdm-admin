@@ -379,6 +379,7 @@ import {
   saveDraft,
   copyOrder,
   confirmOrder,
+  checkConfirmOrder,
   recordPayment,
   voidPayment,
   planShipment,
@@ -666,6 +667,14 @@ function openAction(id: string, o?: Order, rid = '') {
       return;
     }
     demand(o, '请选择订单');
+    if (id === 'confirm') {
+      try {
+        checkConfirmOrder(state.value, o);
+      } catch (error) {
+        adminFeedback.warning(error instanceof Error ? error.message : '当前订单不能确认');
+        return;
+      }
+    }
     action.value = id;
     recordId.value = rid;
     actionOrderId.value = o.id;

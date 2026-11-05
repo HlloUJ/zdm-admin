@@ -348,24 +348,7 @@ public class StoreFinishedProductService {
     if ("purged".equals(target)) {
       return purge(store, listing, source);
     }
-    if (invalidated(listing) || !isUsable(source)) {
-      throw new IllegalArgumentException(sourceMessage(listing, source));
-    }
-    if ("selling".equals(current) && stock(source) == 0) {
-      throw new IllegalArgumentException("统一库存已售完，不能改变商品状态");
-    }
-    boolean allowed = switch (current) {
-      case "warehouse" -> List.of("selling", "recycle").contains(target);
-      case "selling" -> List.of("offShelf", "recycle").contains(target);
-      case "recycle" -> "warehouse".equals(target);
-      default -> false;
-    };
-    if (!allowed) {
-      throw new IllegalArgumentException("当前门店商品状态不允许此操作");
-    }
-    if ("selling".equals(target)) {
-      requireReadyToSell(store, id, source);
-    }
+    requireStatusChange(store, id, listing, source, target);
     if ("offShelf".equals(target) && (reason == null || reason.isBlank())) {
       throw new IllegalArgumentException("请选择下架原因");
     }
@@ -795,6 +778,9 @@ public class StoreFinishedProductService {
         sku.costPrice() == null || sku.guidePrice() == null)) {
       throw new IllegalArgumentException("请先完善每条可售规格的成本价和指导价");
     }
+    if (view.storeCategoryId() == null && view.skus().stream().anyMatch(sku -> sku.salePrice() == null || sku.saleCoefficient() == null)) {
+      throw new IllegalArgumentException("请先选择门店分类并完善商品售价后再上架");
+    }
     salePrices.requireCategory(salePrices.context(store.storeId(), List.of(listingId)), view.storeCategoryId());
     if (view.skus().stream().anyMatch(sku -> sku.salePrice() == null || sku.saleCoefficient() == null)) {
       throw new IllegalArgumentException("请先完善每条可售规格的商品售价");
@@ -912,4 +898,37 @@ public class StoreFinishedProductService {
     stateActivities.record("store-finished","store",listingId,before,after,store.accountId(),"store",type,WarehouseEntryInformation.changedText(changes.get("下架原因")),WarehouseEntryInformation.changedText(changes.get("详细说明")));
     return logId;
   }
+  @Transactional
+  public void checkShelf(Long id) {
+    var store = scopes.require();
+    var listing = listing(store, id, false);
+    var source = source(number(listing.get("finished_product_id")), true);
+    salePrices.lockCategories(store.storeId());
+    listing = listing(store, id, true);
+    requireStatusChange(store, id, listing, source, "selling");
+  }
+
+  private void requireStatusChange(CityPartnerStoreScope.Store store, Long id,
+      Map<String, Object> listing, Map<String, Object> source, String target) {
+    String current = (String) listing.get("status");
+    if (invalidated(listing) || !isUsable(source)) {
+      throw new IllegalArgumentException(sourceMessage(listing, source));
+    }
+    if ("selling".equals(current) && stock(source) == 0) {
+      throw new IllegalArgumentException("统一库存已售完，不能改变商品状态");
+    }
+    boolean allowed = switch (current) {
+      case "warehouse" -> List.of("selling", "recycle").contains(target);
+      case "selling" -> List.of("offShelf", "recycle").contains(target);
+      case "recycle" -> "warehouse".equals(target);
+      default -> false;
+    };
+    if (!allowed) {
+      throw new IllegalArgumentException("当前门店商品状态不允许此操作");
+    }
+    if ("selling".equals(target)) {
+      requireReadyToSell(store, id, source);
+    }
+  }
+
 }

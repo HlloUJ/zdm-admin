@@ -346,12 +346,7 @@ export function saveDraft(state: State, o: Order, c: Context, newCustomerReason 
   else state.orders[index] = clone(o);
 }
 export function confirmOrder(state: State, o: Order, c: Context) {
-  demand(o.status === 'pending', '订单已确认');
-  for (const l of o.lines) {
-    const p = state.products.find((p) => p.sku === l.sku);
-    demand(p?.available, `${l.name}已下架，请移除或更换`);
-    demand(p.replenishable || freeStock(state, l.sku) >= l.quantity, `${l.name}可售库存不足，不能确认`);
-  }
+  checkConfirmOrder(state, o);
   const before = o.status;
   o.status = 'confirmed';
   o.confirmedAt = now();
@@ -684,4 +679,13 @@ export function removeDefaultSettings(state: State) {
       order.id = generateOrderNumber(state.orders.map((existing) => existing.id));
   }
   return state;
+}
+
+export function checkConfirmOrder(state: State, o: Order) {
+  demand(o.status === 'pending', '订单已确认');
+  for (const l of o.lines) {
+    const p = state.products.find((p) => p.sku === l.sku);
+    demand(p?.available, `${l.name}已下架，请移除或更换`);
+    demand(p.replenishable || freeStock(state, l.sku) >= l.quantity, `${l.name}可售库存不足，不能确认`);
+  }
 }

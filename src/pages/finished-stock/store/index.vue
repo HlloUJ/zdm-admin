@@ -487,6 +487,13 @@
 </template>
 
 <script setup lang="ts">
+import {
+  useOperationPreflight,
+  OperationCheckHandled,
+  blockOperation,
+  checkOperation,
+} from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => [activeTab.value, commodity.scope]);
 import { useListBatchSelection } from '@/components/foundation';
 import { deleteProductsBatch } from '@/services/productBatchDelete';
 import { canBatchDelete } from '@/services/productBatchPermissions';
@@ -885,10 +892,33 @@ const handleStoreToolbarAction = (action: string) => {
   } else if (action === 'clear') confirm.value = { kind: 'clear', label: '清空回收站' };
 };
 const handleStoreRowButton = async (action: string, row: StoreFinishedProduct) => {
-  if (!['detail', 'purge'].includes(action) && !(await refreshAvailability([row.id]))) return;
+  if (
+    !['detail', 'purge', 'shelf'].includes(action) &&
+    !(await operationPreflight.run(async () => {
+      if (!(await refreshAvailability([row.id]))) throw new OperationCheckHandled();
+      const latest = rows.value.find((item) => item.id === row.id);
+      if (latest && !finishedStockActions[latest.effectiveStatus].some((item) => item.id === action))
+        blockOperation('当前商品状态不允许此操作，请刷新后重试');
+    }))
+  )
+    return;
   if (action === 'detail') void openDetail(row);
   else if (action === 'edit') void router.push({ name: commodity.storeEditRoute, params: { id: row.id } });
-  else prepareAction(action === 'offShelf' ? 'off-shelf' : (action as ActionKind), row);
+  else {
+    if (
+      action === 'shelf' &&
+      !(await operationPreflight.run(async () => {
+        if (!(await refreshAvailability([row.id]))) throw new OperationCheckHandled();
+        await checkOperation(
+          commodity.scope === 'accessory' ? 'store-accessory-products' : 'store-finished-products',
+          row.id,
+          'shelf',
+        );
+      }))
+    )
+      return;
+    prepareAction(action === 'offShelf' ? 'off-shelf' : (action as ActionKind), row);
+  }
 };
 const baseColumns: PrimaryTableCol<TableRowData>[] = [
   { colKey: 'select', title: 'selectTitle', width: 52, align: 'center' },
@@ -970,6 +1000,10 @@ async function refreshAvailability(ids: number[], allowBlocked = false, isCurren
     const missing = ids.some((id) => !latest.some((item) => item.id === id));
     if (missing) adminFeedback.warning('商品不存在或不可访问');
     const blocked = ids.some((id) => latest.some((item) => item.id === id && item.sourceUnavailable));
+    if (blocked && !allowBlocked)
+      adminFeedback.warning(
+        latest.find((item) => ids.includes(item.id) && item.sourceUnavailable)?.sourceMessage || '上游商品不可用',
+      );
     if (blocked && current.value && ids.includes(current.value.id) && editingId.value) void closeEdit();
     return !missing && (!blocked || allowBlocked);
   } catch (error) {

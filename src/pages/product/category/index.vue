@@ -166,28 +166,23 @@
 
     <AdminConfirmDialog
       v-model:visible="deleteVisible"
+      :confirm-loading="operationPreflight.executing.value"
       function="delete"
       action="删除"
       object-type="分类"
       :object-name="deleteTarget?.name"
-      :mode="canDeleteTarget ? 'confirm' : 'blocked'"
+      mode="confirm"
       @confirm="handleDeleteConfirm"
       @close="closeDeleteDialog"
       @opened="restorePageScroll"
       @closed="restorePageScroll"
     >
-      <template v-if="deleteTarget?.productCount"
-        >分类“{{ deleteTarget.name }}”已关联
-        {{ deleteTarget.productCount }} 个商品，不能删除。请停用该分类，避免新商品继续使用。</template
-      >
-      <template v-else-if="deleteTarget?.children.length"
-        >分类“{{ deleteTarget.name }}”包含下级分类，请先删除或转移下级分类。</template
-      >
-      <template v-else>是否删除分类“{{ deleteTarget?.name }}”？</template>
+      是否删除分类“{{ deleteTarget?.name }}”？
     </AdminConfirmDialog>
 
     <AdminConfirmDialog
       v-model:visible="statusConfirmVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="statusTarget?.status === 'enabled' ? 'disable' : 'enable'"
       :action="statusTarget?.status === 'enabled' ? '停用' : '启用'"
       object-type="分类"
@@ -203,6 +198,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, blockOperation, checkOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => activeScope.value);
 import { formConfirmation, dialogButtonProps } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, cancelButtonProps } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -334,9 +331,6 @@ const activeNodes = computed(() => categoryData.value[activeScope.value]);
 const hasSearch = computed(() => Boolean(appliedSearch.keyword.trim() || appliedSearch.status));
 const parentName = computed(() => (formData.parentId ? (findNode(formData.parentId)?.name ?? '') : ''));
 const formLevel = computed(() => (formData.parentId ? getNodeLevel(formData.parentId) + 1 : 1));
-const canDeleteTarget = computed(() =>
-  Boolean(deleteTarget.value && !deleteTarget.value.productCount && !deleteTarget.value.children.length),
-);
 const statusConfirmText = computed(() => {
   if (!statusTarget.value) return '';
   return statusTarget.value.status === 'enabled'
@@ -673,7 +667,7 @@ function updateDescendantStatus(node: CategoryNode, status: Status) {
 function flattenNode(node: CategoryNode): CategoryNode[] {
   return [node, ...node.children.flatMap(flattenNode)];
 }
-async function handleStatusConfirm() {
+async function performHandleStatusConfirm() {
   if (statusTarget.value) {
     const nextStatus: Status = statusTarget.value.status === 'enabled' ? 'disabled' : 'enabled';
     try {
@@ -692,7 +686,16 @@ async function handleStatusConfirm() {
   }
   closeStatusConfirm();
 }
-function openDeleteDialog(node: CategoryNode) {
+const handleStatusConfirm = () => operationPreflight.execute(performHandleStatusConfirm);
+async function openDeleteDialog(node: CategoryNode) {
+  if (
+    !(await operationPreflight.run(async () => {
+      if (node.productCount) blockOperation('该分类已关联商品，不能删除，请先停用该分类');
+      if (node.children.length) blockOperation('该分类包含下级分类，请先删除或转移下级分类');
+      await checkOperation('product-categories', node.id);
+    }))
+  )
+    return;
   deleteTarget.value = node;
   rememberPageScroll();
   deleteVisible.value = true;
@@ -709,7 +712,7 @@ function removeNode(nodes: CategoryNode[], id: number): boolean {
   }
   return nodes.some((node) => removeNode(node.children, id));
 }
-async function handleDeleteConfirm() {
+async function performHandleDeleteConfirm() {
   const node = deleteTarget.value;
   if (!node) return;
   if (node.productCount || node.children.length) {
@@ -726,6 +729,7 @@ async function handleDeleteConfirm() {
     adminFeedback.error(error instanceof Error ? error.message : '删除失败');
   }
 }
+const handleDeleteConfirm = () => operationPreflight.execute(performHandleDeleteConfirm);
 function handleSearch() {
   appliedSearch.keyword = searchForm.keyword;
   appliedSearch.status = searchForm.status;

@@ -1099,6 +1099,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => [activeTab.value, commodity.scope]);
 import { useListBatchSelection } from '@/components/foundation';
 import DecimalInput from '@/components/DecimalInput.vue';
 import { deleteProductsBatch } from '@/services/productBatchDelete';
@@ -1201,6 +1203,7 @@ const {
   createFinishedProduct,
   deleteFinishedProduct,
   editFinishedProduct,
+  checkFinishedProductShelf,
   listFinishedProducts,
   listFinishedProductFormOptions,
   releaseTemporaryFinishedProductMedia,
@@ -2298,6 +2301,7 @@ const handleRowAction = async (action: RowAction, row: StockItem) => {
     return;
   }
   if (action === 'shelf') {
+    if (!(await operationPreflight.run(() => checkFinishedProductShelf(row.id)))) return;
     openConfirm('shelf', row, `是否上架商品“${row.name}”？`);
     return;
   }
@@ -2870,6 +2874,7 @@ const closeReasonDialog = () => {
   reasonDialogVisible.value = false;
 };
 const submitReason = async () => {
+  if (saving.value) return;
   if (!reasonForm.reason) {
     reasonFeedback.reject('reason', reasonForm.reason, '请选择下架原因');
     return rejectFormSubmission(reasonFormRoot.value);

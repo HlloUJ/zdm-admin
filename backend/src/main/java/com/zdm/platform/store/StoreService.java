@@ -112,8 +112,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (existing == null) {
       return null;
     }
-    requireArchived(existing);
-    requireTenantOperating(existing.getTenantId());
+    checkRestore(id);
     existing.setStatus("enabled");
     updateById(existing);
     jdbcTemplate.update("UPDATE stores SET archived_by_tenant = 0 WHERE id = ?", id);
@@ -126,8 +125,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (existing == null) {
       return false;
     }
-    requireArchived(existing);
-    requireStoreSuppliersUnreferenced(id);
+    checkDelete(id);
     List<Long> accountIds = jdbcTemplate.queryForList("""
         SELECT account_id FROM account_identities WHERE store_id=?
         UNION SELECT account_id FROM employees WHERE store_id=? AND account_id IS NOT NULL
@@ -282,6 +280,20 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
           identityProvider.require(), entity.getCreatedByAccountId());
     }
     return entity;
+  }
+
+  public void checkRestore(Long id) {
+    Store store = getById(id);
+    if (store == null) { throw new IllegalArgumentException("门店不存在或已删除"); }
+    requireArchived(store);
+    requireTenantOperating(store.getTenantId());
+  }
+
+  public void checkDelete(Long id) {
+    Store store = getById(id);
+    if (store == null) { throw new IllegalArgumentException("门店不存在或已删除"); }
+    requireArchived(store);
+    requireStoreSuppliersUnreferenced(id);
   }
 
 }

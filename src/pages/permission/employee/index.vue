@@ -241,6 +241,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmType)"
       :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
       object-type="员工"
@@ -255,6 +256,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import {
   operationConfirmation,
   dialogButtonProps,
@@ -822,7 +825,7 @@ const confirmText = computed(() => {
   return `是否删除员工“${name}”？删除后将解除当前平台及组织的员工身份；若无其他身份或组织关系，将释放手机号，历史业务记录保留。`;
 });
 
-const handleConfirmSubmit = async () => {
+const performHandleConfirmSubmit = async () => {
   if (!confirmEmployee.value) return;
 
   try {
@@ -862,6 +865,7 @@ const handleConfirmSubmit = async () => {
   }
   closeConfirmDialog();
 };
+const handleConfirmSubmit = () => operationPreflight.execute(performHandleConfirmSubmit);
 
 const handleManagedClientChange = () => {
   closeInviteDialog();

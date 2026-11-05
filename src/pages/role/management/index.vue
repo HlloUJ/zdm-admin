@@ -106,6 +106,7 @@
 
     <AdminConfirmDialog
       v-model:visible="deleteDialogVisible"
+      :confirm-loading="operationPreflight.executing.value"
       function="delete"
       action="删除"
       object-type="角色"
@@ -139,6 +140,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import {
   formConfirmation,
   dialogButtonProps,
@@ -427,7 +430,7 @@ const closeDeleteDialog = () => {
   deletingRole.value = null;
 };
 
-const handleDeleteConfirm = async () => {
+const performHandleDeleteConfirm = async () => {
   if (!deletingRole.value) return;
   const target = deletingRole.value;
 
@@ -441,6 +444,7 @@ const handleDeleteConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const handleDeleteConfirm = () => operationPreflight.execute(performHandleDeleteConfirm);
 
 const openPermissionDialog = (row: RoleItem) => {
   if (isSuperAdminRole(row)) {

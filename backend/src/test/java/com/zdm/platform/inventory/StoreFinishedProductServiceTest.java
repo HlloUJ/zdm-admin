@@ -35,6 +35,7 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
       .withDatabaseName("store_finished_test").withUsername("zdm_admin").withPassword("zdm_admin_pwd");
   @Autowired private JdbcTemplate jdbc;
   @Autowired private StoreFinishedProductService products;
+  @Autowired private StoreAccessoryProductService accessoryProducts;
   @Autowired private StorePriceRuleService priceRules;
   @Autowired private com.zdm.platform.store.StoreCategoryService storeCategories;
   @Autowired private ProductLifecycleService lifecycle;
@@ -1529,6 +1530,59 @@ class StoreFinishedProductServiceTest extends SpringContainerTestSupport {
     var detail=products.detail(selected.id());
     assertThat(detail.attributeNames()).containsEntry("attribute_889961","绑定版本原名");
     assertThat(detail.attributeDisplayOrder().get("sales")).containsExactly("attribute_889961");
+  }
+
+  @Test
+  @Transactional
+  void shelfPreflightUsesExecutionConditionsWithoutChangingBusinessData() throws Exception {
+    Long id = salePriceFixture();
+    jdbc.update("INSERT INTO finished_product_guide_prices(finished_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES(99601,99601,'规格一',3,10,30),(99601,99602,'规格二',3,20,60)");
+    sqlSession.clearCache();
+    int logs = jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=?", Integer.class, id);
+    jdbc.update("UPDATE store_finished_products SET store_category_id=NULL WHERE id=?", id);
+    jdbc.update("DELETE FROM store_finished_sale_prices WHERE listing_id=?", id);
+    assertThatThrownBy(() -> products.checkShelf(id)).hasMessage("请先选择门店分类并完善商品售价后再上架");
+    identityWithPermissions(99601L, "store.finished-stock-management.warehouse.shelf");
+    mvc.perform(get("/api/admin/store-finished-products/" + id + "/shelf-check"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先选择门店分类并完善商品售价后再上架"));
+    assertThatThrownBy(() -> products.changeStatus(id, "selling", null, null)).hasMessage("请先选择门店分类并完善商品售价后再上架");
+    assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, id)).isEqualTo("warehouse");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=?", Integer.class, id)).isEqualTo(logs);
+    products.saveEdit(id, 99601L, saleInputs("manual"));
+    int configuredLogs = jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=?", Integer.class, id);
+    products.checkShelf(id);
+    assertThat(jdbc.queryForObject("SELECT status FROM store_finished_products WHERE id=?", String.class, id)).isEqualTo("warehouse");
+    assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM store_finished_operation_logs WHERE listing_id=?", Integer.class, id)).isEqualTo(configuredLogs);
+    jdbc.update("UPDATE finished_products SET total_stock=0 WHERE id=99601");
+    sqlSession.clearCache();
+    assertThatThrownBy(() -> products.changeStatus(id, "selling", null, null)).hasMessage("统一库存已售完，不能上架");
+    identityWithPermissions(99601L, "store.finished-stock-management.warehouse.view");
+    mvc.perform(get("/api/admin/store-finished-products/" + id + "/shelf-check"))
+        .andExpect(status().isForbidden());
+    identity(99602L);
+    assertThatThrownBy(() -> products.checkShelf(id)).hasMessage("本门店商品不存在或不可访问");
+  }
+
+  @Test
+  @Transactional
+  void accessoryShelfPreflightPreservesIndependentScopeAndWritesNoStatus() throws Exception {
+    salePriceFixture();
+    jdbc.update("INSERT INTO accessory_products(id,name,total_stock,status,source_status,operations_deleted) VALUES(99601,'配件预检',2,'selling','selling',FALSE)");
+    jdbc.update("INSERT INTO accessory_product_variants(id,accessory_product_id,variant_label,stock,cost_price) VALUES(99601,99601,'配件规格',2,10)");
+    jdbc.update("INSERT INTO accessory_product_prices(accessory_product_id,sku_id,variant_label,store_level_id,store_level_name,price_coefficient,cost_price,price,price_source) VALUES(99601,99601,'配件规格',99601,'售价级别',1,10,100,'manual')");
+    jdbc.update("INSERT INTO accessory_product_guide_prices(accessory_product_id,sku_id,variant_label,price_coefficient,cost_price,price) VALUES(99601,99601,'配件规格',3,10,30)");
+    sqlSession.clearCache();
+    Long listing = accessoryProducts.select(List.of(99601L)).getFirst().id();
+    identityWithPermissions(99601L, "store.accessory-management.warehouse.shelf");
+    mvc.perform(get("/api/admin/store-accessory-products/" + listing + "/shelf-check"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.message").value("请先选择门店分类并完善商品售价后再上架"));
+    assertThatThrownBy(() -> accessoryProducts.changeStatus(listing, "selling", null, null))
+        .hasMessage("请先选择门店分类并完善商品售价后再上架");
+    assertThat(jdbc.queryForObject("SELECT status FROM store_accessory_products WHERE id=?", String.class, listing)).isEqualTo("warehouse");
+    identity(99602L);
+    assertThatThrownBy(() -> accessoryProducts.checkShelf(listing)).hasMessage("本门店商品不存在或不可访问");
   }
 
 }

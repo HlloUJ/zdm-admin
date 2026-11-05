@@ -18,7 +18,7 @@ const reviewedDisplayTables = new Map([
   ],
   [
     'src/pages/finished-stock/supply-chain/index.vue',
-    { columns: 'specColumns', digest: 'e1587ec2d5c209a426f8bfe9c584eb6a421289c0ef3ca40651b955330d06e1da' },
+    { columns: 'specColumns', digest: 'f3785118ed4756a8e61a99f2aa4985d97fea36d0e94ae1e86b26b881ec54837b' },
   ],
   [
     'src/pages/finished-stock/management/components/FinishedSalesLogTable.vue',
@@ -34,7 +34,7 @@ const reviewedDisplayTables = new Map([
   ],
   [
     'src/pages/finished-stock/management/index.vue',
-    { columns: 'specColumns', digest: 'eb08f195b1aa64cd889f68d480b68817e39177546244f73af819fb3cb89e4a34' },
+    { columns: 'specColumns', digest: '0c3bf64f716dbd262e563f84c756cb2f780a5f2b3e19c5c50254140eaf19d429' },
   ],
 ]);
 // These imported factories have fixed, non-selection column schemas. Verify the actual

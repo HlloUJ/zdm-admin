@@ -150,6 +150,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmState.type === 'delete' ? '删除' : confirmState.type === 'disable' ? '停用' : '启用'"
       object-type="供应商"
@@ -164,6 +165,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, checkOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -465,7 +468,8 @@ const openStatusConfirm = (row: SupplierItem) => {
   confirmDialogVisible.value = true;
 };
 
-const openDeleteConfirm = (row: SupplierItem) => {
+const openDeleteConfirm = async (row: SupplierItem) => {
+  if (!(await operationPreflight.run(() => checkOperation('suppliers', row.id)))) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = `是否删除供应商“${row.name}”？`;
@@ -485,7 +489,7 @@ const persistSupplierStatus = async (item: SupplierItem, status: SupplierStatus)
   }
 };
 
-const handleConfirm = async () => {
+const performHandleConfirm = async () => {
   if (!confirmState.row) return;
 
   const targetName = confirmState.row.name;
@@ -511,6 +515,7 @@ const handleConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const handleConfirm = () => operationPreflight.execute(performHandleConfirm);
 
 onMounted(async () => {
   await Promise.all([loadSupplyTypes(), loadSuppliers()]);

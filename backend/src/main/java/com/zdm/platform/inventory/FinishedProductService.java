@@ -295,7 +295,10 @@ public class FinishedProductService extends CreatorAwareService<FinishedProductM
 
   @Transactional
   public void checkOperationsShelf(Long id) {
-    if (lifecycle.isSupplyChain()) { throw new org.springframework.security.access.AccessDeniedException("此操作属于运营管理平台"); }
+    if (lifecycle.isSupplyChain()) {
+      lifecycle.checkSourceTransition(ProductLifecycleService.Kind.FINISHED, id, "selling");
+      return;
+    }
     lifecycle.lock(ProductLifecycleService.Kind.FINISHED, id);
     FinishedProduct product = attachDetails(getById(id));
     lifecycle.requireFinishedOperational(product);

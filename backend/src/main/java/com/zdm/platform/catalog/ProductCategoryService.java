@@ -80,24 +80,7 @@ public class ProductCategoryService extends CreatorAwareService<ProductCategoryM
 
   @Transactional
   public void deleteCategory(Long id) {
-    ProductCategory category = getById(id);
-    if (category == null) {
-      throw new IllegalArgumentException("分类不存在或已被删除");
-    }
-    if (lambdaQuery().eq(ProductCategory::getParentId, id).count() > 0) {
-      throw new IllegalArgumentException("该分类包含下级分类，请先删除或转移下级分类");
-    }
-    Long referencedProductCount = jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM (SELECT category_id FROM finished_products UNION ALL SELECT category_id FROM accessory_products) products WHERE category_id = ?",
-        Long.class,
-        id);
-    if (referencedProductCount != null && referencedProductCount > 0) {
-      throw new IllegalArgumentException("该分类已关联商品，不能删除，请先停用该分类");
-    }
-    if (java.util.Objects.requireNonNull(jdbcTemplate.queryForObject(
-        "SELECT COUNT(*) FROM category_template_versions WHERE category_id = ?", Long.class, id)) > 0) {
-      throw new IllegalArgumentException("该分类已配置发布属性模板，不能删除，请先移除模板配置");
-    }
+    checkDelete(id);
     if (!removeById(id)) {
       throw new IllegalArgumentException("分类删除失败，请刷新后重试");
     }
@@ -180,6 +163,27 @@ public class ProductCategoryService extends CreatorAwareService<ProductCategoryM
           identityProvider.require(), entity.getCreatedByAccountId());
     }
     return entity;
+  }
+
+  public void checkDelete(Long id) {
+    ProductCategory category = getById(id);
+    if (category == null) {
+      throw new IllegalArgumentException("分类不存在或已被删除");
+    }
+    if (lambdaQuery().eq(ProductCategory::getParentId, id).count() > 0) {
+      throw new IllegalArgumentException("该分类包含下级分类，请先删除或转移下级分类");
+    }
+    Long referencedProductCount = jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM (SELECT category_id FROM finished_products UNION ALL SELECT category_id FROM accessory_products) products WHERE category_id = ?",
+        Long.class,
+        id);
+    if (referencedProductCount != null && referencedProductCount > 0) {
+      throw new IllegalArgumentException("该分类已关联商品，不能删除，请先停用该分类");
+    }
+    if (java.util.Objects.requireNonNull(jdbcTemplate.queryForObject(
+        "SELECT COUNT(*) FROM category_template_versions WHERE category_id = ?", Long.class, id)) > 0) {
+      throw new IllegalArgumentException("该分类已配置发布属性模板，不能删除，请先移除模板配置");
+    }
   }
 
 }

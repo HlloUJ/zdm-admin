@@ -105,6 +105,7 @@
     </AdminDialog>
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmType)"
       :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
       object-type="属性"
@@ -119,6 +120,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, blockOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => activeScope.value);
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -342,19 +345,18 @@ const openStatusConfirm = (row: Attribute) => {
 };
 const openDeleteConfirm = async (row: Attribute) => {
   if (!canDeleteAttribute.value) return;
-  try {
-    const preview = await previewProductAttributeDelete(row.id);
-    if (preview.deletionMode === 'blocked') {
-      adminFeedback.error(preview.message || '该属性当前不能删除');
-      return;
-    }
-    confirmTarget.value = row;
-    confirmType.value = 'delete';
-    deletePreview.value = preview;
-    confirmDialogVisible.value = true;
-  } catch (error) {
-    adminFeedback.error(error instanceof Error ? error.message : '删除条件检查失败');
-  }
+  let preview: Awaited<ReturnType<typeof previewProductAttributeDelete>>;
+  if (
+    !(await operationPreflight.run(async () => {
+      preview = await previewProductAttributeDelete(row.id);
+      if (preview.deletionMode === 'blocked') blockOperation(preview.message || '该属性当前不能删除');
+    }))
+  )
+    return;
+  confirmTarget.value = row;
+  confirmType.value = 'delete';
+  deletePreview.value = preview!;
+  confirmDialogVisible.value = true;
 };
 const closeConfirmDialog = () => {
   confirmDialogVisible.value = false;
@@ -371,7 +373,7 @@ const confirmText = computed(() => {
   }
   return `是否${confirmType.value === 'disable' ? '停用' : confirmType.value === 'enable' ? '启用' : '删除'}属性“${name}”？`;
 });
-const handleConfirm = async () => {
+const performHandleConfirm = async () => {
   if (!confirmTarget.value) return;
   const target = confirmTarget.value;
   const action = confirmType.value === 'delete' ? '删除' : confirmType.value === 'enable' ? '启用' : '停用';
@@ -408,6 +410,7 @@ const handleConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const handleConfirm = () => operationPreflight.execute(performHandleConfirm);
 watch(
   () => route.query.scope,
   (scope) => {

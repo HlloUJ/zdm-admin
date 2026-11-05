@@ -137,13 +137,13 @@ public class AccessoryProductController extends AdminCrudController<AccessoryPro
 
   @PostMapping("/{id}/shelf-check")
   public ApiResponse<Boolean> checkShelf(@PathVariable Long id) {
-    if (!"admin".equals(permissionGuard.identity().clientCode())) { throw new org.springframework.security.access.AccessDeniedException("此操作属于运营管理平台"); }
     permissionGuard.requireDataPermission();
     AccessoryProduct product = service.getById(id);
     if (product == null) { throw new IllegalArgumentException("配件不存在或已被删除"); }
     permissionGuard.requireData(product);
-    permissionGuard.requireAnyPermission(permission(scope(product.getStatus()), "shelf"),
-        permission(scope(product.getStatus()), "batch-shelf"));
+    String state = isSupplyChain() ? product.getSourceStatus() : product.getStatus();
+    permissionGuard.requireAnyPermission(permission(scope(state), "shelf"),
+        permission(scope(state), "batch-shelf"));
     service.checkOperationsShelf(id);
     return ApiResponse.ok(true);
   }

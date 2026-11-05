@@ -838,6 +838,13 @@ async function mockCollection(page: Page, pattern: string, records: unknown[]) {
   );
 
   await page.route(`${pattern}/**`, async (route) => {
+    if (
+      route.request().method() === 'GET' &&
+      /\/(delete|restore)-check$/.test(new URL(route.request().url()).pathname)
+    ) {
+      return fulfillJson(route, true);
+    }
+
     if (route.request().method() === 'DELETE') {
       await fulfillJson(route, true);
       return;

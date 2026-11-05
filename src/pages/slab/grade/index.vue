@@ -122,6 +122,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmType)"
       :action="confirmType === 'delete' ? '删除' : confirmType === 'disable' ? '停用' : '启用'"
       object-type="等级"
@@ -134,6 +135,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight();
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -324,7 +327,7 @@ const openConfirm = (row: GradeItem, type: ConfirmType) => {
   confirmType.value = type;
   confirmVisible.value = true;
 };
-const submitConfirm = async () => {
+const performSubmitConfirm = async () => {
   if (!confirmRow.value) return;
   const target = confirmRow.value;
   const targetName = `${target.code} ${target.name}`;
@@ -340,6 +343,7 @@ const submitConfirm = async () => {
     adminFeedback.error(error instanceof Error ? error.message : '操作失败');
   }
 };
+const submitConfirm = () => operationPreflight.execute(performSubmitConfirm);
 
 onMounted(loadGrades);
 </script>

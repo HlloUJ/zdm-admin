@@ -1918,6 +1918,7 @@ const closeReasonDialog = () => {
   reasonDialogVisible.value = false;
 };
 const submitReason = async () => {
+  if (saving.value) return;
   if (!reasonForm.reason) {
     reasonFeedback.reject('reason', reasonForm.reason, '请选择下架原因');
     return rejectFormSubmission(reasonFormRoot.value);

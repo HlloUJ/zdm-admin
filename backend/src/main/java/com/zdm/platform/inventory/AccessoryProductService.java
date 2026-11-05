@@ -295,7 +295,10 @@ public class AccessoryProductService extends CreatorAwareService<AccessoryProduc
 
   @Transactional
   public void checkOperationsShelf(Long id) {
-    if (lifecycle.isSupplyChain()) { throw new org.springframework.security.access.AccessDeniedException("此操作属于运营管理平台"); }
+    if (lifecycle.isSupplyChain()) {
+      lifecycle.checkSourceTransition(AccessoryLifecycleService.Kind.ACCESSORY, id, "selling");
+      return;
+    }
     lifecycle.lock(AccessoryLifecycleService.Kind.ACCESSORY, id);
     AccessoryProduct product = attachDetails(getById(id));
     lifecycle.requireAccessoryOperational(product);

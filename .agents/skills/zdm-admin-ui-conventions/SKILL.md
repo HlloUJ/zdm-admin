@@ -23,3 +23,5 @@ description: 为装点猫管理后台新增页面、结构性改版、列表、�
 表单分区间距、普通字段栅格、批量填写及上传外观遵守 `docs/ui/form-style-standard.md`，统一复用公共 `product-form-layout.css` 与 `AdminMediaUpload`；标题上24／下20px，普通字段24×32px，上传框110×110px。保持原有列数、全部业务事件及其他业务定制，不复制页面皮肤。
 
 列表批量选择默认遵守 `docs/ui/list-standard.md`“列表批量选择”：权限和当前Tab过滤后的操作显式标记`batch: true`，只有存在此类动作才显示列表复选框；无能力或Tab切换时清理失效选择。新模块使用AdminListPage，兼容列表使用useListBatchSelection；已选计数和选择列共用能力判断，不能依据disabled或标签猜测。表单、权限矩阵和业务选择弹窗保留用途，逐项验证无权限、零选中、禁用、权限撤销和Tab切换。
+
+操作入口遵守[操作校验与反馈全局标准](../../../docs/ui/operation-feedback-standard.md)。新增及调整模块显式登记 single／batch-partial／batch-atomic／form 类型及混合分支；单条预检复用公共 useOperationPreflight，阻断用公共警告 Toast，网络异常用错误 Toast；保留部分成功批量的执行与结果弹框。更新操作台账、受影响测试并验证反例守卫，不把源码登记代替业务验证。

@@ -1,0 +1,4085 @@
+{
+  "version": 1,
+  "standard": "docs/ui/operation-feedback-standard.md",
+  "pages": {
+    "src/components/AdminSideMenu.vue": {
+      "scriptDigest": "fc06458b2c5b6881ba27ac90c9812b3695ff362ec6640da6782d37823d39c947",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "aside",
+          "event": "click",
+          "handler": "handleSideNavClick",
+          "type": "view"
+        },
+        {
+          "component": "t-menu",
+          "event": "change",
+          "handler": "handleMenuChange",
+          "type": "form"
+        }
+      ]
+    },
+    "src/components/AdminTopNav.vue": {
+      "scriptDigest": "e5a211d4fd89b447355b7962b042fd15f0dc38d247fdead2af5b62b056aab7ae",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "handleIdentityChange",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleLogout",
+          "type": "view"
+        }
+      ]
+    },
+    "src/components/DecimalInput.vue": {
+      "scriptDigest": "435a352b9d57a532b4598278202ebfbbf4e9f3e41228710720b6bf40da73e290",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "component",
+          "event": "change",
+          "handler": "handleChange",
+          "type": "form"
+        }
+      ]
+    },
+    "src/components/OperationsBatchShelfResult.vue": {
+      "scriptDigest": "bfce1b5ee6b49904ec5dccf98854d62f2a77addd6404660960acd44adc1bef8a",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "emit('update:visible', false)",
+          "type": "view"
+        }
+      ]
+    },
+    "src/components/customer/CustomerFollowupAttachments.vue": {
+      "scriptDigest": "cbe034066111230145c2062d446e2399a59cf7cede4e52c82e9cd4cddeff0178",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "preview(file)",
+          "type": "view"
+        },
+        {
+          "component": "swap-icon",
+          "event": "click",
+          "handler": "chooseReplacement(file, $event.e)",
+          "type": "view"
+        },
+        {
+          "component": "close-icon",
+          "event": "click",
+          "handler": "remove(file)",
+          "type": "view"
+        },
+        {
+          "component": "input",
+          "event": "change",
+          "handler": "replaceSelected",
+          "type": "form"
+        }
+      ]
+    },
+    "src/components/permission/PermissionAssignmentMatrix.vue": {
+      "scriptDigest": "bdcb7d1bb9049688ee9b6597e8bb932453a4f98de94c83600d2e2b5834f1e59b",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "selectAllNodes",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "clearAllNodes",
+          "type": "view"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "activeModuleValue = module.value",
+          "type": "view"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "toggleModule(activeModule, $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "toggleRow(row, $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "togglePermission(row, action.value, $event)",
+          "type": "form"
+        }
+      ]
+    },
+    "src/components/product-logs/ProductLogFieldValue.vue": {
+      "scriptDigest": "fa0db74eeac64f6e1a71a50d6f3ad39cdd7b5d7a16460d7d7cb4b14992df6ba2",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "emit('preview', media)",
+          "type": "view"
+        }
+      ]
+    },
+    "src/components/product-logs/ProductOperationLogTemplate.vue": {
+      "scriptDigest": "4d79ffaf83f9dbbca8f9ebb0f4f9a2c2e0e62a7cbd3874a9860299482031df47",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "emit('filter-change', 'keyword', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "emit('filter-change', 'operationType', String($event || ''))",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "emit('filter-change', 'operatorName', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-date-range-picker",
+          "event": "change",
+          "handler": "emit('filter-change', 'dateRange', Array.isArray($event) ? $event : [])",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('search')",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('reset')",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "emit('open-detail', row.id)",
+          "type": "view"
+        },
+        {
+          "component": "AdminPagination",
+          "event": "change",
+          "handler": "emit('page-change', $event)",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "emit('update:detailVisible', false)",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/craft/finished-stock/index.vue": {
+      "scriptDigest": "16335072f93b057982a55ccc0633b13e3772e8c67250a2b3ce299640a444d0d1",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog",
+          "type": "form"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "openImagePreview(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-partial",
+            "batchPurge": "batch-partial",
+            "batchOffShelf": "batch-partial",
+            "clearRecycle": "batch-partial"
+          }
+        }
+      ]
+    },
+    "src/pages/customer/index.vue": {
+      "scriptDigest": "254249c239aa64c8194c517db1b4eef2ce0be8872d7be306a2be636fbbf87b96",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "AdminListPage",
+          "event": "action",
+          "handler": "handleToolbarAction",
+          "type": "dispatch",
+          "branches": {
+            "assign": "form",
+            "archive": "single",
+            "restore": "single",
+            "purge": "single",
+            "batch-assign": "batch-atomic",
+            "batch-archive": "batch-atomic",
+            "batch-restore": "batch-atomic",
+            "batch-purge": "batch-atomic",
+            "deleteFollowup": "single"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDetail(row.id)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openFollowup(undefined, row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openProfile(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "prepareAction('archive', [row.id], false)",
+          "type": "dispatch",
+          "branches": {
+            "assign": "form",
+            "archive": "single",
+            "restore": "single",
+            "purge": "single",
+            "batch-assign": "batch-atomic",
+            "batch-archive": "batch-atomic",
+            "batch-restore": "batch-atomic",
+            "batch-purge": "batch-atomic"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "prepareAction('restore', [row.id], false)",
+          "type": "dispatch",
+          "branches": {
+            "assign": "form",
+            "archive": "single",
+            "restore": "single",
+            "purge": "single",
+            "batch-assign": "batch-atomic",
+            "batch-archive": "batch-atomic",
+            "batch-restore": "batch-atomic",
+            "batch-purge": "batch-atomic"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "prepareAction('purge', [row.id], false)",
+          "type": "dispatch",
+          "branches": {
+            "assign": "form",
+            "archive": "single",
+            "restore": "single",
+            "purge": "single",
+            "batch-assign": "batch-atomic",
+            "batch-archive": "batch-atomic",
+            "batch-restore": "batch-atomic",
+            "batch-purge": "batch-atomic"
+          }
+        },
+        {
+          "component": "AdminFormDialog",
+          "event": "confirm",
+          "handler": "submitProfile",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openFollowup(record)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "prepareFollowupDelete(record.id)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "previewAttachment(record, attachment)",
+          "type": "view"
+        },
+        {
+          "component": "AdminFormDialog",
+          "event": "confirm",
+          "handler": "submitFollowup",
+          "type": "form"
+        },
+        {
+          "component": "AdminFormDialog",
+          "event": "confirm",
+          "handler": "submitAction",
+          "type": "dispatch",
+          "branches": {
+            "assign": "form",
+            "archive": "single",
+            "restore": "single",
+            "purge": "single",
+            "batch-assign": "batch-atomic",
+            "batch-archive": "batch-atomic",
+            "batch-restore": "batch-atomic",
+            "batch-purge": "batch-atomic",
+            "deleteFollowup": "single"
+          }
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "confirmOperation",
+          "type": "dispatch",
+          "branches": {
+            "assign": "form",
+            "archive": "single",
+            "restore": "single",
+            "purge": "single",
+            "batch-assign": "batch-atomic",
+            "batch-archive": "batch-atomic",
+            "batch-restore": "batch-atomic",
+            "batch-purge": "batch-atomic",
+            "deleteFollowup": "single"
+          }
+        }
+      ]
+    },
+    "src/pages/employee-invite/index.vue": {
+      "scriptDigest": "d6bcf8a3f8bb27ba74ff67531e0a482fd93a4b65834b7874d2d2ae1807136aad",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-form",
+          "event": "submit",
+          "handler": "handlePhoneSubmit",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "sendCode",
+          "type": "form"
+        },
+        {
+          "component": "t-form",
+          "event": "submit",
+          "handler": "handleProfileSubmit",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "step = 1",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/finished-stock/management/components/FinishedCreationSnapshot.vue": {
+      "scriptDigest": "e6d209380bf8660fb4394825ae7cfc269f599d00e4e50e5661ad3654786019c4",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "asset.resource && emit('preview', asset.resource)",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/finished-stock/management/components/HistoricalRichText.vue": {
+      "scriptDigest": "bcfb8681a78665048a25cbfc6fa7fc27c8a9c09e7f4ada665d8a86daba0f7d9d",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "div",
+          "event": "click",
+          "handler": "openPreview",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/finished-stock/management/components/PriceSourceToggle.vue": {
+      "scriptDigest": "006d54384c9b845fda647a542a1169075b6e1d527070468cf925636caf0129b2",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "toggle",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "confirmToggle",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/finished-stock/management/components/ProductDetail.vue": {
+      "scriptDigest": "e5de7fd41b761e855065700c1514cb08547891bdebf69a9378768aaf8a176643",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "emit('preview', { url }, 'image')",
+          "type": "view"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "emit('preview', { url: product.videoUrl }, 'video')",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/finished-stock/management/components/SalesLogFullscreen.vue": {
+      "scriptDigest": "c412d62601c91880ad2f99ec5177704d266fb3ffbc34059aec8883199f08896a",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "toggle",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/finished-stock/management/components/SpecPriceInput.vue": {
+      "scriptDigest": "eb32e4c53d66a8039027c63ac690b803456d2800d120508054fcec8e88b01702",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleChange",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/finished-stock/management/index.vue": {
+      "scriptDigest": "d4f9a10fd4e42c974e428faa3c20a16c89afeeae47e7d8a71a98f61f402982d5",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "scrollToFormSection(section.key)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "operationLogsVisible = true",
+          "type": "view"
+        },
+        {
+          "component": "t-tabs",
+          "event": "change",
+          "handler": "\n                    activeTab = String($event) as StockTab;\n                    handleTabChange();\n                  ",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "updateManagementListFilter('keyword', String($event || ''))",
+          "type": "form"
+        },
+        {
+          "component": "t-cascader-panel",
+          "event": "change",
+          "handler": "handleCategoryFilterChange",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "updateManagementListFilter('supplier', String($event || ''))",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch()",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset()",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleBatchAction(action.id as BatchAction)",
+          "type": "dispatch",
+          "branches": {
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-partial",
+            "batchPurge": "batch-partial",
+            "batchOffShelf": "batch-partial",
+            "clearRecycle": "batch-partial"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "operationLogsVisible = true",
+          "type": "view"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "toggleCurrentPage",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "(checked: boolean) => toggleRow(row.id, checked)",
+          "type": "form"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "openImagePreview(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "handleManagementRowButton(action.id, row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleRowAction('detail', row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleRowAction('purge', row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closeFormPage",
+          "type": "view"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleMarkupCoefficientChange(row, configuration.id, $event)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleMarkupPriceChange(row, configuration.id, $event)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecCoefficientChange(row, 'level1Coefficient', 'level1', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecPriceChange(row, 'level1', 'level1Coefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecCoefficientChange(row, 'level2Coefficient', 'level2', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecPriceChange(row, 'level2', 'level2Coefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecCoefficientChange(row, 'level3Coefficient', 'level3', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecPriceChange(row, 'level3', 'level3Coefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openPriceDrawer",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "submitProductForm",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closeFormPage",
+          "type": "view"
+        },
+        {
+          "component": "t-check-tag",
+          "event": "change",
+          "handler": "clearBatchFilterField(filter.field)",
+          "type": "form"
+        },
+        {
+          "component": "t-check-tag",
+          "event": "change",
+          "handler": "toggleBatchFilterValue(filter.field, value)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleBatchCoefficientChange('guideCoefficient', 'guide', $event)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleBatchPriceChange('guide', 'guideCoefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleBatchMarkupChange(configuration.id, 'coefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleBatchMarkupChange(configuration.id, 'price', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "savePriceDrawer",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closePriceDrawer",
+          "type": "view"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "submitReason",
+          "type": "dispatch",
+          "branches": {
+            "offShelf": "form",
+            "batchOffShelf": "batch-partial"
+          }
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-partial",
+            "batchPurge": "batch-partial",
+            "batchOffShelf": "batch-partial",
+            "clearRecycle": "batch-partial"
+          }
+        }
+      ]
+    },
+    "src/pages/finished-stock/store/StoreFinishedEditor.vue": {
+      "scriptDigest": "0083945228b368ab5dfbfed0fa28042f77cf70e61565a372dc0e0661869cd043",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "scrollToFormSection(section.key)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('cancel')",
+          "type": "view"
+        },
+        {
+          "component": "t-cascader",
+          "event": "change",
+          "handler": "changeCategory",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "editDraftCoefficient(drafts[row.skuId], $event, sku(row.skuId).costPrice)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "editDraftPrice(drafts[row.skuId], $event, sku(row.skuId).costPrice)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openBatchSalePrice",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "save",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('cancel')",
+          "type": "view"
+        },
+        {
+          "component": "t-check-tag",
+          "event": "change",
+          "handler": "batchFilters[filter.key] = []",
+          "type": "form"
+        },
+        {
+          "component": "t-check-tag",
+          "event": "change",
+          "handler": "toggleBatchValue(filter.key, value)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "applyBatchSalePrice",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "batchVisible = false",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/finished-stock/store/index.vue": {
+      "scriptDigest": "40419c508c91e68a585fe75a52fc3ed9cf0e5af09e3de0fb5db1176fe36b5815",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-tabs",
+          "event": "change",
+          "handler": "\n                  activeTab = String($event) as StoreFinishedTab;\n                  resetSelection();\n                ",
+          "type": "form"
+        },
+        {
+          "component": "t-cascader-panel",
+          "event": "change",
+          "handler": "changeListCategory",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "searchList",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "resetFilter",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleStoreToolbarAction(action.id)",
+          "type": "dispatch",
+          "branches": {
+            "select": "form",
+            "batch-shelf": "batch-partial",
+            "batch-delete": "batch-partial",
+            "batch-restore": "batch-partial",
+            "batch-purge": "batch-partial",
+            "clear": "batch-atomic"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openLogs",
+          "type": "view"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "togglePage",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "(checked: boolean) => toggleRow(row.id, checked)",
+          "type": "form"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "previewRowImage(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "handleStoreRowButton(action.id, row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openDetail(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "prepareAction('purge', row)",
+          "type": "single"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openLogs",
+          "type": "view"
+        },
+        {
+          "component": "t-cascader-panel",
+          "event": "change",
+          "handler": "changePoolCategory",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "searchPool",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "resetPoolFilter",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "selectPool",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "togglePoolPage",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "\n                  (checked: boolean) =>\n                    (poolSelected = checked ? [...poolSelected, row.id] : poolSelected.filter((id) => id !== row.id))\n                ",
+          "type": "form"
+        },
+        {
+          "component": "t-image",
+          "event": "click",
+          "handler": "imagePreview = row.imageUrl",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openPoolDetail(row)",
+          "type": "view"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "confirmOffShelf",
+          "type": "dispatch",
+          "branches": {
+            "offShelf": "form",
+            "batchOffShelf": "batch-partial"
+          }
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "runConfirmed",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "batch-shelf": "batch-partial",
+            "batch-delete": "batch-partial",
+            "batch-restore": "batch-partial",
+            "batch-purge": "batch-partial",
+            "clear": "batch-atomic"
+          }
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "logVideoPreview = null",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/finished-stock/store/price-configuration.vue": {
+      "scriptDigest": "d304546132520006888f79f291dcd10da7918bc87fbcb1367fcc872d17f3e231",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-menu",
+          "event": "change",
+          "handler": "selectMenu",
+          "type": "form"
+        },
+        {
+          "component": "t-form",
+          "event": "submit",
+          "handler": "queryCategories",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "queryCategories",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "resetCategories",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDiscount",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openBatch",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "savePrices",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "(checked: boolean) => selectCategory(checked)",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "(checked: boolean) => selectCategory(checked, row.id)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "toggleExpanded(row.id)",
+          "type": "view"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "\n                        (value: string | number | undefined, context: { type?: string }) =>\n                          changeCoefficient(row.id, value, context)\n                      ",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "editDiscount(row.rule)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "confirmDiscountAction(row.rule, 'status')",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "confirmDiscountAction(row.rule, 'delete')",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "saveDiscount",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "applyDiscountAction",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "save",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "batchError = ''",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/finished-stock/supply-chain/index.vue": {
+      "scriptDigest": "edb5d2d428e37fc1bf79612ff39fc0507396933e1b097cd99055067f7a3d6b43",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "scrollToFormSection(section.key)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "operationLogsVisible = true",
+          "type": "view"
+        },
+        {
+          "component": "t-tabs",
+          "event": "change",
+          "handler": "\n                    activeTab = String($event) as StockTab;\n                    handleTabChange();\n                  ",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "updateManagementListFilter('keyword', String($event || ''))",
+          "type": "form"
+        },
+        {
+          "component": "t-cascader-panel",
+          "event": "change",
+          "handler": "handleCategoryFilterChange",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "updateManagementListFilter('supplier', String($event || ''))",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch()",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset()",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleBatchAction(action.id as BatchAction)",
+          "type": "dispatch",
+          "branches": {
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-partial",
+            "batchPurge": "batch-partial",
+            "batchOffShelf": "batch-partial",
+            "clearRecycle": "batch-partial"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "operationLogsVisible = true",
+          "type": "view"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "toggleCurrentPage",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "(checked: boolean) => toggleRow(row.id, checked)",
+          "type": "form"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "openImagePreview(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "handleManagementRowButton(action.id, row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleRowAction('detail', row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleRowAction('purge', row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCategoryDialog",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closeFormPage",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openSpecDialog",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleSpecCostChange(row, $event)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleSpecCoefficientChange(row, 'guideCoefficient', 'guide', $event)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleSpecPriceChange(row, 'guide', 'guideCoefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecCoefficientChange(row, 'level1Coefficient', 'level1', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecPriceChange(row, 'level1', 'level1Coefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecCoefficientChange(row, 'level2Coefficient', 'level2', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecPriceChange(row, 'level2', 'level2Coefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecCoefficientChange(row, 'level3Coefficient', 'level3', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "handleSpecPriceChange(row, 'level3', 'level3Coefficient', $event)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "deleteSpec(row.id)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openPriceDrawer",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openSpecDialog(true)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "submitProductForm",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closeFormPage",
+          "type": "view"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "confirmCategorySwitchWarning",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "confirmCategory",
+          "type": "form"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "selectCategory(columnIndex, item.id)",
+          "type": "view"
+        },
+        {
+          "component": "t-radio-group",
+          "event": "change",
+          "handler": "requestSpecModeChange",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "removeSingleSpec(index)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "addSingleSpec",
+          "type": "form"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "toggleSpecGroup(group)",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "value.value = String($event ?? '')",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "removeSpecValue(group.name, index)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "addSpecValue(group.name)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "resetSpecDialog",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "confirmCreateSpec",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closeSpecDialog",
+          "type": "view"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "confirmSpecModeChange",
+          "type": "form"
+        },
+        {
+          "component": "t-check-tag",
+          "event": "change",
+          "handler": "clearBatchFilterField(filter.field)",
+          "type": "form"
+        },
+        {
+          "component": "t-check-tag",
+          "event": "change",
+          "handler": "toggleBatchFilterValue(filter.field, value)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleBatchCostChange",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "savePriceDrawer",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closePriceDrawer",
+          "type": "view"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "submitReason",
+          "type": "dispatch",
+          "branches": {
+            "offShelf": "form",
+            "batchOffShelf": "batch-partial"
+          }
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-partial",
+            "batchPurge": "batch-partial",
+            "batchOffShelf": "batch-partial",
+            "clearRecycle": "batch-partial"
+          }
+        }
+      ]
+    },
+    "src/pages/login/index.vue": {
+      "scriptDigest": "62bb6a61fa55d8ae8c3779550ebee563db5463bae2bb6e3dfa733d5cbdbfd1d8",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-form",
+          "event": "submit",
+          "handler": "onSubmit",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "sendCode",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/order/prototype/OrderActionDialog.vue": {
+      "scriptDigest": "087ece8eded10b8efe8dacbe4f3ad879467abe1f7a61c523c8dd1b902b055039",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "AdminFormDialog",
+          "event": "confirm",
+          "handler": "submit",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/order/prototype/OrderEditor.vue": {
+      "scriptDigest": "77127c3192d047db7e0ea5006d12361baafea47fd49e36936dd6621e3ec9296c",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "AdminFormDialog",
+          "event": "confirm",
+          "handler": "save",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "lookup",
+          "type": "query"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "selectCustomer(String($event))",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "draft.customerId = ''",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "add",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "changeLine(row, 'quantity', Number($event))",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "changeLine(row, 'billingQuantity', Number($event))",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "changeLine(row, 'price', Number($event))",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "remove(row.sku)",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/order/prototype/SalesOrderList.vue": {
+      "scriptDigest": "f5709e70a1c062796a24fdba6fc4425abc7f8a064bc74e558e1b8e8321fa21ac",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-date-range-picker",
+          "event": "change",
+          "handler": "changeDates",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('action', action.id)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "copyNumber(order.id)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "toggleExpansion(order.id)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('action', 'detail', order)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('action', 'plan', order)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-dropdown",
+          "event": "click",
+          "handler": "(option: { value?: string | number }) => emit('action', String(option.value), order)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "div",
+          "event": "click",
+          "handler": "toggleExpansion(order.id)",
+          "type": "view"
+        },
+        {
+          "component": "span",
+          "event": "click",
+          "handler": "previewProduct(order, row)",
+          "type": "view"
+        },
+        {
+          "component": "t-pagination",
+          "event": "change",
+          "handler": "emit('pageChange', $event)",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/order/prototype/index.vue": {
+      "scriptDigest": "ce5adfecf9fe83bfa88f01b2d9bfd658db17d29d5171288b4d6d160e351562d8",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "selectedId = ''",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openAction(a.id, selected!)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openAction('revoke-plan', selected!, row.id)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openAction('correct-shipment', selected!, row.id)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "proofUrl = row.proof.url",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openAction('correct-payment', selected!, row.id)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openAction('void-payment', selected!, row.id)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "logDetail = row",
+          "type": "view"
+        },
+        {
+          "component": "SalesOrderList",
+          "event": "action",
+          "handler": "openAction",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openAction('receive', findOrder(row.orderId), row.id)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openAction('ship', findOrder(row.orderId), row.id)",
+          "type": "dispatch",
+          "branches": {
+            "detail": "view",
+            "create": "form",
+            "copy": "form",
+            "edit": "form",
+            "confirm": "single",
+            "receipt": "form",
+            "refund": "form",
+            "correct-payment": "form",
+            "void-payment": "form",
+            "plan": "form",
+            "supply": "form",
+            "ship": "form",
+            "receive": "form",
+            "correct-shipment": "form",
+            "cancel": "form",
+            "terms": "form",
+            "revoke-plan": "form"
+          }
+        },
+        {
+          "component": "AdminListPage",
+          "event": "action",
+          "handler": "openSetting()",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openSetting(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openToggleSetting(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "\n                    deletingSetting = row;\n                    deleteSettingVisible = true;\n                  ",
+          "type": "single"
+        },
+        {
+          "component": "AdminFormDialog",
+          "event": "confirm",
+          "handler": "addSetting",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "confirmToggleSetting",
+          "type": "single"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "deleteSetting",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "logDetail = null",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/permission/employee/index.vue": {
+      "scriptDigest": "be6dcd08a6d89476150f32ae3c2173580ed234e2fc98eafa73496ee0ea39d43b",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-tabs",
+          "event": "change",
+          "handler": "handleManagedClientChange",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openInviteDialog",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openProfileDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openPermissionDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "copyInviteLink",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closeInviteDialog",
+          "type": "view"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleProfileSubmit",
+          "type": "form"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handlePermissionSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirmSubmit",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        }
+      ]
+    },
+    "src/pages/permission/terminal-function/index.vue": {
+      "scriptDigest": "e3f27faf0e077fa442f994140e2ae8af77e34e60a754ab0c84b8e9be8e97d2dd",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-tabs",
+          "event": "change",
+          "handler": "handleTerminalChange",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "saveAllocation",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "resetAllocation",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/product/attribute-value/index.vue": {
+      "scriptDigest": "95ccde2b9a30e8dd224e36acd477cbab15c659ef67bb512b9021a5bc4dc045c0",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "search",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "reset",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreate",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "AdminPagination",
+          "event": "change",
+          "handler": "handlePaginationChange",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        }
+      ]
+    },
+    "src/pages/product/attribute/index.vue": {
+      "scriptDigest": "fb6fcdf29b6198303b9fb022c29fb40fa2905ef3df990afee080d82123398ab1",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "search",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "reset",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreate",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "AdminPagination",
+          "event": "change",
+          "handler": "handlePaginationChange",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        }
+      ]
+    },
+    "src/pages/product/category-attribute-template/index.vue": {
+      "scriptDigest": "62574d33e80abe11d26d400dfd942b7205faf9b3d810676774c57ee20ca7c663",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-tabs",
+          "event": "change",
+          "handler": "switchScope",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "exitEdit",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openAdd",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "preparePublish",
+          "type": "single"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "discardTarget = selected",
+          "type": "single"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "createDraft()",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "navigate(() => choose(draft!))",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "historyVisible = true",
+          "type": "view"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "changeAttributeRole(row)",
+          "type": "form"
+        },
+        {
+          "component": "span",
+          "event": "click",
+          "handler": "notifySpecificationLimit(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-switch",
+          "event": "change",
+          "handler": "toggleSpecification(row, Boolean($event))",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openValues(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openValues(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "removeTarget = row",
+          "type": "form"
+        },
+        {
+          "component": "AdminPagination",
+          "event": "change",
+          "handler": "changeAttributePage",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "addAttributes",
+          "type": "form"
+        },
+        {
+          "component": "AdminPagination",
+          "event": "change",
+          "handler": "changeAddPage",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "applyValues",
+          "type": "form"
+        },
+        {
+          "component": "AdminPagination",
+          "event": "change",
+          "handler": "changeValuePage",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "discardDraft",
+          "type": "single"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "removeAttribute",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "publish",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "copyVersion(copyTarget!)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "viewHistoryVersion(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "prepareCopy(row)",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/product/category/index.vue": {
+      "scriptDigest": "df316c72251c9c45d6556a35e230383f874ae9257b0ace6c6c34541952d1c22c",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog()",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "toggleExpanded(row.node)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openCreateDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row.node)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteDialog(row.node)",
+          "type": "single"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleDeleteConfirm",
+          "type": "single"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleStatusConfirm",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/product/markup-configuration/index.vue": {
+      "scriptDigest": "0d06e7c450484bc7aadde67649493df29129b3bd1d8b894d82f820159e9bab1e",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleGuideCoefficientChange",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "saveGuidePriceSetting",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreate",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEdit(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submitForm",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleFormCoefficientChange",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "submitConfirm",
+          "type": "single"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "submitStatusConfirm",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/role/management/index.vue": {
+      "scriptDigest": "84f3dd0120af5def8f1ddcda6d6f0889a3ddd2712fae939609db93c90e71be37",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openPermissionDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleDeleteConfirm",
+          "type": "single"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handlePermissionSave",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/slab/color/index.vue": {
+      "scriptDigest": "b469554033e40f00518313af8b9112ab47d5a67be7df15a446170820ba236605",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreate",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCategoryManagement",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEdit(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openColorConfirm(row, row.status === 'normal' ? 'disable' : 'enable')",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openColorConfirm(row, 'delete')",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submitColor",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "categoryManagementVisible = false",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCategoryForm()",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openCategoryForm(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openCategoryDelete(row)",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submitCategory",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "submitColorConfirm",
+          "type": "single"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "submitCategoryDelete",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/slab/grade/index.vue": {
+      "scriptDigest": "04b49784cf9e95fb513648bdd86bda81cda6a723eb9587c1c58d5c3029105021",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreate",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEdit(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openConfirm(row, row.status === 'normal' ? 'disable' : 'enable')",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openConfirm(row, 'delete')",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submitGrade",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "submitConfirm",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/slab/management/components/SlabProductFormLayout.vue": {
+      "scriptDigest": "902f39be22f3a37fceafdc2d61f864abc5b4dba9286737770da6e53e5544f50d",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "scrollToSection(section.key)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "emit('close')",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('close')",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('confirm')",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "emit('close')",
+          "type": "view"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "emit('confirm')",
+          "type": "form"
+        }
+      ]
+    },
+    "src/pages/slab/management/index.vue": {
+      "scriptDigest": "4baec4a615bc7fcbea942161ecc97e3772d0639513eb388500c7f5544bdffbff",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-tabs",
+          "event": "change",
+          "handler": "handleTabChange",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleBatchAction(button.action)",
+          "type": "dispatch",
+          "branches": {
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-atomic",
+            "batchPurge": "batch-atomic",
+            "batchOffShelf": "batch-atomic",
+            "clearRecycle": "batch-atomic",
+            "publish": "form"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openOperationLogDrawer",
+          "type": "view"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "toggleCurrentPage",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "(checked: boolean) => toggleRow(row.id, checked)",
+          "type": "form"
+        },
+        {
+          "component": "img",
+          "event": "click",
+          "handler": "!sourceBlocked(row) && openTableImage(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openOffShelfHistory(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "handleRowAction(action.action, row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleRowAction('detail', row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleRowAction('purge', row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "SlabProductFormLayout",
+          "event": "confirm",
+          "handler": "handleProductSubmit",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearProductFieldError('variety')",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearProductFieldError('origin')",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearProductFieldError('textureId')",
+          "type": "form"
+        },
+        {
+          "component": "t-cascader",
+          "event": "change",
+          "handler": "clearProductFieldError('colorId')",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearProductFieldError('gradeId')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange('length')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange('width')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange('height')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange('tolerance')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange(item.key)",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearSalesFieldError('supplier')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleStockChange",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "clearSalesFieldError('sku')",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleCostChange",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleGuideRatioChange",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleGuidePriceChange",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handlePartnerRatioChange(item.id)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handlePartnerPriceChange(item.id)",
+          "type": "form"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "openMediaPreview(media)",
+          "type": "view"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "row.afterMedia && openOperationLogMediaPreview(row.afterMedia, row.field)",
+          "type": "view"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleBatchRatioChange(index)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleBatchPriceChange(index)",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "saveBatchPrice",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closePriceDrawer",
+          "type": "view"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirmSubmit",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-atomic",
+            "batchPurge": "batch-atomic",
+            "batchOffShelf": "batch-atomic",
+            "clearRecycle": "batch-atomic",
+            "savePrice": "form"
+          }
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleReasonSubmit",
+          "type": "dispatch",
+          "branches": {
+            "offShelf": "form",
+            "batchOffShelf": "batch-atomic"
+          }
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "closeOffShelfHistory",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/slab/origin/index.vue": {
+      "scriptDigest": "25827624481b30d6b649aebd8b7b276a00d75ead7343591f52cf8d89f8bd38a4",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        }
+      ]
+    },
+    "src/pages/slab/supply-chain/index.vue": {
+      "scriptDigest": "738693490352e98a8e610969a72b23708ca87763c38f419415dacbcf0caaf555",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-tabs",
+          "event": "change",
+          "handler": "handleTabChange",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleBatchAction(button.action)",
+          "type": "dispatch",
+          "branches": {
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-atomic",
+            "batchPurge": "batch-atomic",
+            "batchOffShelf": "batch-atomic",
+            "clearRecycle": "batch-atomic",
+            "publish": "form"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openOperationLogDrawer",
+          "type": "view"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "toggleCurrentPage",
+          "type": "form"
+        },
+        {
+          "component": "t-checkbox",
+          "event": "change",
+          "handler": "(checked: boolean) => toggleRow(row.id, checked)",
+          "type": "form"
+        },
+        {
+          "component": "img",
+          "event": "click",
+          "handler": "!sourceBlocked(row) && openTableImage(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openOffShelfHistory(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "handleRowAction(action.action, row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleRowAction('detail', row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleRowAction('purge', row)",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "offShelf": "form",
+            "edit": "form",
+            "detail": "view"
+          }
+        },
+        {
+          "component": "SlabProductFormLayout",
+          "event": "confirm",
+          "handler": "handleProductSubmit",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearProductFieldError('variety')",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearProductFieldError('origin')",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearProductFieldError('textureId')",
+          "type": "form"
+        },
+        {
+          "component": "t-cascader",
+          "event": "change",
+          "handler": "clearProductFieldError('colorId')",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearProductFieldError('gradeId')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange('length')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange('width')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange('height')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange('tolerance')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleMeasurementChange(item.key)",
+          "type": "form"
+        },
+        {
+          "component": "SpecPriceInput",
+          "event": "change",
+          "handler": "handleCostChange",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "clearSalesFieldError('supplier')",
+          "type": "form"
+        },
+        {
+          "component": "DecimalInput",
+          "event": "change",
+          "handler": "handleStockChange",
+          "type": "form"
+        },
+        {
+          "component": "t-input",
+          "event": "change",
+          "handler": "clearSalesFieldError('sku')",
+          "type": "form"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "openMediaPreview(media)",
+          "type": "view"
+        },
+        {
+          "component": "button",
+          "event": "click",
+          "handler": "row.afterMedia && openOperationLogMediaPreview(row.afterMedia, row.field)",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "saveBatchPrice",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "closePriceDrawer",
+          "type": "view"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirmSubmit",
+          "type": "dispatch",
+          "branches": {
+            "shelf": "single",
+            "delete": "single",
+            "restore": "single",
+            "purge": "single",
+            "batchShelf": "batch-partial",
+            "batchDelete": "batch-partial",
+            "batchRestore": "batch-atomic",
+            "batchPurge": "batch-atomic",
+            "batchOffShelf": "batch-atomic",
+            "clearRecycle": "batch-atomic",
+            "savePrice": "form"
+          }
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleReasonSubmit",
+          "type": "dispatch",
+          "branches": {
+            "offShelf": "form",
+            "batchOffShelf": "batch-atomic"
+          }
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "closeOffShelfHistory",
+          "type": "view"
+        }
+      ]
+    },
+    "src/pages/slab/texture/index.vue": {
+      "scriptDigest": "c503caa81063b6e65f7548ef10d1a3ac239b935745d8d43f686c11fa9a5ee709",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreate",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openAliases(row)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEdit(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openConfirm(row, row.status === 'normal' ? 'disable' : 'enable')",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openConfirm(row, 'delete')",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submitTexture",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "aliasesVisible = false",
+          "type": "view"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openAliasForm()",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openAliasForm(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "removeAlias(row)",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submitAlias",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "submitConfirm",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/slab/variety/index.vue": {
+      "scriptDigest": "3527f278e0e38eeb196c1135f74e6d3a1531e6cebeeed5a008e4f8b677fa2c59",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-pagination",
+          "event": "change",
+          "handler": "handlePaginationChange",
+          "type": "form"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        }
+      ]
+    },
+    "src/pages/store-category/management/index.vue": {
+      "scriptDigest": "aaaa3da6345fe42c8c8b90021d5f764a5b889dbec36288cc5bad069781d8e76a",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog()",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "toggleNode(row.node)",
+          "type": "view"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openCreateDialog(row.node)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row.node)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row.node)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteDialog(row.node)",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleSubmit(true)",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleDeleteConfirm",
+          "type": "single"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleStatusConfirm",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/store-level/management/index.vue": {
+      "scriptDigest": "a68f4f34d59945af9d44165b6eb15929a53f6e69c896a0271a4d575df2a1d899",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreate",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEdit(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openConfirm(row, row.status === 'normal' ? 'disable' : 'enable')",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openConfirm(row, 'delete')",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "submitLevel",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "submitConfirm",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/supplier/management/index.vue": {
+      "scriptDigest": "69d78cea0c9846b773a444785b77813e9af5ff59080c32ec8af0bb04980bb0dd",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        }
+      ]
+    },
+    "src/pages/supplier/supply-type/index.vue": {
+      "scriptDigest": "7c032ac58785edc1b572261e7ce0149868653126e41e45da5375ea38173028c2",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-form",
+          "event": "submit",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openForm()",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openForm(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusDialog(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "prepareDelete(row)",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "save",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "confirmStatusChange",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "remove",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/tenant/management/index.vue": {
+      "scriptDigest": "549328949130913186e073946962613c311cf2c28793dc0727e1f6b4e66f6d7e",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openBusinessDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openStatusConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openPurgeDialog(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "t-dialog",
+          "event": "confirm",
+          "handler": "handleBusinessSubmit",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "toggleBusiness(item.value)",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "handlePurge",
+          "type": "single"
+        }
+      ]
+    },
+    "src/pages/tenant/store/index.vue": {
+      "scriptDigest": "aa7f428ede150aeae71a3c96549aeb04dbc4425263af8a9a8deb1586a9bd00e0",
+      "review": "2026-11-05 approved operation feedback scope; preserve existing conditions and batch strategy",
+      "bindings": [
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleSearch",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "handleReset",
+          "type": "query"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openCreateDialog",
+          "type": "form"
+        },
+        {
+          "component": "t-button",
+          "event": "click",
+          "handler": "openLevelDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openEditDialog(row)",
+          "type": "form"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openArchiveConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openRestoreConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "t-link",
+          "event": "click",
+          "handler": "openDeleteConfirm(row)",
+          "type": "single"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "handleSubmit",
+          "type": "form"
+        },
+        {
+          "component": "t-select",
+          "event": "change",
+          "handler": "handleTenantChange",
+          "type": "form"
+        },
+        {
+          "component": "AdminDialog",
+          "event": "confirm",
+          "handler": "handleLevelSubmit",
+          "type": "form"
+        },
+        {
+          "component": "AdminConfirmDialog",
+          "event": "confirm",
+          "handler": "handleConfirm",
+          "type": "dispatch",
+          "branches": {
+            "status": "single",
+            "delete": "single"
+          }
+        }
+      ]
+    }
+  }
+}

@@ -223,6 +223,7 @@
 
     <AdminConfirmDialog
       v-model:visible="confirmDialogVisible"
+      :confirm-loading="operationPreflight.executing.value"
       :function="buttonFunctionFor('status', confirmState.type)"
       :action="confirmAction"
       object-type="门店"
@@ -237,6 +238,8 @@
 </template>
 
 <script setup lang="ts">
+import { useOperationPreflight, checkOperation } from '@/composables/useOperationPreflight';
+const operationPreflight = useOperationPreflight(() => activeTab.value);
 import { formConfirmation, operationConfirmation } from '@/components/foundation/actions/confirmation';
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { rejectFormSubmission } from '@/utils/submitValidation';
@@ -691,14 +694,16 @@ const openArchiveConfirm = (row: StoreItem) => {
   confirmDialogVisible.value = true;
 };
 
-const openRestoreConfirm = (row: StoreItem) => {
+const openRestoreConfirm = async (row: StoreItem) => {
+  if (!(await operationPreflight.run(() => checkOperation('stores', row.id, 'restore')))) return;
   confirmState.type = 'restore';
   confirmState.row = row;
   confirmState.content = `是否恢复门店“${row.shopName}”运营？`;
   confirmDialogVisible.value = true;
 };
 
-const openDeleteConfirm = (row: StoreItem) => {
+const openDeleteConfirm = async (row: StoreItem) => {
+  if (!(await operationPreflight.run(() => checkOperation('stores', row.id, 'delete')))) return;
   confirmState.type = 'delete';
   confirmState.row = row;
   confirmState.content = '彻底删除后，该门店的经营数据永久不可恢复，请谨慎操作';
@@ -710,7 +715,7 @@ const closeConfirmDialog = () => {
   confirmState.row = null;
 };
 
-const handleConfirm = async () => {
+const performHandleConfirm = async () => {
   if (!confirmState.row) return;
   const target = confirmState.row;
   const action = confirmAction.value;
@@ -738,6 +743,7 @@ const handleConfirm = async () => {
     adminFeedback.actionError({ action, target: target.shopName, error, fallback: '请稍后重试' });
   }
 };
+const handleConfirm = () => operationPreflight.execute(performHandleConfirm);
 
 watch(activeTab, () => {
   pagination.current = 1;

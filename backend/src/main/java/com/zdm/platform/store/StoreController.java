@@ -86,4 +86,20 @@ public class StoreController {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.delete");
     return ApiResponse.ok(storeService.deleteStore(id));
   }
+  @GetMapping("/{id}/restore-check")
+  public ApiResponse<Boolean> checkRestore(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.restore");
+    permissionGuard.requireData(storeService.getById(id));
+    storeService.checkRestore(id);
+    return ApiResponse.ok(true);
+  }
+
+  @GetMapping("/{id}/delete-check")
+  public ApiResponse<Boolean> checkDelete(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.delete");
+    permissionGuard.requireData(storeService.getById(id));
+    storeService.checkDelete(id);
+    return ApiResponse.ok(true);
+  }
+
 }
