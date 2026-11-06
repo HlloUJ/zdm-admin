@@ -22,10 +22,15 @@
         ><DecimalInput v-model="form.amount" placeholder="请输入金额" :min="0" :decimal-places="2" suffix="元"
       /></t-form-item>
       <t-form-item v-if="paymentKind === 'receipt'" label="款项名称" required v-bind="fb.field('nature', form.nature)"
-        ><t-select v-model="form.nature" :options="options('nature')" placeholder="请选择款项名称"
+        ><t-select
+          :value="paymentNameSelection"
+          :options="paymentNameOptions"
+          empty="暂无可用款项名称，请先配置"
+          placeholder="请选择款项名称"
+          @change="selectPaymentName"
       /></t-form-item>
       <t-form-item label="收退款渠道" required v-bind="fb.field('method', form.method)"
-        ><t-select v-model="form.method" :options="options('method')" placeholder="请选择收退款渠道"
+        ><t-select v-model="form.method" :options="paymentChannelOptions" placeholder="请选择收退款渠道"
       /></t-form-item>
       <t-form-item label="实际时间" required v-bind="fb.field('at', form.at)"
         ><t-date-picker v-model="form.at" enable-time-picker format="YYYY-MM-DD HH:mm:ss" placeholder="请选择日期时间"
@@ -203,10 +208,13 @@ import { operationConfirmation } from '@/components/foundation/actions/confirmat
 import { controlPlaceholder } from '@/utils/controlPlaceholder';
 import { useFormFeedback } from '@/utils/formValidation';
 import { rejectFormSubmission } from '@/utils/submitValidation';
+import type { StorePaymentNameOption } from '@/services/storePaymentNames';
 import { clone, money, pricing, remaining, type State, type Order } from './model';
 export interface ActionForm {
   amount: number;
   nature: string;
+  paymentNameId?: string;
+  paymentNameVersion?: number;
   method: string;
   at: string;
   reason: string;
@@ -235,8 +243,9 @@ const props = defineProps<{
   label: string;
   order: Order;
   state: State;
+  paymentNames: StorePaymentNameOption[];
   recordId?: string;
-  execute: (form: ActionForm) => void;
+  execute: (form: ActionForm) => void | Promise<void>;
 }>();
 const visible = defineModel<boolean>('visible', { required: true });
 const form = ref<ActionForm>(initial());
@@ -281,10 +290,32 @@ const paymentKind = computed(() =>
 const needsReason = computed(() =>
   ['cancel', 'terms', 'void-payment', 'revoke-plan', 'correct-shipment'].includes(props.action),
 );
-const options = (group: string) =>
-  group === 'method'
-    ? ['现金', '银行转账', '微信', '支付宝'].map((name) => ({ label: name, value: name }))
-    : props.state.settings.filter((s) => s.group === group && s.enabled).map((s) => ({ label: s.name, value: s.name }));
+const paymentNameSelection = computed(() => {
+  const formName = form.value;
+  if (!formName.nature) return '';
+  return props.paymentNames.some(
+    (entry) =>
+      entry.id === formName.paymentNameId &&
+      entry.version === formName.paymentNameVersion &&
+      entry.name === formName.nature,
+  )
+    ? formName.paymentNameId
+    : `snapshot:${formName.paymentNameId || 'legacy'}:${formName.nature}`;
+});
+const paymentNameOptions = computed(() => [
+  ...props.paymentNames.map((entry) => ({ label: entry.name, value: entry.id })),
+  ...(paymentNameSelection.value?.startsWith('snapshot:')
+    ? [{ label: form.value.nature, value: paymentNameSelection.value, disabled: true }]
+    : []),
+]);
+function selectPaymentName(value: string | number) {
+  const entry = props.paymentNames.find((item) => item.id === value);
+  if (!entry) return;
+  form.value.paymentNameId = entry.id;
+  form.value.paymentNameVersion = entry.version;
+  form.value.nature = entry.name;
+}
+const paymentChannelOptions = ['现金', '银行转账', '微信', '支付宝'].map((name) => ({ label: name, value: name }));
 watch(visible, (v) => {
   if (!v) return;
   form.value = initial();
@@ -321,7 +352,7 @@ async function submit() {
   fb.clear();
   error.value = '';
   try {
-    props.execute(clone(form.value));
+    await props.execute(clone(form.value));
     visible.value = false;
     return;
   } catch (e) {

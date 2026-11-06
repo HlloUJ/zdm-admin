@@ -23,7 +23,6 @@ export const taskActions = [
   ['ship', '登记客户发货'],
   ['receive', '登记到店收货'],
 ] as const;
-export const settingTabs = [{ value: 'nature', label: '款项名称' }];
 const statusActions = (status: string) =>
   salesActions.filter(([a]) => {
     if (['create', 'detail', 'copy', 'refund', 'correct-payment', 'void-payment'].includes(a)) return true;
@@ -81,18 +80,20 @@ export const storeOrderPrototype: FunctionModule = {
         {
           label: '款项配置页',
           value: `${prefix}.settings`,
-          note: '本地原型配置，不写入真实门店配置',
+          note: '款项名称配置接入门店后端；按当前门店及既有权限隔离',
           actions: [],
-          tabs: settingTabs.map((t) => ({
-            label: t.label,
-            value: `${prefix}.settings.${t.value}`,
-            actions: [
-              ['create', '新增'],
-              ['edit', '编辑'],
-              ['toggle-status', '停用/启用'],
-              ['delete', '删除'],
-            ].map(([value, label]) => ({ label: label!, value: `${prefix}.settings.${t.value}.${value}` })),
-          })),
+          tabs: [
+            {
+              label: '款项名称',
+              value: `${prefix}.settings.nature`,
+              actions: [
+                ['create', '新增'],
+                ['edit', '编辑'],
+                ['toggle-status', '停用/启用'],
+                ['delete', '删除'],
+              ].map(([value, label]) => ({ label: label!, value: `${prefix}.settings.nature.${value}` })),
+            },
+          ],
         },
       ],
     },
