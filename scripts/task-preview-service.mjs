@@ -801,9 +801,12 @@ export class PreviewSupervisor {
   async stopOwnedChild() {
     this.intentionalStop = true;
     const child = this.child;
-    await this.dependencies.stopChild(child);
-    if (this.child === child) this.child = null;
-    this.intentionalStop = false;
+    try {
+      await this.dependencies.stopChild(child);
+      if (this.child === child) this.child = null;
+    } finally {
+      this.intentionalStop = false;
+    }
   }
 
   async launchSelected() {
@@ -958,24 +961,25 @@ export class PreviewSupervisor {
       const worktree = this.config.selectedWorktree;
       this.dependencies.assertStopAllowed(worktree);
       this.clearRestart();
-      this.saveSelection(null, []);
       this.gateway.useIntegration();
-      await this.stopOwnedChild();
+      try {
+        await this.stopOwnedChild();
+        if (worktree) {
+          const result = this.dependencies.run(
+            this.config.nodePath,
+            [this.config.launcherPath, '--worktree', worktree, '--stop'],
+            { cwd: worktree, allowFailure: true, stdio: 'inherit' },
+          );
+          if (result.status !== 0) throw new Error(`任务前端已停止，但后端停止失败：${worktree}`);
+        }
+      } catch (error) {
+        this.transition('error', error.message);
+        throw error;
+      }
+      this.saveSelection(null, []);
       this.currentWorktree = null;
       this.currentTaskArgs = [];
       this.transition('preview-unavailable');
-      if (worktree) {
-        const result = this.dependencies.run(
-          this.config.nodePath,
-          [this.config.launcherPath, '--worktree', worktree, '--stop'],
-          {
-            cwd: worktree,
-            allowFailure: true,
-            stdio: 'inherit',
-          },
-        );
-        if (result.status !== 0) throw new Error(`任务前端已停止，但后端停止失败：${worktree}`);
-      }
       this.dependencies.log('当前任务预览已停止；5175 保留预览入口并显示不可用，预览数据继续保留。');
       return this.status();
     });

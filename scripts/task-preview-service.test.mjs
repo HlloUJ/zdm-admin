@@ -906,3 +906,21 @@ test('real stop policy refuses mismatched batch, unfinished modules and active w
   );
   assert.throws(() => assertBatchStopAllowed(f.target), /并行执行方/);
 });
+
+for (const failure of ['child', 'backend']) {
+  test(`failed ${failure} stop preserves selected ownership and never writes an empty selection`, async () => {
+    const f = supervisorFixture();
+    if (failure === 'child')
+      f.supervisor.dependencies.stopChild = async () => {
+        throw new Error('injected stop failure');
+      };
+    f.supervisor.dependencies.run = () => ({ status: 1 });
+    await assert.rejects(f.supervisor.stop(f.supervisor.status()));
+    assert.equal(f.supervisor.status().worktree, f.root);
+    assert.equal(f.supervisor.currentWorktree, f.root);
+    assert.equal(f.supervisor.status().phase, 'error');
+    assert.equal(f.supervisor.intentionalStop, false);
+    assert.ok(!f.events.includes('save'));
+    if (failure === 'child') assert.equal(f.supervisor.child.pid, 122);
+  });
+}

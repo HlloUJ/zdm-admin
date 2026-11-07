@@ -253,9 +253,11 @@ test('an actual supervisor stop failure blocks handoff and its retry before back
       },
     );
   await assert.rejects(runHandoff(), /未能证明旧任务进程已停止/);
-  assert.equal(supervisor.status().worktree, null);
+  assert.equal(supervisor.status().worktree, '/task');
   assert.equal(supervisor.status().childPid, 123);
-  await assert.rejects(runHandoff(), /无法确认/);
+  assert.equal(supervisor.intentionalStop, false);
+  await assert.rejects(runHandoff(), /未能证明旧任务进程已停止/);
+  assert.equal(supervisor.status().worktree, '/task');
   assert.deepEqual(events, ['pending', 'pending']);
 });
 
