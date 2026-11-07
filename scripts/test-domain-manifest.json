@@ -872,7 +872,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.test.mjs": {
-      "digest": "180df21e622ea12ed187b5de544ada5dca36e77656689413f030e76e7f1e1c4b",
+      "digest": "c2a6cbde082d08605bbbd59def007f8e1f44dce341ad540facaf73454c8a1a97",
       "imports": [
         "scripts/absent.mjs",
         "scripts/check-changed-plan.mjs",
@@ -881,7 +881,7 @@
         "scripts/engineering-impact.mjs",
         "scripts/new-consumer.mjs",
         "scripts/new-module.mjs",
-        "scripts/script-test-plan.mjs",
+        "scripts/test-support/engineering-scope-fixture.mjs",
         "scripts/unknown.mjs",
         "scripts/verification-impact.mjs",
         "scripts/verify.mjs",
@@ -1282,6 +1282,16 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/test-support/engineering-scope-fixture.mjs": {
+      "digest": "7078eb38f3b5f8c4d822d9010c26dde0d5d67fffaffb63aca0e73c1f06760015",
+      "imports": [
+        "scripts/consumer.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/script-test-plan.mjs",
+        "scripts/test-support/wait-quality.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/typography-policy.mjs": {
       "digest": "68c241c4f3efda675f896eb7f328afe384234dbd7e5c113889432a4f2cb64854",
       "imports": [],
@@ -1341,7 +1351,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-impact.test.mjs": {
-      "digest": "6b6d03f52f97252da277dd9d8d266da5c5b30714b4406371d3092914e1d9c3a9",
+      "digest": "d35559405fbad73a6652072dcf1acbf031472e166d648069b085fee464839c9c",
       "imports": [
         "scripts/backend-runtime.mjs",
         "scripts/backend-runtime.test.mjs",
@@ -1356,12 +1366,14 @@
         "scripts/dev-unknown.mjs",
         "scripts/ensure-backend.mjs",
         "scripts/macos/launchd-dev.mjs",
+        "scripts/new-reader.mjs",
         "scripts/task-dependencies.mjs",
         "scripts/task-dependencies.test.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-preview-service.test.mjs",
         "scripts/task-runtime-state.mjs",
         "scripts/task-runtime-state.test.mjs",
+        "scripts/test-support/engineering-scope-fixture.mjs",
         "scripts/verification-impact.mjs"
       ],
       "dynamicImports": 0

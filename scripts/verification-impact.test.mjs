@@ -1,9 +1,13 @@
+import { engineeringScopeFixture } from './test-support/engineering-scope-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { classifyChangedFiles } from './verification-impact.mjs';
 
-const flags = (files) => {
-  const { reasons, ...scope } = classifyChangedFiles(files, { engineeringProof: { proven: true } });
+const flags = (files, root) => {
+  const { reasons, ...scope } = classifyChangedFiles(files, {
+    engineeringProof: { proven: true },
+    ...(root ? { root } : {}),
+  });
   assert.ok(reasons.length);
   return scope;
 };
@@ -145,17 +149,38 @@ test('root Maven and environment inputs are runtime while dependency helpers are
     assert.equal(flags([file]).runtime, false, file);
 });
 
-test('audited preview control narrows business domains while preserving engineering and runtime checks', () => {
+test('audited preview control narrows business domains while preserving engineering and runtime checks', (t) => {
+  const f = engineeringScopeFixture(t);
   for (const [file, runtime] of [
     ['scripts/task-preview-service.mjs', true],
     ['scripts/task-preview-service.test.mjs', false],
   ]) {
-    assert.deepEqual(flags([file]), {
+    assert.deepEqual(flags([file], f.root), {
       frontend: false,
       backend: false,
       engineering: true,
       docsOnly: false,
       full: false,
+      runtime,
+    });
+  }
+});
+
+test('changed audited preview dependencies preserve full gates instead of trusting stale topology', (t) => {
+  const f = engineeringScopeFixture(t);
+  f.write('scripts/task-preview-service.mjs', "import './new-reader.mjs';");
+  f.write('scripts/new-reader.mjs', 'export const value = 1;');
+  f.seal();
+  for (const [file, runtime] of [
+    ['scripts/task-preview-service.mjs', true],
+    ['scripts/task-preview-service.test.mjs', false],
+  ]) {
+    assert.deepEqual(flags([file], f.root), {
+      frontend: true,
+      backend: true,
+      engineering: true,
+      docsOnly: false,
+      full: true,
       runtime,
     });
   }
