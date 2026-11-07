@@ -6,6 +6,7 @@ import {
   mkdirSync,
   openSync,
   readFileSync,
+  realpathSync,
   readSync,
   renameSync,
   statSync,
@@ -14,12 +15,14 @@ import {
 } from 'node:fs';
 import { execFile, spawn, spawnSync } from 'node:child_process';
 import { once } from 'node:events';
+import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import http from 'node:http';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+export const RETAINED_HANDOFF_PROTOCOL = 1;
 export const SERVICE_LABEL = 'com.zdm.admin.task-preview';
 export const CURRENT_TASK_PREVIEW_URL = 'http://127.0.0.1:5175/';
 export const INTEGRATION_PREVIEW_URL = 'http://127.0.0.1:5173/';
@@ -201,6 +204,90 @@ function gitCapture(cwd, args) {
   return run('git', args, { cwd }).stdout.trim();
 }
 
+function guardedJson(file) {
+  if (lstatSync(path.dirname(file)).isSymbolicLink() || lstatSync(file).isSymbolicLink())
+    throw new Error('预览交接登记不得为软链接');
+  return JSON.parse(readFileSync(file, 'utf8'));
+}
+
+function retainedCarrier(root, selected) {
+  if (!selected || path.basename(selected) !== 'preview-current' || lstatSync(selected).isSymbolicLink())
+    throw new Error('当前预览不是已交付的长期载体');
+  const common = (cwd) => realpathSync(path.resolve(cwd, gitCapture(cwd, ['rev-parse', '--git-common-dir'])));
+  const commonDir = common(root);
+  if (common(selected) !== commonDir) throw new Error('预览与目标不属于同一仓库');
+  if (
+    gitCapture(selected, ['branch', '--show-current']) !== 'codex/preview-current' ||
+    gitCapture(selected, ['status', '--porcelain'])
+  )
+    throw new Error('长期预览载体不干净或分支不符');
+  const head = gitCapture(selected, ['rev-parse', 'HEAD']);
+  if (head !== gitCapture(root, ['rev-parse', 'origin/main'])) throw new Error('长期预览不是已发布主线');
+  const record = guardedJson(path.join(commonDir, 'preview-environment/environment.json'));
+  if (record.version !== 1 || path.resolve(record.repository ?? '') !== commonDir || record.profile?.status !== 'ready')
+    throw new Error('长期预览数据身份未就绪');
+  return {
+    commonDir,
+    head,
+    profileFingerprint: createHash('sha256').update(JSON.stringify(record.profile)).digest('hex'),
+  };
+}
+
+// Shared by the task starter, CLI and the installed, self-contained service.
+export function retainedPublishedPreview(root, selected) {
+  try {
+    retainedCarrier(root, selected);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function retainedHandoffProof(target, selected, { freshRemote = false } = {}) {
+  const carrier = retainedCarrier(target, selected);
+  const record = guardedJson(path.join(carrier.commonDir, 'task-batches/active.json'));
+  const branch = gitCapture(target, ['branch', '--show-current']);
+  if (
+    record.version !== 1 ||
+    typeof record.id !== 'string' ||
+    !record.id ||
+    record.closedAt ||
+    record.kind !== 'business' ||
+    path.resolve(record.worktree ?? '') !== path.resolve(target) ||
+    path.resolve(record.repository?.commonDir ?? '') !== carrier.commonDir ||
+    record.branch !== branch ||
+    !branch.startsWith('codex/') ||
+    ['codex/preview-current', 'codex/integration-current'].includes(branch) ||
+    record.originMain !== carrier.head ||
+    record.recordedHead !== gitCapture(target, ['rev-parse', 'HEAD'])
+  )
+    throw new Error('目标不是当前仓库已登记的新业务任务');
+  const entries = gitCapture(target, ['worktree', 'list', '--porcelain']).split(/\r?\n\r?\n/);
+  const integration = entries
+    .find((entry) => entry.split(/\r?\n/).includes('branch refs/heads/codex/integration-current'))
+    ?.split(/\r?\n/)
+    .find((line) => line.startsWith('worktree '))
+    ?.slice(9);
+  if (!integration || existsSync(path.join(integration, 'backups/task-preview/active-database-task.json')))
+    throw new Error('集成载体未知或数据库保护锁尚未交接');
+  if (freshRemote) {
+    const remote = gitCapture(target, ['ls-remote', 'origin', 'refs/heads/main']).split(/\s+/);
+    if (remote.length !== 2 || remote[0] !== carrier.head || remote[1] !== 'refs/heads/main')
+      throw new Error('长期预览不再是远端最新主线');
+  }
+  return {
+    source: path.resolve(selected),
+    target: path.resolve(target),
+    main: carrier.head,
+    profileFingerprint: carrier.profileFingerprint,
+    batchId: record.id,
+  };
+}
+
+function stopRetainedBackend(config, root) {
+  run(config.nodePath, [config.launcherPath, '--worktree', root, '--stop'], { cwd: root, stdio: 'inherit' });
+}
+
 function resolveTaskWorktree(value = process.cwd()) {
   const requested = path.resolve(value);
   const root = path.resolve(gitCapture(requested, ['rev-parse', '--show-toplevel']));
@@ -269,7 +356,10 @@ function requestJson({ paths, method = 'GET', requestPath = '/status', payload =
         agent: false,
         path: requestPath,
         method,
-        headers: body ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } : undefined,
+        headers: {
+          'x-zdm-preview-protocol': '2',
+          ...(body ? { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body) } : {}),
+        },
         timeout: timeoutMs,
       },
       (response) => {
@@ -457,9 +547,13 @@ export class PreviewGateway {
     };
   }
 
-  useIntegration() {
+  useUnavailable() {
     this.mode = 'preview-unavailable';
     this.upstream = null;
+  }
+
+  useIntegration() {
+    this.useUnavailable();
   }
 
   useTask(port = MANAGED_TASK_PREVIEW_PORT) {
@@ -557,6 +651,52 @@ async function checkSelectedPreview(config, root) {
   });
 }
 
+export function resolveRetainedPreview(config) {
+  const root = path.dirname(path.dirname(config.launcherPath));
+  const entries = gitCapture(root, ['worktree', 'list', '--porcelain']).split(/\r?\n\r?\n/);
+  const matches = entries.filter((entry) => entry.split(/\r?\n/).includes('branch refs/heads/codex/preview-current'));
+  if (matches.length !== 1) throw new Error('长期预览载体缺失或不唯一；不重建数据或选择集成环境');
+  const line = matches[0].split(/\r?\n/).find((item) => item.startsWith('worktree '));
+  const target = line?.slice('worktree '.length);
+  retainedCarrier(root, target);
+  return target;
+}
+
+export function assertBatchStopAllowed(worktree) {
+  const common = path.resolve(worktree, gitCapture(worktree, ['rev-parse', '--git-common-dir']));
+  const file = path.join(common, 'task-batches', 'active.json');
+  if (!existsSync(file)) throw new Error('停止目标没有有效批次登记；保留共享预览');
+  const batch = guardedJson(file);
+  if (
+    batch.version !== 1 ||
+    path.resolve(batch.worktree ?? '') !== path.resolve(worktree) ||
+    path.resolve(batch.repository?.commonDir ?? '') !== common ||
+    batch.branch !== gitCapture(worktree, ['branch', '--show-current']) ||
+    batch.closedAt
+  )
+    throw new Error('预览与活动批次归属不一致；保留共享预览');
+  if (
+    !Array.isArray(batch.modules) ||
+    !batch.modules.length ||
+    batch.modules.some((module) => module.status !== 'ready')
+  )
+    throw new Error('仍有未完成模块；保留共享预览');
+  if (typeof batch.id !== 'string' || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(batch.id)) throw new Error('批次身份无效');
+  const workers = path.join(common, 'task-batches', batch.id + '.workers', 'workers.json');
+  if (existsSync(workers)) {
+    const state = guardedJson(workers);
+    if (
+      state.version !== 1 ||
+      !Array.isArray(state.workers) ||
+      state.workers.some(
+        (worker) =>
+          worker.module !== 'batch-delivery' || worker.resources?.length !== 1 || worker.resources[0] !== 'shared',
+      )
+    )
+      throw new Error('仍有并行执行方或未知登记；保留共享预览');
+  }
+}
+
 export class PreviewSupervisor {
   constructor(paths, config, gateway, dependencies = {}) {
     this.paths = paths;
@@ -572,11 +712,17 @@ export class PreviewSupervisor {
     this.restartTimer = null;
     this.intentionalStop = false;
     this.operation = Promise.resolve();
+    this.selectionRevision = 0;
     this.dependencies = {
       resolveTaskWorktree,
+      run,
+      assertStopAllowed: assertBatchStopAllowed,
+      resolveRetainedPreview,
       writeConfig,
       ensureDockerReady,
       stopChild,
+      retainedHandoffProof,
+      stopRetainedBackend,
       spawn,
       waitForPreview,
       checkSelectedPreview,
@@ -590,7 +736,10 @@ export class PreviewSupervisor {
     const gateway = this.gateway.status();
     return {
       type: 'zdm-task-preview-service',
+      retainedHandoffProtocol: RETAINED_HANDOFF_PROTOCOL,
       servicePid: process.pid,
+      stopOwnershipProtocol: 1,
+      selectionRevision: this.selectionRevision,
       childPid: this.child?.pid ?? null,
       phase: this.phase,
       mode: gateway.mode,
@@ -618,6 +767,7 @@ export class PreviewSupervisor {
   }
 
   saveSelection(worktree, taskArgs) {
+    this.selectionRevision += 1;
     this.config = {
       ...this.config,
       selectedWorktree: worktree,
@@ -633,7 +783,7 @@ export class PreviewSupervisor {
   }
 
   scheduleRestart() {
-    if (!this.config.selectedWorktree || this.restartTimer) return;
+    if (this.restartTimer) return;
     this.gateway.useIntegration();
     this.restartAttempts += 1;
     const delay = restartDelay(this.restartAttempts);
@@ -657,11 +807,13 @@ export class PreviewSupervisor {
   }
 
   async launchSelected() {
-    const worktree = this.config.selectedWorktree;
+    let worktree = this.config.selectedWorktree;
     if (!worktree) {
+      if (this.child) throw new Error('没有登记目标但仍有预览子进程；禁止接管');
       this.gateway.useIntegration();
       this.transition('preview-unavailable');
-      return this.status();
+      worktree = this.dependencies.resolveRetainedPreview(this.config);
+      this.saveSelection(worktree, ['--mode', 'full']);
     }
     const resolved = this.dependencies.resolveTaskWorktree(worktree);
     if (this.child && this.currentWorktree !== resolved.root) {
@@ -740,10 +892,52 @@ export class PreviewSupervisor {
     }
   }
 
-  switch(worktree, taskArgs = []) {
+  switch(worktree, taskArgs = [], retainedHandoff = null) {
     return this.enqueue(async () => {
       const resolved = this.dependencies.resolveTaskWorktree(worktree);
-      assertPreviewSelection(this.status(), resolved.root);
+      if (retainedHandoff) {
+        const expected = retainedHandoff;
+        const child = this.child;
+        const assertOwner = () => {
+          if (
+            expected.servicePid !== process.pid ||
+            !child ||
+            expected.childPid !== child.pid ||
+            this.child !== child ||
+            child.exitCode !== null ||
+            this.phase !== 'running' ||
+            this.gateway.mode !== 'task' ||
+            this.currentWorktree !== expected.source ||
+            this.config.selectedWorktree !== expected.source ||
+            resolved.root === expected.source ||
+            !taskArgsEqual(this.currentTaskArgs, this.config.taskArgs)
+          )
+            throw new Error('预览归属已变化，未停止任何任务');
+        };
+        assertOwner();
+        await this.dependencies.checkSelectedPreview(this.config, expected.source);
+        assertOwner();
+        const proof = this.dependencies.retainedHandoffProof(resolved.root, expected.source, { freshRemote: true });
+        for (const key of ['source', 'target', 'main', 'profileFingerprint', 'batchId'])
+          if (proof[key] !== expected[key]) throw new Error('预览交接证明变化，保留现场');
+        this.clearRestart();
+        this.gateway.useIntegration();
+        try {
+          await this.stopOwnedChild();
+          await this.dependencies.stopRetainedBackend(this.config, expected.source);
+          const afterStop = this.dependencies.retainedHandoffProof(resolved.root, expected.source, {
+            freshRemote: true,
+          });
+          for (const key of ['source', 'target', 'main', 'profileFingerprint', 'batchId'])
+            if (afterStop[key] !== proof[key]) throw new Error('长期预览交接证明变化，禁止启动新任务');
+          this.currentWorktree = null;
+          this.currentTaskArgs = [];
+        } catch (error) {
+          this.transition('error', error.message);
+          throw error;
+        }
+      }
+      if (!retainedHandoff) assertPreviewSelection(this.status(), resolved.root);
       if (this.child && this.currentWorktree !== resolved.root) {
         throw new Error('当前预览进程归属另一 Worktree 或归属未知，请先明确交接');
       }
@@ -753,9 +947,16 @@ export class PreviewSupervisor {
     });
   }
 
-  stop() {
+  stop(expected) {
     return this.enqueue(async () => {
+      const current = this.status();
+      if (
+        !expected ||
+        ['worktree', 'childPid', 'servicePid', 'selectionRevision'].some((key) => expected[key] !== current[key])
+      )
+        throw new Error('停止请求归属已变化或缺失；保留当前预览');
       const worktree = this.config.selectedWorktree;
+      this.dependencies.assertStopAllowed(worktree);
       this.clearRestart();
       this.saveSelection(null, []);
       this.gateway.useIntegration();
@@ -764,14 +965,18 @@ export class PreviewSupervisor {
       this.currentTaskArgs = [];
       this.transition('preview-unavailable');
       if (worktree) {
-        const result = run(this.config.nodePath, [this.config.launcherPath, '--worktree', worktree, '--stop'], {
-          cwd: worktree,
-          allowFailure: true,
-          stdio: 'inherit',
-        });
+        const result = this.dependencies.run(
+          this.config.nodePath,
+          [this.config.launcherPath, '--worktree', worktree, '--stop'],
+          {
+            cwd: worktree,
+            allowFailure: true,
+            stdio: 'inherit',
+          },
+        );
         if (result.status !== 0) throw new Error(`任务前端已停止，但后端停止失败：${worktree}`);
       }
-      this.dependencies.log('当前任务预览已停止；5175 已回退到集成环境。');
+      this.dependencies.log('当前任务预览已停止；5175 保留预览入口并显示不可用，预览数据继续保留。');
       return this.status();
     });
   }
@@ -781,6 +986,25 @@ export class PreviewSupervisor {
     await this.stopOwnedChild();
     await this.gateway.stop();
   }
+}
+
+// Older published handoff launchers use these two strings as a stop receipt.
+// This compatibility response never selects an integration upstream.
+export function statusForProtocol(status, protocol) {
+  if (
+    protocol !== '2' &&
+    status.phase === 'preview-unavailable' &&
+    status.childPid === null &&
+    status.worktree === null
+  )
+    return {
+      ...status,
+      phase: 'integration-fallback',
+      mode: 'integration-fallback',
+      environment: 'preview',
+      legacyStopReceipt: true,
+    };
+  return status;
 }
 
 async function readRequestBody(request) {
@@ -825,17 +1049,26 @@ async function runService(paths) {
   const server = http.createServer(async (request, response) => {
     try {
       if (request.method === 'GET' && request.url === '/status') {
-        respond(response, 200, supervisor.status());
+        respond(response, 200, statusForProtocol(supervisor.status(), request.headers['x-zdm-preview-protocol']));
         return;
       }
       if (request.method === 'POST' && request.url === '/switch') {
         const body = await readRequestBody(request);
         if (!body.worktree) throw new Error('缺少 worktree');
-        respond(response, 200, await supervisor.switch(body.worktree, body.taskArgs ?? []));
+        respond(
+          response,
+          200,
+          await supervisor.switch(body.worktree, body.taskArgs ?? [], body.retainedHandoff ?? null),
+        );
         return;
       }
       if (request.method === 'POST' && request.url === '/stop') {
-        respond(response, 200, await supervisor.stop());
+        const body = await readRequestBody(request);
+        respond(
+          response,
+          200,
+          statusForProtocol(await supervisor.stop(body.expected), request.headers['x-zdm-preview-protocol']),
+        );
         return;
       }
       respond(response, 404, { error: 'not found' });
@@ -868,6 +1101,7 @@ async function runService(paths) {
       .enqueue(() => supervisor.launchSelected())
       .catch((error) => {
         console.error(error instanceof Error ? error.message : error);
+        supervisor.scheduleRestart();
       });
   }
 }
@@ -1039,7 +1273,7 @@ Commands:
   install                 安装或更新 macOS 登录常驻服务，并选择当前任务
   switch                  把 5175 切换到当前任务（默认命令）
   status                  只读查看状态；离线时不启动守护服务
-  stop                    停止当前任务前后端，5175 回退到集成环境
+  stop                    停止当前任务前后端，5175 显示预览不可用，数据保留
   logs                    查看服务日志
 
 Options:
@@ -1059,6 +1293,7 @@ export async function main(args = process.argv.slice(2), dependencies = {}) {
     ensureService,
     requestJson,
     resolveTaskWorktree,
+    retainedHandoffProof,
     printStatus,
     log: console.log,
     ...dependencies,
@@ -1091,8 +1326,21 @@ export async function main(args = process.argv.slice(2), dependencies = {}) {
     const current = await system.readServiceStatus(paths);
     if (current.phase === 'offline')
       throw new Error('预览服务离线，无法证明任务资源已停止；未启动守护服务，请核对现场');
+    const target = system.resolveTaskWorktree(options.worktree || process.cwd());
+    if (typeof current.worktree !== 'string' || path.resolve(current.worktree) !== path.resolve(target.root))
+      throw new Error('停止目标与当前预览归属不一致；保留现有服务，不停止其他任务');
+    if (current.stopOwnershipProtocol !== 1) throw new Error('已安装服务不支持原子停止归属校验；保留现有预览');
+    const expected = Object.fromEntries(
+      ['worktree', 'childPid', 'servicePid', 'selectionRevision'].map((key) => [key, current[key]]),
+    );
     system.printStatus(
-      await system.requestJson({ paths, method: 'POST', requestPath: '/stop', timeoutMs: CONTROL_TIMEOUT_MS }),
+      await system.requestJson({
+        paths,
+        method: 'POST',
+        requestPath: '/stop',
+        payload: { expected },
+        timeoutMs: CONTROL_TIMEOUT_MS,
+      }),
     );
     return;
   }
@@ -1107,13 +1355,33 @@ export async function main(args = process.argv.slice(2), dependencies = {}) {
     return;
   }
   const current = await system.readServiceStatus(paths);
-  assertPreviewSelection(current, target.root);
+  let retainedHandoff;
+  try {
+    assertPreviewSelection(current, target.root);
+  } catch (error) {
+    if (
+      current.phase !== 'running' ||
+      current.mode !== 'task' ||
+      !Number.isInteger(current.childPid) ||
+      !Number.isInteger(current.servicePid)
+    )
+      throw error;
+    let proof;
+    try {
+      proof = system.retainedHandoffProof(target.root, current.worktree);
+    } catch {
+      throw error;
+    }
+    if (current.retainedHandoffProtocol !== RETAINED_HANDOFF_PROTOCOL)
+      throw new Error('常驻预览服务尚不支持安全自动交接，请先完成一次受控升级', { cause: error });
+    retainedHandoff = { ...proof, servicePid: current.servicePid, childPid: current.childPid };
+  }
   if (current.phase === 'offline') assertPreviewSelection(await system.ensureService(paths), target.root);
   const status = await system.requestJson({
     paths,
     method: 'POST',
     requestPath: '/switch',
-    payload: { worktree: target.root, taskArgs: options.taskArgs },
+    payload: { worktree: target.root, taskArgs: options.taskArgs, ...(retainedHandoff ? { retainedHandoff } : {}) },
     timeoutMs: CONTROL_TIMEOUT_MS,
   });
   system.printStatus(status);

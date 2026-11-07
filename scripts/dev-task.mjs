@@ -680,7 +680,7 @@ export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_00
   });
 }
 
-function previewServiceRequest(method, requestPath, timeoutMs = 30_000) {
+function previewServiceRequest(method, requestPath, timeoutMs = 30_000, payload) {
   return new Promise((resolve) => {
     if (!existsSync(PREVIEW_SERVICE_SOCKET)) {
       resolve({ statusCode: 0, body: '', absent: true });
@@ -706,7 +706,7 @@ function previewServiceRequest(method, requestPath, timeoutMs = 30_000) {
       resolve({ statusCode: 0, body: '' });
     });
     request.once('error', () => resolve({ statusCode: 0, body: '' }));
-    request.end();
+    request.end(payload === undefined ? undefined : JSON.stringify(payload));
   });
 }
 
@@ -749,7 +749,13 @@ export async function stopSupervisedPreview(root, { request = previewServiceRequ
     throw new Error(`无法确认任务预览守护服务的进程归属和停止状态：${root}`);
   if (!previewServiceOwnsWorktree(currentStatus, root)) return false;
 
-  const stopResponse = await request('POST', '/stop');
+  const expected = Object.fromEntries(
+    ['worktree', 'childPid', 'servicePid', 'selectionRevision'].map((key) => [key, currentStatus[key]]),
+  );
+  const stopResponse =
+    currentStatus.stopOwnershipProtocol === 1
+      ? await request('POST', '/stop', 30_000, { expected })
+      : await request('POST', '/stop');
   if (stopResponse.statusCode >= 200 && stopResponse.statusCode < 300 && stopped(parseJson(stopResponse.body)))
     return true;
   const finalResponse = await request('GET', '/status');

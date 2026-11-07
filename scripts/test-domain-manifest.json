@@ -422,7 +422,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "cec0ecc6ff4c62c81a9d439e1a9e4c5cbe5deec71c5ded064fc99dc48169acaf",
+      "digest": "b369bef85ec57d84f318a2540e8e17c6d493e5f7bfe7ad9435d87f45c1c16a25",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -445,7 +445,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.test.mjs": {
-      "digest": "e24beb36c47d6abaf7d38a11171fedfbf324c40b9374c970a743d65f399d95e0",
+      "digest": "2e945dda7a9ae0f9c6ea554a4d812e44438aab7d8ef90091943cd41e509523f0",
       "imports": [
         "scripts/batch-timing-store.mjs",
         "scripts/completion-cli.mjs",
@@ -623,7 +623,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "bca74ea153986507be2990c5458ebcd0b3221fd172f5864216fe01b1e9775904",
+      "digest": "870a4d76e7bb6a85e31c8d0e400d456b0ce701a638b2cc742df50d161c4f1a07",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
@@ -635,7 +635,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.test.mjs": {
-      "digest": "b0cbd6ed45190abd53ecec9d1558f3a1d8addee8b1bf9a68ecaafb0edc894c8b",
+      "digest": "7ce31e17e824a500784829d519ee24fbe6e486d4ecb1c0050b55740dcc2799cb",
       "imports": [
         "scripts/backend-test-plan.mjs",
         "scripts/dev-task.mjs",
@@ -1168,6 +1168,16 @@
       ],
       "dynamicImports": 1
     },
+    "scripts/shared-work.mjs": {
+      "digest": "8285c1184fd293d82d99f3cc42c2fb978c0f718ff98d3ef7f1532c292972f743",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/shared-work.test.mjs": {
+      "digest": "09824c8919da0fdd0ae32f41ebee561d3a7a121fe7af1d554599cc75a9623064",
+      "imports": ["scripts/shared-work.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/start-micro-task.mjs": {
       "digest": "e54dbc5ccd61944eafdd88a7e900d6145e7d363b67391d8fa6b41c928f5dd75b",
       "imports": ["scripts/batch-timing-store.mjs", "scripts/git-workflow-core.mjs", "scripts/task-batch.mjs"],
@@ -1199,12 +1209,12 @@
       "dynamicImports": 2
     },
     "scripts/task-batch.mjs": {
-      "digest": "2a49301086662648fdbefaa726a23bdfef31e50450b2b22e50c8bd568a687566",
-      "imports": ["scripts/batch-timing-store.mjs"],
+      "digest": "e2871cf504e165cbc9136d76939e531d068dbb5ad6b8bf69b2a0316a02d99700",
+      "imports": ["scripts/batch-timing-store.mjs", "scripts/shared-work.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-batch.test.mjs": {
-      "digest": "110f8903a85d06d3c0017b003dbe646a431046650ae27b08d510bfd502741920",
+      "digest": "a30763c68d692f25bafbade803a3853c091bc4ed5059d81f721ac0a1387598d9",
       "imports": ["scripts/task-batch.mjs"],
       "dynamicImports": 0
     },
@@ -1224,13 +1234,13 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
-      "digest": "1db713a63fa7b761abae26b081096ff3a35a14f9b0b029528b499d6d80f36e5e",
+      "digest": "f83615158809b925f498a4ec01c78da087290a6f8515a57b06d1a933d65e6519",
       "imports": ["scripts/task-data-environment.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-preview-service.test.mjs": {
-      "digest": "6340f502c9c8a55edf4431f771de6caba7199dac9cf443965ee8d418a8ff9399",
-      "imports": ["scripts/task-preview-service.mjs"],
+      "digest": "bb17b4b03fec23b58786055ba9269e7269b9f8e750ea6d1c15eb40d3b75b014e",
+      "imports": ["scripts/dev-task.mjs", "scripts/task-preview-service.mjs"],
       "dynamicImports": 2
     },
     "scripts/task-runtime-state.mjs": {

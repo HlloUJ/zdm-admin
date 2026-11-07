@@ -2,7 +2,7 @@ import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './ac
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
 import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { runCompletionProcess } from './completion-process.mjs';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
@@ -19,7 +19,13 @@ import {
   settleCompletion,
 } from './completion-session.mjs';
 import { assertCompletionQuality, verifyCompletionEvidence } from './completion-ci-evidence.mjs';
-import { readActiveBatch, closeBatch, planBatchDelivery } from './task-batch.mjs';
+import {
+  readActiveBatch,
+  closeBatch,
+  planBatchDelivery,
+  assertBatchModulesReady,
+  batchSharedWork,
+} from './task-batch.mjs';
 import { waitRemoteQuality, selectQualityRun } from './wait-quality.mjs';
 import {
   recoverWriter,
@@ -51,7 +57,7 @@ function run(root, command, args) {
   return r.stdout.trim();
 }
 const read = (p) => JSON.parse(readFileSync(p, 'utf8'));
-export async function completionCommand(
+async function completionCommandLocked(
   root,
   args,
   {
@@ -168,6 +174,9 @@ export async function completionCommand(
     const file = path.join(directory, 'completion-session.json');
     return finalHandoffPlan(root, batch, rest[0], { execute, state: existsSync(file) ? read(file) : undefined });
   }
+  if (['begin', 'freeze', 'deliver', 'final-handoff', 'settle'].includes(mode)) {
+    assertBatchModulesReady(batch);
+  }
   if (['begin', 'freeze', 'deliver'].includes(mode)) {
     const acceptance = freezeAcceptedSource(batch.worktree, batch);
     if (mode === 'freeze')
@@ -217,7 +226,7 @@ export async function completionCommand(
       inventoryAssets,
       previewControl,
       dispatch: (cwd, args) =>
-        completionCommand(cwd, args, {
+        completionCommandLocked(cwd, args, {
           preserveAssets,
           checkRuntime,
           execute,
@@ -511,4 +520,18 @@ export function verifyPreservation(file, directory) {
       assert.equal(createHash('sha256').update(readFileSync(blob)).digest('hex'), e.digest, 'Preserved blob changed');
     }
   return true;
+}
+
+export async function completionCommand(root, args, options) {
+  if (!['begin', 'freeze', 'deliver', 'final-handoff', 'settle', 'measure'].includes(args[0]))
+    return completionCommandLocked(root, args, options);
+  const batch = readActiveBatch(root);
+  if (!batch) return completionCommandLocked(root, args, options);
+  const work = batchSharedWork(batch);
+  const lease = work.claim({ owner: 'completion-' + randomUUID(), module: 'batch-delivery', resources: ['shared'] });
+  try {
+    return await completionCommandLocked(root, args, options);
+  } finally {
+    work.release(lease);
+  }
 }

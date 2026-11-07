@@ -216,6 +216,7 @@ test('an actual supervisor stop failure blocks handoff and its retry before back
     { selectedWorktree: '/task', taskArgs: [] },
     gateway,
     {
+      assertStopAllowed: () => {},
       writeConfig() {},
       stopChild: async () => {
         throw new Error('injected child stop failure');
@@ -225,10 +226,10 @@ test('an actual supervisor stop failure blocks handoff and its retry before back
   supervisor.child = { pid: 123, exitCode: null };
   supervisor.currentWorktree = '/task';
   supervisor.phase = 'running';
-  const request = async (method) => {
+  const request = async (method, _path, _timeout, payload) => {
     if (method === 'GET') return supervisorResponse(supervisor.status());
     try {
-      return supervisorResponse(await supervisor.stop());
+      return supervisorResponse(await supervisor.stop(payload?.expected));
     } catch (error) {
       return supervisorResponse({ error: error.message }, 500);
     }
@@ -960,4 +961,25 @@ test('startup failures and failed convergence close the early listeners without 
     assert.equal(closed, 1);
     assert.equal(forwarded, 0);
   }
+});
+
+test('supervised stop forwards exact atomic identity to supporting services', async () => {
+  const current = { ...activeSupervisorStatus(), stopOwnershipProtocol: 1, servicePid: 7, selectionRevision: 8 };
+  const calls = [];
+  const responses = [supervisorResponse(current), supervisorResponse(supervisorStatus())];
+  assert.equal(
+    await stopSupervisedPreview('/task', {
+      request: async (...args) => {
+        calls.push(args);
+        return responses.shift();
+      },
+    }),
+    true,
+  );
+  assert.deepEqual(calls[1], [
+    'POST',
+    '/stop',
+    30_000,
+    { expected: { worktree: '/task', childPid: 123, servicePid: 7, selectionRevision: 8 } },
+  ]);
 });

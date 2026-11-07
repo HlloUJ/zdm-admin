@@ -16,6 +16,7 @@ import {
   recordBatchCheckpoint,
   setBatchModuleStatus,
   readActiveBatch,
+  batchSharedWork,
 } from './task-batch.mjs';
 function fixture(t, scenario = 'normal') {
   const original = process.cwd(),
@@ -814,4 +815,40 @@ test('actual settlement retains historical timing gaps and authorization proof w
   assert.equal(f.git(f.anchor, 'rev-parse', 'HEAD'), f.main);
   assert.equal(f.downloads(), 1);
   assert.equal(f.checks(), 1);
+});
+
+test('unfinished sibling module blocks freeze and runtime handoff before side effects', async (t) => {
+  const f = fixture(t);
+  upsertBatchModule(f.task, { id: 'unfinished', title: 'Parallel unfinished work' });
+  const candidate = path.join(f.task, 'unfinished.txt');
+  writeFileSync(candidate, 'keep unfinished work');
+  for (const args of [
+    ['begin'],
+    ['freeze'],
+    ['deliver', 'example', f.head],
+    ['final-handoff', f.main],
+    ['settle', 'example', f.main, '42'],
+  ]) {
+    await assert.rejects(completionCommand(f.task, args, f.options), /unfinished modules: unfinished/);
+    assert.equal(readFileSync(candidate, 'utf8'), 'keep unfinished work');
+    assert.equal(f.git(f.task, 'rev-parse', 'HEAD'), f.head);
+    assert.ok(readActiveBatch(f.anchor));
+    assert.equal(existsSync(path.join(f.common, 'task-delivery/example/accepted-source.json')), false);
+    assert.equal(existsSync(path.join(f.common, 'task-delivery/example/completion-session.json')), false);
+    assert.equal(f.checks(), 0);
+    assert.equal(f.downloads(), 0);
+  }
+});
+
+test('active parallel workers block completion even if a module was incorrectly marked ready', async (t) => {
+  const f = fixture(t);
+  const work = batchSharedWork(readActiveBatch(f.task));
+  const worker = work.claim({ owner: 'other-thread', module: 'module', resources: ['change.txt'] });
+  for (const args of [['begin'], ['freeze'], ['deliver', 'example', f.head], ['final-handoff', f.main]]) {
+    await assert.rejects(completionCommand(f.task, args, f.options), /another active worker/);
+    assert.equal(existsSync(path.join(f.common, 'task-delivery/example/accepted-source.json')), false);
+    assert.equal(f.checks(), 0);
+  }
+  work.release(worker);
+  await completionCommand(f.task, ['freeze'], f.options);
 });

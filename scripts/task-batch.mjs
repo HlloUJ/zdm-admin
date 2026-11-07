@@ -1,3 +1,4 @@
+import { createSharedWork } from './shared-work.mjs';
 import { bindBatchTiming, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -423,6 +424,27 @@ export function upsertBatchModule(root, { id: moduleId, title, dependsOn }) {
   });
 }
 
+export function batchSharedWork(record) {
+  return createSharedWork(path.join(record.repository.commonDir, 'task-batches', record.id + '.workers'));
+}
+export function claimBatchWork(root, { owner, module: moduleId, resources }) {
+  let worker;
+  const batch = changeBatch(root, (record) => {
+    demand(
+      !existsSync(path.join(record.repository.commonDir, 'task-delivery', record.id, 'accepted-source.json')),
+      'Batch is frozen; do not resume business writes',
+    );
+    const module = record.modules.find((item) => item.id === moduleId);
+    demand(module, 'Register the module before claiming work');
+    worker = batchSharedWork(record).claim({ owner, module: moduleId, resources });
+    module.status = 'in-progress';
+  });
+  return { batch: batch.id, worker };
+}
+export function releaseBatchWork(root, owner, token) {
+  return changeBatch(root, (record) => batchSharedWork(record).release({ owner, token }));
+}
+
 export function setBatchModuleStatus(root, moduleId, status) {
   id(moduleId, 'module id');
   demand(STATUSES.has(status), 'Invalid module status');
@@ -467,6 +489,16 @@ function orderedModules(modules) {
   };
   for (const module of modules) visit(module);
   return result;
+}
+
+// Check before freezing or touching shared runtime; module state never grants delivery authorization.
+export function assertBatchModulesReady(record) {
+  demand(record && Array.isArray(record.modules) && record.modules.length, 'No batch modules have been registered');
+  const unfinished = record.modules.filter((module) => module.status !== 'ready');
+  demand(
+    !unfinished.length,
+    `Batch still has unfinished modules: ${unfinished.map((module) => `${module.id} (${module.status})`).join(', ')}; preserve shared preview and worktrees`,
+  );
 }
 
 export function planBatchDelivery(root) {
@@ -694,7 +726,7 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
   const command = args[0];
   if (!command || ['help', '--help', '-h'].includes(command)) {
     console.log(
-      `Usage: task-batch status [--json]\n  register --id batch-id [--kind business|infrastructure|maintenance] [--owner label]\n  module --id module-id --title title [--depends-on a,b]\n  module --id module-id --status in-progress|ready|paused|excluded\n  checkpoint --module module-id --commit existing-sha --verification note\n  plan --delivery\n  plan --rollback module-id [--batch archived-batch-id]\n  close\nSchema v1: one active registry per Git common dir, explicit modules/dependencies/checkpoints.\nNo command commits, fetches, pushes, merges, changes preview, rolls back, or deletes Git carriers. Verification notes are unproven descriptions, not passing test evidence.`,
+      `Usage: task-batch status [--json]\n  register --id batch-id [--kind business|infrastructure|maintenance] [--owner label]\n  module --id module-id --title title [--depends-on a,b]\n  module --id module-id --status in-progress|ready|paused|excluded\n  worker-claim --owner thread-id --module module-id --resources src/file.vue,src/other.vue\n  worker-release --owner thread-id --token exact-token\n  checkpoint --module module-id --commit existing-sha --verification note\n  plan --delivery\n  plan --rollback module-id [--batch archived-batch-id]\n  close\nSchema v1: one active registry per Git common dir, explicit modules/dependencies/checkpoints.\nNo command commits, fetches, pushes, merges, changes preview, rolls back, or deletes Git carriers. Verification notes are unproven descriptions, not passing test evidence.`,
     );
     return null;
   }
@@ -719,6 +751,16 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
         title: options.title,
         ...(options['depends-on'] !== undefined ? { dependsOn: options['depends-on'].split(',') } : {}),
       });
+  } else if (command === 'worker-claim') {
+    only(options, ['owner', 'module', 'resources']);
+    result = claimBatchWork(root, {
+      owner: options.owner,
+      module: options.module,
+      resources: options.resources?.split(','),
+    });
+  } else if (command === 'worker-release') {
+    only(options, ['owner', 'token']);
+    result = releaseBatchWork(root, options.owner, options.token);
   } else if (command === 'checkpoint') {
     only(options, ['module', 'commit', 'verification']);
     result = recordBatchCheckpoint(root, {
