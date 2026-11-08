@@ -7,6 +7,7 @@ import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
 import { readActiveBatch } from './task-batch.mjs';
 import { freezeAcceptedSource, prepareAcceptedComposition, readAcceptance } from './accepted-source.mjs';
+import { readAcceptedComposition } from './accepted-source-composition.mjs';
 import { applyTaskComposition } from './task-composition.mjs';
 import { captureSource } from './verification-evidence.mjs';
 import { runCompletionFlow } from './completion-flow.mjs';
@@ -33,6 +34,8 @@ function fixture(t) {
   git(main, 'remote', 'add', 'origin', remote);
   writeFileSync(path.join(main, '.gitignore'), '.task-runtime/\n.task-verification/\n');
   writeFileSync(path.join(main, 'base.txt'), 'base');
+  mkdirSync(path.join(main, 'scripts'));
+  writeFileSync(path.join(main, 'scripts/check.mjs'), '// original verifier\n');
   git(main, 'add', '.');
   git(main, 'commit', '-m', 'base');
   git(main, 'push', '-u', 'origin', 'main');
@@ -82,6 +85,89 @@ test('an interrupted composition resumes only its proven merge and keeps origina
   assert.equal(readFileSync(path.join(f.b, 'unfinished.txt'), 'utf8'), 'unfinished B must survive');
   assert.equal(applyTaskComposition(f.a, 'a', undefined, { recover: true }).recordedHead, result.recordedHead);
 });
+
+for (const mode of ['main already included', 'recorded merge', 'same-tree main advance'])
+  test(`checkpointed technical repair supersedes only a settled composition intent: ${mode}`, (t) => {
+    const f = fixture(t);
+    if (mode !== 'recorded merge') applyTaskComposition(f.a, 'a', f.latest);
+    let latest = f.latest;
+    if (mode === 'same-tree main advance') {
+      f.git(f.main, 'commit', '--allow-empty', '-m', 'published metadata advance');
+      f.git(f.main, 'push', 'origin', 'main');
+      latest = f.git(f.main, 'rev-parse', 'HEAD');
+    }
+    const proof = prepareAcceptedComposition(f.a, 'a', latest);
+    if (mode !== 'main already included') applyTaskComposition(f.a, 'a', undefined, { recover: true });
+    const pointer = path.join(f.registry.commonDir, 'task-delivery/a/composition.json');
+    const originalPointer = readFileSync(pointer, 'utf8');
+    const originalFreeze = readAcceptance(f.a, 'a');
+    writeFileSync(path.join(f.a, 'scripts/check.mjs'), '// repaired progress transport\n');
+    f.git(f.a, 'add', '.');
+    f.git(f.a, 'commit', '-m', 'technical repair');
+    const head = f.git(f.a, 'rev-parse', 'HEAD');
+    f.registry.revise('a', f.registry.readTask('a').revision, (record) => {
+      record.recordedHead = head;
+      record.checkpoints.push({ commit: head, verification: 'technical repair' });
+    });
+    const registered = f.registry.readTask('a');
+    assert.deepEqual(applyTaskComposition(f.a, 'a', undefined, { recover: true }), registered);
+    assert.equal(readFileSync(pointer, 'utf8'), originalPointer, 'Recovery never edits the old immutable intent');
+    assert.deepEqual(readAcceptance(f.a, 'a'), originalFreeze);
+    assert.equal(readFileSync(path.join(f.b, 'unfinished.txt'), 'utf8'), 'unfinished B must survive');
+    assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), head);
+    applyTaskComposition(f.a, 'a', latest);
+    const next = readAcceptedComposition(f.a, 'a', f.accepted.commit);
+    assert.equal(next.taskHead, head);
+    assert.equal(next.candidateTree, f.git(f.a, 'rev-parse', 'HEAD^{tree}'));
+    assert.equal(next.expectedTree, proof.expectedTree);
+    assert.equal(
+      readFileSync(
+        path.join(f.registry.commonDir, 'task-delivery/a/compositions', JSON.parse(originalPointer).proof),
+        'utf8',
+      ).includes(proof.candidateTree),
+      true,
+    );
+  });
+
+for (const file of ['feature-a.txt', 'AGENTS.md', 'scripts/accepted-source-policy.mjs', 'scripts/new-helper.mjs'])
+  test(`a checkpoint cannot turn changed protected or unreviewed source into a technical composition recovery: ${file}`, (t) => {
+    const f = fixture(t);
+    applyTaskComposition(f.a, 'a', f.latest);
+    prepareAcceptedComposition(f.a, 'a', f.latest);
+    writeFileSync(path.join(f.a, file), 'unauthorized change\n');
+    f.git(f.a, 'add', '.');
+    f.git(f.a, 'commit', '-m', 'must remain rejected');
+    const head = f.git(f.a, 'rev-parse', 'HEAD');
+    f.registry.revise('a', f.registry.readTask('a').revision, (record) => {
+      record.recordedHead = head;
+      record.checkpoints.push({ commit: head, verification: 'does not authorize source drift' });
+    });
+    const before = f.registry.readTask('a');
+    assert.throws(() => applyTaskComposition(f.a, 'a', undefined, { recover: true }));
+    assert.deepEqual(f.registry.readTask('a'), before);
+    assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), head);
+    assert.equal(readAcceptance(f.a, 'a').commit, f.accepted.commit);
+  });
+
+test('uncheckpointed repairs and repairs made before the proven composition completed remain rejected', (t) => {
+  for (const pendingMerge of [false, true]) {
+    const f = fixture(t);
+    if (!pendingMerge) applyTaskComposition(f.a, 'a', f.latest);
+    prepareAcceptedComposition(f.a, 'a', f.latest);
+    writeFileSync(path.join(f.a, 'scripts/check.mjs'), '// technical change\n');
+    f.git(f.a, 'add', '.');
+    f.git(f.a, 'commit', '-m', 'not eligible for recovery');
+    const head = f.git(f.a, 'rev-parse', 'HEAD');
+    if (pendingMerge)
+      f.registry.revise('a', f.registry.readTask('a').revision, (record) => {
+        record.recordedHead = head;
+        record.checkpoints.push({ commit: head, verification: 'merge still pending' });
+      });
+    assert.throws(() => applyTaskComposition(f.a, 'a', undefined, { recover: true }));
+    assert.equal(readAcceptance(f.a, 'a').commit, f.accepted.commit);
+  }
+});
+
 test('protected rollback can restart the exact frozen A only inside its live preview and completion leases', (t) => {
   const f = fixture(t),
     leases = createResourceLeases(f.registry.commonDir);

@@ -502,13 +502,17 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "07ba10d5ca63cc6ee31bb19345a80e9fc369bcf0ac5022162e911b9c5da9d4a6",
+      "digest": "d0cb503c29c5ca0a9c809f0ecd3b827b076fae8b42f46186bde2ebaec10f2495",
       "imports": [
+        "scripts/accepted-source-composition.mjs",
+        "scripts/accepted-source-policy.mjs",
         "scripts/accepted-source.mjs",
+        "scripts/check.mjs",
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
         "scripts/completion-session.mjs",
         "scripts/dev-task.mjs",
+        "scripts/new-helper.mjs",
         "scripts/resource-lease.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-composition.mjs",
@@ -1432,9 +1436,10 @@
       "dynamicImports": 1
     },
     "scripts/task-composition.mjs": {
-      "digest": "eadb381c93d4d9bcbb6fac0406ae0ee00893902708de9ec819795857c74b64a0",
+      "digest": "b01accb2b5677b27198a1bccaa2f861916c49415c604f69b48a71b47d3e18380",
       "imports": [
         "scripts/accepted-source-composition.mjs",
+        "scripts/accepted-source-policy.mjs",
         "scripts/accepted-source.mjs",
         "scripts/task-registry.mjs"
       ],
