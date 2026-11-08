@@ -141,12 +141,17 @@ export function adoptPreviewData(root, sourceFile, execute = command) {
   );
   return profile;
 }
-export async function ensureTaskData(options, dependencies = {}) {
-  const location = dataLocation(options.root);
+export function requireTaskData(root) {
+  const location = dataLocation(root);
   if (location.registeredTask?.recovery?.runtimeBlocked) throw new Error('历史恢复候选尚未核验，禁止启动或迁移数据');
   if (location.registeredTask && !location.task && location.registeredTask.resources.persistentPreviewOwner !== true)
     throw new Error('尚未证明跨任务数据兼容；请先准备当前任务的独立数据，不使用其他未完成任务的库');
-  if (!readTaskData(options.root)) throw new Error('预览数据登记缺失；启动不得自动创建或重建，请先完成明确的数据准备');
+  const data = readTaskData(root);
+  if (!data) throw new Error('预览数据登记缺失；启动不得自动创建或重建，请先完成明确的数据准备');
+  return data;
+}
+export async function ensureTaskData(options, dependencies = {}) {
+  requireTaskData(options.root);
   return provisionPreviewData(options, dependencies);
 }
 // Explicit provisioning only. Normal launch calls ensureTaskData and cannot enter

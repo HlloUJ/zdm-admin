@@ -26,6 +26,7 @@ import { assertDevelopmentApi } from './preview-policy.mjs';
 
 import {
   ensureTaskData,
+  requireTaskData,
   readTaskData,
   taskDataComposeEnv,
   protectPreviewUpdate,
@@ -1613,6 +1614,12 @@ export async function main(args = process.argv.slice(2)) {
     });
   }
   const project = taskProjectName({ branch, root });
+  if (!options.pause && !options.stop && !options.handoff) {
+    // Reject an unproved data target before dependency preparation, filesystem
+    // watchers, port allocation or Docker. Backend preparation checks it again.
+    selectTaskPreviewMode({ requestedMode: options.mode, apiTarget: options.apiTarget });
+    requireTaskData(root);
+  }
   const integrationWorktree = integrationWorktreeFor(worktrees);
   const integrationRoot = integrationWorktree.path;
   if (options.pause) {

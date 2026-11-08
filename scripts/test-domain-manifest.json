@@ -368,7 +368,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.test.mjs": {
-      "digest": "0f1f2b5eeadcfd57154fa436a6a2ceb9e824dc9dbb43eded7c71c514293b2880",
+      "digest": "d26ab708c554f33ddecc71d8d5bba00e3c0f458b38eeea120ab83a7a8facfaa1",
       "imports": [
         "scripts/ci-equivalence-environment.mjs",
         "scripts/ci-equivalence.mjs",
@@ -376,6 +376,7 @@
         "scripts/dev-task.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/task-completion.mjs",
+        "scripts/task-data-environment.mjs",
         "scripts/wait-quality.mjs"
       ],
       "dynamicImports": 1
@@ -692,7 +693,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "5d4381cebe8d06fe1a3c4e54b586ae94ff2553b319a45f5f49d5d55480b09bd9",
+      "digest": "a22e15c26a340dcf80c4e065eedb37f27335767f5d96d31f6b60252aadc3ea43",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
@@ -1464,7 +1465,7 @@
       "dynamicImports": 0
     },
     "scripts/task-data-environment.mjs": {
-      "digest": "8fb08034e47ca38aa1a40ef8593b9a583d65fd212d98dd9089256f78ce6567a6",
+      "digest": "2a041e8f42d6f39f1158ecd2e95d38cd569538ac4e7b9ba9ab9a342a22c50215",
       "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
