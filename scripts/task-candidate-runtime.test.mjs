@@ -134,6 +134,43 @@ test('failed runtime cleanup retains its exact lease and both original check and
   );
   assert.equal(f.leases.inspect('temporary-port-5178').task, 'a');
 });
+test('missing candidate data blocks before leasing ports, provisioning data or starting a runtime', async (t) => {
+  const f = fixture(t);
+  let writes = 0;
+  await assert.rejects(
+    withCandidateRuntime(f.task, 'b'.repeat(40), async () => assert.fail('no validation'), {
+      ...f.system,
+      readData: () => null,
+      provision: () => {
+        writes++;
+      },
+      leases: () => assert.fail('no port allocation'),
+      start: () => assert.fail('no runtime startup'),
+    }),
+    /task:data isolate.*explicitly.*No data was created/,
+  );
+  assert.equal(writes, 0);
+  assert.deepEqual(f.events, []);
+  assert.equal(f.leases.inspect('temporary-port-5177').token, f.foreign.token);
+});
+test('cleanup acknowledges only its exact stopped validation port, retaining other task runtime evidence', async (t) => {
+  const f = fixture(t),
+    checks = [];
+  await withCandidateRuntime(f.task, 'b'.repeat(40), async () => 'done', {
+    ...f.system,
+    references: async (_task, options) => {
+      checks.push(options);
+      return { backendPorts: [], owned: [] };
+    },
+  });
+  assert.equal(checks.length, 2);
+  assert.equal(checks[0], undefined);
+  const [lease] = checks[1].closingLeases;
+  assert.equal(lease.resource, 'temporary-port-5178');
+  assert.equal(lease.task, 'a');
+  assert.equal(lease.pid, process.pid);
+  assert.ok(lease.token);
+});
 test('frozen runtime authorization binds actual head, live delivery owner, stage, full mode and temporary port', () => {
   const task = { frozen: {}, owner: 'chat-a', stage: 'validating' },
     head = 'a'.repeat(40);

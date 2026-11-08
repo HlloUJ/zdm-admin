@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { requestResponse, parseTaskPreviewMetadata, taskProjectName } from './dev-task.mjs';
+import { taskProjectName } from './dev-task.mjs';
+import { createTaskRegistry } from './task-registry.mjs';
+import { inspectPreviewConsumers, readPreviewResponse, temporaryPreviewLeases } from './preview-consumers.mjs';
 
 function backendPorts(task) {
   const project = taskProjectName({ root: task.worktree, branch: task.branch });
@@ -31,16 +33,18 @@ function backendPorts(task) {
 // temporary ports. Unknown consumers are never stopped or adopted.
 export async function taskRuntimeReferences(task, dependencies = {}) {
   const ports = (dependencies.backendPorts ?? backendPorts)(task);
-  const request = dependencies.request ?? requestResponse;
-  const frontends = await Promise.all(
-    [5175, 5176, ...Array.from({ length: 23 }, (_, i) => 5177 + i)].map(async (port) => {
-      const response = await request(`http://127.0.0.1:${port}/__zdm_task_preview__`, 1000);
-      return response.statusCode === 200 ? { port, metadata: parseTaskPreviewMetadata(response.body) } : null;
-    }),
+  const snapshot = await inspectPreviewConsumers(
+    { worktree: task.worktree, taskId: task.id, closingLeases: dependencies.closingLeases ?? [] },
+    {
+      request: dependencies.request ?? readPreviewResponse,
+      readLeases:
+        dependencies.readLeases ??
+        (() => temporaryPreviewLeases(task.repository?.commonDir ?? createTaskRegistry(task.worktree).commonDir)),
+    },
   );
   const owned = [],
     consumers = [];
-  for (const frontend of frontends.filter((item) => item?.metadata)) {
+  for (const frontend of snapshot.observations.filter((item) => item.metadata)) {
     if (frontend.metadata.workspaceRoot === task.worktree) owned.push(frontend);
     else if (ports.some((port) => frontend.metadata.apiTarget === `http://127.0.0.1:${port}`)) consumers.push(frontend);
   }

@@ -25,6 +25,7 @@ import { createTaskRegistry, parallelTaskMode } from './task-registry.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { assertPreviewOwner, transitionSelectedPreview } from './preview-transition.mjs';
 import { preparePreviewTarget, prepareRetainedTarget, validatePreparedTarget } from './preview-target.mjs';
+import { inspectPreviewConsumers, readPreviewResponse, temporaryPreviewLeases } from './preview-consumers.mjs';
 
 export const RETAINED_HANDOFF_PROTOCOL = 1;
 export const SERVICE_LABEL = 'com.zdm.admin.task-preview';
@@ -437,14 +438,20 @@ function requestPreviewMetadata(baseUrl = CURRENT_TASK_PREVIEW_URL, timeoutMs = 
 
 // Check before stopping the selected frontend/backend. Temporary validation and
 // other frontend consumers retain their own lifetimes; this check stops nothing.
-export async function assertPreviewConsumersReleased(worktree, request = requestPreviewMetadata) {
+export async function assertPreviewConsumersReleased(worktree, request = readPreviewResponse, dependencies = {}) {
   if (!worktree) return;
-  const selected = await request('http://127.0.0.1:5176/');
-  const api = selected?.workspaceRoot === worktree ? selected.apiTarget : null;
-  const metadata = await Promise.all(
-    Array.from({ length: 23 }, (_, index) => request(`http://127.0.0.1:${5177 + index}/`)),
+  const snapshot = await inspectPreviewConsumers(
+    { worktree, ports: [5176, ...Array.from({ length: 23 }, (_, index) => 5177 + index)] },
+    { request, readLeases: () => temporaryPreviewLeases(createTaskRegistry(worktree).commonDir), ...dependencies },
   );
-  if (metadata.some((item) => item && (item.workspaceRoot === worktree || (api && item.apiTarget === api))))
+  const selected = snapshot.observations.find((item) => item.port === 5176)?.metadata;
+  const api = selected?.workspaceRoot === worktree ? selected.apiTarget : null;
+  if (
+    snapshot.observations.some(
+      ({ port, metadata }) =>
+        port >= 5177 && metadata && (metadata.workspaceRoot === worktree || (api && metadata.apiTarget === api)),
+    )
+  )
     throw new Error('临时预览或验证仍在引用当前后端；保留所有运行环境，稍后重试准确请求');
 }
 
@@ -888,8 +895,22 @@ export class PreviewSupervisor {
     }
   }
 
-  async launchSelected() {
+  frozenSelectedTask() {
+    if (this.config.taskRegistryProtocol !== 2 || !this.config.selectedWorktree) return null;
+    const registry = this.dependencies.createTaskRegistry(path.dirname(path.dirname(this.config.launcherPath)));
+    const task = registry.list().find((record) => record.worktree === this.config.selectedWorktree);
+    return task?.frozen ? registry.resolve({ id: task.id, worktree: task.worktree }) : null;
+  }
+
+  async launchSelected({ previewLeaseHeld = false } = {}) {
     if (this.config.handoffHold) throw new Error('已发布预览交接尚未完成；保留数据和当前归属，不自动启动其他环境');
+    const frozen = this.frozenSelectedTask();
+    if (frozen && !previewLeaseHeld) {
+      const registry = this.dependencies.createTaskRegistry(frozen.worktree);
+      return this.dependencies
+        .createResourceLeases(registry.commonDir)
+        .run('preview-5175', frozen.id, () => this.launchSelected({ previewLeaseHeld: true }));
+    }
     let worktree = this.config.selectedWorktree;
     if (!worktree) {
       if (this.child) throw new Error('没有登记目标但仍有预览子进程；禁止接管');
@@ -920,6 +941,9 @@ export class PreviewSupervisor {
         this.dependencies.log(`当前任务预览检查未通过，按启动保护流程恢复：${error.message}`);
       }
     }
+    // Establish the exact frozen owner and source before stopping an existing
+    // child. A restart owns the same preview transaction as an explicit handoff.
+    const launchArgs = this.dependencies.frozenRestoreArgs(this.config, resolved.root, taskArgs);
     if (this.config.taskRegistryProtocol === 2) await this.dependencies.assertPreviewConsumersReleased(resolved.root);
     this.gateway.useIntegration();
     await this.dependencies.ensureDockerReady(this.config);
@@ -929,7 +953,7 @@ export class PreviewSupervisor {
       nodePath: this.config.nodePath,
       launcherPath: this.config.launcherPath,
       worktree: resolved.root,
-      taskArgs: this.dependencies.frozenRestoreArgs(this.config, resolved.root, taskArgs),
+      taskArgs: launchArgs,
     });
     this.currentWorktree = resolved.root;
     this.currentTaskArgs = [...taskArgs];
@@ -1070,7 +1094,11 @@ export class PreviewSupervisor {
       )
         throw new Error('另一次已发布预览交接尚未完成；不接管其归属');
       const leases = this.dependencies.createResourceLeases(registry.commonDir);
-      return leases.run('preview-5175', task.id, async () => {
+      const restoreTask = this.frozenSelectedTask();
+      // The resource protects the frozen source being interrupted. An unfrozen
+      // target needs no frozen-launch lease; rollback still proves the original
+      // source and its own live completion owner without transferring a lease.
+      return leases.run('preview-5175', restoreTask?.id ?? task.id, async () => {
         const previous = this.config.selectedWorktree;
         if (preparingDelivery && previous !== currentTask.worktree) {
           // Source composition may restart a mounted backend even when its
@@ -1091,6 +1119,10 @@ export class PreviewSupervisor {
           else if (this.dependencies.resolveRetainedPreview(this.config) !== previous)
             throw new Error('当前预览归属尚未接入任务登记；保留现场');
         }
+        if (restoreTask && this.phase === 'running')
+          this.dependencies.frozenRestoreArgs(this.config, restoreTask.worktree, this.config.taskArgs ?? []);
+        if (previous && (previous !== task.worktree || retained))
+          await this.dependencies.assertPreviewConsumersReleased(previous);
         this.dependencies.log('固定 5176 上游采用受保护交接；切换期间 5175 将短暂显示重连。');
         return transitionSelectedPreview({
           expected: request.expected,
@@ -1129,7 +1161,7 @@ export class PreviewSupervisor {
               this.config = { ...this.config, handoffHold: previous.handoffHold };
               this.saveSelection(previous.worktree, previous.taskArgs);
             },
-            launch: () => this.launchSelected(),
+            launch: () => this.launchSelected({ previewLeaseHeld: true }),
             cancelRestart: () => this.clearRestart(),
             error: (error) => this.transition('error', error.message),
           },
@@ -1407,6 +1439,7 @@ async function installService({ paths, worktree, taskArgs = [] }) {
       'task-dependencies.mjs',
       'preview-policy.mjs',
       'task-data-environment.mjs',
+      'preview-consumers.mjs',
     ]) {
       const moduleFile = path.join(path.dirname(sourceFile), name);
       if (!lstatSync(moduleFile).isFile() || lstatSync(moduleFile).isSymbolicLink())
