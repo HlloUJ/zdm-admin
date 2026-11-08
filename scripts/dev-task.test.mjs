@@ -428,12 +428,17 @@ test('recognizes and scopes a shared-database task lock', () => {
   assert.equal(parseDatabaseLock('{"type":"other"}'), null);
 });
 
-test('task Compose reuses integration MySQL and contains no task database storage', () => {
+test('task Compose uses registered isolated schema and media on existing MySQL without task database storage', () => {
   const compose = readFileSync(new URL('../docker-compose.task.yml', import.meta.url), 'utf8');
-  assert.match(compose, /jdbc:mysql:\/\/zdm-platform-mysql:3306\/zdm_admin/);
+  assert.match(compose, /jdbc:mysql:\/\/zdm-platform-mysql:3306\/\$\{ZDM_TASK_DB_NAME:\?set ZDM_TASK_DB_NAME\}\?/);
+  assert.match(compose, /ZDM_DB_USERNAME: \$\{ZDM_TASK_DB_USERNAME:\?set ZDM_TASK_DB_USERNAME\}/);
+  assert.match(compose, /ZDM_DB_PASSWORD: \$\{ZDM_TASK_DB_PASSWORD:\?set ZDM_TASK_DB_PASSWORD\}/);
+  assert.match(compose, /name: \$\{ZDM_TASK_MEDIA_VOLUME:\?set ZDM_TASK_MEDIA_VOLUME\}/);
+  assert.doesNotMatch(compose, /jdbc:mysql:\/\/zdm-platform-mysql:3306\/zdm_admin(?:\?|$)/m);
+  assert.doesNotMatch(compose, /name: zdm-admin_zdm_craft_images/);
   assert.match(compose, /SPRING_FLYWAY_LOCATIONS: filesystem:\/task-migrations/);
   assert.match(compose, /target: \/task-migrations/);
-  assert.match(compose, /com\.zdm\.task\.database: integration/);
+  assert.match(compose, /com\.zdm\.task\.database: isolated/);
   assert.doesNotMatch(compose, /^\s{2}mysql:/m);
   assert.doesNotMatch(compose, /\/var\/lib\/mysql|tmpfs:/);
 });

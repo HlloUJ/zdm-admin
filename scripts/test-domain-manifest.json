@@ -693,7 +693,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "a22e15c26a340dcf80c4e065eedb37f27335767f5d96d31f6b60252aadc3ea43",
+      "digest": "9d624287946b1bf96b3532f8565b71f6bc61b143ec13aff75ed6b11c461ce235",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
@@ -710,7 +710,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.test.mjs": {
-      "digest": "a0c9df5563b59327b4fcbde016b24c1302ac0cc9fd09e66b35e52acd7028efdb",
+      "digest": "325763830c0e3c46b8bb26c7688c1febcbfab41fb165bd84f596339b340429dc",
       "imports": [
         "scripts/backend-test-plan.mjs",
         "scripts/dev-task.mjs",

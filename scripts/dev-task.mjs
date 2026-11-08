@@ -696,9 +696,9 @@ export function requestResponse(url, timeoutMs = 1_000) {
     });
     request.once('timeout', () => {
       request.destroy();
-      resolve({ statusCode: 0, body: '' });
+      resolve({ statusCode: 0, body: '', errorCode: 'ETIMEDOUT' });
     });
-    request.once('error', () => resolve({ statusCode: 0, body: '' }));
+    request.once('error', (error) => resolve({ statusCode: 0, body: '', errorCode: error.code ?? 'NETWORK_ERROR' }));
   });
 }
 
@@ -716,6 +716,7 @@ export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_00
         method,
         headers: method === 'DELETE' ? { [TASK_PREVIEW_CONTROL_HEADER]: TASK_PREVIEW_CONTROL_VALUE } : undefined,
         timeout: timeoutMs,
+        agent: false,
       },
       (response) => {
         const chunks = [];
@@ -727,9 +728,9 @@ export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_00
     );
     request.once('timeout', () => {
       request.destroy();
-      resolve({ statusCode: 0, body: '' });
+      resolve({ statusCode: 0, body: '', errorCode: 'ETIMEDOUT' });
     });
-    request.once('error', () => resolve({ statusCode: 0, body: '' }));
+    request.once('error', (error) => resolve({ statusCode: 0, body: '', errorCode: error.code ?? 'NETWORK_ERROR' }));
     request.end();
   });
 }
@@ -852,6 +853,8 @@ export async function inspectManagedPreview({
     healthStatus: health.statusCode,
     healthBody: health.body,
   });
+  if (!metadata) errors.push(previewProbeFailure(response));
+  else if (health.errorCode) errors.push(`健康探针连接失败：${health.errorCode}`);
   return { metadata, errors };
 }
 
