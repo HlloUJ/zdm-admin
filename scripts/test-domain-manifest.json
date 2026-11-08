@@ -1097,7 +1097,7 @@
       "dynamicImports": 0
     },
     "scripts/parallel-upgrade-preflight.mjs": {
-      "digest": "6baac92669a9dd6871eae0e956d468427afed0eab3c9f035ea8ef9e21ffe3556",
+      "digest": "9a92a0f7eed1d14b38f9f03886bcac32a667c77c77994dc3a05330ef37202713",
       "imports": [
         "scripts/delivery-migration-safety.mjs",
         "scripts/dev-task.mjs",
@@ -1134,9 +1134,9 @@
       "dynamicImports": 0
     },
     "scripts/preview-probe.test.mjs": {
-      "digest": "a3bbd347a98c48261441a9cb1728fde3c9a23bddae7b2b04bea6c59161b0d300",
-      "imports": ["scripts/dev-task.mjs"],
-      "dynamicImports": 2
+      "digest": "c86e5f2a04ce33ab7cd587538103e459be7f5697d9944069db3a80f61d1a0ad3",
+      "imports": ["scripts/dev-task.mjs", "scripts/parallel-upgrade-preflight.mjs"],
+      "dynamicImports": 4
     },
     "scripts/preview-selection.test.mjs": {
       "digest": "d3b08d603eb23657fb778e77ef2d3a56f774b98818048d7639cbabaa80a17a36",

@@ -5,7 +5,7 @@ import { existsSync, readFileSync, writeFileSync, renameSync, realpathSync } fro
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import http from 'node:http';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, urlToHttpOptions } from 'node:url';
 import { servicePaths } from './task-preview-service.mjs';
 import { taskProjectName, parseTaskPreviewMetadata } from './dev-task.mjs';
 import { taskBackendContainerIdentity, taskBackendSourceIdentity } from './task-runtime-state.mjs';
@@ -22,9 +22,12 @@ function capture(root, command, args) {
   );
   return result.stdout.trim();
 }
-function request(options) {
+export function request(options) {
   return new Promise((resolve, reject) => {
-    const req = http.get(options, (response) => {
+    // Git/Docker work can outlive the daemon's idle timeout between probes.
+    // Every read uses a fresh connection, including the Unix control socket.
+    const target = typeof options === 'string' ? urlToHttpOptions(new URL(options)) : options;
+    const req = http.get({ ...target, agent: false }, (response) => {
       let body = '';
       response.setEncoding('utf8');
       response.on('data', (bytes) => {
