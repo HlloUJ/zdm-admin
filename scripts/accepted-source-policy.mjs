@@ -7,6 +7,7 @@ const control = new Set([
   '.codex/zdm-project-workflow.yaml',
   'scripts/accepted-source-policy.mjs',
   'scripts/accepted-source.mjs',
+  'scripts/accepted-source-composition.mjs',
   'scripts/accepted-source-ci.mjs',
   'scripts/accepted-source-hook.mjs',
   ACCEPTED_SOURCE_WORKFLOW,

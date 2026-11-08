@@ -1,3 +1,6 @@
+import { createSharedWork } from './shared-work.mjs';
+import { parallelTaskMode } from './task-registry.mjs';
+import { selectedTaskBatch, validateTaskBatch, planTaskDelivery, closeTaskBatch } from './task-context.mjs';
 import { bindBatchTiming, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
@@ -262,6 +265,9 @@ function readActive(root, current) {
   return record;
 }
 export function readActiveBatch(root) {
+  const selected = selectedTaskBatch(root);
+  if (selected) return selected;
+  if (parallelTaskMode(root)) return null;
   return readActive(root, repository(root));
 }
 
@@ -289,6 +295,7 @@ function validateActive(root, record, facts) {
   return record;
 }
 export function validateActiveBatch(root, record) {
+  if (record?.taskRegistryVersion === 2) return validateTaskBatch(root, record);
   return validateActive(root, record, commitFacts());
 }
 
@@ -302,6 +309,7 @@ function atomicWrite(file, value) {
   }
 }
 function withLock(root, operation) {
+  demand(!parallelTaskMode(root), '旧共享批次登记只保留恢复证据；新任务元数据请使用独立任务入口');
   const current = repository(root);
   const directory = path.join(current.commonDir, 'task-batches');
   noLink(directory);
@@ -353,6 +361,7 @@ export function assertBatchIdAvailable(root, batchId) {
 }
 
 export function registerBatch(root, { id: batchId, kind = 'business', owner = null }) {
+  demand(!parallelTaskMode(root), '多任务登记已启用；请使用 task:start，不再创建共享活动批次');
   id(batchId, 'batch id');
   demand(KINDS.has(kind), 'Invalid batch kind');
   if (owner !== null) owner = text(owner, 'owner');
@@ -423,6 +432,27 @@ export function upsertBatchModule(root, { id: moduleId, title, dependsOn }) {
   });
 }
 
+export function batchSharedWork(record) {
+  return createSharedWork(path.join(record.repository.commonDir, 'task-batches', record.id + '.workers'));
+}
+export function claimBatchWork(root, { owner, module: moduleId, resources }) {
+  let worker;
+  const batch = changeBatch(root, (record) => {
+    demand(
+      !existsSync(path.join(record.repository.commonDir, 'task-delivery', record.id, 'accepted-source.json')),
+      'Batch is frozen; do not resume business writes',
+    );
+    const module = record.modules.find((item) => item.id === moduleId);
+    demand(module, 'Register the module before claiming work');
+    worker = batchSharedWork(record).claim({ owner, module: moduleId, resources });
+    module.status = 'in-progress';
+  });
+  return { batch: batch.id, worker };
+}
+export function releaseBatchWork(root, owner, token) {
+  return changeBatch(root, (record) => batchSharedWork(record).release({ owner, token }));
+}
+
 export function setBatchModuleStatus(root, moduleId, status) {
   id(moduleId, 'module id');
   demand(STATUSES.has(status), 'Invalid module status');
@@ -469,8 +499,19 @@ function orderedModules(modules) {
   return result;
 }
 
+// Check before freezing or touching shared runtime; module state never grants delivery authorization.
+export function assertBatchModulesReady(record) {
+  demand(record && Array.isArray(record.modules) && record.modules.length, 'No batch modules have been registered');
+  const unfinished = record.modules.filter((module) => module.status !== 'ready');
+  demand(
+    !unfinished.length,
+    `Batch still has unfinished modules: ${unfinished.map((module) => `${module.id} (${module.status})`).join(', ')}; preserve shared preview and worktrees`,
+  );
+}
+
 export function planBatchDelivery(root) {
   const record = validateActiveBatch(root, readActiveBatch(root));
+  if (record.taskRegistryVersion === 2) return planTaskDelivery(root, record);
   demand(
     !git(record.worktree, ['status', '--porcelain=v1', '--untracked-files=normal']),
     'Batch worktree must be clean before delivery planning',
@@ -630,6 +671,9 @@ export function planBatchRollback(root, moduleId, batchId = null) {
 }
 
 export function closeBatch(root) {
+  const selected = selectedTaskBatch(root);
+  if (selected?.taskRegistryVersion === 2) return closeTaskBatch(root, selected);
+  demand(!parallelTaskMode(root), '需要准确的新任务上下文；不得关闭其他旧登记');
   return withLock(root, (directory, current) => {
     const record = readActive(root, current);
     demand(record, 'No active batch to close');
@@ -694,7 +738,7 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
   const command = args[0];
   if (!command || ['help', '--help', '-h'].includes(command)) {
     console.log(
-      `Usage: task-batch status [--json]\n  register --id batch-id [--kind business|infrastructure|maintenance] [--owner label]\n  module --id module-id --title title [--depends-on a,b]\n  module --id module-id --status in-progress|ready|paused|excluded\n  checkpoint --module module-id --commit existing-sha --verification note\n  plan --delivery\n  plan --rollback module-id [--batch archived-batch-id]\n  close\nSchema v1: one active registry per Git common dir, explicit modules/dependencies/checkpoints.\nNo command commits, fetches, pushes, merges, changes preview, rolls back, or deletes Git carriers. Verification notes are unproven descriptions, not passing test evidence.`,
+      `Compatibility entry: current independent tasks use task:registry, task:work and task:completion. Legacy write commands below refuse the published parallel-independent mode.\nUsage: task-batch status [--json]\n  register --id batch-id [--kind business|infrastructure|maintenance] [--owner label]\n  module --id module-id --title title [--depends-on a,b]\n  module --id module-id --status in-progress|ready|paused|excluded\n  worker-claim --owner thread-id --module module-id --resources src/file.vue,src/other.vue\n  worker-release --owner thread-id --token exact-token\n  checkpoint --module module-id --commit existing-sha --verification note\n  plan --delivery\n  plan --rollback module-id [--batch archived-batch-id]\n  close\nLegacy schema v1: one active registry per Git common dir, explicit modules/dependencies/checkpoints.\nNo command commits, fetches, pushes, merges, changes preview, rolls back, or deletes Git carriers. Verification notes are unproven descriptions, not passing test evidence.`,
     );
     return null;
   }
@@ -719,6 +763,16 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
         title: options.title,
         ...(options['depends-on'] !== undefined ? { dependsOn: options['depends-on'].split(',') } : {}),
       });
+  } else if (command === 'worker-claim') {
+    only(options, ['owner', 'module', 'resources']);
+    result = claimBatchWork(root, {
+      owner: options.owner,
+      module: options.module,
+      resources: options.resources?.split(','),
+    });
+  } else if (command === 'worker-release') {
+    only(options, ['owner', 'token']);
+    result = releaseBatchWork(root, options.owner, options.token);
   } else if (command === 'checkpoint') {
     only(options, ['module', 'commit', 'verification']);
     result = recordBatchCheckpoint(root, {

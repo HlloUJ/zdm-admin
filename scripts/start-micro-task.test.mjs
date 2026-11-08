@@ -92,6 +92,7 @@ function fixture({ active = null, cwd = '/repo', preview = null, existing = [] }
     unpushedCommits: ['first-module-checkpoint'],
   };
   const dependencies = {
+    parallelMode: () => false,
     cwd,
     captureGit(root, args) {
       events.push(['captureGit', root, args]);
@@ -467,6 +468,7 @@ test('real corrupt or stale batch state blocks the starter before any preview or
   const f = realBatchFixture(t);
   const original = readFileSync(f.recordPath, 'utf8');
   const dependencies = {
+    parallelMode: () => false,
     cwd: f.other,
     queryPreviewStatus: () => assert.fail('invalid record must fail before preview lookup'),
     run: () => assert.fail('invalid record must never execute commands'),
@@ -505,6 +507,7 @@ test('real batch ID validation rejects oversized or archived IDs before starter 
   const beforeRefs = f.git(f.anchor, 'show-ref');
   const beforeWorktrees = f.git(f.anchor, 'worktree', 'list', '--porcelain');
   const dependencies = {
+    parallelMode: () => false,
     cwd: f.other,
     findManagedWorktrees: () => assert.fail('ID validation must precede new-worktree preparation'),
     queryPreviewStatus: () => assert.fail('invalid ID must fail before preview lookup'),

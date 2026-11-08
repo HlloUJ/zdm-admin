@@ -4,9 +4,9 @@ services:
     working_dir: /workspace/backend
     command: mvn spring-boot:run
     environment:
-      ZDM_DB_URL: jdbc:mysql://zdm-platform-mysql:3306/zdm_admin?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
-      ZDM_DB_USERNAME: zdm_admin
-      ZDM_DB_PASSWORD: zdm_admin_pwd
+      ZDM_DB_URL: jdbc:mysql://zdm-platform-mysql:3306/${ZDM_TASK_DB_NAME:?set ZDM_TASK_DB_NAME}?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai
+      ZDM_DB_USERNAME: ${ZDM_TASK_DB_USERNAME:?set ZDM_TASK_DB_USERNAME}
+      ZDM_DB_PASSWORD: ${ZDM_TASK_DB_PASSWORD:?set ZDM_TASK_DB_PASSWORD}
       ZDM_SECURITY_DEV_TOKENS_ENABLED: 'true'
       ZDM_SECURITY_VERIFICATION_CODE: '888888'
       ZDM_MEDIA_DIR: /data/zdm/craft-images
@@ -31,7 +31,7 @@ services:
       - integration
     labels:
       com.zdm.task.preview: 'true'
-      com.zdm.task.database: integration
+      com.zdm.task.database: isolated
 
 networks:
   integration:
@@ -44,4 +44,4 @@ volumes:
     name: zdm-admin_zdm_maven_repo
   zdm_craft_images:
     external: true
-    name: zdm-admin_zdm_craft_images
+    name: ${ZDM_TASK_MEDIA_VOLUME:?set ZDM_TASK_MEDIA_VOLUME}

@@ -2,7 +2,7 @@ import { observeValidationTiming } from './batch-timing-runtime.mjs';
 import { spawn } from 'node:child_process';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, createWriteStream } from 'node:fs';
+import { appendFileSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, createWriteStream } from 'node:fs';
 import path from 'node:path';
 import {
   canReuse,
@@ -17,6 +17,63 @@ import {
 } from './verification-evidence.mjs';
 import { backendReportState, validateBackendReports } from './backend-test-evidence.mjs';
 import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
+
+// Progress output is advisory. A closed terminal must not interrupt concurrent
+// commands before their actual results and immutable attempt records are saved.
+// Command logs, report validation and failure-history checks remain authoritative.
+export function createVerificationReporter(root, { output = process.stdout } = {}) {
+  const directory = path.join(root, '.task-verification', 'logs');
+  mkdirSync(directory, { recursive: true });
+  const file = path.join(directory, `progress-${randomUUID()}.log`);
+  writeFileSync(file, '', { flag: 'wx', mode: 0o600 });
+  const pending = new Set();
+  let disconnected = false,
+    failure,
+    closed = false;
+  const recordError = (error) => {
+    if (error.code === 'EPIPE') {
+      if (!disconnected)
+        appendFileSync(file, '[progress transport disconnected: EPIPE; command results remain pending]\n');
+      disconnected = true;
+    } else {
+      failure ??= error;
+    }
+  };
+  output.on('error', recordError);
+  const report = (message) => {
+    assert.equal(closed, false, 'Verification reporter is closed');
+    if (failure) throw failure;
+    const text = String(message) + '\n';
+    appendFileSync(file, text);
+    if (disconnected) return;
+    let complete;
+    const done = new Promise((resolve) => {
+      complete = resolve;
+    });
+    pending.add(done);
+    const finish = (error) => {
+      if (error) recordError(error);
+      pending.delete(done);
+      complete();
+    };
+    try {
+      output.write(text, finish);
+    } catch (error) {
+      finish(error);
+    }
+  };
+  report.log = file;
+  report.close = async () => {
+    if (closed) return;
+    closed = true;
+    await Promise.all(pending);
+    // Writable streams emit their error event after the write callback.
+    await new Promise((resolve) => setImmediate(resolve));
+    output.removeListener('error', recordError);
+    if (failure) throw failure;
+  };
+  return report;
+}
 
 function save(file, record) {
   const temporary = `${file}.${randomUUID()}.tmp`;

@@ -1,3 +1,4 @@
+import { parallelTaskMode } from './task-registry.mjs';
 import { bindBatchTiming } from './batch-timing-store.mjs';
 import { spawnSync } from 'node:child_process';
 import { existsSync, readFileSync, lstatSync } from 'node:fs';
@@ -174,9 +175,11 @@ export function retainedPublishedPreview(root, selected) {
 }
 
 function printHelp() {
-  console.log(`Usage: npm run task:start -- [--slug <task-slug>] [--kind <kind>] [--resume | --independent]
+  console.log(`旧共享批次恢复工具（仅限已审查的历史恢复；独立任务模式禁止调用）。
+当前唯一入口：已发布 main 的 npm run task:entry -- start --help。
+Legacy usage: node scripts/start-micro-task.mjs [--slug <task-slug>] [--kind <kind>] [--resume | --independent]
 
-默认恢复同类型未交付批次的分支和 Worktree；没有活动批次时从最新 origin/main 创建并登记。
+以下只说明历史行为：默认恢复同类型未交付批次的分支和 Worktree；没有活动批次时从最新 origin/main 创建并登记。
 业务批次随后切换 5175 并校验完整累计任务差异所需的预览环境；基建批次不占用业务预览。task:micro 保持兼容。
 
 Options:
@@ -190,6 +193,7 @@ Options:
 export function startTask(options, dependencies = {}) {
   const system = {
     cwd: process.cwd(),
+    parallelMode: parallelTaskMode,
     captureGit,
     readActiveBatch,
     validateActiveBatch,
@@ -209,6 +213,8 @@ export function startTask(options, dependencies = {}) {
     ...dependencies,
   };
   const invocationRoot = system.captureGit(system.cwd, ['rev-parse', '--show-toplevel']);
+  if (system.parallelMode(invocationRoot))
+    throw new Error('旧共享任务入口已停用；请从已发布 main 的 task:entry/start 使用独立任务入口');
   const active = system.readActiveBatch(invocationRoot);
   let batch = active ? system.validateActiveBatch(invocationRoot, active) : null;
   let branch;

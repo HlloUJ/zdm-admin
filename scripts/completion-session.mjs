@@ -118,6 +118,7 @@ export async function completionStage(state, name, key, run, { now = Date.now, s
       'sync',
       'recovery',
       'discovery',
+      'queue',
     ].includes(name),
     'Unknown completion stage',
   );
@@ -267,6 +268,9 @@ export function completionSummary(state, now = Date.now()) {
         )
       : null,
     ciCompletionSource: ci?.result?.gatesFinishedAt ? 'github-job-completed-at' : 'observed-wait-end',
+    queueWaitMs: union(
+      clip(state.events.filter((e) => e.name === 'queue').map((e) => [e.startedAt, e.finishedAt ?? end])),
+    ),
     ciWaitMs: union(clip(state.events.filter((e) => e.name === 'ci').map((e) => [e.startedAt, e.finishedAt ?? end]))),
     ciJobWindowMs: union(
       clip(

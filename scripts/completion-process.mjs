@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { spawnSync } from 'node:child_process';
+import { spawnSync, spawn } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -47,6 +47,49 @@ export function runCompletionProcess(command, args, options = {}) {
   });
   assertProcessesGone({ processTracking: 1, processes: [{ token }] }, directory);
   return result;
+}
+export function startCompletionProcess(command, args, options = {}) {
+  const current = scope.getStore();
+  assert.ok(current, 'Long-lived validation process requires its exact completion stage');
+  const { state, event, save } = current,
+    directory = state[completionDirectory];
+  assert.ok(directory && process.platform !== 'win32');
+  const token = randomUUID(),
+    file = path.join(directory, 'process-' + token + '.json');
+  writeFileSync(file, JSON.stringify({ token, status: 'pending' }), { flag: 'wx', mode: 0o600 });
+  (event.processes ??= []).push({ token });
+  save(state);
+  const child = spawn(process.execPath, ['--input-type=module', '-e', supervisor, file, token, command, ...args], {
+    ...options,
+    detached: true,
+  });
+  child.completionProof = { directory, token, file };
+  return child;
+}
+export async function stopCompletionProcess(child) {
+  if (!child) return;
+  const proof = child.completionProof;
+  assert.ok(proof && Number.isSafeInteger(child.pid), 'Validation child launch is not proved');
+  const record = JSON.parse(readFileSync(proof.file));
+  assert.ok(
+    record.token === proof.token && record.host === os.hostname() && record.pgid === child.pid,
+    'Validation process group identity is unknown; retain it',
+  );
+  const alive = () => {
+    try {
+      process.kill(-record.pgid, 0);
+      return true;
+    } catch (error) {
+      if (error.code === 'ESRCH') return false;
+      throw error;
+    }
+  };
+  if (alive()) process.kill(-record.pgid, 'SIGTERM');
+  const deadline = Date.now() + 5000;
+  while (alive() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
+  // Do not kill an unknown/reused group after its supervisor disappeared.
+  assert.equal(alive(), false, 'Validation descendants remain; retain their original process proof');
+  assertProcessesGone({ processTracking: 1, processes: [{ token: proof.token }] }, proof.directory);
 }
 export function assertProcessesGone(
   event,
