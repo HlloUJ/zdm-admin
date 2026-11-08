@@ -7,7 +7,6 @@ import { createTaskRegistry } from './task-registry.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { isPortOpen, inspectManagedPreview } from './dev-task.mjs';
 import { readTaskData } from './task-data-environment.mjs';
-import { isolateTaskData } from './task-data-scope.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
 import { collectDeliveryChanges, createVerificationPlan } from './verify.mjs';
 import { startCompletionProcess, stopCompletionProcess, runCompletionProcess } from './completion-process.mjs';
@@ -32,7 +31,6 @@ export async function withCandidateRuntime(batch, head, action, dependencies = {
     leases: createResourceLeases,
     isOpen: isPortOpen,
     readData: readTaskData,
-    provision: isolateTaskData,
     inspect: inspectManagedPreview,
     references: taskRuntimeReferences,
     head: gitHead,
@@ -71,8 +69,10 @@ export async function withCandidateRuntime(batch, head, action, dependencies = {
   assert.equal(system.clean(task.worktree), '', 'Candidate source changed before runtime validation');
   system.migrationSafety(task.worktree); // Read-only proof against actual published schema histories before merge.
   await system.references(task); // Detect foreign API consumers before any backend preparation.
-  if (!system.readData(task.worktree))
-    await system.provision(task.worktree, { id: task.id, owner: task.owner, apply: true });
+  assert.ok(
+    system.readData(task.worktree),
+    'Candidate data is not prepared; run the published task:data isolate <task-id> --apply explicitly before delivery. No data was created.',
+  );
   const leases = system.leases(registry.commonDir);
   let lease, port;
   for (let candidate = 5177; candidate <= 5199; candidate++) {
@@ -139,7 +139,7 @@ export async function withCandidateRuntime(batch, head, action, dependencies = {
   } finally {
     try {
       await system.stopChild(child);
-      const references = await system.references(task);
+      const references = await system.references(task, { closingLeases: [lease] });
       if (!references.owned.some((frontend) => frontend.port !== port))
         system.run(task.worktree, ['--stop', '--worktree', task.worktree, '--port', String(port)], log);
       assert.equal(await system.isOpen(port), false, 'Validation frontend still runs; retain its lease');

@@ -17,7 +17,9 @@ test('another selected or temporary frontend referencing A backend blocks before
     await assert.rejects(
       taskRuntimeReferences(task, {
         backendPorts: () => [8081],
-        request: async (url) => (Number(new URL(url).port) === port ? metadata('/repo/b', 8081) : { statusCode: 503 }),
+        readLeases: () => [],
+        request: async (url) =>
+          Number(new URL(url).port) === port ? metadata('/repo/b', 8081) : { statusCode: 0, errorCode: 'ECONNREFUSED' },
       }),
       /Another frontend still uses/,
     );
@@ -25,9 +27,10 @@ test('another selected or temporary frontend referencing A backend blocks before
 test('own temporary frontends are identified while an independent B backend and unknown web server are preserved', async () => {
   const proof = await taskRuntimeReferences(task, {
     backendPorts: () => [8081],
+    readLeases: () => [],
     request: async (url) => {
       const port = Number(new URL(url).port);
-      if (port === 5175) return metadata('/repo/b', 8082);
+      if ([5175, 5176].includes(port)) return metadata('/repo/b', 8082);
       if (port === 5178) return metadata('/repo/a', 8081);
       return { statusCode: 200, body: '<html>unrelated</html>' };
     },

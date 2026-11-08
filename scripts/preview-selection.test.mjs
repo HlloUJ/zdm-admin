@@ -240,6 +240,7 @@ test('live temporary consumers block before selected child or backend is stopped
   };
   await assert.rejects(f.supervisor.selectTask(f.request), /consumer still active/);
   assert.equal(f.supervisor.child.exitCode, null);
+  assert.equal(f.supervisor.status().phase, 'running');
   assert.ok(!f.events.some((event) => event.startsWith('backend-stop:')));
   f.tasks[0].stage = 'main-verified';
   f.tasks[0].main = { local: 'a'.repeat(40) };
@@ -261,16 +262,37 @@ test('live temporary consumers block before selected child or backend is stopped
 test('consumer guard detects own temporary preview and foreign frontend sharing the selected API', async () => {
   for (const workspaceRoot of ['/repo/a', '/repo/foreign']) {
     await assert.rejects(
-      assertPreviewConsumersReleased('/repo/a', async (url) => {
-        const port = Number(new URL(url).port);
-        if (port === 5176) return { workspaceRoot: '/repo/a', apiTarget: 'http://127.0.0.1:8081' };
-        if (port === 5199) return { workspaceRoot, apiTarget: 'http://127.0.0.1:8081' };
-        return null;
-      }),
+      assertPreviewConsumersReleased(
+        '/repo/a',
+        async (url) => {
+          const port = Number(new URL(url).port);
+          if (port === 5176 || port === 5199)
+            return {
+              type: 'zdm-task-preview',
+              workspaceRoot: port === 5176 ? '/repo/a' : workspaceRoot,
+              branch: 'codex/a',
+              mode: 'full',
+              apiTarget: 'http://127.0.0.1:8081',
+            };
+          return { statusCode: 0, errorCode: 'ECONNREFUSED' };
+        },
+        { readLeases: () => [] },
+      ),
       /仍在引用/,
     );
   }
-  await assertPreviewConsumersReleased('/repo/a', async (url) =>
-    Number(new URL(url).port) === 5188 ? { workspaceRoot: '/repo/b', apiTarget: 'http://127.0.0.1:8082' } : null,
+  await assertPreviewConsumersReleased(
+    '/repo/a',
+    async (url) =>
+      Number(new URL(url).port) === 5188
+        ? {
+            type: 'zdm-task-preview',
+            workspaceRoot: '/repo/b',
+            branch: 'codex/b',
+            mode: 'full',
+            apiTarget: 'http://127.0.0.1:8082',
+          }
+        : { statusCode: 0, errorCode: 'ECONNREFUSED' },
+    { readLeases: () => [] },
   );
 });
