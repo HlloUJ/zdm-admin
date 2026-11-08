@@ -12,6 +12,12 @@ import {
 } from './accepted-source-policy.mjs';
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const oid = /^[a-f0-9]{40}$/;
+import {
+  acceptedCompositionTree,
+  candidateCompositionTree,
+  readAcceptedComposition,
+  writeAcceptedComposition,
+} from './accepted-source-composition.mjs';
 export function acceptedGit(root, args, options = {}) {
   const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, ...options });
   assert.equal(result.status, 0, `Accepted-source Git operation failed: ${args[0]}: ${result.stderr ?? ''}`);
@@ -86,6 +92,14 @@ export function freezeAcceptedSource(root, batch) {
   if (prior) return prior; // Never rebuild a baseline from a repaired candidate.
   assert.equal(acceptedGit(root, ['branch', '--show-current']), batch.branch);
   const head = acceptedGit(root, ['rev-parse', 'HEAD']);
+  let integrationBase, originMainAtFreeze;
+  if (batch.taskRegistryVersion === 2) {
+    assert.match(batch.base, oid, 'Original task integration base required');
+    acceptedGit(root, ['merge-base', '--is-ancestor', batch.base, head]);
+    originMainAtFreeze = acceptedGit(root, ['rev-parse', 'refs/remotes/origin/main']);
+    integrationBase = acceptedGit(root, ['merge-base', head, originMainAtFreeze]);
+    acceptedGit(root, ['merge-base', '--is-ancestor', batch.base, integrationBase]);
+  }
   const files = acceptedGit(root, ['ls-files', '--cached', '--others', '--exclude-standard', '-z'])
     .split('\0')
     .filter(Boolean);
@@ -127,6 +141,9 @@ export function freezeAcceptedSource(root, batch) {
       batch: batch.id,
       branch: batch.branch,
       parent: head,
+      ...(batch.taskRegistryVersion === 2
+        ? { taskRegistryVersion: 2, integrationBase, originalTaskBase: batch.base, originMainAtFreeze }
+        : {}),
       tree,
       protectedPaths: sourceEntries(root, tree).map((entry) => entry.file),
       developmentState: (batch.modules ?? []).map(({ id, status, dependsOn }) => ({
@@ -154,8 +171,10 @@ export function freezeAcceptedSource(root, batch) {
 export function assertAcceptedSource(root, batch, candidate) {
   const record = readAcceptance(root, batch);
   assert.ok(record, 'Accepted local business snapshot missing; freeze before technical repairs');
+  const composition = readAcceptedComposition(root, batch, record.commit);
+  const expectedTree = composition?.expectedTree ?? record.tree;
   const changed = sourceDifference(
-    sourceEntries(root, record.tree, false, record.tree, record.protectedPaths),
+    sourceEntries(root, expectedTree, false, record.tree, record.protectedPaths),
     sourceEntries(root, candidate, false, record.tree, record.protectedPaths),
   );
   assert.deepEqual(
@@ -163,7 +182,38 @@ export function assertAcceptedSource(root, batch, candidate) {
     [],
     'Business/control-plane content differs from accepted local snapshot: ' + changed.join(', '),
   );
-  return { batch, accepted: record.commit, businessDigest: record.businessDigest, candidate };
+  return {
+    batch,
+    accepted: record.commit,
+    businessDigest: record.businessDigest,
+    candidate,
+    ...(composition ? { composition } : {}),
+  };
+}
+export function prepareAcceptedComposition(root, batch, main) {
+  const record = readAcceptance(root, batch);
+  assert.ok(record, 'Original accepted source required');
+  const head = acceptedGit(root, ['rev-parse', 'HEAD']);
+  assertAcceptedSource(root, batch, head);
+  const candidateTree = acceptedGit(root, [
+    '-c',
+    'merge.renames=false',
+    'merge-tree',
+    '--write-tree',
+    main,
+    head,
+  ]).split('\n')[0];
+  const expectedTree = acceptedCompositionTree(root, record.commit, main);
+  const changed = sourceDifference(
+    sourceEntries(root, expectedTree, false, record.tree, record.protectedPaths),
+    sourceEntries(root, candidateTree, false, record.tree, record.protectedPaths),
+  );
+  assert.deepEqual(
+    changed,
+    [],
+    'Composed candidate changes frozen business content beyond published main: ' + changed.join(', '),
+  );
+  return writeAcceptedComposition(root, { batch, accepted: record.commit, main, taskHead: head, candidateTree });
 }
 export function publishAcceptance(root, batch) {
   const record = readAcceptance(root, batch);
@@ -177,7 +227,7 @@ export function publishAcceptance(root, batch) {
 }
 
 // Execute only from a trusted checkout (never import the candidate's verifier in CI).
-export function verifyRemoteAcceptance(root, { candidate, accepted, branch }) {
+export function verifyRemoteAcceptance(root, { candidate, accepted, branch, trustedMain }) {
   assert.match(candidate, oid);
   assert.match(accepted, oid);
   assert.match(branch, /^codex\/[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -193,16 +243,26 @@ export function verifyRemoteAcceptance(root, { candidate, accepted, branch }) {
   assert.equal(acceptedGit(root, ['rev-parse', accepted + '^{tree}']), metadata.tree);
   assert.equal(acceptedGit(root, ['show', '-s', '--format=%P', accepted]), metadata.parent);
   acceptedGit(root, ['merge-base', '--is-ancestor', metadata.parent, candidate]);
+  if (trustedMain) assert.match(trustedMain, oid);
   assert.ok(Array.isArray(metadata.protectedPaths), 'Accepted protected paths missing');
   const all = new Set(sourceEntries(root, metadata.tree, true).map((entry) => entry.file));
   for (const file of metadata.protectedPaths) {
     assertSourcePath(file);
     assert.ok(all.has(file), 'Declared protected source absent from snapshot');
   }
+  const compose = trustedMain && metadata.taskRegistryVersion === 2;
+  const expectedTree = compose ? acceptedCompositionTree(root, accepted, trustedMain) : metadata.tree;
+  const candidateTree = compose ? candidateCompositionTree(root, candidate, trustedMain) : candidate;
   const changed = sourceDifference(
-    sourceEntries(root, metadata.tree, false, metadata.tree, metadata.protectedPaths),
-    sourceEntries(root, candidate, false, metadata.tree, metadata.protectedPaths),
+    sourceEntries(root, expectedTree, false, metadata.tree, metadata.protectedPaths),
+    sourceEntries(root, candidateTree, false, metadata.tree, metadata.protectedPaths),
   );
   assert.deepEqual(changed, [], 'Candidate changed accepted business/control-plane content: ' + changed.join(', '));
-  return { candidate, accepted, batch, businessDigest: digest(JSON.stringify(sourceEntries(root, metadata.tree))) };
+  return {
+    candidate,
+    accepted,
+    batch,
+    businessDigest: digest(JSON.stringify(sourceEntries(root, metadata.tree))),
+    ...(compose ? { trustedMain, composedTree: expectedTree, candidateMergeTree: candidateTree } : {}),
+  };
 }

@@ -63,7 +63,16 @@ export function finalHandoffPlan(root, batch, main, { execute, state }) {
   );
   git(root, 'merge-base', '--is-ancestor', previewHead, main);
   const base = git(root, 'merge-base', main, integrationHead);
+  if (batch.taskRegistryVersion === 2) {
+    const merged = git(root, 'merge-tree', '--write-tree', integrationHead, main).split('\n')[0];
+    assert.equal(
+      git(root, 'rev-parse', main + '^{tree}'),
+      merged,
+      'Integration contains unpublished source; retain it instead of presenting it as published main',
+    );
+  }
   return {
+    taskRegistryVersion: batch.taskRegistryVersion,
     main,
     anchor,
     integration,
@@ -110,6 +119,10 @@ export async function finalHandoff(root, batch, main, options) {
         );
         if (state.previewFingerprint)
           assert.equal(before.profileFingerprint, state.previewFingerprint, 'Persistent data profile changed');
+        if (plan.taskRegistryVersion === 2) {
+          assert.equal(typeof previewControl.prepareHandoff, 'function', 'Protected retained advance control required');
+          await previewControl.prepareHandoff({ ...plan, common }, owner);
+        }
         if (plan.integrationNeedsMerge || plan.integrationNeedsPush) {
           await completionStage(
             state,

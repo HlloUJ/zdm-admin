@@ -337,14 +337,16 @@ test('requires a task branch', () => {
   assert.deepEqual(taskPreviewErrors({ branch: 'main' }), ['只能预览 codex/* 任务分支，当前为：main']);
 });
 
-test('routes frontend-only changes to shared backend and backend changes to full stack', () => {
-  assert.equal(selectTaskPreviewMode({ files: ['src/pages/example.vue'] }), 'frontend');
+test('defaults to isolated full stack and only reuses an explicitly assigned preview API', () => {
+  assert.equal(selectTaskPreviewMode({ files: ['src/pages/example.vue'] }), 'full');
   assert.equal(selectTaskPreviewMode({ files: ['backend/src/main/java/example.java'] }), 'full');
   assert.equal(selectTaskPreviewMode({ files: ['src/pages/example.vue'], requestedMode: 'full' }), 'full');
   assert.equal(
-    selectTaskPreviewMode({ files: ['backend/src/main/java/example.java'], apiTarget: 'http://127.0.0.1:9000' }),
+    selectTaskPreviewMode({ files: ['backend/src/main/java/example.java'], apiTarget: 'http://127.0.0.1:8084' }),
     'frontend',
   );
+  assert.throws(() => selectTaskPreviewMode({ requestedMode: 'frontend' }), /必须指定/);
+  assert.throws(() => selectTaskPreviewMode({ apiTarget: 'http://127.0.0.1:8080' }), /不能使用集成/);
 });
 
 test('chooses the first available port', async () => {
@@ -532,7 +534,7 @@ test('worktree checks reject a stale branch and a frontend preview when the task
   );
   assert.throws(
     () => taskPreviewCheckExpectations({ ...input, files: ['backend/src/main/java/Service.java'] }),
-    /必须使用已登记的任务后端/,
+    /必须使用已登记的隔离任务后端/,
   );
   assert.throws(() => taskPreviewCheckExpectations({ ...input, branch: '' }), /只能预览/);
 });
@@ -565,7 +567,7 @@ test('worktree checks accept an explicitly registered running task backend even 
     { registeredApiTarget: null },
     { registeredApiTarget: 'http://127.0.0.1:8084' },
   ]) {
-    assert.throws(() => taskPreviewCheckExpectations({ ...input, ...changes }), /必须使用已登记的任务后端/);
+    assert.throws(() => taskPreviewCheckExpectations({ ...input, ...changes }), /必须使用已登记的隔离任务后端/);
   }
 });
 
@@ -602,23 +604,20 @@ test('worktree checks preserve explicit full mode and bind it to the registered 
   assert.throws(() => taskPreviewCheckExpectations({ ...input, registeredBackendPort: null }), /无法证明/);
 });
 
-test('frontend worktree checks use the shared API or an independently registered explicit API target', () => {
+test('frontend worktree checks require the registered isolated backend and never default to integration', () => {
   const metadata = {
     workspaceRoot: '/tmp/task',
     branch: 'codex/task',
     mode: 'frontend',
-    apiTarget: 'http://127.0.0.1:9000',
+    apiTarget: 'http://127.0.0.1:8083',
   };
   const input = { root: '/tmp/task', branch: 'codex/task', files: ['src/page.vue'], metadata };
-  const defaultExpected = taskPreviewCheckExpectations(input);
-  assert.equal(defaultExpected.expectedApiTarget, 'http://127.0.0.1:8080');
-  assert.match(
-    taskPreviewReadinessErrors({ metadata, ...defaultExpected, healthStatus: 200, healthBody: '{"status":"UP"}' }).join(
-      '\n',
-    ),
-    /不是 http/,
-  );
-  const explicitExpected = taskPreviewCheckExpectations({ ...input, registeredApiTarget: metadata.apiTarget });
+  assert.throws(() => taskPreviewCheckExpectations(input), /必须使用已登记的隔离任务后端/);
+  const explicitExpected = taskPreviewCheckExpectations({
+    ...input,
+    registeredApiTarget: metadata.apiTarget,
+    registeredBackendPort: 8083,
+  });
   assert.deepEqual(
     taskPreviewReadinessErrors({ metadata, ...explicitExpected, healthStatus: 200, healthBody: '{"status":"UP"}' }),
     [],
@@ -665,14 +664,14 @@ test('worktree runtime scope includes committed, staged, unstaged, deleted and u
   ]);
 });
 
-test('startup, check and watch share the same runtime scope; test/tools-only changes stay frontend', () => {
+test('isolated full stack remains the default while tests/tools do not trigger production watchers', () => {
   for (const file of [
     'backend/src/test/java/ExampleTest.java',
     'backend/src/test/resources/application.yml',
     'scripts/backend-test-plan.mjs',
     'scripts/dev-task.test.mjs',
   ]) {
-    assert.equal(selectTaskPreviewMode({ files: [file] }), 'frontend', file);
+    assert.equal(selectTaskPreviewMode({ files: [file] }), 'full', file);
     const slash = file.indexOf('/');
     assert.equal(runtimeWatchFile(file.slice(0, slash), file.slice(slash + 1)), null, file);
   }
@@ -753,6 +752,11 @@ function backendStartupFixture() {
   };
   const dependencies = {
     ensureDatabase: async () => order.push('database'),
+    provisionData: async () => null, // Legacy injected runtime fixture; production requires an existing isolated profile.
+    withDataLease: async (root, data, project, port, action) => {
+      order.push('lease');
+      return action();
+    },
     prepareMigrations: () => ({ directory: '/migrations', count: 1 }),
     readLock: () => null,
     acquireLock: async () => order.push('lock'),
@@ -778,7 +782,7 @@ test('verified healthy backend is reused after the existing migration lock guard
   const fixture = backendStartupFixture();
   fixture.options.riskFiles = ['migration.sql'];
   assert.deepEqual(await ensureTaskBackend(fixture.options, fixture.dependencies), { action: 'reuse' });
-  assert.deepEqual(fixture.order, ['database', 'lock', 'health']);
+  assert.deepEqual(fixture.order, ['database', 'lease', 'lock', 'health']);
   assert.deepEqual(fixture.commands, []);
   assert.deepEqual(fixture.writes, []);
   fixture.dependencies.readLock = () => ({ project: 'other', branch: 'codex/other', backupFile: '/backup' });
@@ -842,7 +846,7 @@ test('a container change during the health probe cannot pass the backend reuse p
   assert.equal(fixture.commands[0][0], 'up');
 });
 
-test('startup listeners capture a frontend-to-full change and drain the final change before activating live updates', async (t) => {
+test('startup listeners capture late backend input changes and drain the final change before activating live updates', async (t) => {
   const root = mkdtempSync(resolve(tmpdir(), 'zdm-startup-window-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => {
@@ -873,7 +877,7 @@ test('startup listeners capture a frontend-to-full change and drain the final ch
     root,
     async (startup) => {
       assert.ok(subscriptions.has(resolve(root, 'backend/src')), 'listeners exist before initial classification');
-      assert.equal(selectTaskPreviewMode({ files: taskPreviewChangedFiles(root) }), 'frontend');
+      assert.equal(selectTaskPreviewMode({ files: taskPreviewChangedFiles(root) }), 'full');
       // Simulate the await between shared-backend readiness and frontend port preparation.
       await Promise.resolve();
       writeFileSync(resolve(root, 'backend/src/main/java/Example.java'), 'backend change');

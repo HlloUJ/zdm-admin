@@ -7,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { collectDeliveryChanges, createVerificationPlan } from './verify.mjs';
 import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 import { requestResponse } from './dev-task.mjs';
+import { retainTaskDependencies } from './task-dependency-retention.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const knownOutput =
@@ -62,13 +63,30 @@ export function assetKind(name, entry, root) {
   return knownOutput.test(name) || generatedHuskyAsset(name, entry, root) ? 'generated-output' : 'blocked';
 }
 export function inventoryAssets(root) {
-  const files = git(root, ['ls-files', '--others', '--ignored', '--exclude-standard', '-z'])
-    .split('\0')
-    .filter(Boolean);
-  return files.map((file) => {
+  let files = git(root, ['ls-files', '--others', '--ignored', '--exclude-standard', '-z']).split('\0').filter(Boolean);
+  const task = readActiveBatch(root),
+    modules = path.join(root, 'node_modules');
+  const archive =
+    task?.taskRegistryVersion === 2
+      ? path.join(
+          path.resolve(root, git(root, ['rev-parse', '--git-common-dir'])),
+          'task-assets',
+          task.id,
+          'private-dependencies',
+        )
+      : null;
+  const retained =
+    archive &&
+    (existsSync(modules)
+      ? lstatSync(modules).isDirectory() || (lstatSync(modules).isSymbolicLink() && realpathSync(modules) === archive)
+      : existsSync(archive));
+  if (retained) files = files.filter((file) => file !== 'node_modules' && !file.startsWith('node_modules/'));
+  const result = files.map((file) => {
     const entry = lstatSync(path.join(root, file));
     return { file, kind: assetKind(file, entry, root), bytes: entry.size };
   });
+  if (retained) result.push({ file: 'node_modules', kind: 'private-dependencies-to-retain' });
+  return result;
 }
 export function preserveAssets(root, destination, assets = inventoryAssets(root)) {
   assert.equal(
@@ -90,6 +108,16 @@ export function preserveAssets(root, destination, assets = inventoryAssets(root)
   mkdirSync(blobs, { mode: 0o700, recursive: true });
   const manifest = [];
   for (const item of assets) {
+    if (item.kind === 'private-dependencies-to-retain') {
+      const task = readActiveBatch(root);
+      assert.equal(task?.taskRegistryVersion, 2);
+      assert.equal(
+        destination,
+        path.join(path.resolve(root, git(root, ['rev-parse', '--git-common-dir'])), 'task-assets', task.id),
+      );
+      manifest.push(retainTaskDependencies(root, destination));
+      continue;
+    }
     if (item.kind === 'external-dependency-retained') {
       manifest.push(item);
       continue;
@@ -143,6 +171,15 @@ export async function checkCompletionRuntime(
   const file = path.join(commonDir, 'preview-environment/environment.json');
   assert.ok(lstatSync(file).isFile() && !lstatSync(file).isSymbolicLink(), 'Unsafe preview registration');
   const result = previewContract(JSON.parse(readFileSync(file, 'utf8')), commonDir);
+  const published = path.join(commonDir, 'preview-environment/published/environment.json');
+  if (existsSync(published)) {
+    assert.ok(
+      lstatSync(published).isFile() && !lstatSync(published).isSymbolicLink(),
+      'Unsafe published data registration',
+    );
+    const checked = previewContract(JSON.parse(readFileSync(published, 'utf8')), commonDir);
+    result.publishedProfileFingerprint = checked.profileFingerprint;
+  }
   let previewHealthy = false;
   for (const url of [
     'http://127.0.0.1:5173',

@@ -13,8 +13,8 @@
     "dev:task:check": "node scripts/dev-task.mjs --check",
     "dev:task:stop": "node scripts/task-preview-service.mjs stop",
     "dev:task:handoff": "node scripts/dev-task.mjs --handoff",
-    "task:micro": "node scripts/start-micro-task.mjs",
-    "task:start": "node scripts/start-micro-task.mjs",
+    "task:micro": "node scripts/task-start.mjs",
+    "task:start": "node scripts/task-start.mjs",
     "task:completion": "node scripts/task-completion.mjs",
     "task:batch": "node scripts/task-batch.mjs",
     "dev:all": "node scripts/dev-all.mjs",
@@ -79,7 +79,12 @@
     "check:ui-templates": "node --test scripts/ui-template-policy.test.mjs",
     "test:ci-reuse": "node scripts/run-ci-diagnostics.mjs",
     "check:business-regressions": "node scripts/business-regression.mjs",
-    "task:timing": "node scripts/task-timing.mjs"
+    "task:timing": "node scripts/task-timing.mjs",
+    "task:registry": "node scripts/task-registry.mjs",
+    "task:preview": "node scripts/task-preview.mjs",
+    "task:data": "node scripts/task-data-scope.mjs",
+    "task:work": "node scripts/task-development.mjs",
+    "task:entry": "node scripts/task-entry.mjs"
   },
   "lint-staged": {
     "*.{js,ts,vue}": [

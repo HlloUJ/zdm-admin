@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { servicePaths, readServiceStatus } from './task-preview-service.mjs';
+import { servicePaths, readServiceStatus, requestJson } from './task-preview-service.mjs';
 import { inspectManagedPreview } from './dev-task.mjs';
+import { createTaskRegistry } from './task-registry.mjs';
+import { assertPreviewOwner, previewOwner } from './preview-transition.mjs';
+import { assertDevelopmentApi } from './preview-policy.mjs';
+import { taskRuntimeReferences } from './task-runtime-references.mjs';
 
 // Use the installed compatible service; never install, replace its launcher or choose integration API.
 export function createCompletionPreviewControl({
@@ -10,6 +14,9 @@ export function createCompletionPreviewControl({
   paths = servicePaths(),
   readStatus = () => readServiceStatus(paths),
   inspect = inspectManagedPreview,
+  registry = createTaskRegistry,
+  references = taskRuntimeReferences,
+  request = requestJson,
   readInstalled = () => {
     assert.ok(
       lstatSync(paths.configFile).isFile() && !lstatSync(paths.configFile).isSymbolicLink(),
@@ -35,12 +42,20 @@ export function createCompletionPreviewControl({
       status.phase !== 'offline' || (status.selectionKnown === true && status.installed === true),
       'Offline preview ownership or installation is unknown',
     );
-    if (status.worktree !== null)
-      assert.ok(
-        [plan.task, plan.preview].some((root) => root && path.resolve(root) === path.resolve(status.worktree)),
-        'Preview belongs to another task; do not stop or switch it',
+    if (status.worktree !== null) {
+      const owned = [plan.task, plan.preview].some(
+        (root) => root && path.resolve(root) === path.resolve(status.worktree),
       );
-    else assert.ok(status.childPid === null, 'Unowned preview child remains');
+      if (!owned && plan.taskRegistryVersion === 2) {
+        const tasks = registry(plan.anchor ?? plan.task);
+        assert.equal(tasks.commonDir, plan.common, 'Preview registry belongs to another repository');
+        const foreign = tasks.resolve({ worktree: status.worktree });
+        assert.notEqual(foreign.stage, 'closed', 'Selected task is already closed');
+        assert.equal(status.phase, 'running', 'Another selected task is not healthy; preserve it');
+        return { ...status, preservedTask: { id: foreign.id, branch: foreign.branch, worktree: foreign.worktree } };
+      }
+      assert.ok(owned, 'Preview belongs to another task; do not stop or switch it');
+    } else assert.ok(status.childPid === null, 'Unowned preview child remains');
     return status;
   }
   async function retainedReady(plan) {
@@ -79,12 +94,33 @@ export function createCompletionPreviewControl({
     );
     return installed;
   }
-  function checkInstalled(plan) {
+  function checkInstalled(plan, worktree = plan.preview) {
     const installed = installedLauncher(plan);
     // The installed data-aware launcher proves actual registered backend/data bindings.
-    execute(plan.preview, installed.nodePath, [installed.launcherPath, '--check', '--worktree', plan.preview]);
+    execute(worktree, installed.nodePath, [installed.launcherPath, '--check', '--worktree', worktree]);
+  }
+  async function checkPreserved(plan, owner) {
+    const expected = previewOwner(owner),
+      task = owner.preservedTask;
+    const result = await inspect({
+      expectedWorkspaceRoot: task.worktree,
+      expectedBranch: task.branch,
+      expectedMode: 'full',
+    });
+    assert.ok(
+      result.metadata && result.errors.length === 0,
+      'Another selected task lost its preview identity or API health',
+    );
+    assertDevelopmentApi(result.metadata.apiTarget);
+    checkInstalled(plan, task.worktree);
+    const after = await assertOwner(plan);
+    assert.equal(after.preservedTask?.id, task.id, 'Selected task changed during handoff checks');
+    assertPreviewOwner(expected, after);
+    return { ready: true, reused: true, worktree: task.worktree, preservedTask: task.id };
   }
   async function check(plan) {
+    const owner = await assertOwner(plan);
+    if (owner.preservedTask) return checkPreserved(plan, owner);
     assert.ok(await retainedReady(plan), 'Retained preview identity, full mode or API health is unavailable');
     checkInstalled(plan);
     assert.ok(await retainedReady(plan), 'Retained preview changed during its data binding check');
@@ -92,6 +128,7 @@ export function createCompletionPreviewControl({
   }
   async function ensure(plan) {
     const owner = await assertOwner(plan);
+    if (owner.preservedTask) return checkPreserved(plan, owner);
     assert.ok(
       !owner.worktree || path.resolve(owner.worktree) !== path.resolve(plan.task),
       'Old task is still selected; complete its owned handoff before switching',
@@ -100,6 +137,25 @@ export function createCompletionPreviewControl({
     if (!reused) {
       // Fail before starting anything if the installed isolated launcher cannot be proven.
       installedLauncher(plan);
+      if (plan.taskRegistryVersion === 2) {
+        assert.equal(owner.taskSelectionProtocol, 2, 'Reviewed multi-task runtime must be installed before handoff');
+        const task = registry(plan.anchor).resolve({ worktree: plan.task });
+        await request({
+          paths,
+          method: 'POST',
+          requestPath: '/retain-task',
+          timeoutMs: 300_000,
+          payload: {
+            task: task.id,
+            owner: task.owner,
+            worktree: task.worktree,
+            main: plan.main,
+            expected: previewOwner(owner),
+          },
+        });
+        await check(plan);
+        return { reused: false, worktree: plan.preview, mode: 'full' };
+      }
       execute(plan.anchor, process.execPath, [
         path.join(plan.anchor, 'scripts/task-preview-service.mjs'),
         'switch',
@@ -112,5 +168,70 @@ export function createCompletionPreviewControl({
     await check(plan);
     return { reused, worktree: plan.preview, mode: 'full' };
   }
-  return { assertOwner, ensure, check };
+  async function prepareHandoff(plan, owner) {
+    if (plan.taskRegistryVersion === 2) await quiesceTemporary(plan);
+    if (plan.taskRegistryVersion !== 2 || !plan.previewNeedsAdvance || owner.worktree !== plan.preview)
+      return { paused: false };
+    assert.equal(owner.taskSelectionProtocol, 2, 'Reviewed runtime must support protected retained advance');
+    const task = registry(plan.anchor).resolve({ worktree: plan.task });
+    await request({
+      paths,
+      method: 'POST',
+      requestPath: '/pause-retained',
+      timeoutMs: 300_000,
+      payload: {
+        task: task.id,
+        owner: task.owner,
+        worktree: task.worktree,
+        main: plan.main,
+        expected: previewOwner(owner),
+      },
+    });
+    return { paused: true };
+  }
+  async function quiesceTemporary(plan) {
+    const task = registry(plan.anchor).resolve({ worktree: plan.task });
+    const snapshot = await references(task),
+      installed = installedLauncher(plan);
+    for (const frontend of snapshot.owned.filter((item) => item.port >= 5177)) {
+      assert.equal(frontend.metadata.branch, task.branch, 'Temporary preview branch changed');
+      execute(task.worktree, installed.nodePath, [
+        installed.launcherPath,
+        '--worktree',
+        task.worktree,
+        '--stop',
+        '--port',
+        String(frontend.port),
+      ]);
+    }
+    return snapshot;
+  }
+  async function prepareComposition(plan) {
+    const owner = await assertOwner(plan);
+    const snapshot = await quiesceTemporary(plan);
+    if (snapshot.owned.length === 0 && snapshot.backendPorts.length === 0) {
+      if (owner.preservedTask) await checkPreserved(plan, owner);
+      return { quiesced: true, runtimeAbsent: true, preservedTask: owner.preservedTask?.id ?? null };
+    }
+    assert.equal(owner.taskSelectionProtocol, 2, 'Install the reviewed task runtime before composing a live task');
+    installedLauncher(plan);
+    const task = registry(plan.anchor).resolve({ worktree: plan.task });
+    const response = await request({
+      paths,
+      method: 'POST',
+      requestPath: '/prepare-task-delivery',
+      timeoutMs: 300_000,
+      payload: {
+        task: task.id,
+        owner: task.owner,
+        worktree: task.worktree,
+        candidate: task.recordedHead,
+        main: plan.main,
+        expected: previewOwner(owner),
+      },
+    });
+    if (owner.preservedTask) await checkPreserved(plan, owner);
+    return response;
+  }
+  return { assertOwner, ensure, check, prepareHandoff, prepareComposition };
 }

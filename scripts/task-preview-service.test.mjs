@@ -265,6 +265,7 @@ test('creates a login-persistent launchd definition with escaped paths', () => {
 
 function supervisorFixture({ unhealthy = false, blocked = false } = {}) {
   const events = [];
+  let healthChecks = 0;
   const root = '/repo/task';
   const gateway = {
     mode: 'task',
@@ -290,7 +291,7 @@ function supervisorFixture({ unhealthy = false, blocked = false } = {}) {
     writeConfig: () => events.push('save'),
     checkSelectedPreview: async () => {
       events.push('check');
-      if (unhealthy) throw new Error('API health unavailable');
+      if (unhealthy && ++healthChecks === 1) throw new Error('API health unavailable');
     },
     ensureDockerReady: async () => events.push('docker-ready'),
     stopChild: async (child) => {
@@ -331,16 +332,28 @@ test('same-worktree failed preview check reaches protected recovery instead of t
   const f = supervisorFixture({ unhealthy: true });
   const result = await f.supervisor.switch(f.root, f.config.taskArgs);
   assert.equal(result.phase, 'running');
-  assert.deepEqual(f.events, ['save', 'check', 'docker-ready', 'stop', 'launch-protected-task', 'ready', 'ready']);
+  assert.deepEqual(f.events, [
+    'save',
+    'check',
+    'docker-ready',
+    'stop',
+    'launch-protected-task',
+    'ready',
+    'ready',
+    'check',
+  ]);
 });
 
 test('a child that exits during the asynchronous check is recovered instead of reporting stale reuse', async () => {
   const f = supervisorFixture();
+  let checks = 0;
   f.supervisor.dependencies.checkSelectedPreview = async () => {
     f.events.push('check');
-    f.supervisor.child = null;
-    f.supervisor.phase = 'error';
-    f.gateway.useIntegration();
+    if (++checks === 1) {
+      f.supervisor.child = null;
+      f.supervisor.phase = 'error';
+      f.gateway.useIntegration();
+    }
   };
   const result = await f.supervisor.switch(f.root, f.config.taskArgs);
   assert.equal(result.phase, 'running');
@@ -544,6 +557,7 @@ test('safe retained handoff verifies the live source and proof before stopping, 
     'launch-protected-task',
     'ready',
     'ready',
+    'check',
   ]);
 });
 

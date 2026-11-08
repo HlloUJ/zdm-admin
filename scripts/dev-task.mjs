@@ -1,3 +1,6 @@
+import { createTaskRegistry, parallelTaskMode } from './task-registry.mjs';
+import { createResourceLeases } from './resource-lease.mjs';
+import assert from 'node:assert/strict';
 import {
   existsSync,
   lstatSync,
@@ -18,6 +21,16 @@ import net from 'node:net';
 import { homedir, tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { withPreviewDataLease } from './runtime-resource.mjs';
+import { assertDevelopmentApi } from './preview-policy.mjs';
+
+import {
+  ensureTaskData,
+  readTaskData,
+  taskDataComposeEnv,
+  protectPreviewUpdate,
+  releaseIntegrationMigration,
+} from './task-data-environment.mjs';
 
 import { branchKind, DEFAULT_INTEGRATION_BRANCH, parseWorktreePorcelain } from './git-workflow-core.mjs';
 import { classifyChangedFiles } from './verification-impact.mjs';
@@ -80,6 +93,12 @@ export function parseTaskPreviewArgs(args) {
   };
   for (let index = 0; index < args.length; index += 1) {
     const value = args[index];
+    if (value === '--validation-candidate') {
+      if (result.validationCandidate || !/^[a-f0-9]{40}$/.test(args[index + 1] ?? ''))
+        throw new Error('需要准确验证候选SHA');
+      result.validationCandidate = args[++index];
+      continue;
+    }
     if (value === '--help' || value === '-h') {
       result.help = true;
       continue;
@@ -171,10 +190,14 @@ export function databaseRiskFiles(files) {
   return files.filter((file) => file.startsWith('backend/src/main/resources/db/migration/'));
 }
 
-export function selectTaskPreviewMode({ files, requestedMode = 'auto', apiTarget = null }) {
+export function selectTaskPreviewMode({ requestedMode = 'auto', apiTarget = null }) {
+  if (requestedMode === 'frontend' && !apiTarget)
+    throw new Error('前端调试模式必须指定外部 API；普通任务使用隔离完整环境');
+  if (apiTarget === SHARED_API_TARGET) throw new Error('任务预览不能使用集成 API');
+  if (apiTarget) assertDevelopmentApi(apiTarget);
   if (requestedMode !== 'auto') return requestedMode;
   if (apiTarget) return 'frontend';
-  return backendSensitiveFiles(files).length > 0 ? 'full' : 'frontend';
+  return 'full';
 }
 
 export function taskProjectName({ branch, root }) {
@@ -187,6 +210,28 @@ export function taskProjectName({ branch, root }) {
       .slice(0, 24) || 'preview';
   const digest = createHash('sha256').update(path.resolve(root)).digest('hex').slice(0, 10);
   return `zdm-task-${slug}-${digest}`;
+}
+export function assertFrozenValidationStart(task, options, { head, lease, previewLease, alive }) {
+  if (!task.frozen) {
+    if (options.validationCandidate) throw new Error('没有当前任务原始冻结，禁止冒充交付验证');
+    return;
+  }
+  const restore = options.port === 5176 && previewLease?.task === task.id;
+  const stages = restore
+    ? ['frozen', 'queued', 'validating', 'pr-pending', 'merged', 'main-verified', 'handoff-verified']
+    : ['frozen', 'queued', 'validating', 'pr-pending'];
+  if (
+    options.validationCandidate !== head ||
+    !stages.includes(task.stage) ||
+    lease?.task !== task.owner ||
+    !options.port ||
+    (!restore && options.port < 5177) ||
+    options.port > 5199 ||
+    options.mode !== 'full'
+  )
+    throw new Error('当前任务已冻结交付，禁止重新启动其开发运行环境；使用交付恢复入口');
+  assert.ok(alive(lease.pid), '准确交付所有者已结束；不得重启冻结候选');
+  if (restore) assert.ok(alive(previewLease.pid), '原子预览恢复归属已失效');
 }
 
 export function parseBackendPortBindings(value) {
@@ -307,7 +352,7 @@ export function taskPreviewCheckExpectations({
     metadata.mode !== 'full' &&
     (!taskBackendTarget || metadata.apiTarget !== taskBackendTarget || registeredApiTarget !== taskBackendTarget)
   )
-    throw new Error('当前任务包含后端变更，必须使用已登记的任务后端');
+    throw new Error('当前任务必须使用已登记的隔离任务后端');
   // A frontend task may have been explicitly started in full mode; retain that supported choice.
   const expectedMode = metadata.mode;
   let expectedApiTarget = registeredApiTarget ?? SHARED_API_TARGET;
@@ -604,10 +649,19 @@ function prepareTaskMigrations({ root, integrationRoot, project }) {
 }
 
 function composeContext({ root, project, backendPort }) {
+  const data = readTaskData(root, project);
   return {
     cwd: root,
     env: {
       ...process.env,
+      ...(data
+        ? taskDataComposeEnv(data)
+        : {
+            ZDM_TASK_DB_NAME: 'zdm_task_uninitialized',
+            ZDM_TASK_DB_USERNAME: 'uninitialized',
+            ZDM_TASK_DB_PASSWORD: 'uninitialized',
+            ZDM_TASK_MEDIA_VOLUME: 'zdm-task-media-uninitialized',
+          }),
       ZDM_TASK_WORKSPACE: root,
       ZDM_TASK_BACKEND_PORT: String(backendPort),
       ZDM_INTEGRATION_NETWORK: INTEGRATION_NETWORK,
@@ -641,9 +695,9 @@ export function requestResponse(url, timeoutMs = 1_000) {
     });
     request.once('timeout', () => {
       request.destroy();
-      resolve({ statusCode: 0, body: '', errorCode: 'ETIMEDOUT' });
+      resolve({ statusCode: 0, body: '' });
     });
-    request.once('error', (error) => resolve({ statusCode: 0, body: '', errorCode: error.code ?? 'NETWORK_ERROR' }));
+    request.once('error', () => resolve({ statusCode: 0, body: '' }));
   });
 }
 
@@ -661,7 +715,6 @@ export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_00
         method,
         headers: method === 'DELETE' ? { [TASK_PREVIEW_CONTROL_HEADER]: TASK_PREVIEW_CONTROL_VALUE } : undefined,
         timeout: timeoutMs,
-        agent: false,
       },
       (response) => {
         const chunks = [];
@@ -673,9 +726,9 @@ export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_00
     );
     request.once('timeout', () => {
       request.destroy();
-      resolve({ statusCode: 0, body: '', errorCode: 'ETIMEDOUT' });
+      resolve({ statusCode: 0, body: '' });
     });
-    request.once('error', (error) => resolve({ statusCode: 0, body: '', errorCode: error.code ?? 'NETWORK_ERROR' }));
+    request.once('error', () => resolve({ statusCode: 0, body: '' }));
     request.end();
   });
 }
@@ -688,6 +741,7 @@ function previewServiceRequest(method, requestPath, timeoutMs = 30_000, payload)
     }
     const request = http.request(
       {
+        headers: { 'x-zdm-preview-protocol': '2' },
         socketPath: PREVIEW_SERVICE_SOCKET,
         path: requestPath,
         method,
@@ -731,8 +785,8 @@ export async function stopSupervisedPreview(root, { request = previewServiceRequ
     status?.type === 'zdm-task-preview-service' &&
     status.worktree === null &&
     status.childPid === null &&
-    status.phase === 'integration-fallback' &&
-    status.mode === 'integration-fallback';
+    ['preview-unavailable', 'integration-fallback'].includes(status.phase) &&
+    ['preview-unavailable', 'integration-fallback'].includes(status.mode);
   const currentResponse = await request('GET', '/status');
   // A missing supervisor socket preserves foreground-preview handoff. An unreachable
   // installed supervisor is unknown state, never proof that its child has stopped.
@@ -797,8 +851,6 @@ export async function inspectManagedPreview({
     healthStatus: health.statusCode,
     healthBody: health.body,
   });
-  if (!metadata) errors.push(previewProbeFailure(response));
-  else if (health.errorCode) errors.push(`健康探针连接失败：${health.errorCode}`);
   return { metadata, errors };
 }
 
@@ -1092,6 +1144,9 @@ export async function ensureTaskBackend(
   { context, integrationRoot, root, branch, project, riskFiles = [] },
   {
     ensureDatabase = ensureIntegrationDatabase,
+    provisionData = ensureTaskData,
+    withDataLease = withPreviewDataLease,
+    protectData = protectPreviewUpdate,
     prepareMigrations = prepareTaskMigrations,
     readLock = readDatabaseLock,
     acquireLock = acquireDatabaseLock,
@@ -1106,71 +1161,95 @@ export async function ensureTaskBackend(
   } = {},
 ) {
   await ensureDatabase(integrationRoot);
-  const migrations = prepareMigrations({ root, integrationRoot, project });
-  const lock = readLock(integrationRoot);
-  const conflict = databaseLockError(lock, { project, branch });
-  if (conflict) throw new Error(`${conflict}\n当前任务备份：${lock.backupFile}`);
-  if (riskFiles.length > 0) {
-    await acquireLock({ context, integrationRoot, root, branch, project, riskFiles });
-  }
-  const expected = {
-    root,
-    project,
-    backendPort: context.env.ZDM_TASK_BACKEND_PORT,
-    migrationDirectory: migrations.directory,
-  };
-  const state = () => ({
-    sourceIdentity: snapshot({ root, migrationDirectory: migrations.directory }),
-    configurationIdentity: runtimeDigest(configuration(context)),
-    containerIdentity: taskBackendContainerIdentity(inspect(context), expected),
+  const data = await provisionData({ root, integrationRoot, project });
+  return withDataLease(root, data, project, context.env.ZDM_TASK_BACKEND_PORT, async () => {
+    // Recheck writers under the data lease: two launchers may both have observed
+    // an idle database before either one acquired it.
+    const currentData = await provisionData({ root, integrationRoot, project });
+    if (JSON.stringify(currentData) !== JSON.stringify(data))
+      throw new Error('任务数据绑定在取得写入锁前变化，保留现场');
+    if (data) Object.assign(context.env, taskDataComposeEnv(data));
+    const migrations = prepareMigrations({ root, integrationRoot, project });
+    const lock = readLock(integrationRoot);
+    const conflict = databaseLockError(lock, { project, branch });
+    if (conflict) throw new Error(`${conflict}\n当前任务备份：${lock.backupFile}`);
+    if (!data && riskFiles.length > 0) {
+      await acquireLock({ context, integrationRoot, root, branch, project, riskFiles });
+    }
+    const expected = {
+      root,
+      project,
+      backendPort: context.env.ZDM_TASK_BACKEND_PORT,
+      migrationDirectory: migrations.directory,
+      ...(data ? { database: data.database, username: data.username, mediaVolume: data.mediaVolume } : {}),
+    };
+    const state = () => ({
+      sourceIdentity: snapshot({ root, migrationDirectory: migrations.directory }),
+      configurationIdentity: runtimeDigest(configuration(context)),
+      containerIdentity: taskBackendContainerIdentity(inspect(context), expected),
+    });
+    let before = state();
+    const record = readRecord(root);
+    let action = taskBackendAction(record, { ...before, risk: riskFiles.length > 0 });
+    const healthUrl = `http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}/actuator/health`;
+    if (action === 'reuse') {
+      const response = await health(healthUrl);
+      const after = state();
+      if (backendResponseHealthy(response) && JSON.stringify(before) === JSON.stringify(after)) {
+        console.log(`复用已核验的任务后端：http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}`);
+        return { action: 'reuse' };
+      }
+      before = after;
+      action = taskBackendAction(record, { ...before, risk: riskFiles.length > 0 });
+      if (action === 'reuse') action = 'restart';
+    }
+    const previewProtection = data
+      ? protectData({
+          root,
+          data,
+          directory: migrations.directory,
+          risk: riskFiles.length > 0,
+          stop: () => execute(context, ['stop', 'backend']),
+        })
+      : null;
+    execute(
+      context,
+      action === 'restart' ? ['restart', 'backend'] : ['up', '-d', '--no-deps', '--force-recreate', 'backend'],
+    );
+    try {
+      const launchedIdentity = taskBackendContainerIdentity(inspect(context), expected);
+      if (!launchedIdentity || launchedIdentity === before.containerIdentity)
+        throw new Error('任务后端未产生新的有效启动身份，未登记复用证据');
+      await waitForHealth(healthUrl);
+      if (!backendResponseHealthy(await health(healthUrl)))
+        throw new Error('任务后端未返回 UP 健康状态，未登记复用证据');
+      const after = state();
+      if (
+        after.sourceIdentity !== before.sourceIdentity ||
+        after.configurationIdentity !== before.configurationIdentity
+      )
+        throw Object.assign(new Error('后端启动期间运行输入发生变化，未登记复用证据；请在改动稳定后重试'), {
+          code: 'RUNTIME_INPUT_CHANGED',
+        });
+      if (!after.containerIdentity || after.containerIdentity !== launchedIdentity)
+        throw new Error('任务后端容器身份、挂载或端口不匹配，未登记复用证据');
+      writeRecord(root, { version: 1, ...after });
+      releaseIntegrationMigration(previewProtection);
+    } catch (error) {
+      if (error.code === 'RUNTIME_INPUT_CHANGED') throw error;
+      execute(context, ['logs', '--tail', '80', 'backend']);
+      const activeLock = readLock(integrationRoot);
+      if (activeLock?.project === project) {
+        console.error(`数据库保护点保留：${activeLock.backupFile}`);
+        console.error('集成后端保持暂停；恢复数据库必须先取得用户明确确认。');
+      }
+      throw error;
+    }
+    console.log(`任务后端：http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}`);
+    console.log(data ? `任务数据库：${data.database}；任务附件：${data.mediaVolume}` : '旧共享任务环境');
+    console.log(`Flyway 迁移目录：集成基线 + 当前任务（${migrations.count} 个）`);
+    return { action };
   });
-  let before = state();
-  const record = readRecord(root);
-  let action = taskBackendAction(record, { ...before, risk: riskFiles.length > 0 });
-  const healthUrl = `http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}/actuator/health`;
-  if (action === 'reuse') {
-    const response = await health(healthUrl);
-    const after = state();
-    if (backendResponseHealthy(response) && JSON.stringify(before) === JSON.stringify(after)) {
-      console.log(`复用已核验的任务后端：http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}`);
-      return { action: 'reuse' };
-    }
-    before = after;
-    action = taskBackendAction(record, { ...before, risk: riskFiles.length > 0 });
-    if (action === 'reuse') action = 'restart';
-  }
-  execute(
-    context,
-    action === 'restart' ? ['restart', 'backend'] : ['up', '-d', '--no-deps', '--force-recreate', 'backend'],
-  );
-  try {
-    const launchedIdentity = taskBackendContainerIdentity(inspect(context), expected);
-    if (!launchedIdentity || launchedIdentity === before.containerIdentity)
-      throw new Error('任务后端未产生新的有效启动身份，未登记复用证据');
-    await waitForHealth(healthUrl);
-    if (!backendResponseHealthy(await health(healthUrl))) throw new Error('任务后端未返回 UP 健康状态，未登记复用证据');
-    const after = state();
-    if (after.sourceIdentity !== before.sourceIdentity || after.configurationIdentity !== before.configurationIdentity)
-      throw Object.assign(new Error('后端启动期间运行输入发生变化，未登记复用证据；请在改动稳定后重试'), {
-        code: 'RUNTIME_INPUT_CHANGED',
-      });
-    if (!after.containerIdentity || after.containerIdentity !== launchedIdentity)
-      throw new Error('任务后端容器身份、挂载或端口不匹配，未登记复用证据');
-    writeRecord(root, { version: 1, ...after });
-  } catch (error) {
-    if (error.code === 'RUNTIME_INPUT_CHANGED') throw error;
-    execute(context, ['logs', '--tail', '80', 'backend']);
-    const activeLock = readLock(integrationRoot);
-    if (activeLock?.project === project) {
-      console.error(`数据库保护点保留：${activeLock.backupFile}`);
-      console.error('集成后端保持暂停；恢复数据库必须先取得用户明确确认。');
-    }
-    throw error;
-  }
-  console.log(`任务后端：http://127.0.0.1:${context.env.ZDM_TASK_BACKEND_PORT}`);
-  console.log('任务数据库：复用集成 MySQL / zdm_admin（手工验收数据持续保留）');
-  console.log(`Flyway 迁移目录：集成基线 + 当前任务（${migrations.count} 个）`);
-  return { action };
 }
 
 export async function ensureSharedBackend(
@@ -1219,7 +1298,10 @@ export async function handoffDatabaseTask(
   if (managedPreview && path.resolve(managedPreview.workspaceRoot) === path.resolve(root)) {
     await stopPreview();
   }
-  if (supervisedPreviewStopped || managedPreview) {
+  if (
+    supervisedPreviewStopped ||
+    (managedPreview && path.resolve(managedPreview.workspaceRoot) === path.resolve(root))
+  ) {
     console.log(`旧任务预览已停止：${branch}`);
   }
   stopBackend();
@@ -1266,6 +1348,7 @@ function spawnFrontend({ root, branch, port, apiTarget, mode }) {
       '127.0.0.1',
       '--port',
       String(port),
+      '--strictPort',
     ],
     {
       cwd: root,
@@ -1378,7 +1461,7 @@ function printHelp() {
   console.log(`Usage: npm run dev:task -- [options]
 
 Options:
-  --mode auto|frontend|full  旧启动参数；启动须使用已安装且支持隔离数据的常驻服务
+  --mode auto|frontend|full  默认隔离完整环境；frontend 仅用于显式外部 API 调试
   --port 5176               指定临时任务前端端口（5175-5199）
   --temporary               从 5177-5199 自动选择临时端口，不切换固定入口
   --backend-port 8081       指定任务后端端口（8081-8099）
@@ -1397,6 +1480,18 @@ export async function main(args = process.argv.slice(2)) {
     printHelp();
     return;
   }
+  if (
+    options.validationCandidate &&
+    (!options.port ||
+      options.port < 5176 ||
+      options.temporary ||
+      options.check ||
+      options.stop ||
+      options.pause ||
+      options.handoff ||
+      options.mode !== 'full')
+  )
+    throw new Error('冻结候选验证仅允许准确临时端口和 full 模式');
   if (options.apiTarget && options.mode === 'full') throw new Error('--api 不能与 --mode full 同时使用');
   if (options.databaseRisk && options.mode === 'frontend')
     throw new Error('--database-risk 不能与 --mode frontend 同时使用');
@@ -1419,15 +1514,6 @@ export async function main(args = process.argv.slice(2)) {
     throw new Error('--check 只能与 --port 或 --worktree 组合使用');
   }
 
-  // This published legacy launcher cannot prove isolated persistent data inputs.
-  // The installed compatible service remains authoritative; never silently start
-  // against the integration database while its persistent replacement is retained.
-  if (!options.check && !options.handoff && !options.stop && !options.pause) {
-    throw new Error(
-      '该旧启动器未实现长期预览隔离数据契约；请使用已安装的兼容 dev:task 服务，不自动重装、切到集成API或重建预览数据',
-    );
-  }
-
   if (options.check) {
     const expectedWorkspaceRoot = options.worktree ? await resolveTargetRoot(options.worktree) : null;
     const port = options.port || CURRENT_TASK_FRONTEND_PORT;
@@ -1440,10 +1526,7 @@ export async function main(args = process.argv.slice(2)) {
       if (!current) throw new Error(previewProbeFailure(response));
       let registeredBackendPort = null;
       let registeredApiTarget = null;
-      if (
-        current?.mode === 'full' ||
-        (backendSensitiveFiles(files).length > 0 && current?.apiTarget && current.apiTarget !== SHARED_API_TARGET)
-      ) {
+      if (current?.apiTarget && current.apiTarget !== SHARED_API_TARGET) {
         const project = taskProjectName({ branch, root: expectedWorkspaceRoot });
         registeredBackendPort = existingTaskBackendPort(
           composeContext({ root: expectedWorkspaceRoot, project, backendPort: BACKEND_PORT_START }),
@@ -1455,6 +1538,32 @@ export async function main(args = process.argv.slice(2)) {
         const status = response.statusCode === 200 ? parseJson(response.body) : null;
         if (previewServiceOwnsWorktree(status, expectedWorkspaceRoot))
           registeredApiTarget = parseTaskPreviewArgs(status.taskArgs ?? []).apiTarget;
+      }
+      const data = readTaskData(expectedWorkspaceRoot, taskProjectName({ branch, root: expectedWorkspaceRoot }));
+      if (!data) throw new Error('任务尚未登记独立数据库与附件卷，不能声明隔离环境就绪');
+      if (
+        current?.mode === 'full' ||
+        (current?.mode === 'frontend' && registeredBackendPort && registeredApiTarget === current.apiTarget)
+      ) {
+        const context = composeContext({
+          root: expectedWorkspaceRoot,
+          project: taskProjectName({ branch, root: expectedWorkspaceRoot }),
+          backendPort: registeredBackendPort,
+        });
+        const backend = inspectTaskBackend(context);
+        if (
+          !taskBackendContainerIdentity(backend, {
+            root: expectedWorkspaceRoot,
+            project: taskProjectName({ branch, root: expectedWorkspaceRoot }),
+            backendPort: registeredBackendPort,
+            migrationDirectory: taskMigrationDirectory(taskProjectName({ branch, root: expectedWorkspaceRoot })),
+            database: data.database,
+            username: data.username,
+            mediaVolume: data.mediaVolume,
+          })
+        ) {
+          throw new Error('任务后端未连接登记的独立任务库或附件卷');
+        }
       }
       expectations = taskPreviewCheckExpectations({
         root: expectedWorkspaceRoot,
@@ -1483,6 +1592,26 @@ export async function main(args = process.argv.slice(2)) {
     throw new Error(`目标目录不是当前仓库已登记的 Worktree：${root}`);
   }
 
+  let registeredTask = null;
+  if (
+    !options.pause &&
+    !options.stop &&
+    !options.handoff &&
+    parallelTaskMode(root) &&
+    branch !== 'codex/preview-current'
+  ) {
+    const task = createTaskRegistry(root).resolve({ worktree: root });
+    registeredTask = task;
+    assertFrozenValidationStart(task, options, {
+      head: gitCapture(root, ['rev-parse', 'HEAD']),
+      lease: createResourceLeases(task.repository.commonDir).inspect('task-delivery-' + task.id),
+      previewLease: createResourceLeases(task.repository.commonDir).inspect('preview-5175'),
+      alive: (pid) => {
+        process.kill(pid, 0);
+        return true;
+      },
+    });
+  }
   const project = taskProjectName({ branch, root });
   const integrationWorktree = integrationWorktreeFor(worktrees);
   const integrationRoot = integrationWorktree.path;
@@ -1543,7 +1672,28 @@ export async function main(args = process.argv.slice(2)) {
     const frontendPort = await chooseTaskFrontendPort({
       requestedPort: options.port,
       temporary: options.temporary,
+      ...(registeredTask
+        ? {
+            isOpen: async (port) =>
+              Boolean(createResourceLeases(registeredTask.repository.commonDir).inspect('temporary-port-' + port)) ||
+              (await isPortOpen(port)),
+          }
+        : {}),
     });
+    let leasedFrontend = null;
+    if (registeredTask && frontendPort >= 5177) {
+      const leases = createResourceLeases(registeredTask.repository.commonDir);
+      const current = leases.inspect('temporary-port-' + frontendPort);
+      if (options.validationCandidate) {
+        if (current?.task !== registeredTask.id) throw new Error('验证端口不属于当前准确任务');
+      } else {
+        const lease = leases.acquire('temporary-port-' + frontendPort, registeredTask.id);
+        process.once('exit', () => {
+          if (leasedFrontend && leasedFrontend.exitCode === null && !leasedFrontend.signalCode) return;
+          leases.release(lease);
+        });
+      }
+    }
 
     let backendContext = null;
     let apiTarget = options.apiTarget;
@@ -1579,12 +1729,13 @@ export async function main(args = process.argv.slice(2)) {
       `${options.port || options.temporary ? '准备临时页面' : '准备固定页面'}：http://127.0.0.1:${frontendPort}/`,
     );
     console.log(`API 代理：${apiTarget}`);
-    console.log('按 Ctrl+C 只停止前端；任务后端继续保留，数据始终位于集成数据库。');
+    console.log('按 Ctrl+C 只停止前端；任务后端继续保留，数据始终保留在长期预览数据库。');
 
     let frontend = null;
     let shuttingDown = false;
     let restartingFrontend = false;
     const attachFrontend = (child) => {
+      leasedFrontend = child;
       child.on('error', (error) => {
         console.error(error.message);
         process.exitCode = 1;
