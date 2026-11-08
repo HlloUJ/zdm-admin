@@ -12,6 +12,12 @@ export async function runAcceptedSourceCI(root, event, { repository, token, requ
   assert.match(repository, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
   assert.match(pull.head.sha, /^[a-f0-9]{40}$/);
   assert.match(pull.head.ref, /^codex\/[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  assert.match(pull.base.sha, /^[a-f0-9]{40}$/, 'GitHub trusted base SHA required');
+  assert.equal(
+    acceptedGit(root, ['rev-parse', 'HEAD']),
+    pull.base.sha,
+    'Run the verifier from the exact trusted base checkout',
+  );
   const api = async (method, suffix, body) => {
     const response = await request('https://api.github.com/repos/' + repository + suffix, {
       method,
@@ -35,7 +41,12 @@ export async function runAcceptedSourceCI(root, event, { repository, token, requ
       ref = acceptedRef(batch);
     acceptedGit(root, ['fetch', '--no-tags', 'origin', pull.head.sha, ref + ':' + ref]);
     const accepted = acceptedGit(root, ['rev-parse', ref]);
-    const result = verifyRemoteAcceptance(root, { candidate: pull.head.sha, accepted, branch: pull.head.ref });
+    const result = verifyRemoteAcceptance(root, {
+      candidate: pull.head.sha,
+      accepted,
+      branch: pull.head.ref,
+      trustedMain: pull.base.sha,
+    });
     await api('PATCH', '/check-runs/' + check.id, {
       status: 'completed',
       conclusion: 'success',

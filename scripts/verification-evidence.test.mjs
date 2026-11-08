@@ -1,13 +1,14 @@
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { captureIdentity, captureArtifacts, captureSource, verificationAttempts } from './verification-evidence.mjs';
-import { runVerificationTask } from './verification-runner.mjs';
+import { createVerificationReporter, runVerificationTask } from './verification-runner.mjs';
 import { collectDeliveryChanges, createVerificationPlan, executeVerification } from './verify.mjs';
 
 function fixture(t) {
@@ -48,6 +49,74 @@ const count = fs.existsSync(file) ? Number(fs.readFileSync(file, 'utf8')) : 0;
 fs.writeFileSync(file, String(count + 1)); process.exit(count === 0 ? 1 : 0);`;
 const attemptsDirectory = (result) =>
   path.join(path.dirname(result.evidence), 'attempts', path.basename(result.evidence, '.json'));
+
+test('a real closed progress pipe preserves concurrent command results and unchanged failure blocking', async (t) => {
+  const { root } = fixture(t);
+  const runner = new URL('./verification-runner.mjs', import.meta.url).href;
+  const script = `
+    import { writeFileSync } from 'node:fs';
+    import { createVerificationReporter, runVerificationTask } from ${JSON.stringify(runner)};
+    const root = ${JSON.stringify(root)};
+    const report = createVerificationReporter(root);
+    report('viewer connected');
+    await new Promise(resolve => setTimeout(resolve, 75));
+    const base = { root, command: process.execPath, env: ${JSON.stringify(task(root).env)} };
+    const failedTask = { ...base, name: 'failed command', args: ['-e', ${JSON.stringify(failFirstScript)}] };
+    const [passed, failed] = await Promise.all([
+      runVerificationTask({ ...base, name: 'concurrent command', args: ['-e', 'setTimeout(() => console.log("finished"), 100)'] }, { report }),
+      runVerificationTask(failedTask, { report }),
+    ]);
+    const blocked = await runVerificationTask(failedTask, { report });
+    await report.close();
+    writeFileSync(root + '/.task-verification/progress-results.json', JSON.stringify({ passed, failed, blocked, log: report.log }));
+  `;
+  const child = spawn(process.execPath, ['--input-type=module', '-e', script], {
+    cwd: root,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  let stderr = '',
+    viewerClosed = false;
+  child.stderr.on('data', (bytes) => {
+    stderr += bytes;
+  });
+  child.stdout.once('data', () => {
+    viewerClosed = true;
+    child.stdout.destroy();
+  });
+  const code = await new Promise((resolve, reject) => {
+    child.once('error', reject);
+    child.once('close', resolve);
+  });
+  assert.equal(viewerClosed, true);
+  assert.equal(code, 0, stderr);
+  const result = JSON.parse(readFileSync(path.join(root, '.task-verification/progress-results.json'), 'utf8'));
+  assert.equal(result.passed.exitCode, 0);
+  assert.equal(result.failed.exitCode, 1);
+  assert.equal(result.blocked.exitCode, 1);
+  assert.equal(record(result.blocked).status, 'blocked');
+  assert.equal(readFileSync(path.join(root, '.task-verification/fixture-attempt-count'), 'utf8'), '1');
+  assert.equal(record(result.blocked).firstFailure.attemptId, record(result.failed).attemptId);
+  const progress = readFileSync(result.log, 'utf8');
+  assert.match(progress, /progress transport disconnected: EPIPE/);
+  assert.match(progress, /\[passed\] concurrent command/);
+  assert.match(progress, /\[failed\] failed command/);
+  assert.match(progress, /\[blocked\] failed command/);
+});
+
+test('progress persistence does not suppress other output errors', async (t) => {
+  const { root } = fixture(t);
+  const output = new Writable({
+    write(_chunk, _encoding, done) {
+      done(Object.assign(new Error('output denied'), { code: 'EACCES' }));
+    },
+  });
+  const listeners = output.listenerCount('error');
+  const report = createVerificationReporter(root, { output });
+  report('durable progress');
+  await assert.rejects(report.close(), { code: 'EACCES' });
+  assert.equal(output.listenerCount('error'), listeners);
+  assert.equal(readFileSync(report.log, 'utf8'), 'durable progress\n');
+});
 
 test('matching evidence reuses success, but force and CI always execute', async (t) => {
   const { root } = fixture(t);

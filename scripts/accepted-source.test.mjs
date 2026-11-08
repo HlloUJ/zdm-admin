@@ -221,6 +221,8 @@ for (const scenario of ['success', 'business-change', 'missing-tag']) {
     mkdirSync(path.dirname(remote));
     f.git('init', '--bare', remote);
     f.git('remote', 'add', 'origin', remote);
+    const base = f.git('rev-parse', 'HEAD');
+    f.git('push', 'origin', base + ':refs/heads/main');
     freezeAcceptedSource(f.root, f.batch);
     writeFileSync(path.join(f.root, 'scripts/check.mjs'), "throw Error('Candidate code must never run');\n");
     if (scenario === 'business-change') writeFileSync(path.join(f.root, 'src/product.js'), 'unreviewed');
@@ -231,6 +233,8 @@ for (const scenario of ['success', 'business-change', 'missing-tag']) {
     mkdirSync(trusted);
     acceptedGit(trusted, ['init']);
     acceptedGit(trusted, ['remote', 'add', 'origin', remote]);
+    acceptedGit(trusted, ['fetch', 'origin', base]);
+    acceptedGit(trusted, ['checkout', '--detach', base]);
     const calls = [];
     const options = {
       repository: 'owner/repo',
@@ -242,7 +246,7 @@ for (const scenario of ['success', 'business-change', 'missing-tag']) {
     };
     const event = {
       pull_request: {
-        base: { ref: 'main' },
+        base: { ref: 'main', sha: base },
         head: { ref: f.batch.branch, sha: candidate, repo: { full_name: 'owner/repo' } },
       },
     };
@@ -252,8 +256,13 @@ for (const scenario of ['success', 'business-change', 'missing-tag']) {
     assert.equal(calls[0].body.head_sha, candidate);
     assert.equal(calls[1].body.conclusion, scenario === 'success' ? 'success' : 'failure');
     assert.equal(calls[1].url.endsWith('/check-runs/123'), true);
-    assert.equal(existsSync(path.join(trusted, 'scripts/check.mjs')), false);
-    assert.equal(existsSync(path.join(trusted, 'src/product.js')), false);
+    assert.equal(readFileSync(path.join(trusted, 'scripts/check.mjs'), 'utf8'), '// technical\n');
+    assert.equal(readFileSync(path.join(trusted, 'src/product.js'), 'utf8'), 'export const price = 12;\n');
+    assert.equal(
+      acceptedGit(trusted, ['rev-parse', 'HEAD']),
+      base,
+      'Candidate was fetched as objects and never checked out',
+    );
     const before = calls.length;
     event.pull_request.head.repo.full_name = 'attacker/fork';
     await assert.rejects(runAcceptedSourceCI(trusted, event, options), /Forks/);

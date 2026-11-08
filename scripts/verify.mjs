@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
-import { runVerificationTask } from './verification-runner.mjs';
+import { createVerificationReporter, runVerificationTask } from './verification-runner.mjs';
 import { captureSource } from './verification-evidence.mjs';
 import { createValidationPlan } from './check-changed-plan.mjs';
 import { classifyChangedFiles } from './verification-impact.mjs';
@@ -60,10 +60,20 @@ export function createVerificationPlan({
   plannedCandidate = null,
 }) {
   const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
-  const task = (name, script, extra = {}) => ({ root, name, command, args: ['run', script], env, ...extra });
-  const browserEnv = browser ? { ...env, PLAYWRIGHT_CHANNEL: browser } : env;
+  const qualityEnv = { ...env };
+  delete qualityEnv.ZDM_TASK_VALIDATION_PORT;
+  delete qualityEnv.ZDM_TASK_VALIDATION_ROOT;
+  const task = (name, script, extra = {}) => ({
+    root,
+    name,
+    command,
+    args: ['run', script],
+    env: qualityEnv,
+    ...extra,
+  });
+  const browserEnv = browser ? { ...qualityEnv, PLAYWRIGHT_CHANNEL: browser } : qualityEnv;
   const plan = {
-    earlyChecks: earlyReadinessTasks(root, files, env),
+    earlyChecks: earlyReadinessTasks(root, files, qualityEnv),
     preflight: task('format check', 'format:check', { reuse: false }),
     contractPreflight:
       !affected || needsContractPreflight(files)
@@ -84,10 +94,18 @@ export function createVerificationPlan({
     ],
     runtime:
       runtime || (affected && impact.runtime)
-        ? task('task runtime identity', 'dev:task:check', {
-            args: ['run', 'dev:task:check', '--', '--worktree', root],
-            kind: 'runtime',
-          })
+        ? task(
+            'task runtime identity',
+            'dev:task:check',
+            env.ZDM_TASK_VALIDATION_PORT
+              ? {
+                  command: process.execPath,
+                  env,
+                  args: [path.join(path.dirname(fileURLToPath(import.meta.url)), 'task-runtime-check.mjs')],
+                  kind: 'runtime',
+                }
+              : { args: ['run', 'dev:task:check', '--', '--worktree', root], kind: 'runtime' },
+          )
         : null,
     affected,
     impact,
@@ -112,8 +130,8 @@ export function createVerificationPlan({
           args: ['run', 'format:changed', '--', ...existing],
           reuse: false,
         })
-      : { root, name: 'diff check', command: 'git', args: ['diff', '--check'], env, reuse: false };
-    plan.frontend = localReadinessTasks(root, files, env);
+      : { root, name: 'diff check', command: 'git', args: ['diff', '--check'], env: qualityEnv, reuse: false };
+    plan.frontend = localReadinessTasks(root, files, qualityEnv);
     plan.backend = [];
     plan.engineering = [];
     plan.ciCapability = ciCapability;
@@ -133,7 +151,7 @@ export function createVerificationPlan({
           args: ['run', 'format:changed', '--', ...existing],
           reuse: false,
         })
-      : { root, name: 'diff check', command: 'git', args: ['diff', '--check'], env, reuse: false };
+      : { root, name: 'diff check', command: 'git', args: ['diff', '--check'], env: qualityEnv, reuse: false };
     plan.frontend = [];
     plan.backend = [];
     plan.engineering = impact.engineering ? plan.engineering : [];
@@ -151,7 +169,7 @@ export function createVerificationPlan({
         ...entry,
         root,
         command,
-        env,
+        env: qualityEnv,
         kind: entry.kind ?? (backend ? 'backend' : 'node'),
         reuse: backend,
       });
@@ -359,7 +377,12 @@ export async function main(args = process.argv.slice(2)) {
     console.log('--list only prints this plan.');
     return 0;
   }
-  return executeVerification(plan, { force: args.includes('--force') || args.includes('--no-reuse') });
+  const report = createVerificationReporter(process.cwd());
+  try {
+    return await executeVerification(plan, { force: args.includes('--force') || args.includes('--no-reuse'), report });
+  } finally {
+    await report.close();
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

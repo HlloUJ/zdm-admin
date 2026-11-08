@@ -37,7 +37,10 @@ export function taskBackendSourceIdentity({ root, migrationDirectory }) {
   return hash.digest('hex');
 }
 
-export function taskBackendContainerIdentity(container, { root, project, backendPort, migrationDirectory }) {
+export function taskBackendContainerIdentity(
+  container,
+  { root, project, backendPort, migrationDirectory, database, username, mediaVolume },
+) {
   const labels = container?.Config?.Labels ?? {};
   const mounts = container?.Mounts ?? [];
   const port = container?.HostConfig?.PortBindings?.['8080/tcp'];
@@ -48,7 +51,16 @@ export function taskBackendContainerIdentity(container, { root, project, backend
     labels['com.docker.compose.project'] !== project ||
     labels['com.docker.compose.service'] !== 'backend' ||
     labels['com.zdm.task.preview'] !== 'true' ||
-    labels['com.zdm.task.database'] !== 'integration' ||
+    labels['com.zdm.task.database'] !== (database ? 'isolated' : 'integration') ||
+    (database &&
+      (!container.Config.Env?.some((value) =>
+        value.startsWith('ZDM_DB_URL=jdbc:mysql://zdm-platform-mysql:3306/' + database + '?'),
+      ) ||
+        !container.Config.Env?.includes('ZDM_DB_USERNAME=' + username) ||
+        !mounts.some(
+          (mount) =>
+            mount.Type === 'volume' && mount.Destination === '/data/zdm/craft-images' && mount.Name === mediaVolume,
+        ))) ||
     !mounts.some(
       (mount) => mount.Type === 'bind' && mount.Destination === '/workspace' && sameHostPath(mount.Source, root),
     ) ||

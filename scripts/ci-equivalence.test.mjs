@@ -10,6 +10,8 @@ import {
   readdirSync,
   symlinkSync,
   rmSync,
+  existsSync,
+  realpathSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,7 +26,8 @@ import {
 import { environmentProofFromSnapshot, validateEnvironmentProof } from './ci-equivalence-environment.mjs';
 import { verifyFrontendEvidence } from './ci-quality-evidence.mjs';
 import { SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
-import { main as legacyPreviewMain } from './dev-task.mjs';
+import { main as taskPreviewMain } from './dev-task.mjs';
+import { taskDataNames } from './task-data-environment.mjs';
 import { waitQuality } from './wait-quality.mjs';
 import { assetKind, preserveAssets, previewContract } from './task-completion.mjs';
 
@@ -489,9 +492,68 @@ for (const scenario of [
   });
 }
 
-test('legacy preview cannot start against integration data through any frontend/full entry', async () => {
-  for (const args of [[], ['--mode', 'full'], ['--mode', 'frontend'], ['--temporary']]) {
-    await assert.rejects(legacyPreviewMain(args), /旧启动器未实现长期预览隔离数据契约/);
+test('all preview startup entries reject missing or integration data before preparing any runtime', async (t) => {
+  const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'preview-data-start-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const git = (...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
+  git('init', '-b', 'codex/data-guard');
+  git('config', 'user.email', 'fixture@example.invalid');
+  git('config', 'user.name', 'Fixture');
+  writeFileSync(path.join(root, 'README.md'), 'isolated startup guard fixture\n');
+  git('add', 'README.md');
+  git('commit', '-m', 'fixture');
+  const head = git('rev-parse', 'HEAD');
+  const dataRoot = path.join(root, '.git/preview-environment');
+  const file = path.join(dataRoot, 'environment.json');
+  const fullOrExternal = [
+    [],
+    ['--mode', 'full'],
+    ['--temporary'],
+    ['--mode', 'frontend', '--api', 'http://127.0.0.1:8081'],
+  ];
+  const unchanged = () => {
+    assert.equal(git('rev-parse', 'HEAD'), head);
+    assert.equal(git('status', '--porcelain'), '');
+    for (const relative of ['node_modules', '.task-runtime', '.task-verification', 'backend', 'dist'])
+      assert.equal(existsSync(path.join(root, relative)), false, 'Startup must not prepare ' + relative);
+    assert.equal(git('worktree', 'list', '--porcelain').match(/^worktree /gm).length, 1);
+  };
+  for (const args of fullOrExternal) {
+    await assert.rejects(taskPreviewMain(['--worktree', root, ...args]), /预览数据登记缺失；启动不得自动创建或重建/);
+    assert.equal(existsSync(dataRoot), false, 'Missing data registration must not be initialized');
+    unchanged();
+  }
+  await assert.rejects(taskPreviewMain(['--worktree', root, '--mode', 'frontend']), /前端调试模式必须指定外部 API/);
+  await assert.rejects(
+    taskPreviewMain(['--worktree', root, '--api', 'http://127.0.0.1:8080']),
+    /任务预览不能使用集成 API/,
+  );
+  unchanged();
+  mkdirSync(dataRoot);
+  for (const invalid of [{ database: 'zdm_admin' }, { mediaVolume: 'zdm-admin_zdm_craft_images' }]) {
+    const bytes = JSON.stringify({
+      version: 1,
+      repository: path.join(root, '.git'),
+      profile: {
+        version: 1,
+        status: 'ready',
+        workspaceRoot: dataRoot,
+        project: 'persistent-preview',
+        ...taskDataNames(dataRoot, 'persistent-preview'),
+        password: 'a'.repeat(48),
+        backupFile: '/fixture-retained.sql.gz',
+        ...invalid,
+      },
+    });
+    writeFileSync(file, bytes);
+    for (const args of fullOrExternal) {
+      await assert.rejects(
+        taskPreviewMain(['--worktree', root, ...args]),
+        /任务数据环境记录不可核验，保留现场，不自动覆盖/,
+      );
+      assert.equal(readFileSync(file, 'utf8'), bytes, 'Invalid database/media target must remain untouched');
+      unchanged();
+    }
   }
 });
 

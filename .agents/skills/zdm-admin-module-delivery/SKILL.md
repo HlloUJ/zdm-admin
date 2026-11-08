@@ -11,7 +11,7 @@ description: 为装点猫管理后台新增、重构或补齐完整业务功能�
 2. 涉及组织业务数据读取、写入、共享或跨端协作时，同时使用 `zdm-data-permission-isolation`；涉及账号、身份、角色或权限模型调整时，同时使用 `account-permission-rules`。
 3. 涉及页面结构或新增页面时，同时使用 `zdm-admin-ui-conventions`；涉及全量功能资源目录登记或调整时，同时使用 `zdm-function-catalog-registration`。
 4. 涉及代码修改时，同时使用 `efficient-code-delivery`，按项目 `AGENTS.md` 的风险等级验证。
-5. 同批次模块沿用已登记分支、Worktree 和预览；模块验收后保存独立本地提交并登记真实依赖，整批结束时才统一远程交付。模块独立验收不意味着必须新建分支或先合并主线。
+5. 按项目独立任务适配核对当前任务的真实 owner、永久 Worktree、分支和已发布入口；本任务内部模块沿用本任务，其他顶层对话独立分支和目录。模块验收保存本地 checkpoint 与依赖；用户对当前任务下达“任务完成”后逐任务正式交付，不等待无关任务。启动不切换5175，预览按准确任务显式选择；旧目录调用已发布 main 的 task:entry，不复制源码覆盖业务。
 6. 开始设计和交付前读取 [模块交付清单](references/module-delivery-checklist.md)，只填写与当前模块有关的部分。
 7. 同一模块任务后续对话在业务边界、规则和代码基线未变化时复用已读取原则、PRD、UI 约定和交付清单；只补读发生变化或当前阶段新增的部分。
 

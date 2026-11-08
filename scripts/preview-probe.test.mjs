@@ -3,7 +3,10 @@ import test from 'node:test';
 import http from 'node:http';
 import { Worker } from 'node:worker_threads';
 import { once } from 'node:events';
+import { mkdtempSync, rmSync } from 'node:fs';
+import path from 'node:path';
 import { requestResponse, taskPreviewControlRequest, inspectManagedPreview, previewProbeFailure } from './dev-task.mjs';
+import { request as hostPreflightRequest } from './parallel-upgrade-preflight.mjs';
 
 test('expired idle connection plus synchronous work reproduces ECONNRESET; probe uses fresh connections', async (t) => {
   const closed = new Int32Array(new SharedArrayBuffer(4));
@@ -102,4 +105,45 @@ test('real probe rejects wrong identity, unhealthy API, invalid metadata, and ne
   assert.equal(deletes, 1);
   assert.match(previewProbeFailure(failed), /ECONNRESET/);
   assert.match(previewProbeFailure({ statusCode: 503 }), /HTTP 503/);
+});
+
+test('host preflight uses fresh Unix control connections after synchronous phases without retrying requests', async (t) => {
+  // A short private socket path also fits macOS sockaddr_un limits.
+  const directory = mkdtempSync('/tmp/zpp-');
+  const socket = path.join(directory, 'control.sock');
+  const expired = new Int32Array(new SharedArrayBuffer(4));
+  const worker = new Worker(
+    `const http = require('node:http');
+     const { parentPort, workerData } = require('node:worker_threads');
+     const ready = new Int32Array(workerData.expired);
+     const expired = new WeakSet();
+     let idleSocket, count = 0;
+     const server = http.createServer((req, res) => {
+       count++;
+       idleSocket = req.socket;
+       if (expired.has(req.socket)) { req.socket.destroy(); return; }
+       res.end(JSON.stringify({ count }));
+     });
+     server.keepAliveTimeout = 0;
+     parentPort.on('message', () => {
+       expired.add(idleSocket);
+       Atomics.store(ready, 0, 1); Atomics.notify(ready, 0);
+     });
+     server.listen(workerData.socket, () => parentPort.postMessage('listening'));`,
+    { eval: true, workerData: { socket, expired: expired.buffer } },
+  );
+  t.after(async () => {
+    await worker.terminate();
+    rmSync(directory, { recursive: true, force: true });
+  });
+  await once(worker, 'message');
+  for (let count = 1; count <= 3; count++) {
+    const response = await hostPreflightRequest({ socketPath: socket, path: '/status' });
+    assert.equal(response.statusCode, 200);
+    assert.deepEqual(JSON.parse(response.body), { count });
+    if (count === 3) break;
+    Atomics.store(expired, 0, 0);
+    worker.postMessage('expire');
+    assert.notEqual(Atomics.wait(expired, 0, 0, 5000), 'timed-out');
+  }
 });

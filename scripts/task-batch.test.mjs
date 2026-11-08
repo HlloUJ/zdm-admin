@@ -7,6 +7,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import {
+  assertBatchModulesReady,
+  claimBatchWork,
+  releaseBatchWork,
+  batchSharedWork,
   readActiveBatch,
   assertBatchIdAvailable,
   validateActiveBatch,
@@ -397,3 +401,50 @@ for (const state of ['branch', 'head', 'operation', 'replacement']) {
     assert.equal(existsSync(path.join(f.registry, 'write.lock')), false);
   });
 }
+
+for (const status of ['in-progress', 'paused', 'excluded', 'unknown']) {
+  test(`completion readiness blocks ${status} modules alongside a ready module`, () => {
+    assert.throws(
+      () =>
+        assertBatchModulesReady({
+          modules: [
+            { id: 'finished', status: 'ready' },
+            { id: 'other', status },
+          ],
+        }),
+      /unfinished modules: other/,
+    );
+  });
+}
+test('completion readiness requires a nonempty fully ready module registry', () => {
+  assert.throws(() => assertBatchModulesReady(null), /No batch modules/);
+  assert.throws(() => assertBatchModulesReady({ modules: [] }), /No batch modules/);
+  assert.doesNotThrow(() => assertBatchModulesReady({ modules: [{ id: 'finished', status: 'ready' }] }));
+});
+
+test('parallel module claims preserve one branch, block overlaps and prevent a shared operation', (t) => {
+  const f = fixture(t);
+  registerBatch(f.worktree, { id: 'parallel', kind: 'business' });
+  f.module('a');
+  f.module('b');
+  const a = claimBatchWork(f.worktree, { owner: 'thread-a', module: 'a', resources: ['src/a.vue'] });
+  const b = claimBatchWork(f.worktree, { owner: 'thread-b', module: 'b', resources: ['src/b.vue'] });
+  const work = batchSharedWork(readActiveBatch(f.worktree));
+  assert.throws(
+    () => claimBatchWork(f.worktree, { owner: 'thread-c', module: 'b', resources: ['src/a.vue'] }),
+    /another active worker/,
+  );
+  assert.throws(
+    () => work.claim({ owner: 'delivery', module: 'batch', resources: ['shared'] }),
+    /another active worker/,
+  );
+  releaseBatchWork(f.worktree, a.worker.owner, a.worker.token);
+  assert.throws(() => work.assertIdle(), /workers remain active/);
+  releaseBatchWork(f.worktree, b.worker.owner, b.worker.token);
+  work.assertIdle();
+  assert.equal(f.git(f.worktree, 'branch', '--show-current'), 'codex/task');
+  assert.equal(
+    readActiveBatch(f.worktree).modules.every((m) => m.status === 'in-progress'),
+    true,
+  );
+});

@@ -2,7 +2,7 @@ import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './ac
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
 import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { runCompletionProcess } from './completion-process.mjs';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
@@ -19,7 +19,13 @@ import {
   settleCompletion,
 } from './completion-session.mjs';
 import { assertCompletionQuality, verifyCompletionEvidence } from './completion-ci-evidence.mjs';
-import { readActiveBatch, closeBatch, planBatchDelivery } from './task-batch.mjs';
+import {
+  readActiveBatch,
+  closeBatch,
+  planBatchDelivery,
+  assertBatchModulesReady,
+  batchSharedWork,
+} from './task-batch.mjs';
 import { waitRemoteQuality, selectQualityRun } from './wait-quality.mjs';
 import {
   recoverWriter,
@@ -41,9 +47,19 @@ import {
   readIntegrationProof,
 } from './integration-handoff-state.mjs';
 import { retainedPublishedPreview } from './start-micro-task.mjs';
+import { createTaskRegistry } from './task-registry.mjs';
+import { createResourceLeases } from './resource-lease.mjs';
+import { selectedTaskBatch, withTaskContext } from './task-context.mjs';
+import { verifyRetainedDependencies } from './task-dependency-retention.mjs';
+import { taskRuntimeReferences } from './task-runtime-references.mjs';
 
-function run(root, command, args) {
-  const r = runCompletionProcess(command, args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 });
+function run(root, command, args, options = {}) {
+  const r = runCompletionProcess(command, args, {
+    cwd: root,
+    ...options,
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+  });
   if (r.status !== 0) {
     if (r.stderr) process.stderr.write(r.stderr.slice(-4000));
     throw new Error(command + ' failed; preserve state and inspect its original output');
@@ -51,7 +67,7 @@ function run(root, command, args) {
   return r.stdout.trim();
 }
 const read = (p) => JSON.parse(readFileSync(p, 'utf8'));
-export async function completionCommand(
+async function completionCommandLocked(
   root,
   args,
   {
@@ -63,6 +79,7 @@ export async function completionCommand(
     waitQuality = waitRemoteQuality,
     verifyEvidence = verifyCompletionEvidence,
     previewControl = createCompletionPreviewControl({ execute }),
+    runtimeReferences = taskRuntimeReferences,
   },
 ) {
   const limits = {
@@ -93,12 +110,18 @@ export async function completionCommand(
   const [mode, ...rest] = args,
     git = (...a) => execute(existsSync(root) ? root : process.cwd(), 'git', a),
     common = path.resolve(root, git('rev-parse', '--git-common-dir'));
-  const batch = readActiveBatch(root),
-    requestedBatch = ['report', 'settle', 'deliver', 'status', 'backfill', 'pause-record', 'resume-record'].includes(
-      mode,
-    )
-      ? rest[0]
-      : batch?.id;
+  let batch = readActiveBatch(root);
+  const requestedBatch = [
+    'report',
+    'settle',
+    'deliver',
+    'status',
+    'backfill',
+    'pause-record',
+    'resume-record',
+  ].includes(mode)
+    ? rest[0]
+    : batch?.id;
   assert.match(requestedBatch ?? '', /^[a-z0-9]+(?:-[a-z0-9]+)*$/, 'Exact completion batch required');
   const directory = path.join(common, 'task-delivery', requestedBatch);
   const archiveFile = path.join(common, 'task-batches/archive', requestedBatch + '.json');
@@ -168,8 +191,48 @@ export async function completionCommand(
     const file = path.join(directory, 'completion-session.json');
     return finalHandoffPlan(root, batch, rest[0], { execute, state: existsSync(file) ? read(file) : undefined });
   }
+  if (['begin', 'freeze', 'deliver', 'final-handoff', 'settle'].includes(mode) && batch.taskRegistryVersion !== 2) {
+    assertBatchModulesReady(batch);
+  }
   if (['begin', 'freeze', 'deliver'].includes(mode)) {
     const acceptance = freezeAcceptedSource(batch.worktree, batch);
+    if (batch.taskRegistryVersion === 2) {
+      const tasks = createTaskRegistry(root),
+        current = tasks.readTask(batch.id);
+      if (!current.frozen)
+        tasks.revise(current.id, current.revision, (record) => {
+          record.frozen = {
+            accepted: acceptance.commit,
+            tree: acceptance.tree,
+            businessDigest: acceptance.businessDigest,
+          };
+          record.stage = 'frozen';
+        });
+      if (mode === 'deliver' && rest[1] !== batch.recordedHead) {
+        assert.equal(
+          execute(batch.worktree, 'git', ['rev-parse', 'HEAD']),
+          rest[1],
+          'Requested repair candidate is not HEAD',
+        );
+        assertAcceptedSource(batch.worktree, batch.id, rest[1]);
+        const before = tasks.readTask(batch.id);
+        const commits = execute(batch.worktree, 'git', ['rev-list', '--reverse', before.recordedHead + '..' + rest[1]])
+          .split('\n')
+          .filter(Boolean);
+        tasks.revise(before.id, before.revision, (record) => {
+          record.recordedHead = rest[1];
+          for (const commit of commits)
+            if (!record.checkpoints.some((item) => item.commit === commit))
+              record.checkpoints.push({
+                commit,
+                verification:
+                  'Candidate adopted only after original accepted business/control-plane identity check; formal gates remain required',
+                recordedAt: new Date().toISOString(),
+              });
+        });
+        batch = readActiveBatch(root);
+      }
+    }
     if (mode === 'freeze')
       return { acceptance, protection: 'local-content-addressed; remote-independent-enforcement-not-implied' };
   }
@@ -217,7 +280,7 @@ export async function completionCommand(
       inventoryAssets,
       previewControl,
       dispatch: (cwd, args) =>
-        completionCommand(cwd, args, {
+        completionCommandLocked(cwd, args, {
           preserveAssets,
           checkRuntime,
           execute,
@@ -226,6 +289,7 @@ export async function completionCommand(
           waitQuality,
           verifyEvidence,
           previewControl,
+          runtimeReferences,
         }),
     });
   }
@@ -435,7 +499,14 @@ export async function completionCommand(
             false,
             'Database task lock remains',
           );
-          await previewControl.check({ anchor, task: batch.worktree, preview, main: expectedMain, common });
+          await previewControl.check({
+            anchor,
+            task: batch.worktree,
+            preview,
+            main: expectedMain,
+            common,
+            taskRegistryVersion: batch.taskRegistryVersion,
+          });
           const runtime = await checkRuntime(root, common);
           assert.equal(runtime.runtimeHealthy, true);
           assert.equal(runtime.backupRetained, true);
@@ -451,7 +522,14 @@ export async function completionCommand(
             : preserved.result,
       },
       cleanup: {
-        run: () => {
+        run: async () => {
+          if (batch.taskRegistryVersion === 2) {
+            const task = createTaskRegistry(anchor).readTask(batch.id);
+            assert.equal(task.stage, 'handoff-verified', 'Current task handoff is incomplete');
+            const references = await runtimeReferences(task);
+            assert.equal(references.owned.length, 0, 'Current task frontend still runs; retain its source');
+            assert.equal(references.backendPorts.length, 0, 'Current task backend still runs; retain its source');
+          }
           reconcileInterruptedValidationTiming(common, batch.id, { root: batch.worktree, completion: state, key });
           requireBatchTimingForCleanup(common, batch.id);
           if (existsSync(batch.worktree)) assert.equal(execute(batch.worktree, 'git', ['status', '--porcelain']), '');
@@ -503,7 +581,8 @@ export function verifyPreservation(file, directory) {
     'Preservation manifest changed',
   );
   for (const e of JSON.parse(bytes))
-    if (e.kind !== 'external-dependency-retained') {
+    if (e.kind === 'private-dependencies-retained') verifyRetainedDependencies(e, directory);
+    else if (e.kind !== 'external-dependency-retained') {
       assert.equal(e.kind, 'generated-output');
       assert.match(e.digest, /^[a-f0-9]{64}$/);
       const blob = path.join(directory, 'blobs', e.digest);
@@ -511,4 +590,50 @@ export function verifyPreservation(file, directory) {
       assert.equal(createHash('sha256').update(readFileSync(blob)).digest('hex'), e.digest, 'Preserved blob changed');
     }
   return true;
+}
+
+export async function completionCommand(root, args, options = {}) {
+  const registry = createTaskRegistry(root);
+  const explicit = ['report', 'settle', 'deliver', 'status', 'backfill', 'pause-record', 'resume-record'].includes(
+    args[0],
+  )
+    ? args[1]
+    : null;
+  const task = explicit ? registry.readTask(explicit) : selectedTaskBatch(root);
+  if (task) {
+    assert.ok(!task.compatibility?.readOnly, 'Legacy frozen task remains on its reviewed recovery path');
+    const readOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
+    if (!readOnly)
+      assert.equal(
+        options.owner ?? process.env.CODEX_THREAD_ID,
+        task.owner,
+        'Completion must belong to the exact current chat/task',
+      );
+    return withTaskContext({ id: task.id, commonDir: registry.commonDir, owner: task.owner }, async () => {
+      if (readOnly) return completionCommandLocked(root, args, options);
+      const leases = createResourceLeases(registry.commonDir);
+      leases.recoverEndedTask('task-delivery-' + task.id, task.owner, () => {
+        const directory = path.join(registry.commonDir, 'task-delivery', task.id);
+        assert.ok(
+          existsSync(path.join(directory, 'completion-session.json')),
+          'Interrupted owner has no process evidence; retain lease',
+        );
+        recoverWriter(directory);
+        recoverInterrupted(openCompletion(directory, task.id, { formal: false }), directory);
+        return true;
+      });
+      return leases.run('task-delivery-' + task.id, task.owner, () => completionCommandLocked(root, args, options));
+    });
+  }
+  if (!['begin', 'freeze', 'deliver', 'final-handoff', 'settle', 'measure'].includes(args[0]))
+    return completionCommandLocked(root, args, options);
+  const batch = readActiveBatch(root);
+  if (!batch) return completionCommandLocked(root, args, options);
+  const work = batchSharedWork(batch);
+  const lease = work.claim({ owner: 'completion-' + randomUUID(), module: 'batch-delivery', resources: ['shared'] });
+  try {
+    return await completionCommandLocked(root, args, options);
+  } finally {
+    work.release(lease);
+  }
 }
