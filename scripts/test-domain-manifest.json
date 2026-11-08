@@ -1732,7 +1732,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "2ce98b06c12d165a2def70c12e2eb46f6965f1d1b692beea7f61bafa804701bb",
+      "digest": "34846471d8be4d8eb58589b6bed034c0dc7ae4d820156e082108870c5810495a",
       "imports": [
         "scripts/run-frontend-tests.mjs",
         "scripts/verification-evidence.mjs",
@@ -1814,7 +1814,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "fa1c0807a6e5ca16aef6eb55bc0f31b5843a4c339a59470d24a7d64e518c326d",
+      "digest": "c6ba7fbb1a83c753e4e922ee2b207ca222a9cc2263b9a900c89a0c162506f577",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -1833,7 +1833,7 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "d06180507822ee890edbcd31c8112a15b34e8163faf192d4155cfc97ef32b4bb",
+      "digest": "daa14afbb2689405820be78d01d128a9f58c33d751e6f22ad1a68ed14e20ab46",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",

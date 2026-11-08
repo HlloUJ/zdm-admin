@@ -19,7 +19,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync } from 'node:fs';
-import { runVerificationTask } from './verification-runner.mjs';
+import { createVerificationReporter, runVerificationTask } from './verification-runner.mjs';
 import { captureSource } from './verification-evidence.mjs';
 import { createValidationPlan } from './check-changed-plan.mjs';
 import { classifyChangedFiles } from './verification-impact.mjs';
@@ -377,7 +377,12 @@ export async function main(args = process.argv.slice(2)) {
     console.log('--list only prints this plan.');
     return 0;
   }
-  return executeVerification(plan, { force: args.includes('--force') || args.includes('--no-reuse') });
+  const report = createVerificationReporter(process.cwd());
+  try {
+    return await executeVerification(plan, { force: args.includes('--force') || args.includes('--no-reuse'), report });
+  } finally {
+    await report.close();
+  }
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
