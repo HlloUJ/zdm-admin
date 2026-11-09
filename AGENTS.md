@@ -53,6 +53,7 @@
 - 多个顶层对话各自修改独立 Worktree。一个任务中的反馈和模块沿用本任务；不同任务不共享暂存区、node_modules、缓存、构建或报告。禁止在操作系统临时目录开发。主目录仅作 main 锚点；不改写其他任务源码或登记。
 - 在 main 锚点运行 `npm run task:entry -- --worktree <准确任务目录> <入口> ...`，复用已发布实现并保留实际业务 cwd。旧任务无新命令时也调用这个主线入口，不复制整套 main 覆盖业务，不继续调用旧共享启动/停止/交付命令。候选代码不能冒充已发布能力。
 - “确认”“执行”持续完成当前任务的实施、逐项需求检核、反向审查、修正与受影响回归，直至闭环。WIP/checkpoint 只保存本任务；开发就绪用 task:work 的当前候选证明登记，不代表已推送或正式交付。“任务完成”冻结并交付当前准确任务；不等待无关任务，不将另一任务半成品带入候选。
+- 复查修正的唯一执行约定见 `docs/task-completion.md` 的“开发完成前的复查修正门禁”。先登记原始需求依据，再保存每轮复查及问题历史；不能用实施清单替换批准清单，不能删除旧问题制造完成。报告整项开发完成前，必须通过已发布 main 的 `task:entry -- --worktree <准确任务目录> work status <task-id>` 实时核验，且 `developmentComplete=true`；原始 stage、reviewed、累计进度、测试退出码或旧回执不代替该结果。门禁失败在原授权内继续修正并补验，真实外部阻点给出具体协助动作后保持未完成。新改动使旧就绪失效；同内容且证据有效时不机械重验。已冻结业务继续遵守原快照保护，不为补过开发门禁重写业务；开发、推送、合并、运行交接和正式完成分层报告。
 - 5173 仅展示已正式汇入的 main 组合；5175 仅展示明确选中的任务，使用 `task:entry ... preview switch --task <id>`。启动/恢复登记不抢占预览。额外端口仅按需使用 temporary，临时组合记录准确成员和提交，不作正式交付候选。
 - 切换前核对 task/owner、Worktree、分支、私有依赖、API/数据和运行资源。服务端串行核对 Worktree、PID 和 selectionRevision；准备失败保留原归属，受保护交接启动失败执行实际恢复，不能假报健康。首次前端结果、切换或异常后通过已发布 `check` 证明完整代理链路；普通前端改动且本次运行身份未变时才可复用成功证明。
 - 新任务默认独立数据登记 `git-common-dir/task-environments/<id>/environment.json`。数据准备使用显式 `task:data isolate <id> [--apply]`；正常启动不创建或重建缺失数据。已核实的旧订单任务保留原 `preview-environment/environment.json`，仅其登记的 persistentPreviewOwner 可用。已发布保留载体 codex/preview-current 使用独立的 `preview-environment/published/environment.json`，不接管未完成任务数据。所有预览数据及媒体与集成 8080 独立；不可用时明确503，不回退5173。
