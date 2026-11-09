@@ -127,6 +127,18 @@ test('changed launcher tasks require explicit reviewed selection even when main 
     value.task,
   );
 });
+test('a shared integration or private Maven helper change also requires the reviewed candidate launcher', (t) => {
+  for (const name of ['integration-resource.mjs', 'task-maven.mjs', 'backend-runtime.mjs']) {
+    const value = fixture(t);
+    writeFileSync(path.join(value.task, 'scripts', name), '// reviewed runtime helper upgrade\n');
+    const head = value.commit(value.task);
+    value.publishTask();
+    assert.throws(() => selectDeliveryLauncher(value.options, value.task), /启动器变更/);
+    const selected = selectDeliveryLauncher({ ...value.options, reviewedCandidate: head }, value.task);
+    assert.equal(selected.launcherRoot, value.task);
+    assert.ok(selected.launcherChanges.includes('scripts/' + name));
+  }
+});
 
 test('ordinary backend business and launcher test edits keep the published path without extra approval', (t) => {
   const value = fixture(t);

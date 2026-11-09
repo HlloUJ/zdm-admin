@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { branchKind, parseWorktreePorcelain } from './git-workflow-core.mjs';
 import { classifyChangedFiles } from './verification-impact.mjs';
+import { withIntegrationResource, integrationChildEnvironment } from './integration-resource.mjs';
 
 export const DELIVERY_LAUNCHER_PROTOCOL = 1;
 const SHA = /^[a-f0-9]{40}$/;
@@ -12,6 +13,9 @@ const launchers = {
   handoff: 'scripts/dev-task.mjs',
 };
 const launcherHelpers = new Set([
+  'scripts/integration-resource.mjs',
+  'scripts/task-maven.mjs',
+  'scripts/backend-runtime.mjs',
   'scripts/git-workflow-core.mjs',
   'scripts/verification-impact.mjs',
   'scripts/task-dependencies.mjs',
@@ -166,7 +170,13 @@ export function runDeliveryLauncher(options, { cwd = process.cwd(), execute = sp
           selection.publishedHead,
         ]
       : [selection.entrypoint, '--handoff', '--worktree', selection.taskWorktree];
-  const result = execute(process.execPath, args, { cwd: selection.launcherRoot, stdio: 'inherit' });
+  const result = withIntegrationResource(cwd, selection.taskBranch, () =>
+    execute(process.execPath, args, {
+      cwd: selection.launcherRoot,
+      stdio: 'inherit',
+      env: integrationChildEnvironment(),
+    }),
+  );
   if (result.status !== 0)
     throw new Error(`选定启动器执行失败：${result.status ?? result.error?.message ?? 'unknown'}`);
   return selection;

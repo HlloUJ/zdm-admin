@@ -65,6 +65,7 @@ fs.appendFileSync(settings.callsFile, JSON.stringify({ command, args }) + '\\n')
 const out = (value) => process.stdout.write(value);
 const save = () => fs.writeFileSync(settings.stateFile, JSON.stringify(state));
 if (command === 'git') {
+  if (args[0] === '-C') { out(settings.root); process.exit(0); }
   if (args[0] === 'rev-parse') {
     if (args[1] === '--show-toplevel') out(settings.root);
     else if (args[1] === 'refs/heads/codex/task') out('task-head');

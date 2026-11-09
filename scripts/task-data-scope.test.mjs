@@ -5,8 +5,15 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSy
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
+import { createResourceLeases } from './resource-lease.mjs';
 import { isolateTaskData } from './task-data-scope.mjs';
-import { ensureTaskData, previewDataFile, taskDataNames, readTaskData } from './task-data-environment.mjs';
+import {
+  ensureTaskData,
+  provisionPreviewData,
+  previewDataFile,
+  taskDataNames,
+  readTaskData,
+} from './task-data-environment.mjs';
 function fixture(t) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'task-data-scope-'))),
     root = path.join(dir, 'main');
@@ -47,6 +54,59 @@ test('data preparation plan is read-only and never queries Docker or provisions 
   );
   assert.equal(plan.apply, false);
   assert.deepEqual(f.registry.readTask('b'), before);
+});
+test('historical recovery blocks both explicit data APIs before Docker, profile or registry mutation', async (t) => {
+  const f = fixture(t),
+    task = f.registry.readTask('b');
+  f.registry.revise('b', task.revision, (record) => {
+    record.recovery = { runtimeBlocked: true, status: 'partial-historical-restoration' };
+  });
+  const before = f.registry.readTask('b');
+  const forbidden = () => assert.fail('blocked recovery must not query or mutate a runtime');
+  for (const apply of [false, true])
+    await assert.rejects(
+      isolateTaskData(f.root, { id: 'b', owner: 'chat-b', apply }, { running: forbidden, provision: forbidden }),
+      /recovery.*blocked/,
+    );
+  await assert.rejects(
+    provisionPreviewData({ root: f.b, project: 'b', integrationRoot: f.a }, { execute: forbidden }),
+    /历史恢复候选/,
+  );
+  assert.deepEqual(f.registry.readTask('b'), before);
+  assert.equal(readTaskData(f.b), null);
+});
+test('public data preparation refuses an integration handoff before any runtime or scope writes', async (t) => {
+  const f = fixture(t),
+    before = f.registry.readTask('b'),
+    leases = createResourceLeases(f.registry.commonDir);
+  const owner = leases.acquire('integration-5173', 'formal-handoff');
+  const forbidden = () => assert.fail('integration is already owned');
+  await assert.rejects(
+    isolateTaskData(f.root, { id: 'b', owner: 'chat-b', apply: true }, { running: forbidden, provision: forbidden }),
+    /Resource is owned/,
+  );
+  await assert.rejects(
+    provisionPreviewData({ root: f.b, project: 'b', integrationRoot: f.a }, { execute: forbidden }),
+    /Resource is owned/,
+  );
+  assert.deepEqual(f.registry.readTask('b'), before);
+  assert.deepEqual(leases.inspect('integration-5173'), owner);
+  leases.release(owner);
+});
+test('direct provisioning cannot mutate an integration source from another repository', async (t) => {
+  const f = fixture(t),
+    other = fixture(t);
+  await assert.rejects(
+    provisionPreviewData(
+      { root: f.b, project: 'b', integrationRoot: other.a },
+      {
+        execute: () => assert.fail('foreign source must be rejected before any Docker or data mutation'),
+      },
+    ),
+    /another repository/,
+  );
+  assert.equal(readTaskData(f.b), null);
+  assert.equal(createResourceLeases(f.registry.commonDir).inspect('integration-5173'), null);
 });
 test('parallel incompatible task data gets a separate durable location and preserves task A scope', async (t) => {
   const f = fixture(t),

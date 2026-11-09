@@ -106,6 +106,66 @@ test('a writer that released normally before its PID probe does not leave a fals
   assert.equal(updates, 1);
   assert.equal(existsSync(f.lock), false);
 });
+test('the ended writer probe rechecks the nonce of a replacement writer before diagnosing an orphan', (t) => {
+  const f = fixture(t);
+  f.occupied({ pid: 12345, token: 'observed' });
+  let updated = 0,
+    paused = 0;
+  withTaskRegistryWriteLock(f.directory, () => updated++, {
+    alive: () => {
+      writeFileSync(f.file, JSON.stringify({ pid: 12346, token: 'replacement' }));
+      return false;
+    },
+    pause: (owner) => {
+      assert.equal(owner.token, 'replacement');
+      paused++;
+      rmSync(f.lock, { recursive: true });
+    },
+  });
+  assert.equal(updated, 1);
+  assert.equal(paused, 1);
+});
+test(
+  'three real processes preserve a writer replacement between owner read and PID observation',
+  { timeout: 10000 },
+  async (t) => {
+    const f = fixture(t),
+      url = new URL('./task-registry.mjs', import.meta.url).href;
+    const code = `import fs from 'node:fs';import path from 'node:path';
+    const [url,dir,role]=process.argv.slice(1),{withTaskRegistryWriteLock}=await import(url);
+    const cell=new Int32Array(new SharedArrayBuffer(4)),end=Date.now()+5000;
+    const file=n=>path.join(dir,n), wait=fn=>{while(!fn()){if(Date.now()>end)throw Error('barrier expired: '+role);Atomics.wait(cell,0,0,2);}};
+    const alive=pid=>{try{process.kill(pid,0);return true;}catch(e){if(e.code==='ESRCH')return false;throw e;}};
+    if(role!=='a')wait(()=>fs.existsSync(file('a-ready')));
+    const first=role==='a'?null:JSON.parse(fs.readFileSync(file('a-ready')));
+    withTaskRegistryWriteLock(dir,()=>{
+      if(role==='a'){fs.writeFileSync(file('a-ready'),JSON.stringify({pid:process.pid}));wait(()=>fs.existsSync(file('c-observed-a')));}
+      if(role==='b'){fs.writeFileSync(file('b-ready'),'ready');wait(()=>fs.existsSync(file('release-b')));}
+      if(role==='c')fs.writeFileSync(file('c-finished'),'passed');
+    },{alive:pid=>{
+      if(role==='c'&&pid===first.pid){fs.writeFileSync(file('c-observed-a'),'ready');wait(()=>fs.existsSync(file('b-ready'))&&!alive(pid));return false;}
+      return alive(pid);
+    },pause:owner=>{if(role==='c'&&owner&&owner.pid!==first.pid)fs.writeFileSync(file('release-b'),'ready');Atomics.wait(cell,0,0,2);}});`;
+    const outcomes = await Promise.all(
+      ['a', 'b', 'c'].map(
+        (role) =>
+          new Promise((resolve, reject) => {
+            const child = spawn(process.execPath, ['--input-type=module', '-e', code, url, f.directory, role], {
+              stdio: ['ignore', 'pipe', 'pipe'],
+            });
+            let output = '';
+            child.stdout.on('data', (value) => (output += value));
+            child.stderr.on('data', (value) => (output += value));
+            child.once('error', reject);
+            child.once('exit', (status, signal) => resolve({ role, status, signal, output }));
+          }),
+      ),
+    );
+    for (const outcome of outcomes) assert.equal(outcome.status, 0, JSON.stringify(outcome));
+    assert.equal(readFileSync(path.join(f.directory, 'c-finished'), 'utf8'), 'passed');
+    assert.equal(existsSync(f.lock), false);
+  },
+);
 test(
   'two real processes serialize the same metadata critical section after proven live contention',
   { timeout: 10000 },

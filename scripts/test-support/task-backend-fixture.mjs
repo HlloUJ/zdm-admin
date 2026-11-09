@@ -1,3 +1,4 @@
+import { taskMavenVolume } from '../task-maven.mjs';
 export function backendFixture() {
   const expected = { root: '/task', project: 'zdm-task-test', backendPort: 8084, migrationDirectory: '/migrations' };
   const container = {
@@ -16,6 +17,7 @@ export function backendFixture() {
     Mounts: [
       { Type: 'bind', Source: '/task', Destination: '/workspace', RW: true },
       { Type: 'bind', Source: '/migrations', Destination: '/task-migrations', RW: false },
+      { Type: 'volume', Destination: '/root/.m2', Name: taskMavenVolume('/task', 'zdm-task-test'), RW: true },
     ],
   };
   return { expected, container };

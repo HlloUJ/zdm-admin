@@ -2,12 +2,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
+import { spawnSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, realpathSync, rmSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { ensureBackend, resolveRuntimeMigrations, runtimeMigrationDirectory } from './backend-runtime.mjs';
+import {
+  ensureBackend as guardedEnsureBackend,
+  resolveRuntimeMigrations,
+  runtimeMigrationDirectory,
+} from './backend-runtime.mjs';
 import { ensureIntegrationDatabase, ensureSharedBackend, startIntegrationBackend } from './dev-task.mjs';
 const first = { name: 'V1__base.sql', content: 'SELECT 1;' };
+// These pipeline unit tests inject only the outer repository/resource coordinator.
+// The production coordinator is exercised separately with real repositories/leases.
+const ensureBackend = (root, dependencies) =>
+  guardedEnsureBackend(root, { coordinate: (root, action) => action(root), ...dependencies });
 const pending = { name: 'V2__paused.sql', content: 'SELECT 2;' };
 const record = {
   type: 'zdm-paused-database-task',
@@ -46,6 +55,7 @@ test('starts MySQL once and waits for container health before backend runtime wo
   await ensureBackend(root, {
     ensureDatabase: (directory) =>
       ensureIntegrationDatabase(directory, {
+        coordinate: (root, task, action) => action(),
         prepare: (cwd) => {
           assert.equal(cwd, root);
           events.push('docker-and-volume-protection');
@@ -171,14 +181,17 @@ test('a temporary-root symlink keeps an existing canonical migration mount witho
   assert.deepEqual(commands, [['compose', '-f', 'runtime.json', 'start', 'backend']]);
 });
 
-test('integration recovery uses the launcher backend entrypoint even for an older target Worktree', async () => {
-  const target = '/tmp/old-integration';
+test('integration recovery uses the launcher backend entrypoint even for an older target Worktree', async (t) => {
+  const target = mkdtempSync(path.join(tmpdir(), 'old-integration-'));
+  t.after(() => rmSync(target, { recursive: true, force: true }));
+  spawnSync('git', ['init', '-q', target]);
   const events = [];
   await startIntegrationBackend(target, {
     execute: (command, args, context) => {
       assert.equal(command, process.execPath);
       assert.deepEqual(args, [fileURLToPath(new URL('./ensure-backend.mjs', import.meta.url)), '--worktree', target]);
-      assert.deepEqual(context, { cwd: target });
+      assert.equal(context.cwd, target);
+      assert.equal(JSON.parse(context.env.ZDM_INTEGRATION_OPERATION).parent, process.pid);
       events.push('same-launcher-entrypoint');
     },
     waitForHealth: async (url) => {

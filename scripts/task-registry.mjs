@@ -102,12 +102,27 @@ export function withTaskRegistryWriteLock(directory, operation, dependencies = {
         );
         assert.notEqual(owner.pid, process.pid, 'Task registry is locked by this process; do not enter it recursively');
         if (!system.alive(owner.pid)) {
-          // The writer may have released normally and exited after our read.
-          // Re-enter mkdir only when that observed lock is actually absent.
+          // The observed writer may have released and another writer may now
+          // own this directory. Recheck the current nonce before diagnosing it.
           if (!existsSync(lock)) continue;
-          throw new Error('Task registry is locked by an ended writer; preserve its original evidence', {
-            cause: error,
-          });
+          safe(lock);
+          safe(ownerFile);
+          let current;
+          try {
+            current = read(ownerFile);
+          } catch (failure) {
+            if (failure.code !== 'ENOENT' && !(failure instanceof SyntaxError)) throw failure;
+          }
+          if (current?.pid === owner.pid && current?.token === owner.token)
+            throw new Error('Task registry is locked by an ended writer; preserve its original evidence', {
+              cause: error,
+            });
+          assert.ok(
+            system.now() - startedAt < system.timeoutMs,
+            'Registry ownership kept changing; preserve current writer',
+          );
+          system.pause(current ?? null);
+          continue;
         }
       }
       assert.ok(
