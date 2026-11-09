@@ -104,17 +104,18 @@ for (const [client, path, resource] of surfaces) {
       // The result opens before the list refresh finishes; keep its async options mock alive.
       const optionsReady =
         resource === 'finished-products'
-          ? page.waitForResponse((response) => response.url().endsWith('/api/admin/finished-products/form-options'))
+          ? page
+              .waitForResponse((response) => response.url().endsWith('/api/admin/finished-products/form-options'))
+              .then(
+                (response) => ({ response }),
+                (error: unknown) => ({ error }),
+              )
           : null;
       const responseReady = page.waitForResponse(
         (response) =>
           response.request().method() === 'POST' && response.url().endsWith(`/api/admin/${resource}/batch-delete`),
       );
-      const [, response, options] = await Promise.all([
-        clickOpenedDialogConfirmation(confirm, '确认批量删除'),
-        responseReady,
-        optionsReady,
-      ]);
+      const [, response] = await Promise.all([clickOpenedDialogConfirmation(confirm, '确认批量删除'), responseReady]);
       expect(response.status()).toBe(200);
       expect((await response.json()).data).toMatchObject({ total: 3, successCount: 1, failureCount: 2 });
       const result = page.locator('.t-dialog:visible').filter({ hasText: '批量删除结果' });
@@ -123,7 +124,11 @@ for (const [client, path, resource] of surfaces) {
       await expect(result.locator('tbody tr')).toHaveCount(1);
       await expect(result.locator('tbody')).toContainText(client === 'store' ? '1072、1073' : '72、73');
       await expect(main.locator('tbody input[type="checkbox"]:checked')).toHaveCount(0);
-      if (options) expect(await options.finished()).toBeNull();
+      if (optionsReady) {
+        const options = await optionsReady;
+        if ('error' in options) throw options.error;
+        expect(await options.response.finished()).toBeNull();
+      }
       expect(requests).toBe(1);
     });
   }
