@@ -16,6 +16,17 @@ function commonDirectory(root) {
 }
 function validate(context, common) {
   assert.equal(context.common, common, 'Integration operation belongs to another repository');
+  assert.ok(
+    context.lease &&
+      context.lease.resource === 'integration-5173' &&
+      Number.isSafeInteger(context.lease.pid) &&
+      context.lease.pid > 0 &&
+      typeof context.lease.task === 'string' &&
+      context.lease.task.trim() &&
+      typeof context.lease.token === 'string' &&
+      context.lease.token.trim(),
+    'A complete owned integration lease is required',
+  );
   assert.deepEqual(
     createResourceLeases(common).inspect('integration-5173'),
     context.lease,

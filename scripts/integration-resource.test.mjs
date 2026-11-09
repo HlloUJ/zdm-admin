@@ -62,6 +62,24 @@ test('real child processes borrow only the exact direct-parent operation and nev
     }
   });
 });
+test('an empty or malformed inherited capability cannot turn an absent lease into permission', (t) => {
+  const f = fixture(t),
+    url = new URL('./integration-resource.mjs', import.meta.url).href;
+  const code = `const {withIntegrationResource}=await import(process.argv[1]);withIntegrationResource(process.argv[2],'child',()=>console.log('entered'));`;
+  for (const lease of [null, {}, { resource: 'integration-5173', task: 'other', token: 'nonce', pid: 0 }]) {
+    const result = spawnSync(process.execPath, ['--input-type=module', '-e', code, url, f.root], {
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        ZDM_INTEGRATION_OPERATION: JSON.stringify({ common: f.common, lease, parent: process.pid }),
+      },
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /complete owned integration lease is required/);
+    assert.equal(result.stdout, '');
+    assert.equal(f.leases.inspect('integration-5173'), null);
+  }
+});
 test('the actual journalled completion supervisor forwards only a validated capability and retains process evidence', async (t) => {
   const f = fixture(t),
     directory = path.join(f.root, 'completion');

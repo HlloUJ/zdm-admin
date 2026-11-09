@@ -1043,12 +1043,12 @@
       "dynamicImports": 0
     },
     "scripts/integration-resource.mjs": {
-      "digest": "df12c13ed87d77fa50773fe22eb4acd5259f1e39c488b07f7d46bf896f5e6fb2",
+      "digest": "eeb5c12d5e51e91103b30cb43d635144d5e12d7f8a6993781095922e2165106e",
       "imports": ["scripts/resource-lease.mjs"],
       "dynamicImports": 0
     },
     "scripts/integration-resource.test.mjs": {
-      "digest": "d926321aeee92bb35ac1c628cc32535672d987badb42de043aecd198b7dac4d0",
+      "digest": "d3410030bcec4a06219955d5db166d876379a74f11d2558fd66744557091ebef",
       "imports": [
         "scripts/backend-runtime.mjs",
         "scripts/completion-handoff.mjs",
@@ -1059,7 +1059,7 @@
         "scripts/resource-lease.mjs",
         "scripts/sync-integration.mjs"
       ],
-      "dynamicImports": 3
+      "dynamicImports": 4
     },
     "scripts/lint-policy.test.mjs": {
       "digest": "8b986d61c1a5329838876480e702cab9346e2e751991c2c21a29d38f95dc21af",
