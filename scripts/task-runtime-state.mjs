@@ -1,3 +1,4 @@
+import { taskMavenVolume } from './task-maven.mjs';
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
 import path from 'node:path';
@@ -63,6 +64,13 @@ export function taskBackendContainerIdentity(
         ))) ||
     !mounts.some(
       (mount) => mount.Type === 'bind' && mount.Destination === '/workspace' && sameHostPath(mount.Source, root),
+    ) ||
+    !mounts.some(
+      (mount) =>
+        mount.Type === 'volume' &&
+        mount.Destination === '/root/.m2' &&
+        mount.Name === taskMavenVolume(root, project) &&
+        mount.RW === true,
     ) ||
     !mounts.some(
       (mount) =>

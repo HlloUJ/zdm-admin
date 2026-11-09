@@ -1,3 +1,4 @@
+import { taskMavenVolume } from './task-maven.mjs';
 import assert from 'node:assert/strict';
 import { readFileSync, mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
@@ -740,6 +741,7 @@ function backendStartupFixture() {
     Mounts: [
       { Type: 'bind', Source: '/task', Destination: '/workspace', RW: true },
       { Type: 'bind', Source: '/migrations', Destination: '/task-migrations', RW: false },
+      { Type: 'volume', Destination: '/root/.m2', Name: taskMavenVolume('/task', 'zdm-task-test'), RW: true },
     ],
   };
   const commands = [];
@@ -757,6 +759,7 @@ function backendStartupFixture() {
   };
   const dependencies = {
     ensureDatabase: async () => order.push('database'),
+    prepareMaven: () => {},
     provisionData: async () => null, // Legacy injected runtime fixture; production requires an existing isolated profile.
     withDataLease: async (root, data, project, port, action) => {
       order.push('lease');

@@ -6,6 +6,7 @@ import { integrationProofMatches } from './integration-handoff-state.mjs';
 import { retainedPublishedPreview } from './start-micro-task.mjs';
 import { planBatchDelivery } from './task-batch.mjs';
 import { completionStage } from './completion-session.mjs';
+import { withIntegrationResource, integrationChildEnvironment } from './integration-resource.mjs';
 
 // Local, read-only target plan. The executing entry refreshes origin before planning.
 export function finalHandoffPlan(root, batch, main, { execute, state }) {
@@ -108,107 +109,112 @@ export async function finalHandoff(root, batch, main, options) {
       state,
       'handoff',
       main + ':final',
-      async () => {
-        execute(root, 'git', ['fetch', 'origin']);
-        const plan = finalHandoffPlan(root, batch, main, options);
-        const owner = await previewControl.assertOwner({ ...plan, common });
-        const before = await checkRuntime(root, common, { allowPreviewUnavailable: true });
-        assert.ok(
-          (before.integrationHealthy ?? before.runtimeHealthy) && before.backupRetained,
-          'Persistent runtime or backup unavailable',
-        );
-        if (state.previewFingerprint)
-          assert.equal(before.profileFingerprint, state.previewFingerprint, 'Persistent data profile changed');
-        if (plan.taskRegistryVersion === 2) {
-          assert.equal(typeof previewControl.prepareHandoff, 'function', 'Protected retained advance control required');
-          await previewControl.prepareHandoff({ ...plan, common }, owner);
-        }
-        if (plan.integrationNeedsMerge || plan.integrationNeedsPush) {
-          await completionStage(
-            state,
-            'sync',
-            main + ':integration',
-            () => {
-              try {
-                if (plan.integrationNeedsMerge) execute(plan.integration, 'git', ['merge', '--no-edit', main]);
-              } catch (error) {
-                const merge = execute(plan.integration, 'git', ['rev-parse', '--git-path', 'MERGE_HEAD']);
-                if (existsSync(path.resolve(plan.integration, merge)))
-                  execute(plan.integration, 'git', ['merge', '--abort']);
-                throw error;
-              }
-              const localHead = execute(plan.integration, 'git', ['rev-parse', 'HEAD']);
-              state.integrationPush = {
-                main,
-                taskHead: batch.recordedHead,
-                worktree: plan.integration,
-                oldRemote: plan.remoteHead,
-                localHead,
-                status: 'pending',
-              };
-              save(state);
-              if (plan.integrationNeedsMerge || plan.integrationHead !== plan.remoteHead)
-                execute(plan.integration, 'git', ['push', 'origin', 'codex/integration-current']);
-              assert.equal(
-                execute(plan.integration, 'git', ['rev-parse', 'origin/codex/integration-current']),
-                localHead,
-              );
-              state.integrationPush.status = 'done';
-              save(state);
-              return { main, localHead };
-            },
-            { save },
+      () =>
+        withIntegrationResource(root, batch.id, async () => {
+          execute(root, 'git', ['fetch', 'origin']);
+          const plan = finalHandoffPlan(root, batch, main, options);
+          const owner = await previewControl.assertOwner({ ...plan, common });
+          const before = await checkRuntime(root, common, { allowPreviewUnavailable: true });
+          assert.ok(
+            (before.integrationHealthy ?? before.runtimeHealthy) && before.backupRetained,
+            'Persistent runtime or backup unavailable',
           );
-        }
-        if (plan.previewNeedsAdvance)
-          await completionStage(
-            state,
-            'sync',
-            main + ':preview',
-            () => {
-              execute(plan.preview, 'git', ['merge', '--ff-only', main]);
-              return { main };
-            },
-            { save },
-          );
-        const snapshotReady = (snapshot) => {
-          const proof = runtimeProof(plan.integration);
-          return (
-            integrationProofMatches(proof, snapshot) &&
-            snapshot.worktreeClean &&
-            proof.taskHead === batch.recordedHead &&
-            proof.integrationHead === snapshot.integrationHead &&
-            !existsSync(path.join(plan.integration, 'backups/task-preview/active-database-task.json'))
-          );
-        };
-        const beforeSnapshot = runtimeSnapshot(plan.integration);
-        const taskSelected = owner.worktree && path.resolve(owner.worktree) === path.resolve(plan.task);
-        const reused = snapshotReady(beforeSnapshot) && !taskSelected;
-        if (!reused)
-          execute(plan.anchor, process.execPath, [
-            path.join(plan.anchor, 'scripts/delivery-launcher.mjs'),
-            'handoff',
-            '--task',
-            batch.branch,
-          ]);
-        // Keep fresh before/after runtime checks, then use the final snapshot for ancestry too.
-        const afterSnapshot = runtimeSnapshot(plan.integration);
-        assert.ok(snapshotReady(afterSnapshot), 'Published runtime handoff proof missing');
-        execute(root, 'git', ['merge-base', '--is-ancestor', main, afterSnapshot.integrationHead]);
-        assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview differs from published main');
-        const preview = await previewControl.ensure({ ...plan, common });
-        assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview changed during startup');
-        const after = await checkRuntime(root, common);
-        assert.ok(after.runtimeHealthy && after.backupRetained, 'Runtime health or backup changed');
-        assert.equal(after.profileFingerprint, before.profileFingerprint, 'Persistent data profile changed');
-        return {
-          main,
-          launcherReused: reused,
-          previewReused: preview.reused,
-          integrationUpdated: plan.integrationNeedsMerge,
-          previewUpdated: plan.previewNeedsAdvance,
-        };
-      },
+          if (state.previewFingerprint)
+            assert.equal(before.profileFingerprint, state.previewFingerprint, 'Persistent data profile changed');
+          if (plan.taskRegistryVersion === 2) {
+            assert.equal(
+              typeof previewControl.prepareHandoff,
+              'function',
+              'Protected retained advance control required',
+            );
+            await previewControl.prepareHandoff({ ...plan, common }, owner);
+          }
+          if (plan.integrationNeedsMerge || plan.integrationNeedsPush) {
+            await completionStage(
+              state,
+              'sync',
+              main + ':integration',
+              () => {
+                try {
+                  if (plan.integrationNeedsMerge) execute(plan.integration, 'git', ['merge', '--no-edit', main]);
+                } catch (error) {
+                  const merge = execute(plan.integration, 'git', ['rev-parse', '--git-path', 'MERGE_HEAD']);
+                  if (existsSync(path.resolve(plan.integration, merge)))
+                    execute(plan.integration, 'git', ['merge', '--abort']);
+                  throw error;
+                }
+                const localHead = execute(plan.integration, 'git', ['rev-parse', 'HEAD']);
+                state.integrationPush = {
+                  main,
+                  taskHead: batch.recordedHead,
+                  worktree: plan.integration,
+                  oldRemote: plan.remoteHead,
+                  localHead,
+                  status: 'pending',
+                };
+                save(state);
+                if (plan.integrationNeedsMerge || plan.integrationHead !== plan.remoteHead)
+                  execute(plan.integration, 'git', ['push', 'origin', 'codex/integration-current']);
+                assert.equal(
+                  execute(plan.integration, 'git', ['rev-parse', 'origin/codex/integration-current']),
+                  localHead,
+                );
+                state.integrationPush.status = 'done';
+                save(state);
+                return { main, localHead };
+              },
+              { save },
+            );
+          }
+          if (plan.previewNeedsAdvance)
+            await completionStage(
+              state,
+              'sync',
+              main + ':preview',
+              () => {
+                execute(plan.preview, 'git', ['merge', '--ff-only', main]);
+                return { main };
+              },
+              { save },
+            );
+          const snapshotReady = (snapshot) => {
+            const proof = runtimeProof(plan.integration);
+            return (
+              integrationProofMatches(proof, snapshot) &&
+              snapshot.worktreeClean &&
+              proof.taskHead === batch.recordedHead &&
+              proof.integrationHead === snapshot.integrationHead &&
+              !existsSync(path.join(plan.integration, 'backups/task-preview/active-database-task.json'))
+            );
+          };
+          const beforeSnapshot = runtimeSnapshot(plan.integration);
+          const taskSelected = owner.worktree && path.resolve(owner.worktree) === path.resolve(plan.task);
+          const reused = snapshotReady(beforeSnapshot) && !taskSelected;
+          if (!reused)
+            execute(
+              plan.anchor,
+              process.execPath,
+              [path.join(plan.anchor, 'scripts/delivery-launcher.mjs'), 'handoff', '--task', batch.branch],
+              { env: integrationChildEnvironment() },
+            );
+          // Keep fresh before/after runtime checks, then use the final snapshot for ancestry too.
+          const afterSnapshot = runtimeSnapshot(plan.integration);
+          assert.ok(snapshotReady(afterSnapshot), 'Published runtime handoff proof missing');
+          execute(root, 'git', ['merge-base', '--is-ancestor', main, afterSnapshot.integrationHead]);
+          assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview differs from published main');
+          const preview = await previewControl.ensure({ ...plan, common });
+          assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview changed during startup');
+          const after = await checkRuntime(root, common);
+          assert.ok(after.runtimeHealthy && after.backupRetained, 'Runtime health or backup changed');
+          assert.equal(after.profileFingerprint, before.profileFingerprint, 'Persistent data profile changed');
+          return {
+            main,
+            launcherReused: reused,
+            previewReused: preview.reused,
+            integrationUpdated: plan.integrationNeedsMerge,
+            previewUpdated: plan.previewNeedsAdvance,
+          };
+        }),
       { save },
     )
   ).result;

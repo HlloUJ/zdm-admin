@@ -1,3 +1,4 @@
+import { taskMavenVolume } from './task-maven.mjs';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -28,6 +29,8 @@ test('runtime reuse requires source/configuration and an unchanged correctly sco
     (value) => (value.Config.Labels['com.docker.compose.project'] = 'other'),
     (value) => (value.Mounts[0].Source = '/other'),
     (value) => (value.Mounts[1].RW = true),
+    (value) => (value.Mounts[2].Name = 'zdm-admin_zdm_maven_repo'),
+    (value) => (value.Mounts[2].RW = false),
     (value) => (value.HostConfig.PortBindings['8080/tcp'][0].HostPort = '8085'),
     (value) => (value.HostConfig.PortBindings['8080/tcp'][0].HostIp = '0.0.0.0'),
   ]) {
@@ -54,6 +57,7 @@ test('macOS Docker Desktop host mount aliases resolve to the same task paths', (
   expected.migrationDirectory = migrations;
   container.Mounts[0].Source = `/host_mnt${root}`;
   container.Mounts[1].Source = `/host_mnt${migrations}`;
+  container.Mounts[2].Name = taskMavenVolume(root, expected.project);
   assert.ok(taskBackendContainerIdentity(container, expected));
 });
 

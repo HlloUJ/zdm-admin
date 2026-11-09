@@ -58,6 +58,8 @@
 - 切换前核对 task/owner、Worktree、分支、私有依赖、API/数据和运行资源。服务端串行核对 Worktree、PID 和 selectionRevision；准备失败保留原归属，受保护交接启动失败执行实际恢复，不能假报健康。首次前端结果、切换或异常后通过已发布 `check` 证明完整代理链路；普通前端改动且本次运行身份未变时才可复用成功证明。
 - 新任务默认独立数据登记 `git-common-dir/task-environments/<id>/environment.json`。数据准备使用显式 `task:data isolate <id> [--apply]`；正常启动不创建或重建缺失数据。已核实的旧订单任务保留原 `preview-environment/environment.json`，仅其登记的 persistentPreviewOwner 可用。已发布保留载体 codex/preview-current 使用独立的 `preview-environment/published/environment.json`，不接管未完成任务数据。所有预览数据及媒体与集成 8080 独立；不可用时明确503，不回退5173。
 - 后端、API、迁移和运行配置变化使用兼容全栈启动器；复用须有实际源码、配置、容器、端口和数据绑定证明。数据/媒体和端口准备独占，Flyway/高风险更新保留锁与备份；失败不自动恢复数据库，不改已应用迁移，不清理数据资产。
+- 显式数据准备、集成同步、最终交接及后端恢复共同使用 `integration-5173` 资源归属。正式交付先取得 main 队列，再进入集成资源范围；进入后才操作预览及数据资源，不反向等待 main。嵌套调用复用同一准确归属，子进程必须验证直接父进程及当前 nonce；外国、损坏或中断归属保留并拒绝，不能靠超时删除。历史恢复的 `runtimeBlocked` 同时阻断运行和显式数据准备。
+- 任务后端使用按准确 Worktree 与 Compose project 分配的 Maven 卷，容器复用须核验实际挂载。Docker 检查工具使用该 Worktree 的 `.task-runtime/maven-tools`，本地 Maven 使用 `.task-runtime/maven-local/repository`；保留旧全局卷。旧业务目录经已发布入口使用这些保护，不在业务半成品中复制新版工具；`backend:dev`、`backend:restart` 通过受保护的集成恢复入口，本地开发服务只允许固定集成目录。
 - 正式交付只在准确当前任务取得授权后进入队列；初始 PR CI 不占最终 main 交接顺序。队列内组合最新 main、重新验证变化候选、合并、main CI、交接和清理串行，开发目录不全局加锁；原冻结不重建，业务冲突不偷偷解决。
 - A 完成时若5175展示B则核验并保留B；若展示A则交接健康的已发布保留载体。更新运行中保留载体源码前先暂停其进程，组合任务源码前停止本任务监视器。其他前端仍引用A后端时阻断停止和清理；归属或健康不明保留现场。
 - macOS 首次安装及正式升级常驻服务才使用安装入口，日常使用任务预览入口；状态查询不启动旧环境。Git载体清理、数据清理与备份恢复分开授权，保留其他任务、固定环境、数据、卷、媒体及备份。

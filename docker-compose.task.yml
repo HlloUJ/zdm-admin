@@ -41,7 +41,7 @@ networks:
 volumes:
   zdm_maven_repo:
     external: true
-    name: zdm-admin_zdm_maven_repo
+    name: ${ZDM_TASK_MAVEN_VOLUME:?set ZDM_TASK_MAVEN_VOLUME}
   zdm_craft_images:
     external: true
     name: ${ZDM_TASK_MEDIA_VOLUME:?set ZDM_TASK_MEDIA_VOLUME}

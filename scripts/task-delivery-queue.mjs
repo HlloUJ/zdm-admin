@@ -14,7 +14,11 @@ import path from 'node:path';
 import { createResourceLeases } from './resource-lease.mjs';
 const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 function safe(file) {
-  if (existsSync(file)) assert.ok(!lstatSync(file).isSymbolicLink(), 'Linked delivery queue is unsafe');
+  try {
+    assert.ok(!lstatSync(file).isSymbolicLink(), 'Linked delivery queue is unsafe');
+  } catch (error) {
+    if (error.code !== 'ENOENT') throw error;
+  }
 }
 export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
   const directory = path.join(commonDir, 'task-registry'),
@@ -22,6 +26,7 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
   const leases = createResourceLeases(commonDir);
   const system = {
     tick: () => new Promise((resolve) => setTimeout(resolve, 1_000)),
+    now: Date.now,
     notify: console.error,
     alive: (pid) => {
       try {
@@ -54,6 +59,7 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
     safe(directory);
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     const lock = path.join(directory, 'queue-write.lock');
+    safe(lock);
     try {
       mkdirSync(lock, { mode: 0o700 });
     } catch (error) {
@@ -82,20 +88,51 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
     }
   }
   async function update(action) {
-    const started = Date.now();
+    const started = system.now();
+    let unpublishedSince = null;
     for (;;) {
       try {
         return change(action);
       } catch (error) {
-        if (error.code !== 'QUEUE_METADATA_BUSY' || Date.now() - started >= 30_000) throw error;
-        const ownerFile = path.join(directory, 'queue-write.lock/owner.json');
+        if (error.code !== 'QUEUE_METADATA_BUSY' || system.now() - started >= 30_000) throw error;
+        const lock = path.join(directory, 'queue-write.lock'),
+          ownerFile = path.join(lock, 'owner.json');
+        safe(lock);
         safe(ownerFile);
-        if (existsSync(ownerFile)) {
-          const owner = JSON.parse(readFileSync(ownerFile));
-          if (!system.alive(owner.pid))
-            throw new Error('Interrupted queue metadata writer; inspect its exact state before recovery', {
-              cause: error,
-            });
+        let owner;
+        try {
+          owner = JSON.parse(readFileSync(ownerFile));
+        } catch (failure) {
+          if (failure.code !== 'ENOENT' && !(failure instanceof SyntaxError)) throw failure;
+          if (!existsSync(lock)) continue;
+          unpublishedSince ??= system.now();
+          assert.ok(
+            system.now() - unpublishedSince < 1_000,
+            'Queue ownership publication is incomplete; preserve the original lock',
+          );
+        }
+        if (owner !== undefined) {
+          unpublishedSince = null;
+          assert.ok(
+            owner && Number.isSafeInteger(owner.pid) && owner.pid > 0 && typeof owner.token === 'string' && owner.token,
+            'Invalid queue metadata ownership; preserve it',
+          );
+          assert.notEqual(owner.pid, process.pid, 'Recursive queue metadata writer; preserve its ownership');
+          if (!system.alive(owner.pid)) {
+            if (!existsSync(lock)) continue;
+            safe(lock);
+            safe(ownerFile);
+            let current;
+            try {
+              current = JSON.parse(readFileSync(ownerFile));
+            } catch (failure) {
+              if (failure.code !== 'ENOENT' && !(failure instanceof SyntaxError)) throw failure;
+            }
+            if (current?.pid === owner.pid && current?.token === owner.token)
+              throw new Error('Interrupted queue metadata writer; inspect its exact state before recovery', {
+                cause: error,
+              });
+          }
         }
         await system.tick();
       }

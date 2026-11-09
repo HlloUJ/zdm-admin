@@ -5,12 +5,14 @@ import path from 'node:path';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
 import { provisionPreviewData, readTaskData } from './task-data-environment.mjs';
 import { taskProjectName } from './dev-task.mjs';
+import { withIntegrationResource } from './integration-resource.mjs';
 import { deliveryStatus } from './completion-status.mjs';
 
 export async function isolateTaskData(root, { id, owner, apply = false }, dependencies = {}) {
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id });
   assert.equal(task.owner, owner, 'Exact task owner required for isolated data preparation');
+  assert.ok(!task.recovery?.runtimeBlocked, 'Historical recovery is not verified; data preparation remains blocked');
   assert.ok(
     !['merged', 'main-verified', 'handoff-verified', 'closed'].includes(task.stage) &&
       (task.resources.dataScope === 'isolated-task' ||
@@ -29,33 +31,39 @@ export async function isolateTaskData(root, { id, owner, apply = false }, depend
       action: 'backup-and-copy-into-a-new-task-database-and-media-volume',
       retainsExistingData: true,
     };
-  const running = (
-    dependencies.running ??
-    ((project) =>
-      execFileSync('docker', ['ps', '--filter', 'label=com.docker.compose.project=' + project, '--format', '{{.ID}}'], {
-        encoding: 'utf8',
-      }).trim())
-  )(project);
-  assert.equal(running, '', 'Stop the exact task runtime before changing its data scope');
-  let selected = task;
-  if (task.resources.dataScope !== 'isolated-task')
-    selected = registry.revise(task.id, task.revision, (record) => {
-      record.resources.dataScope = 'isolated-task';
-    });
-  // Failed provisioning keeps both the isolated scope and its failure/backup records.
-  // Launching it then fails closed instead of returning to the persistent shared data.
-  const data = await (dependencies.provision ?? provisionPreviewData)(
-    { root: selected.worktree, project, integrationRoot: integration[0].worktree },
-    dependencies.data ?? {},
-  );
-  return {
-    task: selected.id,
-    scope: 'isolated-task',
-    database: data.database,
-    mediaVolume: data.mediaVolume,
-    backupFile: data.backupFile,
-    existingPersistentPreviewRetained: true,
-  };
+  return withIntegrationResource(root, task.id, async () => {
+    const running = (
+      dependencies.running ??
+      ((project) =>
+        execFileSync(
+          'docker',
+          ['ps', '--filter', 'label=com.docker.compose.project=' + project, '--format', '{{.ID}}'],
+          {
+            encoding: 'utf8',
+          },
+        ).trim())
+    )(project);
+    assert.equal(running, '', 'Stop the exact task runtime before changing its data scope');
+    let selected = task;
+    if (task.resources.dataScope !== 'isolated-task')
+      selected = registry.revise(task.id, task.revision, (record) => {
+        record.resources.dataScope = 'isolated-task';
+      });
+    // Failed provisioning keeps both the isolated scope and its failure/backup records.
+    // Launching it then fails closed instead of returning to the persistent shared data.
+    const data = await (dependencies.provision ?? provisionPreviewData)(
+      { root: selected.worktree, project, integrationRoot: integration[0].worktree },
+      dependencies.data ?? {},
+    );
+    return {
+      task: selected.id,
+      scope: 'isolated-task',
+      database: data.database,
+      mediaVolume: data.mediaVolume,
+      backupFile: data.backupFile,
+      existingPersistentPreviewRetained: true,
+    };
+  });
 }
 export async function dataScopeCommand(root, args, owner = process.env.CODEX_THREAD_ID) {
   const [command, id, flag] = args;
@@ -110,9 +118,11 @@ export async function preparePublishedData(root, { id, owner, apply = false }, d
       retainsExistingData: true,
     };
   const project = taskProjectName({ root: retained, branch: 'codex/preview-current' });
-  const data = await (dependencies.provision ?? provisionPreviewData)(
-    { root: retained, project, integrationRoot },
-    dependencies.data ?? {},
+  const data = await withIntegrationResource(root, task.id, () =>
+    (dependencies.provision ?? provisionPreviewData)(
+      { root: retained, project, integrationRoot },
+      dependencies.data ?? {},
+    ),
   );
   return {
     task: id,

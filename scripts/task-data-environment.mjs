@@ -15,6 +15,7 @@ import path from 'node:path';
 import { gzipSync, gunzipSync } from 'node:zlib';
 import { fileURLToPath } from 'node:url';
 import { createTaskRegistry } from './task-registry.mjs';
+import { withIntegrationResource } from './integration-resource.mjs';
 
 const MYSQL = 'zdm-platform-mysql';
 const SHARED_DATABASE = 'zdm_admin';
@@ -157,6 +158,16 @@ export async function ensureTaskData(options, dependencies = {}) {
 // Explicit provisioning only. Normal launch calls ensureTaskData and cannot enter
 // the initializer when a retained schema or registration is missing.
 export async function provisionPreviewData({ root, project, integrationRoot }, dependencies = {}) {
+  const location = dataLocation(root);
+  if (location.registeredTask?.recovery?.runtimeBlocked) throw new Error('历史恢复候选尚未核验，禁止启动或迁移数据');
+  if (readTaskData(root)) return provisionPreviewDataLocked({ root, project, integrationRoot }, dependencies);
+  return withIntegrationResource(root, location.registeredTask?.id ?? project, () =>
+    withIntegrationResource(integrationRoot, location.registeredTask?.id ?? project, () =>
+      provisionPreviewDataLocked({ root, project, integrationRoot }, dependencies),
+    ),
+  );
+}
+async function provisionPreviewDataLocked({ root, project, integrationRoot }, dependencies) {
   const execute = dependencies.execute ?? command;
   const existing = readTaskData(root);
   if (existsSync(path.join(previewDataRoot(root), 'update.json')))

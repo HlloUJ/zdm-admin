@@ -48,12 +48,12 @@
       "dynamicImports": 0
     },
     "docker-compose.task.yml": {
-      "digest": "c451d379862e940736cc05d3993bd3f5a8f02edf6aafe7d6b453077328fc58d7",
+      "digest": "75b386c195eebc20fd39700c39786c4d0b387459d9afed361be3b9097acf0a04",
       "imports": [],
       "dynamicImports": 0
     },
     "docker-compose.yml": {
-      "digest": "c378c46007f112d94af90a16f008f3e1a0d6aead3a5891ce02a9a8106bb0b799",
+      "digest": "7769def3226af0a609b1df402d6a6da87e95be89c377ed33b177d463bd76d36d",
       "imports": [],
       "dynamicImports": 0
     },
@@ -63,7 +63,7 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "d6bffd6faca9216320edf1a88ad49902039d481a0e46f13a82d9eb9cb2628d55",
+      "digest": "d24834dc29f39317a7726cb81a33f65e233d7b2eb719b1f580b24d7375a9fdc6",
       "imports": [],
       "dynamicImports": 0
     },
@@ -137,13 +137,29 @@
       "imports": ["scripts/affected-test-inputs.mjs", "scripts/backend-test-plan.mjs"],
       "dynamicImports": 2
     },
+    "scripts/backend-local.mjs": {
+      "digest": "d1ea4693543a423a13c49d12d282b44a479161bb1afae750e27cd8ffcfeab50d",
+      "imports": ["scripts/integration-resource.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/backend-local.test.mjs": {
+      "digest": "ca822dc0932f6421a1292d2aa2b791c2554637a7ab9044edb01ce268080f5575",
+      "imports": ["scripts/backend-local.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/backend-runtime.mjs": {
-      "digest": "f74af9e9d5a54c8717d7b779754da9827642ca930bc595d566b913350c7293e2",
-      "imports": ["scripts/dev-task.mjs", "scripts/git-workflow-core.mjs", "scripts/integration-handoff-state.mjs"],
+      "digest": "4566d95e5261ebb887c2f28210be777eae9b59f0c3e2d14892bb2a543e48dbe0",
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/integration-handoff-state.mjs",
+        "scripts/integration-resource.mjs",
+        "scripts/task-registry.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/backend-runtime.test.mjs": {
-      "digest": "c67534152b95a8a3bad918512fec98edb48accb855b54f3e5e3adb9b12642009",
+      "digest": "c1fd3aab2342b98a9b778062468205a3159d1e23888bfbb966d54cc948a0677c",
       "imports": ["scripts/backend-runtime.mjs", "scripts/dev-task.mjs", "scripts/ensure-backend.mjs"],
       "dynamicImports": 0
     },
@@ -490,12 +506,13 @@
       "dynamicImports": 0
     },
     "scripts/completion-handoff.mjs": {
-      "digest": "db94e0b998edd83afd8403d93614c285ebd94e2b76e182c2f607bcc77dc9fb19",
+      "digest": "69e993cda81d680efe9eea7a208481c6db3f180d6778a0166982108f3086e81d",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/delivery-launcher.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
+        "scripts/integration-resource.mjs",
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs"
       ],
@@ -613,21 +630,24 @@
       "dynamicImports": 0
     },
     "scripts/delivery-launcher.mjs": {
-      "digest": "e17ac3c93f7bccc47634e254c6a6bcc52eb1f9adcab2458d97446fc8c6057750",
+      "digest": "bd1efa19e95d0492ee14193866de46b9664b0ca8e5bf24ca747c80249effff13",
       "imports": [
+        "scripts/backend-runtime.mjs",
         "scripts/delivery-launcher.mjs",
         "scripts/dev-task.mjs",
         "scripts/ensure-backend.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
+        "scripts/integration-resource.mjs",
         "scripts/sync-integration.mjs",
         "scripts/task-dependencies.mjs",
+        "scripts/task-maven.mjs",
         "scripts/verification-impact.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/delivery-launcher.test.mjs": {
-      "digest": "27fa92cb4a260eb3cb356d3410b5fe624b7f2c55656e207dea26be5c43f89c71",
+      "digest": "0ccdee6132682d8b53991df63ce19821a342ca19d42dc056e905605accdbc712",
       "imports": [
         "scripts/delivery-launcher.mjs",
         "scripts/dev-task.mjs",
@@ -697,16 +717,18 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "9d624287946b1bf96b3532f8565b71f6bc61b143ec13aff75ed6b11c461ce235",
+      "digest": "82d573b0d1b1a5bacb28613b3bff9e6abe735064d5807b61b4701ecf38589b94",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
+        "scripts/integration-resource.mjs",
         "scripts/preview-policy.mjs",
         "scripts/resource-lease.mjs",
         "scripts/runtime-resource.mjs",
         "scripts/task-data-environment.mjs",
         "scripts/task-dependencies.mjs",
+        "scripts/task-maven.mjs",
         "scripts/task-registry.mjs",
         "scripts/task-runtime-state.mjs",
         "scripts/verification-impact.mjs"
@@ -714,12 +736,13 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.test.mjs": {
-      "digest": "325763830c0e3c46b8bb26c7688c1febcbfab41fb165bd84f596339b340429dc",
+      "digest": "383b0137b6a1f04ffea414de0dd13e7412aa1acb02fab40bb9543e571b177405",
       "imports": [
         "scripts/backend-test-plan.mjs",
         "scripts/dev-task.mjs",
         "scripts/dev-task.test.mjs",
         "scripts/sync-integration.mjs",
+        "scripts/task-maven.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-runtime-state.mjs",
         "vite.config.js"
@@ -1018,6 +1041,23 @@
       "digest": "04c7d57f628b5f99e08a188d2a1378ffebefeb19f6d0b4b4fe73759a6d09c5f6",
       "imports": ["scripts/runtime-file-scope.mjs", "scripts/task-runtime-state.mjs"],
       "dynamicImports": 0
+    },
+    "scripts/integration-resource.mjs": {
+      "digest": "05cecd7143b150ac55a87f1640606724d68220912049f1ec7a1c97909ca19038",
+      "imports": ["scripts/resource-lease.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/integration-resource.test.mjs": {
+      "digest": "fffd3d219ec30716de5c3017b252ca6e7a6947b078ed5d10bc085c9bd5dbbd24",
+      "imports": [
+        "scripts/backend-runtime.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/integration-resource.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/sync-integration.mjs"
+      ],
+      "dynamicImports": 2
     },
     "scripts/lint-policy.test.mjs": {
       "digest": "8b986d61c1a5329838876480e702cab9346e2e751991c2c21a29d38f95dc21af",
@@ -1395,17 +1435,18 @@
       "dynamicImports": 0
     },
     "scripts/sync-integration.mjs": {
-      "digest": "ac1c9e22eb0382b9d63b0eaf9d549b138ca18e38b3fadaec2f6e75393eeafd09",
+      "digest": "b46625cf54dfe29d394595058bb0ec8d66954cd940dba457c57483c05b23e4db",
       "imports": [
         "scripts/delivery-launcher.mjs",
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
-        "scripts/integration-handoff-state.mjs"
+        "scripts/integration-handoff-state.mjs",
+        "scripts/integration-resource.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/sync-integration.test.mjs": {
-      "digest": "43931f15522ced4b1a2b5a55972ce94e696c3608c67e3fa492e5353228c9179b",
+      "digest": "e96720a6d2585e421b53cd34860b2c8b67877cba7836c4915a3e6777a1eed7b7",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/integration-handoff-state.mjs",
@@ -1511,8 +1552,8 @@
       "dynamicImports": 0
     },
     "scripts/task-data-environment.mjs": {
-      "digest": "2a041e8f42d6f39f1158ecd2e95d38cd569538ac4e7b9ba9ab9a342a22c50215",
-      "imports": ["scripts/task-registry.mjs"],
+      "digest": "16a31c2480ad03f1f12dd1a701309808d3319833c4e0aa66a3aa5cbeeb7c2c38",
+      "imports": ["scripts/integration-resource.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-data-environment.test.mjs": {
@@ -1525,27 +1566,33 @@
       "dynamicImports": 0
     },
     "scripts/task-data-scope.mjs": {
-      "digest": "f4eccc1e985a5b17a043f899499b39e3854abbc188de10c9f7ce44df18408d03",
+      "digest": "65887d1df2366cfba374cbdc21d65c4b19bcb8ad9f306e2bbe19c619e2b958db",
       "imports": [
         "scripts/completion-status.mjs",
         "scripts/dev-task.mjs",
+        "scripts/integration-resource.mjs",
         "scripts/task-data-environment.mjs",
         "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/task-data-scope.test.mjs": {
-      "digest": "13e17d41171dc29f5f2194b3b31ecdd6435b5aac6ecb144e40715d87acfa467f",
-      "imports": ["scripts/task-data-environment.mjs", "scripts/task-data-scope.mjs", "scripts/task-registry.mjs"],
+      "digest": "09dd82d50151d77eb6453655e52ec7c1c02891627ac54070233fd827faa619c0",
+      "imports": [
+        "scripts/resource-lease.mjs",
+        "scripts/task-data-environment.mjs",
+        "scripts/task-data-scope.mjs",
+        "scripts/task-registry.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-delivery-queue.mjs": {
-      "digest": "dce80b1cb17172c4c3053a15fb06552cf92b1cbfec91a42753b39e2feb8f9584",
+      "digest": "c33897494a6c39cb9719432abbc53125b6db50cfa85f8574586bba4e08e4f14b",
       "imports": ["scripts/resource-lease.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-delivery-queue.test.mjs": {
-      "digest": "2da4be950d77ad9badd9f0c61aa8d0134dea4571a894d62ddacdb8b5e55de23c",
+      "digest": "7f54e75bc528289f53f7ab4a1d7a8c5500a678dc2d8f2f8345c372a405241c4e",
       "imports": ["scripts/task-delivery-queue.mjs"],
       "dynamicImports": 0
     },
@@ -1614,6 +1661,16 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-maven.mjs": {
+      "digest": "5bb8da5d8e61ab4daf2141f035716203410a9fa76cc02cfe177f3948dc8108de",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-maven.test.mjs": {
+      "digest": "d7a30c087a8e117eeb06e8da1cbb21f5fcc4784082a53498eaf5ff71c81a3136",
+      "imports": ["scripts/task-maven.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-preview-service.mjs": {
       "digest": "822e85a58ee270edc016e1be5e25dd4a24fe3a66d528e882794ca04fd9881a36",
       "imports": [
@@ -1647,12 +1704,12 @@
       "dynamicImports": 0
     },
     "scripts/task-registry-lock.test.mjs": {
-      "digest": "0bfcebd1fd612b1010640f4441cb2e00820942467651ee8b58f50a55b1fb6111",
+      "digest": "c04deb422f110eb9e75f347a8bd268eb6f1bb8c4d5fa37930d82faa6ab7fb23f",
       "imports": ["scripts/task-registry.mjs"],
-      "dynamicImports": 1
+      "dynamicImports": 2
     },
     "scripts/task-registry.mjs": {
-      "digest": "a29e2be74059dea154e1c383cb98042abad86d02dabe65d9772b33fdad3ef3ba",
+      "digest": "50268a299c326cb8f45997bd7772f31ab1c7ca9a1f77be61cd567378a81bb88e",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1682,13 +1739,17 @@
       "dynamicImports": 0
     },
     "scripts/task-runtime-state.mjs": {
-      "digest": "d22f0c742c111d5e5e1c8d5ce1f7db88378b97aae11de7e6587870863487779e",
-      "imports": [],
+      "digest": "2cc473738aec0bf84a244d7edaf0d66c26422f44f0b0a5cdba5b89548add8acc",
+      "imports": ["scripts/task-maven.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-runtime-state.test.mjs": {
-      "digest": "cba47fbb1e5fe1eaf0a59f1b1db183635d265a1d87fee5a67c37c4e4aa9e74ea",
-      "imports": ["scripts/task-runtime-state.mjs", "scripts/test-support/task-backend-fixture.mjs"],
+      "digest": "efbb84d5ca00fee8aff7caf7fb091e22e586f5428d9456f12c2762c1b0c8bb12",
+      "imports": [
+        "scripts/task-maven.mjs",
+        "scripts/task-runtime-state.mjs",
+        "scripts/test-support/task-backend-fixture.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-start.mjs": {
@@ -1746,8 +1807,8 @@
       "dynamicImports": 0
     },
     "scripts/test-support/task-backend-fixture.mjs": {
-      "digest": "48b17d24f46f1cb8f182b196442cfd606f07cbb25812ba3324fe666df7e61c41",
-      "imports": [],
+      "digest": "5c22c4b3d4b569b35411765b7d75729693ff89013c58aa37bd35486db5dc6164",
+      "imports": ["scripts/task-maven.mjs"],
       "dynamicImports": 0
     },
     "scripts/typography-policy.mjs": {
