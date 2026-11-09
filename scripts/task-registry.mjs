@@ -47,6 +47,88 @@ function read(file) {
   safe(file);
   return JSON.parse(readFileSync(file, 'utf8'));
 }
+// This lock serializes only synchronous registry metadata updates. Normal live
+// contention waits for the writer to release its own nonce; no lock is stolen
+// or removed because of age, missing metadata, an ended PID or a timeout.
+export function withTaskRegistryWriteLock(directory, operation, dependencies = {}) {
+  const sleeper = new Int32Array(new SharedArrayBuffer(4));
+  const system = {
+    now: () => performance.now(),
+    pause: () => Atomics.wait(sleeper, 0, 0, 10),
+    alive: (pid) => {
+      try {
+        process.kill(pid, 0);
+        return true;
+      } catch (error) {
+        if (error.code === 'ESRCH') return false;
+        throw error;
+      }
+    },
+    timeoutMs: 30_000,
+    publicationMs: 1_000,
+    ...dependencies,
+  };
+  assert.ok(Number.isFinite(system.timeoutMs) && system.timeoutMs >= 0 && system.timeoutMs <= 30_000);
+  assert.ok(Number.isFinite(system.publicationMs) && system.publicationMs > 0 && system.publicationMs <= 1_000);
+  const lock = path.join(directory, 'write.lock'),
+    ownerFile = path.join(lock, 'owner.json');
+  const startedAt = system.now();
+  let unknownSince = null;
+  for (;;) {
+    safe(directory);
+    safe(lock);
+    safe(ownerFile);
+    try {
+      mkdirSync(lock, { mode: 0o700 });
+      break;
+    } catch (error) {
+      if (error.code !== 'EEXIST') throw error;
+      let owner;
+      try {
+        owner = read(ownerFile);
+      } catch (failure) {
+        if (failure.code !== 'ENOENT' && !(failure instanceof SyntaxError)) throw failure;
+        unknownSince ??= system.now();
+        assert.ok(
+          system.now() - unknownSince < system.publicationMs,
+          'Task registry is locked with incomplete ownership; preserve existing writer',
+        );
+      }
+      if (owner) {
+        unknownSince = null;
+        assert.ok(
+          Number.isSafeInteger(owner.pid) && owner.pid > 0 && typeof owner.token === 'string' && owner.token,
+          'Task registry is locked with invalid ownership; preserve it',
+        );
+        assert.notEqual(owner.pid, process.pid, 'Task registry is locked by this process; do not enter it recursively');
+        if (!system.alive(owner.pid)) {
+          // The writer may have released normally and exited after our read.
+          // Re-enter mkdir only when that observed lock is actually absent.
+          if (!existsSync(lock)) continue;
+          throw new Error('Task registry is locked by an ended writer; preserve its original evidence', {
+            cause: error,
+          });
+        }
+      }
+      assert.ok(
+        system.now() - startedAt < system.timeoutMs,
+        'Task registry is locked by a live writer; bounded wait expired without taking over',
+      );
+      system.pause(owner ?? null);
+    }
+  }
+  const token = randomUUID();
+  writeFileSync(ownerFile, JSON.stringify({ pid: process.pid, token }), { flag: 'wx', mode: 0o600 });
+  try {
+    return operation();
+  } finally {
+    const owner = read(ownerFile);
+    assert.equal(owner.token, token, 'Registry lock ownership changed');
+    assert.equal(owner.pid, process.pid, 'Registry lock process changed');
+    unlinkSync(ownerFile);
+    rmdirSync(lock);
+  }
+}
 function id(value) {
   assert.ok(typeof value === 'string' && value.length <= 64 && ID.test(value), 'Explicit valid task id required');
   return value;
@@ -127,23 +209,7 @@ export function createTaskRegistry(root) {
   function locked(operation) {
     guarded();
     mkdirSync(tasks, { recursive: true, mode: 0o700 });
-    const lock = path.join(directory, 'write.lock');
-    try {
-      mkdirSync(lock, { mode: 0o700 });
-    } catch {
-      throw Error('Task registry is locked; preserve existing writer');
-    }
-    const token = randomUUID(),
-      ownerFile = path.join(lock, 'owner.json');
-    writeFileSync(ownerFile, JSON.stringify({ pid: process.pid, token }), { flag: 'wx', mode: 0o600 });
-    try {
-      return operation();
-    } finally {
-      const owner = read(ownerFile);
-      assert.equal(owner.token, token, 'Registry lock ownership changed');
-      unlinkSync(ownerFile);
-      rmdirSync(lock);
-    }
+    return withTaskRegistryWriteLock(directory, operation);
   }
   function write(record) {
     shape(record);
