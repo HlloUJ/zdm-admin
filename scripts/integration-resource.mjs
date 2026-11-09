@@ -58,3 +58,12 @@ export function integrationChildEnvironment(environment = process.env) {
   validate(current, current.common);
   return { ...environment, [VARIABLE]: JSON.stringify({ ...current, parent: process.pid }) };
 }
+// A journalled completion supervisor is an additional real process boundary.
+// It validates the received capability before delegating it to its direct child.
+export function forwardIntegrationEnvironment(environment = process.env) {
+  if (!environment[VARIABLE]) return environment;
+  const inherited = JSON.parse(environment[VARIABLE]);
+  assert.equal(inherited.parent, process.ppid, 'Integration supervisor did not receive its direct parent capability');
+  validate(inherited, realpathSync(inherited.common));
+  return { ...environment, [VARIABLE]: JSON.stringify({ ...inherited, parent: process.pid }) };
+}

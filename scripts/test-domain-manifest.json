@@ -568,8 +568,8 @@
       "dynamicImports": 0
     },
     "scripts/completion-process.mjs": {
-      "digest": "f1398e9f4a55ad30f94d9d2827cfc4154863e7415e61ffffb3a02bab3691da2b",
-      "imports": [],
+      "digest": "ea58fa360ee27a53a724978891d7c8e0afdd03fc5d1f3dd0d7bf2d3cac0b5803",
+      "imports": ["scripts/integration-resource.mjs"],
       "dynamicImports": 0
     },
     "scripts/completion-process.test.mjs": {
@@ -1043,21 +1043,23 @@
       "dynamicImports": 0
     },
     "scripts/integration-resource.mjs": {
-      "digest": "05cecd7143b150ac55a87f1640606724d68220912049f1ec7a1c97909ca19038",
+      "digest": "df12c13ed87d77fa50773fe22eb4acd5259f1e39c488b07f7d46bf896f5e6fb2",
       "imports": ["scripts/resource-lease.mjs"],
       "dynamicImports": 0
     },
     "scripts/integration-resource.test.mjs": {
-      "digest": "fffd3d219ec30716de5c3017b252ca6e7a6947b078ed5d10bc085c9bd5dbbd24",
+      "digest": "d926321aeee92bb35ac1c628cc32535672d987badb42de043aecd198b7dac4d0",
       "imports": [
         "scripts/backend-runtime.mjs",
         "scripts/completion-handoff.mjs",
+        "scripts/completion-process.mjs",
+        "scripts/completion-session.mjs",
         "scripts/dev-task.mjs",
         "scripts/integration-resource.mjs",
         "scripts/resource-lease.mjs",
         "scripts/sync-integration.mjs"
       ],
-      "dynamicImports": 2
+      "dynamicImports": 3
     },
     "scripts/lint-policy.test.mjs": {
       "digest": "8b986d61c1a5329838876480e702cab9346e2e751991c2c21a29d38f95dc21af",

@@ -9,6 +9,8 @@ import { createResourceLeases } from './resource-lease.mjs';
 import { finalHandoff } from './completion-handoff.mjs';
 import { ensureIntegrationDatabase } from './dev-task.mjs';
 import { ensureBackend } from './backend-runtime.mjs';
+import { openCompletion, completionStage, saveCompletion } from './completion-session.mjs';
+import { runCompletionProcess } from './completion-process.mjs';
 
 function fixture(t) {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'integration-operation-')));
@@ -59,6 +61,57 @@ test('real child processes borrow only the exact direct-parent operation and nev
       assert.deepEqual(f.leases.inspect('integration-5173'), lease);
     }
   });
+});
+test('the actual journalled completion supervisor forwards only a validated capability and retains process evidence', async (t) => {
+  const f = fixture(t),
+    directory = path.join(f.root, 'completion');
+  const state = openCompletion(directory, 'supervised-handoff', { formal: false });
+  const url = new URL('./integration-resource.mjs', import.meta.url).href;
+  const code = `const {withIntegrationResource}=await import(process.argv[1]);withIntegrationResource(process.argv[2],'actual-child',lease=>console.log(JSON.stringify(lease)));`;
+  await withIntegrationResource(f.root, 'formal-handoff', (lease) =>
+    completionStage(
+      state,
+      'handoff',
+      'exact-child',
+      () => {
+        const result = runCompletionProcess(process.execPath, ['--input-type=module', '-e', code, url, f.root], {
+          env: integrationChildEnvironment(),
+          encoding: 'utf8',
+        });
+        assert.equal(result.status, 0, result.stderr);
+        assert.deepEqual(JSON.parse(result.stdout), lease);
+        assert.deepEqual(f.leases.inspect('integration-5173'), lease);
+        return { delegated: true };
+      },
+      { save: (current) => saveCompletion(directory, current) },
+    ),
+  );
+  assert.equal(state.events[0].status, 'success');
+  assert.equal(state.events[0].processes.length, 1);
+  assert.equal(f.leases.inspect('integration-5173'), null);
+  await withIntegrationResource(f.root, 'formal-handoff', (lease) =>
+    completionStage(
+      state,
+      'handoff',
+      'reject-wrong-supervisor',
+      () => {
+        const env = integrationChildEnvironment(),
+          invalid = JSON.parse(env.ZDM_INTEGRATION_OPERATION);
+        invalid.parent = 1;
+        const result = runCompletionProcess(process.execPath, ['--input-type=module', '-e', code, url, f.root], {
+          env: { ...env, ZDM_INTEGRATION_OPERATION: JSON.stringify(invalid) },
+          encoding: 'utf8',
+        });
+        assert.equal(result.status, 1);
+        assert.match(result.stderr, /supervisor did not receive its direct parent capability/);
+        assert.equal(result.stdout, '');
+        assert.deepEqual(f.leases.inspect('integration-5173'), lease);
+      },
+      { save: (current) => saveCompletion(directory, current) },
+    ),
+  );
+  assert.equal(state.events[1].processes.length, 1);
+  assert.equal(f.leases.inspect('integration-5173'), null);
 });
 test('the actual final handoff refuses a data-copy lease before fetch, Git mutation or runtime writes', async (t) => {
   const f = fixture(t),
