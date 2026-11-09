@@ -45,6 +45,10 @@
 
 ## 长期预览契约
 
+共享运行的日常入口使用 `integration-5173` 同一资源协议：显式任务/已发布预览数据准备、集成同步、最终交接、后端恢复和数据库就绪检查均在共享变更前核验归属。锁顺序为正式 main 队列、集成资源、必要的预览和数据资源；内部调用复用当前准确操作，直接子进程核验父进程与当前租约 nonce，不能凭相同任务名接管。损坏、中断或外国归属保留并明确拒绝，不按年龄清锁。数据复制失败继续保留原备份及数据库保护；释放已结束操作的集成租约不代表数据库保护已解除。部分历史恢复的 `runtimeBlocked` 同样阻断显式数据准备。
+
+可写 Maven 产物按实际使用方隔离：任务后端使用由 Worktree 与 Compose project 确定的私有卷，运行复用验证实际挂载；Docker 工具使用当前 Worktree 的 `.task-runtime/maven-tools`，本地工具使用 `.task-runtime/maven-local/repository`。原集成缓存卷保留，不因本次隔离或任务 Git 收口删除。已运行旧后端改用私有卷属于受控运行升级，必须核对原源码、API、数据库及媒体并健康恢复，不能把源码合并当成旧容器已经完成迁移。
+
 - 5173/8080为已交付集成，5175为明确选中任务；新任务建立登记不切换它。切换经 task:preview 的准确 task/owner 和服务端 PID/选择版本事务执行；缺失新协议时不自动降级。
 - 新任务数据存于 Git common dir 的 task-environments/<id>/environment.json；旧订单任务保留 preview-environment/environment.json 并登记唯一旧数据所有者。已发布保留载体独立使用 preview-environment/published/environment.json。显式准备数据才允许首次备份复制，正常启动不初始化、不重建、不覆盖其他任务数据或媒体。
 - 正式候选的临时运行验证同样要求数据已显式准备。缺失时提示已发布的 `task:data isolate <id> --apply` 并阻断，不在验证器中自动创建数据库、媒体或暂停集成后端。

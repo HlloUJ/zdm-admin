@@ -1,5 +1,7 @@
 import { createTaskRegistry, parallelTaskMode } from './task-registry.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
+import { withIntegrationResource, integrationChildEnvironment } from './integration-resource.mjs';
+import { taskMavenVolume, prepareTaskMaven } from './task-maven.mjs';
 import assert from 'node:assert/strict';
 import {
   existsSync,
@@ -664,6 +666,7 @@ function composeContext({ root, project, backendPort }) {
             ZDM_TASK_MEDIA_VOLUME: 'zdm-task-media-uninitialized',
           }),
       ZDM_TASK_WORKSPACE: root,
+      ZDM_TASK_MAVEN_VOLUME: taskMavenVolume(root, project),
       ZDM_TASK_BACKEND_PORT: String(backendPort),
       ZDM_INTEGRATION_NETWORK: INTEGRATION_NETWORK,
       ZDM_TASK_MIGRATION_DIR: taskMigrationDirectory(project),
@@ -947,6 +950,14 @@ function integrationComposeContext(integrationRoot) {
 
 export async function ensureIntegrationDatabase(
   integrationRoot,
+  { coordinate = withIntegrationResource, ...dependencies } = {},
+) {
+  return coordinate(integrationRoot, 'integration-database', () =>
+    ensureIntegrationDatabaseLocked(integrationRoot, dependencies),
+  );
+}
+async function ensureIntegrationDatabaseLocked(
+  integrationRoot,
   { prepare = ensureDocker, execute = run, inspect = capture, wait = waitUntil } = {},
 ) {
   prepare(integrationRoot);
@@ -1002,7 +1013,12 @@ function stopIntegrationBackend(integrationRoot) {
   run('docker', [...context.args, 'stop', 'backend'], context);
 }
 
-export async function startIntegrationBackend(
+export async function startIntegrationBackend(integrationRoot, dependencies = {}) {
+  return withIntegrationResource(integrationRoot, 'integration-backend', () =>
+    startIntegrationBackendLocked(integrationRoot, dependencies),
+  );
+}
+async function startIntegrationBackendLocked(
   integrationRoot,
   { execute = run, waitForHealth = waitForHttp, forceRecreate = false } = {},
 ) {
@@ -1016,6 +1032,7 @@ export async function startIntegrationBackend(
     ],
     {
       cwd: integrationRoot,
+      env: integrationChildEnvironment(),
     },
   );
   await waitForHealth(`${SHARED_API_TARGET}/actuator/health`);
@@ -1149,6 +1166,7 @@ export async function ensureTaskBackend(
   {
     ensureDatabase = ensureIntegrationDatabase,
     provisionData = ensureTaskData,
+    prepareMaven = prepareTaskMaven,
     withDataLease = withPreviewDataLease,
     protectData = protectPreviewUpdate,
     prepareMigrations = prepareTaskMigrations,
@@ -1167,6 +1185,7 @@ export async function ensureTaskBackend(
   await ensureDatabase(integrationRoot);
   const data = await provisionData({ root, integrationRoot, project });
   return withDataLease(root, data, project, context.env.ZDM_TASK_BACKEND_PORT, async () => {
+    prepareMaven({ root, project });
     // Recheck writers under the data lease: two launchers may both have observed
     // an idle database before either one acquired it.
     const currentData = await provisionData({ root, integrationRoot, project });
@@ -1638,18 +1657,19 @@ export async function main(args = process.argv.slice(2)) {
     return;
   }
   if (options.handoff) {
-    ensureDocker(root);
-    const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
-    const context = composeContext({ root, project, backendPort });
-    await handoffDatabaseTask({
-      root,
-      branch,
-      project,
-      integrationRoot,
-      context,
-      forceIntegrationBackend: options.forceIntegrationBackend,
+    return withIntegrationResource(root, registeredTask?.id ?? branch, async () => {
+      ensureDocker(root);
+      const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
+      const context = composeContext({ root, project, backendPort });
+      await handoffDatabaseTask({
+        root,
+        branch,
+        project,
+        integrationRoot,
+        context,
+        forceIntegrationBackend: options.forceIntegrationBackend,
+      });
     });
-    return;
   }
   if (options.stop) {
     const lock = readDatabaseLock(integrationRoot);

@@ -2,6 +2,7 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { assertDeliveryLauncherFresh, runDeliveryLauncher } from './delivery-launcher.mjs';
+import { withIntegrationResource, integrationChildEnvironment } from './integration-resource.mjs';
 import {
   integrationBackendSnapshot,
   integrationProofMatches,
@@ -37,7 +38,12 @@ function aheadBehind(localRef, remoteRef, cwd) {
   return parseAheadBehind(capture(['rev-list', '--left-right', '--count', `${localRef}...${remoteRef}`], { cwd }));
 }
 
-export function syncIntegration(requestedTask = '', { executeHandoff = execFileSync, launcher = null } = {}) {
+export function syncIntegration(requestedTask = '', dependencies = {}) {
+  const root = capture(['rev-parse', '--show-toplevel']);
+  const task = requestedTask || capture(['branch', '--show-current'], { cwd: root });
+  return withIntegrationResource(root, task, () => syncIntegrationLocked(requestedTask, dependencies));
+}
+function syncIntegrationLocked(requestedTask = '', { executeHandoff = execFileSync, launcher = null } = {}) {
   const root = capture(['rev-parse', '--show-toplevel']);
   const taskBranch = requestedTask || capture(['branch', '--show-current'], { cwd: root });
   if (branchKind(taskBranch) !== 'task') throw new Error(`只能同步 codex/* 任务分支，当前为：${taskBranch}`);
@@ -120,7 +126,7 @@ export function syncIntegration(requestedTask = '', { executeHandoff = execFileS
       taskWorktree.path,
       ...(recreate ? ['--force-integration-backend'] : []),
     ],
-    { cwd: integrationWorktree.path, stdio: 'inherit' },
+    { cwd: integrationWorktree.path, stdio: 'inherit', env: integrationChildEnvironment() },
   );
 
   const after = integrationBackendSnapshot(integrationWorktree.path);

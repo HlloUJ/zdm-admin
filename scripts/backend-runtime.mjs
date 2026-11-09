@@ -9,6 +9,9 @@ import { tmpdir } from 'node:os';
 import http from 'node:http';
 import { ensureIntegrationDatabase, mergeMigrationCatalog, verifyPausedCatalog } from './dev-task.mjs';
 import { parseWorktreePorcelain, DEFAULT_INTEGRATION_BRANCH } from './git-workflow-core.mjs';
+import assert from 'node:assert/strict';
+import { registeredTaskWorktrees } from './task-registry.mjs';
+import { withIntegrationResource } from './integration-resource.mjs';
 
 export function resolveRuntimeMigrations(currentFiles, pausedRecords, history) {
   if (history.some((entry) => entry.success !== '1')) throw new Error('存在失败迁移，不能启动集成后端');
@@ -162,7 +165,21 @@ export function waitForPort(port, timeoutMs = 120_000) {
   });
 }
 
-export async function ensureBackend(
+export async function ensureBackend(root, { coordinate = coordinateIntegrationBackend, ...dependencies } = {}) {
+  return coordinate(root, (target) => ensureBackendLocked(target, dependencies));
+}
+function coordinateIntegrationBackend(root, action) {
+  const worktrees = registeredTaskWorktrees(root),
+    caller = worktrees.find((item) => path.resolve(item.worktree) === path.resolve(root));
+  assert.ok(
+    caller && ['main', DEFAULT_INTEGRATION_BRANCH].includes(caller.branch),
+    'Shared runtime requires main or the exact fixed integration worktree',
+  );
+  const targets = worktrees.filter((item) => item.branch === DEFAULT_INTEGRATION_BRANCH);
+  assert.equal(targets.length, 1, 'Exact fixed integration worktree required');
+  return withIntegrationResource(targets[0].worktree, 'integration-backend', () => action(targets[0].worktree));
+}
+async function ensureBackendLocked(
   root,
   {
     forceRecreate = false,

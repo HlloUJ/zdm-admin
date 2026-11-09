@@ -17,6 +17,7 @@ export function processScope(state, event, save, run) {
 const supervisor = `
 import { spawnSync } from 'node:child_process';
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
+import { forwardIntegrationEnvironment } from ${JSON.stringify(new URL('./integration-resource.mjs', import.meta.url).href)};
 import os from 'node:os';
 const [file, token, command, ...args] = process.argv.slice(1);
 const intent = JSON.parse(readFileSync(file, 'utf8'));
@@ -24,7 +25,9 @@ if (intent.token !== token || intent.status !== 'pending') throw Error('Invalid 
 const record = { token, host: os.hostname(), pgid: process.pid, status: 'started' };
 const publish = () => { writeFileSync(file + '.tmp', JSON.stringify(record), { mode: 0o600, flag: 'wx' }); renameSync(file + '.tmp', file); };
 publish();
-const result = spawnSync(command, args, { stdio: 'inherit' });
+let result;
+try { result = spawnSync(command, args, { stdio: 'inherit', env: forwardIntegrationEnvironment() }); }
+catch (error) { process.stderr.write(error.message + '\\n'); result = {status:1,signal:null}; }
 record.status = 'exited'; record.exitCode = result.status; record.signal = result.signal;
 publish();
 process.exit(result.status ?? 1);

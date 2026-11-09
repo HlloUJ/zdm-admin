@@ -456,7 +456,7 @@
         "src/pages/finished-stock/shared/guidePriceSource.test.ts": "78b7b219cb169c86b10590cef5faaf1394ec3c00e27101c4b784001e224f2fad",
         "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java": "8f4a40ce5c9d7b76b6c2b11a5afaea0554d45a4907cafd6f19c31412a97effff",
         "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java": "a2ea4de0623f1b0338db2d0cf2bd9c9b27c64bce5c64fdbceeb5c6df393ee1f9",
-        "tests/e2e/product-batch-delete.spec.ts": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
+        "tests/e2e/product-batch-delete.spec.ts": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
         "backend/src/test/java/com/zdm/platform/customer/CustomerApiTest.java": "780f04ab359cc37f12f6d0deeca2c4f6e7ee5b4cb67d98f3b6a9f3545dff8557",
         "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
         "src/services/batchActionPermissions.test.ts": "f4ed67b265dc6f436c0ed4ddddf80ccf55eb3a1517b28d35eaafbed783ab9751",
@@ -2655,6 +2655,12 @@
           "before": "0c2e4bf392fadbe30ef6c3c7b7a485bff0a7d143221499da316ab6be9326d6bb",
           "after": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
           "reason": "正式本地门禁09a0c62e-d89b-49c9-a81b-07369dde4e6c确认导航销毁旧文档的选项聚合RPC；只将该旧请求abort，其他错误原样抛出，不重试，保持原业务断言及动态集合覆盖，并新增两个确定性导航和一个错误传播回归。"
+        },
+        {
+          "file": "tests/e2e/product-batch-delete.spec.ts",
+          "before": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
+          "after": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
+          "reason": "parallel-environment-final 技术收尾：CI 42612230860 的 Validation scope 因漏登已审查测试同步修复而失败。保留原批量删除35条用例及全部业务断言；仅在弹窗入场完成后确认、并发观察POST响应并显式传播form-options等待失败；不增加超时、重试或修改业务。对应原修复 b6ae13f8cf6dfa74fcdadb2900f18a4340a1f6b9、f0d018ace3e1c3a5cb969ba1a0ea0ce2c8b438c1。"
         }
       ],
       "routes": [
