@@ -174,6 +174,83 @@ E2E保留两分片和单worker。默认预构建应用及登记的全部HTML入�
 
 “确认”“执行”在当前任务内循环实施、逐项需求核对、反向审查、修正和受影响回归。task:work checkpoint记录已有本地提交，ready核验当前源码、复查材料及原执行器证据，不能用状态声明代替门禁。用户“任务完成”首先冻结实际源码，包括已检查的未完成内容；已检查的未完成业务状态原样保留并明确报告，不移除、擅自补做或虚报开发就绪；它不授权跳过当前准确候选的来源保护、真实依赖、全部适用门禁、运行交接和保全清理。无关任务不构成完成条件，真实依赖必须有完整正式回执及main祖先证明。
 
+### 开发完成前的复查修正门禁
+
+本节是“确认”“执行”后的唯一开发完成标准，适用于当前独立任务；不另建一套完成清单，不改变正式交付授权及原冻结流程。Agent 在已批准范围内持续实施、复查、修正及回归，不能实现后等待用户再次要求检查。
+
+1. 实施前，以已确认需求及后续明确批准的调整建立范围文件。包含目标、限制、保留约定、异常与验收条件；逐项保存原要求、来源和验收标准。`work scope <task-id> <scope-file>` 将内容及授权材料哈希固定到本任务登记。改写或删除原要求必须显式引用上一范围摘要，并为每项变化保存原因及批准证据；所有旧版本保留。程序能检查引用及完整性，不能判断自然语言是否忠实，Agent 仍须对照原文逐条核实。
+2. 实施完成，逐项核对完整需求；再从原需求出发另作一轮反向审查，检查公开入口、未修改使用方、否定条件、异常边界、原约定和最终差异。每项要求必须有实施位置与证据；不适用必须有理由和证据。反向审查不能只填 completed=true，须有覆盖全部要求的具体入口、场景、预期、观察结果及证据。独立指审查依据与视角独立，不冒充其他人员或默认开启多个 Agent。
+3. `work review <task-id> <review-file>` 保存本轮复查，包括未完成要求和所有发现。后续复查必须衔接前一轮摘要，完整保留旧问题；修正后写明实际改动、原问题及相关回归证据、再复查证据。不得删除问题、只改状态、缩减要求或降低断言来通过。不完整或阻塞的复查可以保存，但不能成为开发完成。
+4. 原授权内的问题直接修正，再验证原问题、同类路径和受影响要求，重复核对至无已知未闭环问题。源码、配置、测试或相关证据改变使旧结果失效时补验；已有有效证据保留，不每轮重复昂贵全量。`work ready <task-id> <review-file>` 只接纳已保存的准确复查，核对全部要求、问题闭环、最终差异和原执行器的完整适用证据，不代跑或补造验证。
+5. **报告开发完成之前**，调用已发布 main 的 `work status <task-id>`。该命令只读，重新核对准确源码、需求/复查材料、必要检查输入、产物与日志；仅 `developmentComplete=true` 且退出码0才可报告当前任务开发完成。源码改变后，即使未运行 checkpoint，兼容批次状态也不再显示就绪；新 WIP checkpoint 会失效旧状态并保存原审查。相同内容的本地保存不机械撤销有效结果。登记里的 stage/reviewed、测试绿灯、42/42或历史交付回执均不单独代表当前完成。
+6. 最终回复说明实际变化、复查发现及修正、执行/复用的验证、未执行项和剩余限制，区分开发完成与正式交付。缺能力时给出具体操作及需返回的结果，收到后续接；不重复索要已给的授权。用户明确“任务完成”仍立即冻结实际业务快照，包括其中未完成内容，不以本节推迟冻结或补改冻结业务；正式门禁及最终回执继续按原流程，不能把交付冻结等同开发就绪。
+
+所有入口由 clean published main 的 task:entry 转发，保留本任务真实 cwd：
+
+```sh
+npm run task:entry -- --worktree "<准确任务目录>" work scope <task-id> .task-runtime/scope.json
+npm run task:entry -- --worktree "<准确任务目录>" work review <task-id> .task-runtime/review-1.json
+npm run task:entry -- --worktree "<准确任务目录>" work ready <task-id> .task-runtime/review-1.json
+npm run task:entry -- --worktree "<准确任务目录>" work status <task-id>
+```
+
+范围文件 v1 示例（`sha256` 为该文件实际字节的 SHA-256，不填占位符运行）：
+
+```json
+{
+  "version": 1,
+  "task": "example-task",
+  "authorization": [{ "file": ".task-runtime/approval.txt", "sha256": "<实际摘要>" }],
+  "requirements": [
+    { "id": "R1", "requirement": "原始要求及保留限制", "source": "批准原文位置", "acceptance": "可观察的验收标准" }
+  ]
+}
+```
+
+范围调整增加 `previousScopeDigest`；`amendments` 精确列出被修改或撤销的原要求，格式为 `{ "id": "R1", "reason": "用户批准的调整及原因", "authorization": [{ "file": "...", "sha256": "..." }] }`。原范围与全部复查历史保留，不覆盖。
+
+复查文件 v2 示例：
+
+```json
+{
+  "version": 2,
+  "task": "example-task",
+  "scopeDigest": "<已登记范围摘要>",
+  "previousReview": null,
+  "sourceDigest": "<captureSource 的准确内容摘要>",
+  "requirements": [
+    {
+      "id": "R1",
+      "result": "met",
+      "implementation": ["实际实施位置"],
+      "evidence": [{ "file": ".task-runtime/requirement-proof.txt", "sha256": "<实际摘要>" }]
+    }
+  ],
+  "reverseReview": {
+    "completed": true,
+    "basis": "<已登记范围摘要>",
+    "finalDiffEvidence": [{ "file": ".task-runtime/diff-review.txt", "sha256": "<实际摘要>" }],
+    "cases": [
+      {
+        "requirement": "R1",
+        "entry": "实际公开入口或相关使用方",
+        "scenario": "由要求推导的边界/失败场景",
+        "expected": "要求的行为",
+        "observed": "实际观察",
+        "evidence": [{ "file": ".task-runtime/reverse-proof.txt", "sha256": "<实际摘要>" }]
+      }
+    ]
+  },
+  "findings": [],
+  "reviewedFiles": ["完整最终差异路径"],
+  "verification": [{ "name": "原执行器计划中的检查名", "file": ".task-verification/准确证据.json" }]
+}
+```
+
+后续复查用新文件并将 `previousReview` 指向前一轮摘要。要求结果可为 met、not-applicable、pending、blocked；不适用还需 reason 及证据。每个发现包含 id、requirement、description、expected、actual、status；resolved 还需 correction、regressionEvidence、recheckEvidence（均为实际文件与哈希列表）。新发现或候选变化后，按实际结果更新全表，不能跨版本拼接绿灯。v1复查和旧就绪登记只作历史，不能自动升级为新门禁通过；既有冻结与正式回执不改写。
+
+这是项目的执行与本地技术检查，尚非独立账号、不可修改审批来源或平台级回复拦截。它不能证明任意自然语言审查判断都正确，也不能阻止模型在聊天中写出无依据结论；Agent 必须执行最后的状态核验并诚实报告，不将本机制宣称为不可绕过。
+
 初始PR CI在主线队列外运行；最终main合并、准确main CI、共享交接和settle按FIFO串行。队列内主线前进后按原冻结加受信main组合，候选变化必须重新检查。合并前失败释放本次顺序；main可能已变化后的失败保留原ticket和资源租约，只允许证明原执行及其前台进程组已经结束的准确任务恢复。禁止按年龄抢锁；其他任务仍可开发。
 
 独立任务入口通过 main 锚点的 task:entry 调用，保留真实业务cwd；旧共享批次写入口在新模式下拒绝，不给两套标准。旧冻结批次保持原身份、接受对象和失败记录，只能走其经审查的恢复路径，不改成当前预览任务。新旧调用方尚未全部接入、已安装协议未证明或真实验收未完成时，不报告现场迁移完成。
