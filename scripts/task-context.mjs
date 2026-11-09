@@ -3,7 +3,7 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, realpathSync, mkdirSync, writeFileSync, readFileSync, lstatSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
-import { captureSource } from './verification-evidence.mjs';
+import { developmentReviewStatus, assertStoredDevelopmentReview } from './task-review.mjs';
 import path from 'node:path';
 import { assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { deliveryStatus } from './completion-status.mjs';
@@ -54,8 +54,10 @@ export function closeTaskBatch(root, batch) {
 export function taskBatch(task, root) {
   const anchor = registeredTaskWorktrees(root).filter((entry) => entry.branch === 'main');
   assert.equal(anchor.length, 1, 'Exact main anchor required');
+  const reviewStatus = task.frozen || task.stage === 'closed' ? null : developmentReviewStatus(task.worktree, task);
   return {
     ...task,
+    ...(reviewStatus ? { developmentReview: reviewStatus } : {}),
     version: 1,
     taskRegistryVersion: 2,
     repository: { ...task.repository, anchor: realpathSync(anchor[0].worktree) },
@@ -63,7 +65,9 @@ export function taskBatch(task, root) {
       {
         id: task.id,
         title: task.title ?? task.id,
-        status: task.development?.reviewed === true ? 'ready' : 'in-progress',
+        status: (reviewStatus ? reviewStatus.developmentComplete : task.development?.reviewed === true)
+          ? 'ready'
+          : 'in-progress',
         dependsOn: [],
         checkpoints: task.checkpoints,
       },
@@ -99,12 +103,7 @@ export function validateTaskBatch(root, batch) {
 }
 export function assertTaskDevelopmentSnapshot(batch) {
   if (batch.taskRegistryVersion !== 2) return;
-  assert.equal(batch.development?.reviewed, true, 'Current task development review is incomplete');
-  assert.equal(
-    captureSource(batch.worktree).digest,
-    batch.development.sourceDigest,
-    'Current task changed after development review',
-  );
+  assertStoredDevelopmentReview(batch.worktree, batch);
 }
 export function planTaskDelivery(root, batch) {
   batch = validateTaskBatch(root, batch);

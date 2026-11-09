@@ -1,13 +1,19 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
-import { captureSource, captureIdentity, captureArtifacts } from './verification-evidence.mjs';
-import { collectDeliveryChanges } from './verify.mjs';
-import { createValidationPlan } from './check-changed-plan.mjs';
+import { captureSource } from './verification-evidence.mjs';
+import {
+  reviewFile,
+  validateReviewScope,
+  validateTaskReview,
+  invalidateDevelopment,
+  developmentReviewStatus,
+  validateDevelopmentChecks,
+} from './task-review.mjs';
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const text = (value) => typeof value === 'string' && value.trim().length > 0;
 const git = (root, ...args) =>
@@ -23,12 +29,59 @@ function owned(task, owner) {
     'Accepted source already exists; preserve the original freeze',
   );
 }
-function ownFile(root, file, within) {
-  const absolute = path.resolve(root, file);
-  assert.ok(absolute.startsWith(path.resolve(root, within) + path.sep), 'Evidence must belong to this task');
-  assert.ok(lstatSync(absolute).isFile() && !lstatSync(absolute).isSymbolicLink());
-  assert.equal(realpathSync(absolute), absolute, 'Linked evidence is unsafe');
-  return absolute;
+export function scopeTask(root, { id, owner, scope }) {
+  const registry = createTaskRegistry(root),
+    task = registry.resolve({ id, worktree: root });
+  owned(task, owner);
+  const bytes = readFileSync(reviewFile(root, scope, ['.task-runtime'])),
+    document = JSON.parse(bytes);
+  if (task.reviewScope?.digest === digest(bytes)) return task;
+  validateReviewScope(root, task, document);
+  return registry.revise(id, task.revision, (record) => {
+    record.reviewScopeHistory ??= [];
+    if (record.reviewScope) record.reviewScopeHistory.push(record.reviewScope);
+    record.reviewScope = {
+      digest: digest(bytes),
+      file: scope,
+      raw: bytes.toString('utf8'),
+      document,
+      recordedAt: new Date().toISOString(),
+    };
+    invalidateDevelopment(record, 'Approved scope registered or explicitly amended; current-candidate review required');
+  });
+}
+export function reviewTask(root, { id, owner, review }) {
+  const registry = createTaskRegistry(root),
+    task = registry.resolve({ id, worktree: root });
+  owned(task, owner);
+  const bytes = readFileSync(reviewFile(root, review, ['.task-runtime'])),
+    document = JSON.parse(bytes);
+  if (task.reviewPasses?.at(-1)?.digest === digest(bytes)) return task;
+  assert.ok(
+    !(task.reviewPasses ?? []).some((pass) => pass.file === review),
+    'Preserve prior review files; use a new file for each pass',
+  );
+  const snapshot = captureSource(root);
+  const result = validateTaskReview(root, task, document, snapshot.digest);
+  assert.equal(captureSource(root).digest, snapshot.digest, 'Candidate changed during review recording');
+  return registry.revise(id, task.revision, (record) => {
+    record.reviewPasses ??= [];
+    record.reviewPasses.push({
+      digest: digest(bytes),
+      file: review,
+      raw: bytes.toString('utf8'),
+      document,
+      result,
+      recordedAt: new Date().toISOString(),
+    });
+    invalidateDevelopment(record, 'Review recorded; unresolved findings and applicable checks must pass before ready');
+  });
+}
+export function taskWorkStatus(root, { id, owner }, dependencies = {}) {
+  const registry = createTaskRegistry(root),
+    task = registry.resolve({ id, worktree: root });
+  assert.equal(task.owner, owner, 'Current chat must own this exact task');
+  return { task: id, ...developmentReviewStatus(root, task, dependencies) };
 }
 export function checkpointTask(root, { id, owner, commit, verification }) {
   const registry = createTaskRegistry(root),
@@ -38,7 +91,10 @@ export function checkpointTask(root, { id, owner, commit, verification }) {
   assert.ok(text(verification), 'Checkpoint notes required; WIP may explicitly remain unverified');
   git(root, 'merge-base', '--is-ancestor', task.base, commit);
   git(root, 'merge-base', '--is-ancestor', commit, 'HEAD');
+  const sourceDigest = captureSource(root).digest;
   return registry.revise(id, task.revision, (record) => {
+    if (record.development?.reviewed && record.development.sourceDigest !== sourceDigest)
+      invalidateDevelopment(record, 'New source differs from the reviewed candidate');
     if (!record.checkpoints.some((entry) => entry.commit === commit))
       record.checkpoints.push({ commit, verification, recordedAt: new Date().toISOString() });
     record.recordedHead = git(root, 'rev-parse', 'HEAD');
@@ -48,101 +104,30 @@ export function readyTask(root, { id, owner, review }, dependencies = {}) {
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id, worktree: root });
   owned(task, owner);
-  const system = {
-    capture: captureSource,
-    changes: collectDeliveryChanges,
-    plan: (files) => createValidationPlan(files, (file) => existsSync(path.join(root, file)), { root }),
-    identity: captureIdentity,
-    artifacts: captureArtifacts,
-    ...dependencies,
-  };
-  const snapshot = system.capture(root),
-    changes = system.changes(root),
-    files = changes.files;
-  assert.ok(changes.base, 'Delivery change scope is unknown');
-  const file = ownFile(root, review, '.task-runtime');
-  const bytes = readFileSync(file),
+  const bytes = readFileSync(reviewFile(root, review, ['.task-runtime'])),
     record = JSON.parse(bytes);
-  assert.equal(record.version, 1);
-  assert.equal(record.task, task.id);
-  assert.equal(record.sourceDigest, snapshot.digest, 'Review belongs to an older candidate');
-  assert.ok(
-    Array.isArray(record.requirements) && record.requirements.length > 0,
-    'Requirement-by-requirement review required',
+  const latest = task.reviewPasses?.at(-1);
+  assert.equal(latest?.digest, digest(bytes), 'Record the complete review and findings history before ready');
+  assert.deepEqual(record, latest.document, 'Recorded review content changed');
+  const snapshot = captureSource(root);
+  const result = validateTaskReview(
+    root,
+    { ...task, reviewPasses: task.reviewPasses.slice(0, -1) },
+    record,
+    snapshot.digest,
   );
-  for (const item of record.requirements)
-    assert.ok(text(item.id) && item.result === 'met' && text(item.evidence), 'Unfinished requirement remains');
-  assert.ok(record.reverseReview?.completed && text(record.reverseReview.evidence), 'Reverse review evidence required');
-  assert.ok(
-    Array.isArray(record.findings) &&
-      record.findings.every((item) => item.status === 'resolved' && text(item.evidence)),
-    'Unresolved review finding remains',
-  );
-  assert.deepEqual(
-    [...new Set(record.reviewedFiles ?? [])].sort(),
-    [...new Set(files)].sort(),
-    'Authorization review omitted or added changed files',
-  );
-  assert.ok(text(record.authorizationEvidence), 'Approved scope reference required');
-  const plan = system.plan(files),
-    reports = record.verification ?? [];
-  const checks = [...plan.tasks];
-  if (plan.browserPlan?.mode === 'full' || plan.e2eFiles?.length)
-    checks.push({
-      name: 'affected E2E',
-      args: ['run', 'test:e2e:chrome', ...(plan.browserPlan?.mode === 'full' ? [] : ['--', ...plan.e2eFiles])],
-      kind: 'browser',
-    });
-  const proofs = [];
-  for (const check of checks) {
-    const matching = reports.filter((entry) => entry.name === check.name);
-    assert.equal(matching.length, 1, 'Exact existing check evidence required: ' + check.name);
-    const proofFile = ownFile(root, matching[0].file, '.task-verification');
-    const proof = JSON.parse(readFileSync(proofFile));
-    assert.equal(proof.version, 4);
-    assert.equal(proof.exitCode, 0);
-    assert.ok(proof.completedAt && proof.startedAt);
-    assert.ok(
-      ['passed', 'not-reusable'].includes(proof.status),
-      'Failed, interrupted or inapplicable evidence is not success',
-    );
-    assert.equal(proof.identity.root, realpathSync(root));
-    assert.equal(proof.identity.command, process.platform === 'win32' ? 'npm.cmd' : 'npm');
-    assert.deepEqual(proof.identity.args, check.args, 'Evidence command differs from required check');
-    assert.equal(digest(JSON.stringify(proof.identity)), proof.fingerprint, 'Evidence fingerprint changed');
-    const descriptor = {
-      ...check,
-      root,
-      command: proof.identity.command,
-      kind: check.kind ?? (check.args.includes('backend:test') ? 'backend' : 'node'),
-      reuse: check.args.includes('backend:test'),
-      ...(check.args.includes('build:app') ? { artifacts: ['dist'] } : {}),
-    };
-    const expected = system.identity(descriptor);
-    assert.equal(
-      proof.fingerprint,
-      expected.fingerprint,
-      'Existing execution inputs, dependencies, environment or scope changed',
-    );
-    assert.equal(proof.artifacts, system.artifacts(descriptor), 'Required verification artifacts changed');
-    assert.equal(
-      digest(readFileSync(ownFile(root, proof.log, '.task-verification/logs'))),
-      proof.logDigest,
-      'Verification log changed',
-    );
-    proofs.push({
-      name: check.name,
-      file: matching[0].file,
-      attemptId: proof.attemptId,
-      fingerprint: proof.fingerprint,
-    });
-  }
-  assert.equal(system.capture(root).digest, snapshot.digest, 'Candidate changed during review recording');
+  assert.equal(result.unresolved.length, 0, 'Unresolved review finding remains');
+  assert.equal(result.incomplete.length, 0, 'Unfinished requirement remains');
+  assert.equal(result.reverseReviewComplete, true, 'Reverse review is incomplete');
+  const proofs = validateDevelopmentChecks(root, record, dependencies);
+  assert.equal(captureSource(root).digest, snapshot.digest, 'Candidate changed during readiness validation');
   return registry.revise(id, task.revision, (current) => {
     current.stage = 'dev-validated';
     current.recordedHead = git(root, 'rev-parse', 'HEAD');
     current.development = {
       reviewed: true,
+      reviewVersion: 2,
+      scopeDigest: task.reviewScope.digest,
       sourceDigest: snapshot.digest,
       reviewDigest: digest(bytes),
       reviewFile: review,
@@ -157,20 +142,24 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     const [command, id, value, notes, ...extra] = process.argv.slice(2);
     assert.equal(extra.length, 0, 'Unexpected task work arguments');
     const owner = process.env.CODEX_THREAD_ID;
-    if (command === 'ready') assert.equal(notes, undefined, 'Unexpected ready arguments');
+    if (command !== 'checkpoint') assert.equal(notes, undefined, 'Unexpected task work arguments');
+    if (command === 'status') assert.equal(value, undefined, 'Unexpected status arguments');
     assert.ok(
-      ['checkpoint', 'ready'].includes(command),
-      'task:work <checkpoint task-id commit verification-note|ready task-id review-file>',
+      ['scope', 'review', 'checkpoint', 'ready', 'status'].includes(command),
+      'task:work <scope task-id scope-file|review task-id review-file|checkpoint task-id commit verification-note|ready task-id review-file|status task-id>',
     );
-    console.log(
-      JSON.stringify(
-        command === 'checkpoint'
-          ? checkpointTask(process.cwd(), { id, owner, commit: value, verification: notes })
-          : readyTask(process.cwd(), { id, owner, review: value }),
-        null,
-        2,
-      ),
-    );
+    const result =
+      command === 'checkpoint'
+        ? checkpointTask(process.cwd(), { id, owner, commit: value, verification: notes })
+        : command === 'scope'
+          ? scopeTask(process.cwd(), { id, owner, scope: value })
+          : command === 'review'
+            ? reviewTask(process.cwd(), { id, owner, review: value })
+            : command === 'status'
+              ? taskWorkStatus(process.cwd(), { id, owner })
+              : readyTask(process.cwd(), { id, owner, review: value });
+    console.log(JSON.stringify(result, null, 2));
+    if (command === 'status' && !result.developmentComplete) process.exitCode = 1;
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

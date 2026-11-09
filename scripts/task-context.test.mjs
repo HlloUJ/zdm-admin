@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync, existsSync } from 'node:fs';
@@ -10,7 +11,9 @@ import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 import { completionCommand } from './completion-cli.mjs';
 import { readAcceptance, assertAcceptedSource } from './accepted-source.mjs';
 import { checkAcceptedIndex } from './accepted-source-hook.mjs';
-import { captureSource } from './verification-evidence.mjs';
+import { captureSource, captureIdentity } from './verification-evidence.mjs';
+import { createValidationPlan } from './check-changed-plan.mjs';
+import { scopeTask, reviewTask, readyTask } from './task-development.mjs';
 function fixture(t) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'task-context-'))),
     main = path.join(dir, 'main');
@@ -49,9 +52,96 @@ function fixture(t) {
     record.checkpoints = [
       { commit, verification: 'Fixture completed development', recordedAt: new Date().toISOString() },
     ];
-    record.development = { reviewed: true, sourceDigest: captureSource(a).digest };
-    record.stage = 'dev-validated';
   });
+  mkdirSync(path.join(a, '.task-runtime'));
+  const evidenceFile = '.task-runtime/fixture-review.txt';
+  writeFileSync(path.join(a, evidenceFile), 'Fixture approval, implementation and reverse review for task A only');
+  const evidence = [
+    {
+      file: evidenceFile,
+      sha256: createHash('sha256')
+        .update(readFileSync(path.join(a, evidenceFile)))
+        .digest('hex'),
+    },
+  ];
+  writeFileSync(
+    path.join(a, '.task-runtime/scope.json'),
+    JSON.stringify({
+      version: 1,
+      task: 'a',
+      authorization: evidence,
+      requirements: [
+        {
+          id: 'a-only',
+          requirement: 'Task A only',
+          source: 'Fixture approval',
+          acceptance: 'Task B remains independent',
+        },
+      ],
+    }),
+  );
+  const scoped = scopeTask(a, { id: 'a', owner: 'chat-a', scope: '.task-runtime/scope.json' });
+  const review = {
+    version: 2,
+    task: 'a',
+    scopeDigest: scoped.reviewScope.digest,
+    sourceDigest: captureSource(a).digest,
+    requirements: [{ id: 'a-only', result: 'met', implementation: ['src/feature.js'], evidence }],
+    reverseReview: {
+      completed: true,
+      basis: scoped.reviewScope.digest,
+      finalDiffEvidence: evidence,
+      cases: [
+        {
+          requirement: 'a-only',
+          entry: 'src/feature.js and task B',
+          scenario: 'Task ownership isolation',
+          expected: 'B is retained',
+          observed: 'B metadata is unchanged',
+          evidence,
+        },
+      ],
+    },
+    findings: [],
+    reviewedFiles: ['src/feature.js'],
+    verification: [],
+  };
+  const plan = createValidationPlan(['src/feature.js'], (file) => existsSync(path.join(a, file)), { root: a });
+  const checks = [...plan.tasks];
+  if (plan.browserPlan?.mode === 'full' || plan.e2eFiles?.length)
+    checks.push({
+      name: 'affected E2E',
+      args: ['run', 'test:e2e:chrome', ...(plan.browserPlan.mode === 'full' ? [] : ['--', ...plan.e2eFiles])],
+      kind: 'browser',
+    });
+  mkdirSync(path.join(a, '.task-verification/logs'), { recursive: true });
+  for (const [index, check] of checks.entries()) {
+    const identity = captureIdentity({ ...check, root: a, command: 'npm', kind: check.kind ?? 'node', reuse: false });
+    const log = '.task-verification/logs/context-' + index + '.log';
+    writeFileSync(path.join(a, log), 'Synthetic fixture evidence; this test exercises context and dependency rules');
+    const file = '.task-verification/context-' + index + '.json';
+    writeFileSync(
+      path.join(a, file),
+      JSON.stringify({
+        version: 4,
+        exitCode: 0,
+        status: 'not-reusable',
+        startedAt: new Date().toISOString(),
+        completedAt: new Date().toISOString(),
+        identity: identity.identity,
+        fingerprint: identity.fingerprint,
+        artifacts: null,
+        log,
+        logDigest: createHash('sha256')
+          .update(readFileSync(path.join(a, log)))
+          .digest('hex'),
+      }),
+    );
+    review.verification.push({ name: check.name, file });
+  }
+  writeFileSync(path.join(a, '.task-runtime/review.json'), JSON.stringify(review));
+  reviewTask(a, { id: 'a', owner: 'chat-a', review: '.task-runtime/review.json' });
+  readyTask(a, { id: 'a', owner: 'chat-a', review: '.task-runtime/review.json' });
   writeFileSync(path.join(b, 'src/feature.js'), 'unfinished B');
   return { a, b, main, registry, execute, git };
 }
@@ -123,6 +213,11 @@ test('freezing A preserves B and its index while wrong chat cannot freeze B', as
   await completionCommand(f.a, ['freeze'], { owner: 'chat-a', execute: f.execute });
   assert.ok(readAcceptance(f.a, 'a'));
   assert.equal(f.registry.readTask('a').stage, 'frozen');
+  assert.equal(
+    Object.hasOwn(readActiveBatch(f.a), 'developmentReview'),
+    false,
+    'Do not change historical archive shape with a transient readiness status',
+  );
   assert.equal(readAcceptance(f.b, 'b'), null);
   assert.deepEqual(f.registry.readTask('b'), before);
   assert.equal(f.git(f.b, 'write-tree'), index);
@@ -184,4 +279,14 @@ test('technical repair is adopted only after accepted business proof and retains
   const session = JSON.parse(readFileSync(path.join(f.registry.commonDir, 'task-delivery/a/completion-session.json')));
   assert.equal(session.events.find((event) => event.name === 'prepare').status, 'failure');
   assert.equal(f.registry.readTask('b').stage, 'developing');
+});
+
+test('legacy reviewed flags are historical and cannot grant current development readiness', (t) => {
+  const f = fixture(t),
+    task = f.registry.readTask('a');
+  f.registry.revise('a', task.revision, (record) => {
+    record.development = { reviewed: true, sourceDigest: captureSource(f.a).digest };
+  });
+  assert.equal(readActiveBatch(f.a).modules[0].status, 'in-progress');
+  assert.throws(() => planBatchDelivery(f.a), /development review is incomplete/);
 });
