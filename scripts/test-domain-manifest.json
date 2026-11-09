@@ -1643,8 +1643,13 @@
       "imports": ["scripts/task-preview.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-registry-lock.test.mjs": {
+      "digest": "0bfcebd1fd612b1010640f4441cb2e00820942467651ee8b58f50a55b1fb6111",
+      "imports": ["scripts/task-registry.mjs"],
+      "dynamicImports": 1
+    },
     "scripts/task-registry.mjs": {
-      "digest": "b5f506065037e7f8bccd3a29bf02c5fde5e074d6a0d0890e12c4f94b0664fa30",
+      "digest": "a29e2be74059dea154e1c383cb98042abad86d02dabe65d9772b33fdad3ef3ba",
       "imports": [],
       "dynamicImports": 0
     },
