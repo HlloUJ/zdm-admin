@@ -1,12 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync, readFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { isRuntimeFile } from './runtime-file-scope.mjs';
 import { classifyChangedFiles } from './verification-impact.mjs';
 import { integrationSourceIdentity } from './integration-handoff-state.mjs';
+import { PREVIEW_RUNTIME_MODULES } from './task-preview-service.mjs';
 
 const runtime = [
   'backend/src/main/java/com/zdm/platform/inventory/ProductController.java',
@@ -111,4 +112,35 @@ test('runtime input changes still invalidate fingerprints; frontend-only tree ch
   assert.notEqual(integrationSourceIdentity(root, tree.replace('a'.repeat(40), 'b'.repeat(40))), first);
   writeFileSync(main, 'new source');
   assert.notEqual(integrationSourceIdentity(root, tree), first);
+});
+
+test('actual backend startup and watcher scope never reads a legacy task business-test contract', (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'runtime-legacy-contract-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(path.join(root, 'scripts'));
+  writeFileSync(path.join(root, 'scripts/business-regression-contracts.json'), 'invalid contract must not be read');
+  const script = `
+    import assert from 'node:assert/strict';
+    import { backendSensitiveFiles } from ${JSON.stringify(new URL('./dev-task.mjs', import.meta.url).href)};
+    assert.deepEqual(backendSensitiveFiles(${JSON.stringify([...runtime, ...nonRuntime])}), ${JSON.stringify(runtime)});
+    console.log('startup and watcher scope preserve runtime inputs without reading business contracts');
+  `;
+  const result = spawnSync(process.execPath, ['--input-type=module', '-e', script], { cwd: root, encoding: 'utf8' });
+  assert.equal(result.status, 0, result.stderr);
+  assert.match(result.stdout, /without reading business contracts/);
+  assert.throws(() => classifyChangedFiles(['backend/pom.xml'], { root }), /JSON|Unexpected token/);
+});
+
+test('installed preview service copies its complete native module dependency closure', () => {
+  const available = new Set(['task-preview-service.mjs', ...PREVIEW_RUNTIME_MODULES]);
+  assert.equal(available.size, PREVIEW_RUNTIME_MODULES.length + 1);
+  for (const name of available) {
+    assert.equal(path.basename(name), name);
+    const source = readFileSync(new URL(name, import.meta.url), 'utf8');
+    for (const match of source.matchAll(/\bfrom\s*['"](\.[^'"]+)['"]|\bimport\s*['"](\.[^'"]+)['"]/g)) {
+      const dependency = match[1] ?? match[2];
+      assert.ok(available.has(dependency.replace(/^\.\//, '')), `${name} requires uncopied ${dependency}`);
+    }
+  }
+  assert.ok(available.has('integration-resource.mjs'));
 });

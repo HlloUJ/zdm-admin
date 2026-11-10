@@ -23,7 +23,7 @@
       "dynamicImports": 0
     },
     "ci/browser-image.lock.json": {
-      "digest": "974f3c68de7d428eae39b03c1034c6a943989b7a757a51a023a023f25c160050",
+      "digest": "a024a97eb1b4901eb06a2c90dd8123296b023b505a2bad32ea78a9a6cff717dc",
       "imports": [],
       "dynamicImports": 0
     },
@@ -717,7 +717,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "82d573b0d1b1a5bacb28613b3bff9e6abe735064d5807b61b4701ecf38589b94",
+      "digest": "501fe317c6b42b2d01ed5704b9bea3e6612fbb60660e7c6db2484264323c939a",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
@@ -725,13 +725,13 @@
         "scripts/integration-resource.mjs",
         "scripts/preview-policy.mjs",
         "scripts/resource-lease.mjs",
+        "scripts/runtime-file-scope.mjs",
         "scripts/runtime-resource.mjs",
         "scripts/task-data-environment.mjs",
         "scripts/task-dependencies.mjs",
         "scripts/task-maven.mjs",
         "scripts/task-registry.mjs",
-        "scripts/task-runtime-state.mjs",
-        "scripts/verification-impact.mjs"
+        "scripts/task-runtime-state.mjs"
       ],
       "dynamicImports": 0
     },
@@ -1362,7 +1362,7 @@
       "dynamicImports": 0
     },
     "scripts/runtime-file-scope.test.mjs": {
-      "digest": "11f89134c0dfdb18b2561e6855bc721f0a0e54e4d5b87c2921d25807524676af",
+      "digest": "837292f238c14193ed4c777a8214176c3fedba4af084fbbd9828e16a115f4160",
       "imports": [
         "scripts/backend-runtime.mjs",
         "scripts/business-regression.mjs",
@@ -1674,7 +1674,7 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
-      "digest": "822e85a58ee270edc016e1be5e25dd4a24fe3a66d528e882794ca04fd9881a36",
+      "digest": "45bc8525a3321d13d20d64f2807166decb8979e1ccb5aac637a49c2e441f61b8",
       "imports": [
         "scripts/preview-consumers.mjs",
         "scripts/preview-target.mjs",
