@@ -36,7 +36,7 @@ import {
 } from './task-data-environment.mjs';
 
 import { branchKind, DEFAULT_INTEGRATION_BRANCH, parseWorktreePorcelain } from './git-workflow-core.mjs';
-import { classifyChangedFiles } from './verification-impact.mjs';
+import { isRuntimeFile } from './runtime-file-scope.mjs';
 import {
   assertIntegrationRuntimeReady,
   integrationBackendSnapshot,
@@ -186,7 +186,7 @@ export function taskPreviewErrors({ branch }) {
 }
 
 export function backendSensitiveFiles(files) {
-  return files.filter((file) => classifyChangedFiles([file]).runtime);
+  return files.filter(isRuntimeFile);
 }
 
 export function databaseRiskFiles(files) {

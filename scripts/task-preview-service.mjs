@@ -27,6 +27,18 @@ import { assertPreviewOwner, transitionSelectedPreview } from './preview-transit
 import { preparePreviewTarget, prepareRetainedTarget, validatePreparedTarget } from './preview-target.mjs';
 import { inspectPreviewConsumers, readPreviewResponse, temporaryPreviewLeases } from './preview-consumers.mjs';
 
+export const PREVIEW_RUNTIME_MODULES = Object.freeze([
+  'task-registry.mjs',
+  'resource-lease.mjs',
+  'preview-transition.mjs',
+  'preview-target.mjs',
+  'task-dependencies.mjs',
+  'preview-policy.mjs',
+  'task-data-environment.mjs',
+  'integration-resource.mjs',
+  'preview-consumers.mjs',
+]);
+
 export const RETAINED_HANDOFF_PROTOCOL = 1;
 export const SERVICE_LABEL = 'com.zdm.admin.task-preview';
 export const CURRENT_TASK_PREVIEW_URL = 'http://127.0.0.1:5175/';
@@ -1431,16 +1443,7 @@ async function installService({ paths, worktree, taskArgs = [] }) {
   if (path.resolve(sourceFile) !== path.resolve(paths.runtimeScript)) {
     // Installed services execute outside the checkout. Copy the reviewed native-only
     // module closure alongside the entry point, never resolve helpers from a task.
-    for (const name of [
-      'task-registry.mjs',
-      'resource-lease.mjs',
-      'preview-transition.mjs',
-      'preview-target.mjs',
-      'task-dependencies.mjs',
-      'preview-policy.mjs',
-      'task-data-environment.mjs',
-      'preview-consumers.mjs',
-    ]) {
+    for (const name of PREVIEW_RUNTIME_MODULES) {
       const moduleFile = path.join(path.dirname(sourceFile), name);
       if (!lstatSync(moduleFile).isFile() || lstatSync(moduleFile).isSymbolicLink())
         throw new Error('预览服务依赖不是安全文件：' + name);
