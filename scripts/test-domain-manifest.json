@@ -1229,6 +1229,11 @@
       "imports": ["scripts/preview-transition.mjs", "scripts/resource-lease.mjs", "scripts/task-preview-service.mjs"],
       "dynamicImports": 0
     },
+    "scripts/preview-stop-errors.test.mjs": {
+      "digest": "b2915ceda511a11cf184e469616a4e148739da2e1ec16b943ef0f9c317d504a1",
+      "imports": ["scripts/task-preview-service.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/preview-target.mjs": {
       "digest": "3c9bdeeff8724908db26b10ff12d54e2740a18a6826674c9e4622404ba75e6ef",
       "imports": [
@@ -1674,7 +1679,7 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
-      "digest": "45bc8525a3321d13d20d64f2807166decb8979e1ccb5aac637a49c2e441f61b8",
+      "digest": "389a612c6cdadbdc1bec3be6c31765a8b5388a63665ff652a1cbcf283091a5c8",
       "imports": [
         "scripts/preview-consumers.mjs",
         "scripts/preview-target.mjs",

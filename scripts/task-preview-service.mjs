@@ -14,7 +14,6 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { execFile, spawn, spawnSync } from 'node:child_process';
-import { once } from 'node:events';
 import { createHash } from 'node:crypto';
 import { homedir } from 'node:os';
 import http from 'node:http';
@@ -534,14 +533,62 @@ async function waitForPreview(
   throw new Error(`等待 ${CURRENT_TASK_PREVIEW_URL} 切换到 ${worktree} 超时`);
 }
 
-async function stopChild(child) {
-  if (!child || child.exitCode !== null || child.signalCode) return;
-  child.kill('SIGTERM');
-  const exited = once(child, 'exit').then(() => true);
-  const timedOut = sleep(15_000).then(() => false);
-  if (!(await Promise.race([exited, timedOut])) && child.exitCode === null) {
-    child.kill('SIGKILL');
-    await once(child, 'exit').catch(() => undefined);
+export async function stopChild(child) {
+  const exitedAlready = () => child.exitCode !== null || Boolean(child.signalCode);
+  if (!child || exitedAlready()) return;
+  let onExit, onError, failure, timer;
+  const exited = new Promise((resolve) => {
+    onExit = () => resolve('exited');
+    child.once('exit', onExit);
+  });
+  const failed = new Promise((resolve) => {
+    onError = (error) => {
+      failure = error;
+      resolve('failed');
+    };
+    child.on('error', onError);
+  });
+  const signal = (name) => {
+    const sent = child.kill(name);
+    if (failure) throw failure;
+    if (!sent && !exitedAlready()) {
+      const error = new Error(`Cannot prove owned child accepted ${name}; retain its process and selection`);
+      error.code = 'CHILD_STOP_SIGNAL_REJECTED';
+      throw error;
+    }
+  };
+  const wait = async () => {
+    try {
+      return await Promise.race([
+        exited,
+        failed,
+        new Promise((resolve) => {
+          timer = setTimeout(() => resolve('timeout'), 15_000);
+        }),
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+  try {
+    signal('SIGTERM');
+    if (exitedAlready()) return;
+    const first = await wait();
+    if (first === 'failed') throw failure;
+    if (first === 'exited' || exitedAlready()) return;
+    signal('SIGKILL');
+    if (exitedAlready()) return;
+    const final = await wait();
+    if (final === 'failed') throw failure;
+    if (final !== 'exited' && !exitedAlready()) {
+      const error = new Error('Owned child did not exit after SIGKILL; retain its process and selection');
+      error.code = 'CHILD_STOP_NOT_PROVEN';
+      throw error;
+    }
+  } finally {
+    clearTimeout(timer);
+    child.removeListener('exit', onExit);
+    child.removeListener('error', onError);
   }
 }
 

@@ -115,5 +115,3 @@ export default defineConfig(({ mode }) => {
     },
   };
 });
-
-// Owned parallel acceptance cf226831-d63e-4c31-9c2f-3bdaffa22115 t2
