@@ -79,7 +79,25 @@ function fixture(t) {
     }
     rmSync(root, { recursive: true, force: true });
   });
-  return { root, anchor, task, common, cli, env, file, row, at };
+  return {
+    root,
+    anchor,
+    task,
+    common,
+    cli,
+    env,
+    file,
+    row,
+    at,
+    writeTimeline: (bytes) =>
+      timingWriterLock(path.join(common, 'task-timing/timing'), () =>
+        writeFileSync(path.join(common, 'task-timing/timing/timeline.json'), bytes),
+      ),
+    removeTimeline: () =>
+      timingWriterLock(path.join(common, 'task-timing/timing'), () =>
+        rmSync(path.join(common, 'task-timing/timing/timeline.json')),
+      ),
+  };
 }
 test('actual registration CLI automatically starts timing; real failed verification enters batch report without zero repair claim', async (t) => {
   const f = fixture(t);
@@ -154,7 +172,7 @@ test('wrong thread cannot silently observe or take over an active batch', (t) =>
 
 test('a new timing record cannot disappear into legacy compatibility or silently reset its authorization', (t) => {
   const f = fixture(t);
-  rmSync(path.join(f.common, 'task-timing/timing/timeline.json'));
+  f.removeTimeline();
   assert.throws(() => requireBatchTiming(f.common, 'timing'), /New batch timing proof missing/);
   const result = f.cli('./task-batch.mjs', ['register', '--id', 'timing', '--kind', 'infrastructure']);
   assert.notEqual(result.status, 0);
@@ -166,7 +184,7 @@ test('authorization tampering cannot pass the report/cleanup proof', (t) => {
     file = path.join(f.common, 'task-timing/timing/timeline.json'),
     state = JSON.parse(readFileSync(file));
   state.authorizedAt += 10;
-  writeFileSync(file, JSON.stringify(state));
+  f.writeTimeline(JSON.stringify(state));
   assert.throws(() => requireBatchTiming(f.common, 'timing'), /Authorization boundary changed/);
 });
 
@@ -362,7 +380,7 @@ test('cleanup accepts only a proved historical boundary gap while strict reports
   appendFileSync(f.file, f.row('event_msg', { type: 'turn_aborted', turn_id: 'one' }, f.at + 20));
   const state = refreshTimeline(f.common, 'timing').state;
   state.registeredAt = f.at + 50;
-  writeFileSync(file, JSON.stringify(state));
+  f.writeTimeline(JSON.stringify(state));
   assert.throws(() => requireBatchTiming(f.common, 'timing'), /authorization-turn-ended-before-registration/);
   const result = requireBatchTimingForCleanup(f.common, 'timing');
   assert.equal(result.status, 'incomplete');
@@ -371,9 +389,9 @@ test('cleanup accepts only a proved historical boundary gap while strict reports
   const original = readFileSync(file);
   const tampered = JSON.parse(original);
   tampered.authorizedAt += 1;
-  writeFileSync(file, JSON.stringify(tampered));
+  f.writeTimeline(JSON.stringify(tampered));
   assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /Authorization boundary changed/);
-  writeFileSync(file, original);
+  f.writeTimeline(original);
   const concurrent = JSON.parse(original);
   concurrent.turns.push(
     ...['two', 'three'].map((id) => ({
@@ -384,11 +402,11 @@ test('cleanup accepts only a proved historical boundary gap while strict reports
       projectVerified: true,
     })),
   );
-  writeFileSync(file, JSON.stringify(concurrent));
+  f.writeTimeline(JSON.stringify(concurrent));
   assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /Multiple open execution turns/);
-  writeFileSync(file, original);
+  f.writeTimeline(original);
   const damaged = JSON.parse(original);
   damaged.issues.push('native-source-unavailable:ENOENT');
-  writeFileSync(file, JSON.stringify(damaged));
+  f.writeTimeline(JSON.stringify(damaged));
   assert.throws(() => requireBatchTimingForCleanup(f.common, 'timing'), /native-source-unavailable/);
 });
