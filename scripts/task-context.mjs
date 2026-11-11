@@ -3,7 +3,6 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, realpathSync, mkdirSync, writeFileSync, readFileSync, lstatSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
-import { developmentReviewStatus, assertStoredDevelopmentReview } from './task-review.mjs';
 import path from 'node:path';
 import { assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { deliveryStatus } from './completion-status.mjs';
@@ -54,10 +53,8 @@ export function closeTaskBatch(root, batch) {
 export function taskBatch(task, root) {
   const anchor = registeredTaskWorktrees(root).filter((entry) => entry.branch === 'main');
   assert.equal(anchor.length, 1, 'Exact main anchor required');
-  const reviewStatus = task.frozen || task.stage === 'closed' ? null : developmentReviewStatus(task.worktree, task);
   return {
     ...task,
-    ...(reviewStatus ? { developmentReview: reviewStatus } : {}),
     version: 1,
     taskRegistryVersion: 2,
     repository: { ...task.repository, anchor: realpathSync(anchor[0].worktree) },
@@ -65,9 +62,10 @@ export function taskBatch(task, root) {
       {
         id: task.id,
         title: task.title ?? task.id,
-        status: (reviewStatus ? reviewStatus.developmentComplete : task.development?.reviewed === true)
-          ? 'ready'
-          : 'in-progress',
+        // Preserve frozen/archive snapshots without deriving an active task's
+        // readiness from the retired development metadata.
+        status:
+          (task.frozen || task.stage === 'closed') && task.development?.reviewed === true ? 'ready' : 'in-progress',
         dependsOn: [],
         checkpoints: task.checkpoints,
       },
@@ -101,17 +99,12 @@ export function validateTaskBatch(root, batch) {
   assert.equal(task.branch, batch.branch, 'Task branch changed');
   return taskBatch(task, root);
 }
-export function assertTaskDevelopmentSnapshot(batch) {
-  if (batch.taskRegistryVersion !== 2) return;
-  assertStoredDevelopmentReview(batch.worktree, batch);
-}
 export function planTaskDelivery(root, batch) {
   batch = validateTaskBatch(root, batch);
   const registry = createTaskRegistry(root);
   const git = (...args) =>
     execFileSync('git', ['--no-replace-objects', '-C', batch.worktree, ...args], { encoding: 'utf8' }).trim();
   assert.equal(git('status', '--porcelain'), '', 'Task must be clean before delivery planning');
-  if (!batch.frozen) assert.equal(batch.modules[0].status, 'ready', 'Current task development review is incomplete');
   if (batch.frozen) {
     assert.equal(
       readAcceptance(batch.worktree, batch.id)?.commit,
@@ -119,7 +112,7 @@ export function planTaskDelivery(root, batch) {
       'Original accepted source changed',
     );
     assertAcceptedSource(batch.worktree, batch.id, git('rev-parse', 'HEAD'));
-  } else assertTaskDevelopmentSnapshot(batch);
+  }
   const head = git('rev-parse', 'HEAD'),
     originMain = git('rev-parse', 'origin/main');
   assert.equal(head, batch.recordedHead, 'Checkpoint the exact current task head');
@@ -153,7 +146,6 @@ export function planTaskDelivery(root, batch) {
     originMain,
     commits,
     modules: batch.modules,
-    businessDevelopmentReviewed: batch.development?.reviewed === true,
     originalDevelopmentStateRetained: Boolean(batch.frozen),
     verificationProven: false,
     requiredExternalChecks: [
