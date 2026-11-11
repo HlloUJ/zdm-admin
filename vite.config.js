@@ -3,53 +3,9 @@ import { fileURLToPath, URL } from 'node:url';
 
 import vue from '@vitejs/plugin-vue';
 import { defineConfig, loadEnv } from 'vite';
+import { taskPreviewControlPlugin } from './scripts/task-preview-control.mjs';
 
-const TASK_PREVIEW_CONTROL_PATH = '/__zdm_task_preview__';
 const TASK_PREVIEW_API_HEALTH_PATH = '/__zdm_task_preview_api_health__';
-const TASK_PREVIEW_CONTROL_HEADER = 'x-zdm-task-preview-control';
-const TASK_PREVIEW_CONTROL_VALUE = 'switch-current-task';
-
-function taskPreviewControlPlugin({ workspaceRoot, branch, mode, apiTarget }) {
-  return {
-    name: 'zdm-task-preview-control',
-    configureServer(server) {
-      server.middlewares.use((request, response, next) => {
-        const requestUrl = new URL(request.url || '/', 'http://127.0.0.1');
-        if (requestUrl.pathname !== TASK_PREVIEW_CONTROL_PATH) {
-          next();
-          return;
-        }
-        if (request.method === 'GET') {
-          response.setHeader('Content-Type', 'application/json; charset=utf-8');
-          response.end(
-            JSON.stringify({
-              type: 'zdm-task-preview',
-              workspaceRoot,
-              branch,
-              mode,
-              apiTarget,
-            }),
-          );
-          return;
-        }
-        if (
-          request.method === 'DELETE' &&
-          request.headers[TASK_PREVIEW_CONTROL_HEADER] === TASK_PREVIEW_CONTROL_VALUE
-        ) {
-          response.statusCode = 202;
-          response.end('switching');
-          const shutdownTimer = setTimeout(() => {
-            void server.close().finally(() => process.exit(0));
-          }, 25);
-          shutdownTimer.unref();
-          return;
-        }
-        response.statusCode = 405;
-        response.end('method not allowed');
-      });
-    },
-  };
-}
 
 export default defineConfig(({ mode }) => {
   const taskPreview = process.env.ZDM_TASK_PREVIEW === '1';
@@ -76,6 +32,7 @@ export default defineConfig(({ mode }) => {
               branch: taskBranch,
               mode: taskMode,
               apiTarget: apiProxyTarget,
+              runtimeId: process.env.ZDM_TASK_RUNTIME_ID || null,
             }),
           ]
         : []),

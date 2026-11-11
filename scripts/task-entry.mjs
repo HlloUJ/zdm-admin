@@ -23,6 +23,10 @@ export function publishedTaskEntry(root, args) {
     target = realpathSync(args[1]);
     args = args.slice(2);
   }
+  assert.ok(
+    !args.some((arg) => arg === '--worktree' || arg.startsWith('--worktree=')),
+    'Use --worktree once before the command; forwarded task identity cannot override the verified worktree',
+  );
   const [command, ...rest] = args;
   assert.ok(
     entries[command],

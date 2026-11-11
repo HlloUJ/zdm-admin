@@ -54,15 +54,23 @@ preview:
       run: 'npm run task:entry -- --worktree "{task_worktree}" check'
     start:
       cwd: repository
-      run: 'npm run task:entry -- --worktree "{task_worktree}" preview switch --task "{batch_slug}"'
+      run: 'npm run task:entry -- --worktree "{task_worktree}" preview start --task "{batch_slug}"'
+    status:
+      cwd: repository
+      run: 'npm run task:entry -- --worktree "{task_worktree}" preview status --task "{batch_slug}"'
+    stop:
+      cwd: repository
+      run: 'npm run task:entry -- --worktree "{task_worktree}" preview stop --task "{batch_slug}"'
     temporary:
       cwd: repository
       run: 'npm run task:entry -- --worktree "{task_worktree}" temporary'
     contract:
       cwd: repository
       run: 'npm run task:entry -- --worktree "{task_worktree}" complete runtime'
-    # Stop and handoff are owned stages of complete/deliver, never global stops.
+    # Development stop targets the exact independent task. Formal delivery
+    # handoff remains owned by complete/deliver, never a global stop.
   urls:
+    # Legacy explicitly selected preview; normal tasks use their returned URL.
     current_task: http://127.0.0.1:5175
     integration: http://127.0.0.1:5173
     playwright: http://127.0.0.1:5174
@@ -90,6 +98,7 @@ database:
   migration: flyway
   safety:
     create_task_database: explicit-preparation-only
+    independent_start: prepare-missing-task-registration-once-before-launch
     retain_preview_database_and_media: true
     auto_rebuild_missing_preview_data: false
     launcher_enforced: true
