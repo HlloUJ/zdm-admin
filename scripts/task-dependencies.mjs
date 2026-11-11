@@ -18,9 +18,13 @@ export function validateTaskDependencies(
     libc = platform === 'linux' ? (process.report.getReport().header.glibcVersionRuntime ? 'glibc' : 'musl') : null,
   } = {},
 ) {
+  const canonicalModules = realpathSync(modules);
+  const installedFile = path.join(modules, '.package-lock.json');
+  if (realpathSync(installedFile) !== path.join(canonicalModules, '.package-lock.json'))
+    throw new Error('安装清单指向依赖目录之外，保留原链接');
   const manifest = readJson(path.join(root, 'package.json'));
   const lock = readJson(path.join(root, 'package-lock.json'));
-  const installed = readJson(path.join(modules, '.package-lock.json'));
+  const installed = readJson(installedFile);
   if (!lock.packages?.[''] || !installed.packages) throw new Error('缺少可验证的 npm 安装清单');
   for (const field of dependencyFields) {
     if (JSON.stringify(sorted(manifest[field])) !== JSON.stringify(sorted(lock.packages[''][field])))
@@ -43,13 +47,19 @@ export function validateTaskDependencies(
       if ((expected[field] ?? null) !== (actual[field] ?? null)) throw new Error(`安装版本与锁文件不一致：${name}`);
     }
     const relative = name.slice('node_modules/'.length);
+    const packageDirectory = path.join(modules, relative);
     const packageFile = path.join(modules, relative, 'package.json');
+    if (
+      realpathSync(packageDirectory) !== path.join(canonicalModules, relative) ||
+      realpathSync(packageFile) !== path.join(canonicalModules, relative, 'package.json')
+    )
+      throw new Error(`锁定依赖指向其他目录，不能证明私有隔离：${name}`);
     const packageManifest = readJson(packageFile);
     if (!actual.version || packageManifest.version !== actual.version)
       throw new Error(`实际安装版本与清单不一致：${name}`);
     checked += 1;
   }
-  return { modules: realpathSync(modules), packagesChecked: checked };
+  return { modules: canonicalModules, packagesChecked: checked };
 }
 
 export function compatibleTaskDependencies(root, modules) {

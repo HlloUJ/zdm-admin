@@ -1,4 +1,5 @@
 import { createTaskRegistry, parallelTaskMode } from './task-registry.mjs';
+import { assertCombinationPreview } from './preview-combination-state.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { withIntegrationResource, integrationChildEnvironment } from './integration-resource.mjs';
 import { taskMavenVolume, prepareTaskMaven } from './task-maven.mjs';
@@ -6,6 +7,7 @@ import assert from 'node:assert/strict';
 import {
   existsSync,
   lstatSync,
+  realpathSync,
   mkdirSync,
   readFileSync,
   readdirSync,
@@ -428,11 +430,13 @@ function refExists(ref, cwd) {
   return spawnSync('git', ['show-ref', '--verify', '--quiet', ref], { cwd }).status === 0;
 }
 
-export function ensureNodeModules(root, worktrees) {
+export function ensureNodeModules(root, worktrees, { privateOnly = parallelTaskMode(root) } = {}) {
   const localModules = path.join(root, 'node_modules');
   // An existing symlink is not evidence that its target matches this Worktree's lock.
   try {
-    lstatSync(localModules);
+    const stat = lstatSync(localModules);
+    if (privateOnly && (stat.isSymbolicLink() || !stat.isDirectory()))
+      throw new Error('并行任务必须使用实体私有 node_modules；保留原链接，不修改其他任务依赖');
     try {
       return validateTaskDependencies(root, localModules);
     } catch (error) {
@@ -444,6 +448,8 @@ export function ensureNodeModules(root, worktrees) {
   } catch (error) {
     if (error.code !== 'ENOENT') throw error;
   }
+  if (privateOnly)
+    throw new Error('并行任务缺少私有 node_modules；请通过已发布任务启动入口准备，不从其他任务建立共享链接');
   const sharedModules = selectSharedNodeModules({ root, worktrees });
   if (!sharedModules) throw new Error('当前 Worktree 缺少可复用且实际安装版本一致的 node_modules，请先安装依赖');
   symlinkSync(sharedModules, localModules, process.platform === 'win32' ? 'junction' : 'dir');
@@ -1350,13 +1356,18 @@ export async function handoffDatabaseTask(
   console.log(`任务运行环境已交接到集成环境：${branch}`);
 }
 
-function targetViteConfig(root) {
+export function targetViteConfig(root, { combination = false } = {}) {
   const localConfig = path.join(root, 'vite.config.js');
-  if (existsSync(localConfig) && readFileSync(localConfig, 'utf8').includes('ZDM_TASK_PREVIEW')) return localConfig;
+  if (!combination && existsSync(localConfig) && readFileSync(localConfig, 'utf8').includes('ZDM_TASK_PREVIEW'))
+    return localConfig;
   return path.join(launcherRoot, 'vite.config.js');
 }
 
 function spawnFrontend({ root, branch, port, apiTarget, mode }) {
+  const task = createTaskRegistry(root)
+    .list()
+    .find((record) => record.worktree === realpathSync(root));
+  const combination = task?.previewOnly ? assertCombinationPreview(root, task, { port }) : null;
   const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
   if (!existsSync(viteBin)) throw new Error(`缺少 Vite：${viteBin}`);
   return spawn(
@@ -1366,7 +1377,7 @@ function spawnFrontend({ root, branch, port, apiTarget, mode }) {
       '--configLoader',
       'runner',
       '--config',
-      targetViteConfig(root),
+      targetViteConfig(root, { combination: Boolean(combination) }),
       '--host',
       '127.0.0.1',
       '--port',
@@ -1380,6 +1391,7 @@ function spawnFrontend({ root, branch, port, apiTarget, mode }) {
         ZDM_TASK_WORKSPACE: root,
         ZDM_TASK_BRANCH: branch,
         ZDM_TASK_MODE: mode,
+        ZDM_TASK_COMBINATION: combination ? JSON.stringify(combination) : '',
         VITE_PUBLIC_APP_ORIGIN: taskPublicOrigin(port),
         ZDM_TASK_PREVIEW: '1',
         ZDM_FRONTEND_PORT: String(port),
@@ -1539,6 +1551,12 @@ export async function main(args = process.argv.slice(2)) {
 
   if (options.check) {
     const expectedWorkspaceRoot = options.worktree ? await resolveTargetRoot(options.worktree) : null;
+    if (expectedWorkspaceRoot) {
+      const task = createTaskRegistry(expectedWorkspaceRoot)
+        .list()
+        .find((record) => record.worktree === realpathSync(expectedWorkspaceRoot));
+      if (task?.previewOnly) assertCombinationPreview(expectedWorkspaceRoot, task, { port: options.port });
+    }
     const port = options.port || CURRENT_TASK_FRONTEND_PORT;
     let expectations = { expectedWorkspaceRoot };
     if (expectedWorkspaceRoot) {
@@ -1625,6 +1643,7 @@ export async function main(args = process.argv.slice(2)) {
   ) {
     const task = createTaskRegistry(root).resolve({ worktree: root });
     registeredTask = task;
+    if (task.previewOnly) assertCombinationPreview(root, task, options);
     assertFrozenValidationStart(task, options, {
       head: gitCapture(root, ['rev-parse', 'HEAD']),
       lease: createResourceLeases(task.repository.commonDir).inspect('task-delivery-' + task.id),

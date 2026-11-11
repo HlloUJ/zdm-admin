@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, realpathSync, mkdirSync, writeFileSync, readFileSync, lstatSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
+import { createTaskRegistry, registeredTaskWorktrees, isPreservedReadOnlyTask } from './task-registry.mjs';
 import path from 'node:path';
 import { assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { deliveryStatus } from './completion-status.mjs';
@@ -11,7 +11,7 @@ export const withTaskContext = (identity, action) => context.run(identity, actio
 export function closeTaskBatch(root, batch) {
   const registry = createTaskRegistry(root),
     task = registry.readTask(batch.id);
-  assert.ok(task && !task.compatibility?.readOnly, 'Exact current task required');
+  assert.ok(task && !isPreservedReadOnlyTask(task) && !task.previewOnly, 'Exact deliverable current task required');
   assert.ok(['handoff-verified', 'closed'].includes(task.stage), 'Task runtime handoff is incomplete');
   const git = (...args) =>
     execFileSync('git', ['--no-replace-objects', '-C', root, ...args], { encoding: 'utf8' }).trim();
@@ -90,7 +90,7 @@ export function selectedTaskBatch(root) {
     task = matching[0];
   }
   if (!task) return null;
-  assert.ok(!task.compatibility?.readOnly, 'Legacy task is preserved read-only; use its reviewed recovery path');
+  assert.ok(!isPreservedReadOnlyTask(task), 'Legacy task is preserved read-only; use its reviewed recovery path');
   return taskBatch(task, root);
 }
 export function validateTaskBatch(root, batch) {
@@ -101,6 +101,7 @@ export function validateTaskBatch(root, batch) {
 }
 export function planTaskDelivery(root, batch) {
   batch = validateTaskBatch(root, batch);
+  assert.ok(!batch.previewOnly, 'Temporary preview combinations cannot be delivered as a task');
   const registry = createTaskRegistry(root);
   const git = (...args) =>
     execFileSync('git', ['--no-replace-objects', '-C', batch.worktree, ...args], { encoding: 'utf8' }).trim();
