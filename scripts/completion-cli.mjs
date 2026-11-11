@@ -601,8 +601,15 @@ export async function completionCommand(root, args, options = {}) {
     : null;
   const task = explicit ? registry.readTask(explicit) : selectedTaskBatch(root);
   if (task) {
-    assert.ok(!task.compatibility?.readOnly, 'Legacy frozen task remains on its reviewed recovery path');
+    assert.ok(
+      !task.compatibility?.readOnly || task.previewOnly,
+      'Legacy frozen task remains on its reviewed recovery path',
+    );
     const readOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
+    assert.ok(
+      !task.previewOnly || readOnly,
+      'Temporary preview combinations cannot freeze, merge, settle or formally deliver',
+    );
     if (!readOnly)
       assert.equal(
         options.owner ?? process.env.CODEX_THREAD_ID,

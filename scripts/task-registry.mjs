@@ -163,6 +163,14 @@ export function registeredTaskWorktrees(root) {
       };
     });
 }
+export function isPreservedReadOnlyTask(record) {
+  const previewPurpose =
+    record?.version === 2 &&
+    record.previewOnly === true &&
+    record.compatibility?.previewOnlyProtocol === 1 &&
+    record.resources?.dataScope === 'isolated-combination';
+  return Boolean(record?.compatibility?.readOnly && !previewPurpose);
+}
 export function parallelTaskMode(root) {
   if (createTaskRegistry(root).list().length) return true;
   const main = registeredTaskWorktrees(root).find((item) => item.branch === 'main');
@@ -171,6 +179,19 @@ export function parallelTaskMode(root) {
 }
 function shape(record) {
   assert.equal(record.version, 2, 'Unknown task registry schema');
+  assert.ok(
+    record.previewOnly === undefined || typeof record.previewOnly === 'boolean',
+    'Unknown preview-only purpose',
+  );
+  if (record.previewOnly) {
+    assert.equal(
+      record.resources?.dataScope,
+      'isolated-combination',
+      'Preview-only task must keep its isolated compatibility scope',
+    );
+    assert.equal(record.compatibility?.readOnly, true, 'Older entry points must refuse preview-only tasks');
+    assert.equal(record.compatibility.previewOnlyProtocol, 1, 'Unknown preview-only compatibility protocol');
+  }
   id(record.id);
   assert.ok(['business', 'infrastructure', 'maintenance'].includes(record.kind), 'Unknown task kind');
   assert.ok(TASK_STAGES.includes(record.stage), 'Unknown task stage');
@@ -374,7 +395,7 @@ export function createTaskRegistry(root) {
       }
     });
   }
-  function register({ id: taskId, worktree, owner, kind = 'business', dependsOn = [] }) {
+  function register({ id: taskId, worktree, owner, kind = 'business', dependsOn = [], previewOnly = false }) {
     id(taskId);
     assert.ok(typeof owner === 'string' && owner.trim(), 'Explicit task owner required');
     const target = realpathSync(worktree);
@@ -384,6 +405,7 @@ export function createTaskRegistry(root) {
         assert.equal(existing.worktree, target, 'Task id already belongs to another worktree');
         assert.equal(existing.owner, owner, 'Task id already belongs to another owner');
         assert.equal(existing.kind, kind, 'Existing task kind cannot be silently changed');
+        assert.equal(Boolean(existing.previewOnly), previewOnly, 'Existing preview-only purpose cannot change');
         assert.deepEqual(existing.dependsOn, dependsOn, 'Existing task dependencies require an explicit update');
         return validateLive(existing);
       }
@@ -408,6 +430,8 @@ export function createTaskRegistry(root) {
         version: 2,
         id: taskId,
         kind,
+        previewOnly,
+        ...(previewOnly ? { compatibility: { readOnly: true, previewOnlyProtocol: 1 } } : {}),
         owner,
         worktree: target,
         branch,
@@ -419,7 +443,7 @@ export function createTaskRegistry(root) {
         stage: 'developing',
         revision: 1,
         dependsOn,
-        resources: { dataScope: 'isolated-task' },
+        resources: { dataScope: previewOnly ? 'isolated-combination' : 'isolated-task' },
         checkpoints: [],
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
@@ -441,7 +465,7 @@ export function createTaskRegistry(root) {
     } else throw Error('Explicit task id or worktree required; preview selection is not task ownership');
     assert.ok(record, 'Task is not registered');
     assert.ok(
-      !record.compatibility?.readOnly,
+      !isPreservedReadOnlyTask(record),
       'Legacy record is read-only; use its reviewed recovery without redirecting another task',
     );
     if (worktree) assert.equal(record.worktree, realpathSync(worktree), 'Requested task and worktree differ');
@@ -450,10 +474,12 @@ export function createTaskRegistry(root) {
   function revise(taskId, expectedRevision, change) {
     return locked(() => {
       const record = readTask(taskId);
-      assert.ok(record && !record.compatibility?.readOnly, 'Exact writable task required');
+      assert.ok(record && !isPreservedReadOnlyTask(record), 'Exact writable task required');
       assert.equal(record.revision, expectedRevision, 'Task revision changed; reload before updating');
       const identities = [
         'id',
+        'previewOnly',
+        'compatibility',
         'version',
         'kind',
         'owner',

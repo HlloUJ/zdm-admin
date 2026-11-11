@@ -7,11 +7,13 @@ import { provisionPreviewData, readTaskData } from './task-data-environment.mjs'
 import { taskProjectName } from './dev-task.mjs';
 import { withIntegrationResource } from './integration-resource.mjs';
 import { deliveryStatus } from './completion-status.mjs';
+import { assertCombinationPreview } from './preview-combination-state.mjs';
 
 export async function isolateTaskData(root, { id, owner, apply = false }, dependencies = {}) {
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id });
   assert.equal(task.owner, owner, 'Exact task owner required for isolated data preparation');
+  if (task.previewOnly) assertCombinationPreview(root, task, { temporary: true });
   assert.ok(!task.recovery?.runtimeBlocked, 'Historical recovery is not verified; data preparation remains blocked');
   assert.ok(
     !['merged', 'main-verified', 'handoff-verified', 'closed'].includes(task.stage) &&
@@ -45,9 +47,10 @@ export async function isolateTaskData(root, { id, owner, apply = false }, depend
     )(project);
     assert.equal(running, '', 'Stop the exact task runtime before changing its data scope');
     let selected = task;
-    if (task.resources.dataScope !== 'isolated-task')
+    const scope = task.previewOnly ? 'isolated-combination' : 'isolated-task';
+    if (task.resources.dataScope !== scope)
       selected = registry.revise(task.id, task.revision, (record) => {
-        record.resources.dataScope = 'isolated-task';
+        record.resources.dataScope = scope;
       });
     // Failed provisioning keeps both the isolated scope and its failure/backup records.
     // Launching it then fails closed instead of returning to the persistent shared data.
@@ -57,7 +60,7 @@ export async function isolateTaskData(root, { id, owner, apply = false }, depend
     );
     return {
       task: selected.id,
-      scope: 'isolated-task',
+      scope,
       database: data.database,
       mediaVolume: data.mediaVolume,
       backupFile: data.backupFile,

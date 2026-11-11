@@ -20,6 +20,7 @@ const git = (root, ...args) =>
   execFileSync('git', ['--no-replace-objects', '-C', root, ...args], { encoding: 'utf8' }).trim();
 function owned(task, owner) {
   assert.equal(task.owner, owner, 'Current chat must own this exact task');
+  assert.ok(!task.previewOnly, 'Preview-only combinations are not development or delivery tasks');
   assert.ok(
     ['developing', 'dev-validated', 'blocked'].includes(task.stage),
     'Formal delivery source is frozen; development cannot reset it',

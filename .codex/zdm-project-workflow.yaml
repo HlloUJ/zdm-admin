@@ -58,6 +58,21 @@ preview:
     temporary:
       cwd: repository
       run: 'npm run task:entry -- --worktree "{task_worktree}" temporary'
+    combination_plan:
+      cwd: repository
+      run: 'npm run task:entry -- combination plan "{combination_id}" --member "{member_a}@{member_a_head}" --member "{member_b}@{member_b_head}"'
+    combination_create:
+      cwd: repository
+      run: 'npm run task:entry -- combination create "{combination_id}" --member "{member_a}@{member_a_head}" --member "{member_b}@{member_b_head}"'
+    combination_status:
+      cwd: repository
+      run: 'npm run task:entry -- combination status "{combination_id}"'
+    combination_run:
+      cwd: repository
+      run: 'npm run task:entry -- combination run "{combination_id}"'
+    combination_stop:
+      cwd: repository
+      run: 'npm run task:entry -- combination stop "{combination_id}"'
     contract:
       cwd: repository
       run: 'npm run task:entry -- --worktree "{task_worktree}" complete runtime'

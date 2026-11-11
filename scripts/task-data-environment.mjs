@@ -73,20 +73,22 @@ function dataLocation(root) {
     return { common, task: null, registeredTask: null, directory, project: 'published-preview' };
   }
   const scope = task?.resources?.dataScope ?? 'persistent-preview';
-  if (!['persistent-preview', 'isolated-task'].includes(scope)) throw new Error('未知任务数据范围');
-  const directory =
-    scope === 'isolated-task'
-      ? path.join(common, 'task-environments', task.id)
-      : path.join(common, 'preview-environment');
+  if (!['persistent-preview', 'isolated-task', 'isolated-combination'].includes(scope))
+    throw new Error('未知任务数据范围');
+  if (scope === 'isolated-combination' && !task?.previewOnly) throw new Error('组合数据范围没有准确的预览任务归属');
+  const isolated = scope === 'isolated-task' || scope === 'isolated-combination';
+  const directory = isolated
+    ? path.join(common, 'task-environments', task.id)
+    : path.join(common, 'preview-environment');
   for (const entry of [path.dirname(directory), directory])
     if (existsSync(entry) && (lstatSync(entry).isSymbolicLink() || !lstatSync(entry).isDirectory()))
       throw new Error('数据登记目录不是安全目录');
   return {
     common,
-    task: scope === 'isolated-task' ? task.id : null,
+    task: isolated ? task.id : null,
     registeredTask: task ?? null,
     directory,
-    project: scope === 'isolated-task' ? 'task-' + task.id : 'persistent-preview',
+    project: isolated ? 'task-' + task.id : 'persistent-preview',
   };
 }
 export function previewDataRoot(root) {

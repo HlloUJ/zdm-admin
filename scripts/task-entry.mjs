@@ -14,7 +14,26 @@ const entries = {
   complete: 'scripts/task-completion.mjs',
   check: 'scripts/dev-task.mjs',
   temporary: 'scripts/dev-task.mjs',
+  combination: 'scripts/preview-combination.mjs',
 };
+export function previewEntryArguments(command, target, rest) {
+  const values = command === 'check' ? ['--port'] : ['--mode', '--api', '--backend-port'];
+  const switches = command === 'temporary' ? ['--database-risk'] : [];
+  const seen = new Set();
+  for (let i = 0; i < rest.length; i++) {
+    const flag = rest[i];
+    assert.ok(values.includes(flag) || switches.includes(flag), 'Unsupported ' + command + ' option: ' + flag);
+    assert.ok(!seen.has(flag), 'Duplicate ' + command + ' option: ' + flag);
+    seen.add(flag);
+    if (values.includes(flag)) {
+      assert.ok(rest[i + 1] && !rest[i + 1].startsWith('--'), 'Missing value for ' + flag);
+      i++;
+    }
+  }
+  return command === 'check'
+    ? ['--check', '--worktree', target, ...rest]
+    : ['--worktree', target, '--temporary', ...rest];
+}
 export function publishedTaskEntry(root, args) {
   const git = (cwd, ...flags) => execFileSync('git', ['-C', cwd, ...flags], { encoding: 'utf8', stdio: 'pipe' }).trim();
   let target = realpathSync(root);
@@ -26,7 +45,7 @@ export function publishedTaskEntry(root, args) {
   const [command, ...rest] = args;
   assert.ok(
     entries[command],
-    'task:entry [--worktree <exact path>] <start|registry|preview|data|work|complete|check|temporary> [args]',
+    'task:entry [--worktree <exact path>] <start|registry|preview|data|work|complete|check|temporary|combination> [args]',
   );
   const registry = createTaskRegistry(root),
     targetRegistry = createTaskRegistry(target);
@@ -47,18 +66,13 @@ export function publishedTaskEntry(root, args) {
   const script = path.join(main, entries[command]);
   assert.ok(existsSync(script) && lstatSync(script).isFile() && !lstatSync(script).isSymbolicLink());
   git(main, 'cat-file', '-e', published + ':' + entries[command]);
-  const forwarded =
-    command === 'check'
-      ? ['--check', '--worktree', target, ...rest]
-      : command === 'temporary'
-        ? ['--worktree', target, '--temporary', ...rest]
-        : rest;
+  const forwarded = ['check', 'temporary'].includes(command) ? previewEntryArguments(command, target, rest) : rest;
   return { script, cwd: target, args: forwarded, published, source: main };
 }
 export function main(root = process.cwd(), args = process.argv.slice(2)) {
   if (args.includes('--help')) {
     console.log(
-      'task:entry [--worktree <exact path>] <start|registry|preview|data|work|complete|check|temporary> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
+      'task:entry [--worktree <exact path>] <start|registry|preview|data|work|complete|check|temporary|combination> [args]\ncheck [--port <5175-5199>]\ntemporary [--mode auto|frontend|full] [--api <isolated-origin>] [--backend-port <8081-8099>] [--database-risk]\ncombination plan|create <id> --member <task@full-sha> --member <task@full-sha> | status|run|stop <id>\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
     );
     return;
   }

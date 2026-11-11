@@ -9,6 +9,8 @@ import {
   rmSync,
   symlinkSync,
   existsSync,
+  lstatSync,
+  readlinkSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -83,4 +85,31 @@ test('failed installation preserves previous private contents and records failur
   assert.equal(receipt.exitCode, 1);
   assert.equal(readFileSync(path.join(receipt.backup, 'keep'), 'utf8'), 'original');
   assert.equal(existsSync(path.join(f.root, '.task-runtime/task-artifacts.json')), false);
+});
+test('dangling dependency links are preserved and refused before installation or readiness', (t) => {
+  for (const dependency of [false, true]) {
+    for (const install of [false, true]) {
+      const f = fixture(t, dependency),
+        target = path.join(f.root, 'absent-owner'),
+        link = path.join(f.root, 'node_modules');
+      symlinkSync(target, link);
+      let invoked = 0;
+      assert.throws(
+        () =>
+          prepareTaskArtifacts(f.task, {
+            install,
+            execute: () => {
+              invoked++;
+              return { status: 0 };
+            },
+          }),
+        /Shared dependency symlink/,
+      );
+      assert.equal(invoked, 0);
+      assert.ok(lstatSync(link).isSymbolicLink());
+      assert.equal(readlinkSync(link), target);
+      assert.equal(existsSync(path.join(f.root, '.task-runtime/task-artifacts.json')), false);
+      assert.equal(existsSync(target), false);
+    }
+  }
 });
