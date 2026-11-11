@@ -19,7 +19,15 @@ const hasRef = (root, ref) => {
   return r.status === 0;
 };
 export function parseTaskStart(args) {
-  const options = { slug: null, kind: 'business', owner: null, resume: false, taskParent: null, help: false };
+  const options = {
+    slug: null,
+    kind: 'business',
+    owner: null,
+    resume: false,
+    previewOnly: false,
+    taskParent: null,
+    help: false,
+  };
   for (let i = 0; i < args.length; i++) {
     const value = args[i];
     if (['--help', '-h'].includes(value)) {
@@ -29,6 +37,11 @@ export function parseTaskStart(args) {
     if (value === '--resume') {
       assert.ok(!options.resume, 'Duplicate resume flag');
       options.resume = true;
+      continue;
+    }
+    if (value === '--preview-only') {
+      assert.ok(!options.previewOnly, 'Duplicate preview-only flag');
+      options.previewOnly = true;
       continue;
     }
     const key = { '--slug': 'slug', '--kind': 'kind', '--owner': 'owner', '--task-parent': 'taskParent' }[value];
@@ -76,12 +89,18 @@ export function startParallelTask(
   if (!options.slug) {
     const task = registry.resolve({ worktree: root });
     assert.equal(task.owner, owner, 'Another owner controls this task');
+    assert.equal(Boolean(task.previewOnly), Boolean(options.previewOnly), 'Use the exact preview-only task purpose');
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   const existing = registry.readTask(options.slug);
   if (existing) {
     assert.equal(existing.owner, owner, 'Another owner controls this task');
     assert.equal(existing.kind, options.kind, 'Task kind differs');
+    assert.equal(
+      Boolean(existing.previewOnly),
+      Boolean(options.previewOnly),
+      'Use the exact preview-only task purpose',
+    );
     const task = registry.resolve({ id: options.slug });
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
@@ -145,12 +164,19 @@ export function startParallelTask(
       base,
       state: 'prepared',
       previewSwitched: false,
+      previewOnly: Boolean(options.previewOnly),
     };
     writeFileSync(intent, JSON.stringify(record, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     git(anchor, 'worktree', 'add', '-b', branch, target, base);
     record.state = 'worktree-created';
     writeFileSync(intent, JSON.stringify(record, null, 2) + '\n');
-    const task = registry.register({ id: options.slug, worktree: target, owner, kind: options.kind });
+    const task = registry.register({
+      id: options.slug,
+      worktree: target,
+      owner,
+      kind: options.kind,
+      previewOnly: Boolean(options.previewOnly),
+    });
     record.state = 'registered';
     writeFileSync(intent, JSON.stringify(record, null, 2) + '\n');
     result = { task, resumed: false, previewSwitched: false, remoteFetched: true, remoteMain: base };
@@ -163,7 +189,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseTaskStart(args);
   if (options.help) {
     console.log(
-      'Usage: task:start -- --slug <task-id> --owner <owner> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services.',
+      'Usage: task:start -- --slug <task-id> --owner <owner> [--kind business|infrastructure|maintenance] [--resume] [--preview-only] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services. Preview-only purpose is immutable and forbids formal delivery.',
     );
     return;
   }

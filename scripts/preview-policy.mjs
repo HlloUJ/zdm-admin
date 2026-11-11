@@ -37,6 +37,7 @@ export function previewDescriptor(role, input) {
     };
   }
   if (role === 'development') {
+    assert.ok(!input.task?.previewOnly, 'Preview-only combinations must use a temporary port, not 5175');
     assert.ok(input.task?.id && input.task.worktree && input.task.branch, 'Exact task identity required');
     assert.ok(
       input.task.stage !== 'closed' && !input.task.compatibility?.readOnly,

@@ -9,7 +9,7 @@ const TASK_PREVIEW_API_HEALTH_PATH = '/__zdm_task_preview_api_health__';
 const TASK_PREVIEW_CONTROL_HEADER = 'x-zdm-task-preview-control';
 const TASK_PREVIEW_CONTROL_VALUE = 'switch-current-task';
 
-function taskPreviewControlPlugin({ workspaceRoot, branch, mode, apiTarget }) {
+function taskPreviewControlPlugin({ workspaceRoot, branch, mode, apiTarget, combination }) {
   return {
     name: 'zdm-task-preview-control',
     configureServer(server) {
@@ -28,6 +28,7 @@ function taskPreviewControlPlugin({ workspaceRoot, branch, mode, apiTarget }) {
               branch,
               mode,
               apiTarget,
+              ...(combination ? { combination } : {}),
             }),
           );
           return;
@@ -63,6 +64,18 @@ export default defineConfig(({ mode }) => {
   const apiProxyTarget = process.env.ZDM_API_PROXY_TARGET || 'http://127.0.0.1:8080';
   const taskBranch = process.env.ZDM_TASK_BRANCH || '';
   const taskMode = process.env.ZDM_TASK_MODE || '';
+  const combination =
+    taskPreview && process.env.ZDM_TASK_COMBINATION ? JSON.parse(process.env.ZDM_TASK_COMBINATION) : null;
+  if (
+    combination &&
+    (combination.worktree !== workspaceRoot ||
+      combination.branch !== taskBranch ||
+      !Number.isInteger(frontendPort) ||
+      frontendPort < 5177 ||
+      frontendPort > 5199 ||
+      combination.eligibleForTaskDelivery !== false)
+  )
+    throw new Error('组合预览归属或临时端口不符');
 
   return {
     root: workspaceRoot,
@@ -76,6 +89,7 @@ export default defineConfig(({ mode }) => {
               branch: taskBranch,
               mode: taskMode,
               apiTarget: apiProxyTarget,
+              combination,
             }),
           ]
         : []),

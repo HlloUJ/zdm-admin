@@ -5,6 +5,7 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
 import test from 'node:test';
+import { fileURLToPath } from 'node:url';
 
 import viteConfig from '../vite.config.js';
 import { runtimeDigest, taskBackendContainerIdentity } from './task-runtime-state.mjs';
@@ -42,6 +43,7 @@ import {
   taskPreviewChangedFiles,
   taskPreviewErrors,
   taskProjectName,
+  targetViteConfig,
 } from './dev-task.mjs';
 
 test('keeps the public task origin separate from the internal managed port', () => {
@@ -996,4 +998,72 @@ test('supervised stop forwards exact atomic identity to supporting services', as
     30_000,
     { expected: { worktree: '/task', childPid: 123, servicePid: 7, selectionRevision: 8 } },
   ]);
+});
+
+test('combination preview uses the reviewed launcher configuration when a member has an older local Vite config', (t) => {
+  const dir = mkdtempSync(resolve(tmpdir(), 'combination-vite-'));
+  t.after(() => rmSync(dir, { recursive: true, force: true }));
+  const local = resolve(dir, 'vite.config.js');
+  writeFileSync(local, '// ZDM_TASK_PREVIEW supported; old member has no combination metadata');
+  assert.equal(targetViteConfig(dir), local);
+  assert.equal(
+    targetViteConfig(dir, { combination: true }),
+    fileURLToPath(new URL('../vite.config.js', import.meta.url)),
+  );
+  assert.equal(readFileSync(local, 'utf8'), '// ZDM_TASK_PREVIEW supported; old member has no combination metadata');
+});
+test('actual Vite control middleware reports exact combination versions and rejects a fixed preview port', () => {
+  const values = {
+    ZDM_TASK_PREVIEW: '1',
+    ZDM_TASK_WORKSPACE: '/tmp/combination-member-fixture',
+    ZDM_TASK_BRANCH: 'codex/combination-fixture',
+    ZDM_TASK_MODE: 'full',
+    ZDM_API_PROXY_TARGET: 'http://127.0.0.1:8082',
+    ZDM_FRONTEND_PORT: '5177',
+  };
+  const combination = {
+    worktree: values.ZDM_TASK_WORKSPACE,
+    branch: values.ZDM_TASK_BRANCH,
+    head: 'c'.repeat(40),
+    members: [
+      { task: 'a', commit: 'a'.repeat(40) },
+      { task: 'b', commit: 'b'.repeat(40) },
+    ],
+    eligibleForTaskDelivery: false,
+  };
+  values.ZDM_TASK_COMBINATION = JSON.stringify(combination);
+  const before = Object.fromEntries(Object.keys(values).map((k) => [k, process.env[k]]));
+  Object.assign(process.env, values);
+  try {
+    const config = viteConfig({ mode: 'development' }),
+      plugin = config.plugins.find((p) => p.name === 'zdm-task-preview-control');
+    let middleware, metadata;
+    plugin.configureServer({
+      middlewares: {
+        use: (fn) => {
+          middleware = fn;
+        },
+      },
+    });
+    middleware(
+      { url: '/__zdm_task_preview__', method: 'GET' },
+      {
+        setHeader() {},
+        end: (body) => {
+          metadata = JSON.parse(body);
+        },
+      },
+      () => assert.fail('must return metadata'),
+    );
+    assert.deepEqual(metadata.combination, combination);
+    assert.equal(metadata.workspaceRoot, combination.worktree);
+    assert.equal(metadata.apiTarget, values.ZDM_API_PROXY_TARGET);
+    process.env.ZDM_FRONTEND_PORT = '5175';
+    assert.throws(() => viteConfig({ mode: 'development' }), /组合预览归属或临时端口不符/);
+  } finally {
+    for (const [k, v] of Object.entries(before)) {
+      if (v === undefined) delete process.env[k];
+      else process.env[k] = v;
+    }
+  }
 });

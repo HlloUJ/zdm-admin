@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, realpathSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { validateTaskDependencies } from './task-dependencies.mjs';
+import { isPreservedReadOnlyTask } from './task-registry.mjs';
 const dependencyFields = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
 function directory(root, relative) {
   let current = root;
@@ -19,11 +20,26 @@ function directory(root, relative) {
   }
   return current;
 }
+function present(file) {
+  try {
+    return lstatSync(file);
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    throw error;
+  }
+}
 export function prepareTaskArtifacts(task, { install = true, execute = spawnSync } = {}) {
   assert.equal(task.version, 2);
-  assert.ok(!task.compatibility?.readOnly, 'Legacy task requires reviewed preparation');
+  assert.ok(!isPreservedReadOnlyTask(task), 'Legacy task requires reviewed preparation');
   const root = realpathSync(task.worktree);
   assert.equal(root, task.worktree, 'Task worktree path changed');
+  const modules = path.join(root, 'node_modules');
+  const moduleStat = present(modules);
+  if (moduleStat)
+    assert.ok(
+      moduleStat.isDirectory() && !moduleStat.isSymbolicLink(),
+      'Shared dependency symlink or non-directory must be preserved; do not install through it',
+    );
   const dirs = Object.fromEntries(
     [
       '.task-runtime/cache',
@@ -40,12 +56,6 @@ export function prepareTaskArtifacts(task, { install = true, execute = spawnSync
   const manifest = JSON.parse(readFileSync(packageFile, 'utf8')),
     lock = JSON.parse(readFileSync(lockFile, 'utf8'));
   assert.ok(lock.packages?.[''], 'Task lockfile is not indexed');
-  const modules = path.join(root, 'node_modules');
-  if (existsSync(modules))
-    assert.ok(
-      !lstatSync(modules).isSymbolicLink(),
-      'Shared dependency symlink must be preserved; do not install through it',
-    );
   let dependencies,
     backup = null;
   const noDependencies =
