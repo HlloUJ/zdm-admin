@@ -58,3 +58,32 @@ test('role mapping is read-only and never requires a registry or starts services
   assert.equal(roles.integration, 5173);
   assert.equal(roles.development, 5175);
 });
+test('normal task preview operations use independent lifecycle without reading or switching the shared service', async () => {
+  const calls = [];
+  const dependencies = {
+    owner: 'chat-a',
+    readStatus: () => assert.fail('independent task must not read shared selection'),
+    request: () => assert.fail('independent task must not switch shared preview'),
+    independent: async (root, options) => {
+      calls.push({ root, options });
+      return { task: options.id };
+    },
+  };
+  for (const command of ['start', 'status', 'stop'])
+    assert.deepEqual(await taskPreview('/repo/a', [command, '--task', 'a'], dependencies), { task: 'a' });
+  assert.deepEqual(
+    calls.map((call) => call.options.command),
+    ['start', 'status', 'stop'],
+  );
+  assert.ok(calls.every((call) => call.root === '/repo/a' && call.options.owner === 'chat-a'));
+  for (const args of [
+    ['start'],
+    ['stop'],
+    ['start', '--task', 'a', '--port', '5175'],
+    ['start', '--task', 'a', '--backend-port', '8080'],
+    ['stop', '--task', 'a', '--port', '5177'],
+    ['start', '--task', 'a', '--task', 'b'],
+    ['start', '--task', 'a', '--worktree', '/repo/b'],
+  ])
+    await assert.rejects(taskPreview('/repo/a', args, dependencies));
+});

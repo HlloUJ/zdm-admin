@@ -469,12 +469,14 @@ test('roots task preview assets and aliases in the selected worktree', () => {
   const previousWorkspace = process.env.ZDM_TASK_WORKSPACE;
   const previousMode = process.env.ZDM_TASK_MODE;
   const previousApiTarget = process.env.ZDM_API_PROXY_TARGET;
+  const previousRuntimeId = process.env.ZDM_TASK_RUNTIME_ID;
   const selectedWorktree = '/tmp/zdm-selected-task-worktree';
 
   process.env.ZDM_TASK_PREVIEW = '1';
   process.env.ZDM_TASK_WORKSPACE = selectedWorktree;
   process.env.ZDM_TASK_MODE = 'frontend';
   process.env.ZDM_API_PROXY_TARGET = 'http://127.0.0.1:8080';
+  process.env.ZDM_TASK_RUNTIME_ID = 'selected-task-runtime';
   try {
     const config = viteConfig({ mode: 'development' });
     assert.equal(config.root, resolve(selectedWorktree));
@@ -486,6 +488,26 @@ test('roots task preview assets and aliases in the selected worktree', () => {
     );
     assert.equal(config.server.proxy['/__zdm_task_preview_api_health__'].target, 'http://127.0.0.1:8080');
     assert.equal(config.server.proxy['/__zdm_task_preview_api_health__'].rewrite(), '/actuator/health');
+    let middleware;
+    config.plugins
+      .find((plugin) => plugin.name === 'zdm-task-preview-control')
+      .configureServer({
+        middlewares: {
+          use: (value) => {
+            middleware = value;
+          },
+        },
+      });
+    const response = {
+      setHeader: () => {},
+      end: (body) => {
+        assert.equal(JSON.parse(body).runtimeId, 'selected-task-runtime');
+        assert.equal(JSON.parse(body).workspaceRoot, resolve(selectedWorktree));
+      },
+    };
+    middleware({ method: 'GET', url: '/__zdm_task_preview__', headers: {} }, response, () =>
+      assert.fail('control route'),
+    );
   } finally {
     if (previousPreview === undefined) delete process.env.ZDM_TASK_PREVIEW;
     else process.env.ZDM_TASK_PREVIEW = previousPreview;
@@ -495,6 +517,8 @@ test('roots task preview assets and aliases in the selected worktree', () => {
     else process.env.ZDM_TASK_MODE = previousMode;
     if (previousApiTarget === undefined) delete process.env.ZDM_API_PROXY_TARGET;
     else process.env.ZDM_API_PROXY_TARGET = previousApiTarget;
+    if (previousRuntimeId === undefined) delete process.env.ZDM_TASK_RUNTIME_ID;
+    else process.env.ZDM_TASK_RUNTIME_ID = previousRuntimeId;
   }
 });
 

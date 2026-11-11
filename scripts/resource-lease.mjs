@@ -9,6 +9,7 @@ function safe(file) {
 function resource(value) {
   assert.ok(
     fixed.has(value) ||
+      /^task-preview-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ||
       /^task-delivery-[a-z0-9]+(?:-[a-z0-9]+)*$/.test(value) ||
       /^backend-port-80(?:8[1-9]|9[0-9])$/.test(value) ||
       /^temporary-port-51(?:7[7-9]|8[0-9]|9[0-9])$/.test(value) ||
@@ -20,6 +21,7 @@ function resource(value) {
 export function createResourceLeases(
   commonDir,
   {
+    mkdir = mkdirSync,
     alive = (pid) => {
       try {
         process.kill(pid, 0);
@@ -56,9 +58,11 @@ export function createResourceLeases(
     const folder = path.join(directory, name);
     safe(folder);
     try {
-      mkdirSync(folder, { mode: 0o700 });
-    } catch {
-      throw Error('Resource is owned or interrupted; do not take over: ' + name);
+      mkdir(folder, { mode: 0o700 });
+    } catch (error) {
+      if (error.code === 'EEXIST')
+        throw Error('Resource is owned or interrupted; do not take over: ' + name, { cause: error });
+      throw Error(`Cannot acquire resource ${name}: ${error.code ?? error.message}`, { cause: error });
     }
     const lease = { resource: name, task, token: randomUUID(), pid: process.pid };
     writeFileSync(path.join(folder, 'owner.json'), JSON.stringify(lease) + '\n', { flag: 'wx', mode: 0o600 });

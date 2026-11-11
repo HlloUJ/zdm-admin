@@ -61,3 +61,33 @@ test('failed operation releases its own lease and unknown scopes are rejected', 
   for (const name of ['../other', 'backend-port-8080', 'temporary-port-5173', 'global-development'])
     assert.throws(() => resources.acquire(name, 'a'), /Unknown/);
 });
+test('permission and filesystem failures retain their actual cause instead of reporting an occupied resource', (t) => {
+  for (const code of ['EPERM', 'EACCES', 'ENOSPC']) {
+    const failure = Object.assign(new Error('injected filesystem failure'), { code });
+    const resources = fixture(t, {
+      mkdir: () => {
+        throw failure;
+      },
+    });
+    assert.throws(
+      () => resources.acquire('main-sync', 'a'),
+      (error) => {
+        assert.match(error.message, new RegExp('Cannot acquire resource main-sync: ' + code));
+        assert.equal(error.cause, failure);
+        assert.doesNotMatch(error.message, /owned or interrupted/);
+        return true;
+      },
+    );
+    assert.equal(resources.inspect('main-sync'), null);
+  }
+});
+test('independent preview operations serialize only their own task and preserve foreign leases', async (t) => {
+  const resources = fixture(t),
+    a = resources.acquire('task-preview-a', 'a');
+  const b = resources.acquire('task-preview-b', 'b');
+  assert.throws(() => resources.acquire('task-preview-a', 'a'), /owned or interrupted/);
+  assert.equal(resources.inspect('task-preview-b').token, b.token);
+  assert.throws(() => resources.recoverEndedTask('task-preview-a', 'a', () => true), /private completion/);
+  resources.release(a);
+  resources.release(b);
+});
