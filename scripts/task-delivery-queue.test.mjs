@@ -80,19 +80,23 @@ test(
   { timeout: 10000 },
   async (t) => {
     const common = mkdtempSync(path.join(tmpdir(), 'queue-process-publication-'));
-    t.after(() => rmSync(common, { recursive: true, force: true }));
-    const lock = path.join(common, 'task-registry/queue-write.lock'),
-      ready = path.join(common, 'partial-ready');
+    const lock = path.join(common, 'task-registry/queue-write.lock');
     const code = `import fs from 'node:fs';import path from 'node:path';
     const root=process.argv[1],lock=path.join(root,'task-registry/queue-write.lock'),owner=path.join(lock,'owner.json');
-    const cell=new Int32Array(new SharedArrayBuffer(4)),end=Date.now()+5000;
-    const wait=n=>{while(!fs.existsSync(path.join(root,n))){if(Date.now()>end)throw Error('publication barrier expired');Atomics.wait(cell,0,0,2);}};
-    fs.mkdirSync(lock,{recursive:true});fs.writeFileSync(owner,'{"pid":');fs.writeFileSync(path.join(root,'partial-ready'),'ready');
-    wait('publish');fs.writeFileSync(owner,JSON.stringify({pid:process.pid,token:'actual-writer'}));
-    wait('release');if(JSON.parse(fs.readFileSync(owner)).token!=='actual-writer')throw Error('owner stolen');
-    fs.unlinkSync(owner);fs.rmdirSync(lock);`;
+    const end=Date.now()+5000;
+    const wait=phase=>new Promise((resolve,reject)=>{
+      const timer=setTimeout(()=>{process.off('message',receive);reject(Error('publication barrier expired'));},Math.max(1,end-Date.now()));
+      const receive=message=>{if(message===phase){clearTimeout(timer);process.off('message',receive);resolve();}};
+      process.on('message',receive);
+    });
+    const publish=wait('publish');
+    fs.mkdirSync(lock,{recursive:true});fs.writeFileSync(owner,'{"pid":');process.send('partial-ready');
+    await publish;fs.writeFileSync(owner,JSON.stringify({pid:process.pid,token:'actual-writer'}));
+    const release=wait('release');process.send('published');await release;
+    if(JSON.parse(fs.readFileSync(owner)).token!=='actual-writer')throw Error('owner stolen');
+    fs.unlinkSync(owner);fs.rmdirSync(lock);process.disconnect();`;
     const child = spawn(process.execPath, ['--input-type=module', '-e', code, common], {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['ignore', 'pipe', 'pipe', 'ipc'],
     });
     let output = '';
     child.stdout.on('data', (value) => (output += value));
@@ -101,32 +105,64 @@ test(
       child.once('error', reject);
       child.once('exit', (code) => resolve(code));
     });
-    const deadline = Date.now() + 5000;
-    while (!existsSync(ready)) {
-      assert.ok(Date.now() < deadline, 'writer must reach the publication barrier');
-      await new Promise((resolve) => setTimeout(resolve, 2));
-    }
+    t.after(async () => {
+      if (child.exitCode === null && child.signalCode === null) child.kill('SIGTERM');
+      await ended;
+      rmSync(common, { recursive: true, force: true });
+    });
+    let partialReady, published;
+    const partial = new Promise((resolve) => {
+      partialReady = resolve;
+    });
+    const complete = new Promise((resolve) => {
+      published = resolve;
+    });
+    child.on('message', (phase) => {
+      if (phase === 'partial-ready') partialReady();
+      if (phase === 'published') published();
+    });
+    const phase = (barrier) =>
+      Promise.race([
+        barrier,
+        ended.then((code) => {
+          throw Error('writer exited before publication barrier: ' + code + '\n' + output);
+        }),
+      ]);
+    await phase(partial);
     let sawPartial = false,
-      sawPublished = false;
+      sawPublished = false,
+      observedLiveWriter = false;
     const queue = createTaskDeliveryQueue(common, {
+      alive: (pid) => {
+        assert.equal(pid, child.pid);
+        process.kill(pid, 0);
+        observedLiveWriter = true;
+        return true;
+      },
       tick: async () => {
-        if (existsSync(lock)) {
-          const bytes = readFileSync(path.join(lock, 'owner.json'), 'utf8');
-          if (bytes === '{"pid":') {
-            sawPartial = true;
-            writeFileSync(path.join(common, 'publish'), 'ready');
-          } else {
-            assert.equal(JSON.parse(bytes).pid, child.pid);
-            sawPublished = true;
-            writeFileSync(path.join(common, 'release'), 'ready');
-          }
+        if (!sawPartial) {
+          assert.equal(readFileSync(path.join(lock, 'owner.json'), 'utf8'), '{"pid":');
+          sawPartial = true;
+          child.send('publish');
+          await phase(complete);
+          // The writer now holds the complete owner until the NEXT queue tick.
+          // That tick is reached only after the queue observes its real live PID.
+          return;
         }
-        await new Promise((resolve) => setTimeout(resolve, 2));
+        assert.ok(observedLiveWriter);
+        assert.deepEqual(JSON.parse(readFileSync(path.join(lock, 'owner.json'))), {
+          pid: child.pid,
+          token: 'actual-writer',
+        });
+        sawPublished = true;
+        child.send('release');
+        // Do not inspect owner.json after release: unlink-before-rmdir is valid.
+        assert.equal(await ended, 0, output);
       },
     });
     assert.equal((await queue.enqueue(source('a'))).task, 'a');
     assert.equal(await ended, 0, output);
-    assert.ok(sawPartial && sawPublished);
+    assert.ok(sawPartial && sawPublished && observedLiveWriter);
   },
 );
 test('independent tasks queue FIFO while development takes no main lease', async (t) => {
