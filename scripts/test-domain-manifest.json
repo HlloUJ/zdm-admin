@@ -78,13 +78,13 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.mjs": {
-      "digest": "d2259a9a893e8e0159417e3d57be439459a43063184ecf52f69ae1fe58e261bc",
-      "imports": [],
+      "digest": "7c68cea0f9b7f4f03d1e556faaffb097173d24920c93f9db8b117cccb41457d9",
+      "imports": ["scripts/accepted-source-policy.mjs"],
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.test.mjs": {
-      "digest": "de8e168317f5e49bc645da32a5650f13734ac955ebefcf574e97e5d2ddc89b3a",
-      "imports": ["scripts/accepted-source-composition.mjs", "scripts/accepted-source.mjs"],
+      "digest": "0e06cb77e8d138bac7ee458494a9544f0b3aac05a3a5d14d16b1b22d70fb739d",
+      "imports": ["scripts/accepted-source-composition.mjs", "scripts/accepted-source.mjs", "scripts/shared-tool.mjs"],
       "dynamicImports": 0
     },
     "scripts/accepted-source-hook.mjs": {
@@ -1567,28 +1567,20 @@
       "dynamicImports": 0
     },
     "scripts/task-context.mjs": {
-      "digest": "09beba8d95a96ba808384b73d56813e92991085efa940dbd049ed62ba289d52c",
-      "imports": [
-        "scripts/accepted-source.mjs",
-        "scripts/completion-status.mjs",
-        "scripts/task-registry.mjs",
-        "scripts/task-review.mjs"
-      ],
+      "digest": "742e1d345ec87e2213d60570f50d32433fce5c7053917b28640d4c59f9291f5b",
+      "imports": ["scripts/accepted-source.mjs", "scripts/completion-status.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-context.test.mjs": {
-      "digest": "a2d89974ec3c321fe30d0fcc3ddac82b0c94ae73cc6813046ba84f6cb553eb6f",
+      "digest": "ecfbdd7674bd871afdc9d3e0985a054b6bd0130652e593b10b996cbd95dd04ab",
       "imports": [
         "scripts/accepted-source-hook.mjs",
         "scripts/accepted-source.mjs",
-        "scripts/check-changed-plan.mjs",
         "scripts/completion-cli.mjs",
         "scripts/repair.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-context.mjs",
-        "scripts/task-development.mjs",
-        "scripts/task-registry.mjs",
-        "scripts/verification-evidence.mjs"
+        "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
     },
@@ -1664,19 +1656,13 @@
       "dynamicImports": 0
     },
     "scripts/task-development.mjs": {
-      "digest": "2f1d8e8874c2e5fdcae29559d90ec922c190d78c13d225e1eafc9e391535bfb8",
-      "imports": ["scripts/task-registry.mjs", "scripts/task-review.mjs", "scripts/verification-evidence.mjs"],
+      "digest": "3843abae2f854190bf0dd99acd8696b652cdea328f9f6dbfe74dbf43218e8527",
+      "imports": ["scripts/completion-status.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-development.test.mjs": {
-      "digest": "fcfc2a566d6362a4afb92657244df0fefb85faf8a3189516585a1d76643e37c7",
-      "imports": [
-        "scripts/task-batch.mjs",
-        "scripts/task-context.mjs",
-        "scripts/task-development.mjs",
-        "scripts/task-registry.mjs",
-        "scripts/verification-evidence.mjs"
-      ],
+      "digest": "02f8e7a9fa30f9263060e76ae94d41cefc79311e042b553bd1828361133bdace",
+      "imports": ["scripts/task-development.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
@@ -1760,11 +1746,6 @@
     "scripts/task-registry.test.mjs": {
       "digest": "b390b1fd86c98f002d98a2598173c0fa040aa47e43ce68a56d2924cd309e799b",
       "imports": ["scripts/task-registry.mjs"],
-      "dynamicImports": 0
-    },
-    "scripts/task-review.mjs": {
-      "digest": "24345769ff7e581ff768c29030200ef39740ae882e6f0ab3e9f90cfe4b95dee4",
-      "imports": ["scripts/check-changed-plan.mjs", "scripts/verification-evidence.mjs", "scripts/verify.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-runtime-check.mjs": {

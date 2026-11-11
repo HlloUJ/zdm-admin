@@ -11,7 +11,12 @@ import {
   prepareAcceptedComposition,
   verifyRemoteAcceptance,
 } from './accepted-source.mjs';
-function fixture(t, { legacy = false, overwritesA = false, freezeAfterMainSync = false } = {}) {
+import {
+  acceptedCompositionTree,
+  candidateCompositionTree,
+  writeAcceptedComposition,
+} from './accepted-source-composition.mjs';
+function fixture(t, { legacy = false, overwritesA = false, freezeAfterMainSync = false, conflictPath = null } = {}) {
   const root = mkdtempSync(path.join(tmpdir(), 'accepted-composition-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
   const git = (...args) => acceptedGit(root, args);
@@ -24,6 +29,10 @@ function fixture(t, { legacy = false, overwritesA = false, freezeAfterMainSync =
   writeFileSync(path.join(root, 'src/product.js'), 'price = 12;\n');
   writeFileSync(path.join(root, 'src/obsolete.js'), 'obsolete');
   writeFileSync(path.join(root, 'scripts/accepted-source-composition.mjs'), '// frozen control plane');
+  if (conflictPath) {
+    mkdirSync(path.dirname(path.join(root, conflictPath)), { recursive: true });
+    writeFileSync(path.join(root, conflictPath), 'base\n');
+  }
   git('add', '.');
   git('commit', '-m', 'base');
   const base = git('rev-parse', 'HEAD'),
@@ -34,6 +43,7 @@ function fixture(t, { legacy = false, overwritesA = false, freezeAfterMainSync =
   git('switch', '-c', 'codex/a');
   writeFileSync(path.join(root, 'src/product.js'), 'price = 20;\n');
   rmSync(path.join(root, 'src/obsolete.js'));
+  if (conflictPath) writeFileSync(path.join(root, conflictPath), 'accepted task\n');
   git('add', '.');
   git('commit', '-m', 'task A approved feature');
   const head = git('rev-parse', 'HEAD');
@@ -43,6 +53,7 @@ function fixture(t, { legacy = false, overwritesA = false, freezeAfterMainSync =
   git('worktree', 'add', '-b', 'codex/b', b, overwritesA ? head : base);
   const bGit = (...args) => git('-C', b, ...args);
   writeFileSync(path.join(b, 'src/task-b.js'), 'published B feature');
+  if (conflictPath) writeFileSync(path.join(b, conflictPath), 'published main\n');
   if (overwritesA) writeFileSync(path.join(b, 'src/product.js'), 'price = 15;\n');
   bGit('add', '.');
   bGit('commit', '-m', 'published B');
@@ -151,5 +162,159 @@ test('trusted main synchronized during development is kept as baseline provenanc
   assert.equal(readFileSync(path.join(f.root, 'src/product.js'), 'utf8'), 'price = 20;\n');
   assert.equal(readFileSync(path.join(f.root, 'src/task-b.js'), 'utf8'), 'new published B revision');
   assert.equal(proof.accepted, f.original.commit);
+  assert.deepEqual(readAcceptance(f.root, 'a'), f.original);
+});
+
+function repairTechnicalConflict(f, file) {
+  writeFileSync(path.join(f.root, file), readFileSync(path.join(f.b, file)));
+  f.git('add', '--', file);
+  f.git('commit', '-m', 'adapt exempt technical file to published main');
+  return f.git('rev-parse', 'HEAD');
+}
+
+test('exempt original technical conflict compares protected source without changing the freeze, index or worktree', (t) => {
+  const file = 'scripts/shared-tool.mjs',
+    f = fixture(t, { conflictPath: file });
+  assert.throws(() => candidateCompositionTree(f.root, f.head, f.main), /CONFLICT|Command failed/);
+  const candidate = repairTechnicalConflict(f, file);
+  const before = {
+    head: f.git('rev-parse', 'HEAD'),
+    index: f.git('write-tree'),
+    refs: f.git('show-ref'),
+    status: f.git('status', '--porcelain'),
+  };
+  const expected = acceptedCompositionTree(f.root, f.original.commit, f.main);
+  assert.equal(f.git('show', expected + ':src/product.js'), 'price = 20;');
+  assert.equal(f.git('show', expected + ':src/task-b.js'), 'published B feature');
+  assert.throws(() => f.git('cat-file', '-e', expected + ':src/obsolete.js'));
+  assert.deepEqual(
+    {
+      head: f.git('rev-parse', 'HEAD'),
+      index: f.git('write-tree'),
+      refs: f.git('show-ref'),
+      status: f.git('status', '--porcelain'),
+    },
+    before,
+  );
+  const remote = verifyRemoteAcceptance(f.root, {
+    candidate,
+    accepted: f.original.commit,
+    branch: f.batch.branch,
+    trustedMain: f.main,
+  });
+  assert.equal(remote.accepted, f.original.commit);
+  const proof = prepareAcceptedComposition(f.root, 'a', f.main);
+  assert.equal(proof.expectedTree, expected);
+  f.git('merge', '--no-edit', f.main);
+  assertAcceptedSource(f.root, 'a', f.git('rev-parse', 'HEAD'));
+  assert.equal(readFileSync(path.join(f.root, file), 'utf8'), 'published main\n');
+  assert.deepEqual(readAcceptance(f.root, 'a'), f.original);
+});
+
+for (const file of ['src/product.js', 'AGENTS.md', 'scripts/accepted-source-composition.mjs']) {
+  test('original protected conflict remains blocked: ' + file, (t) => {
+    const f = fixture(t, { conflictPath: file });
+    repairTechnicalConflict(f, file);
+    assert.throws(() => acceptedCompositionTree(f.root, f.original.commit, f.main), /business\/control-plane conflict/);
+    assert.throws(() => prepareAcceptedComposition(f.root, 'a', f.main));
+    assert.equal(existsSync(path.join(f.root, '.git/task-delivery/a/composition.json')), false);
+    assert.deepEqual(readAcceptance(f.root, 'a'), f.original);
+  });
+}
+
+test('explicitly protected technical file is never exempted by the comparison adapter', (t) => {
+  const file = 'scripts/shared-tool.mjs',
+    f = fixture(t, { conflictPath: file });
+  const message = f.git('show', '-s', '--format=%B', f.original.commit);
+  const metadata = JSON.parse(message.slice('zdm-accepted-source-v1\n'.length));
+  metadata.protectedPaths.push(file);
+  const accepted = acceptedGit(f.root, ['commit-tree', f.original.tree, '-p', metadata.parent], {
+    input: 'zdm-accepted-source-v1\n' + JSON.stringify(metadata) + '\n',
+  });
+  assert.throws(() => acceptedCompositionTree(f.root, accepted, f.main), /business\/control-plane conflict/);
+});
+
+test('technical conflict does not mask unauthorized business content, deletion or executable mode changes', (t) => {
+  const file = 'scripts/shared-tool.mjs',
+    f = fixture(t, { conflictPath: file });
+  repairTechnicalConflict(f, file);
+  prepareAcceptedComposition(f.root, 'a', f.main);
+  f.git('merge', '--no-edit', f.main);
+  const good = f.git('rev-parse', 'HEAD');
+  for (const attack of ['business', 'resurrection', 'mode']) {
+    const scratch = path.join(f.root, '.task-runtime', 'attack-' + attack);
+    f.git('worktree', 'add', '--detach', scratch, good);
+    if (attack === 'business') writeFileSync(path.join(scratch, 'src/product.js'), 'price = 99;');
+    if (attack === 'resurrection') writeFileSync(path.join(scratch, 'src/obsolete.js'), 'resurrected');
+    f.git('-C', scratch, 'add', '.');
+    if (attack === 'mode') f.git('-C', scratch, 'update-index', '--chmod=+x', 'src/product.js');
+    f.git('-C', scratch, 'commit', '-m', attack);
+    const bad = f.git('-C', scratch, 'rev-parse', 'HEAD');
+    assert.throws(() => assertAcceptedSource(f.root, 'a', bad), /differs from accepted/);
+    assert.throws(
+      () =>
+        verifyRemoteAcceptance(f.root, {
+          candidate: bad,
+          accepted: f.original.commit,
+          branch: f.batch.branch,
+          trustedMain: f.main,
+        }),
+      /changed accepted/,
+    );
+  }
+  assert.deepEqual(readAcceptance(f.root, 'a'), f.original);
+});
+
+test('clean compositions keep their exact historical full-tree identity', (t) => {
+  const f = fixture(t);
+  const prior = f
+    .git('-c', 'merge.renames=false', 'merge-tree', '--write-tree', '--merge-base=' + f.base, f.main, f.original.commit)
+    .split('\n')[0];
+  assert.equal(acceptedCompositionTree(f.root, f.original.commit, f.main), prior);
+});
+
+test('reviewed technical conflict recovery is bound to its exact resolved tree and original parents', (t) => {
+  const file = 'scripts/shared-tool.mjs',
+    f = fixture(t, { conflictPath: file });
+  // Build the review artifact in a private index; the owned task stays clean.
+  const index = path.join(f.root, '.task-runtime/resolved-index');
+  const env = { ...process.env, GIT_INDEX_FILE: index };
+  const raw = acceptedCompositionTree(f.root, f.original.commit, f.main);
+  acceptedGit(f.root, ['read-tree', raw], { env });
+  const entry = f.git('ls-tree', f.main, '--', file).split(/\s+/);
+  acceptedGit(f.root, ['update-index', '--cacheinfo', entry[0], entry[2], file], { env });
+  const resolved = acceptedGit(f.root, ['write-tree'], { env });
+  const proof = writeAcceptedComposition(f.root, {
+    batch: 'a',
+    accepted: f.original.commit,
+    main: f.main,
+    taskHead: f.head,
+    candidateTree: resolved,
+  });
+  assert.throws(() => f.git('merge', '--no-ff', '--no-edit', f.main));
+  writeFileSync(path.join(f.root, file), readFileSync(path.join(f.b, file)));
+  f.git('add', '--', file);
+  assert.equal(f.git('write-tree'), proof.candidateTree);
+  f.git('commit', '-m', 'reviewed technical-only composition');
+  assert.deepEqual(f.git('show', '-s', '--format=%P', 'HEAD').split(' '), [f.head, f.main]);
+  assertAcceptedSource(f.root, 'a', f.git('rev-parse', 'HEAD'));
+  verifyRemoteAcceptance(f.root, {
+    candidate: f.git('rev-parse', 'HEAD'),
+    accepted: f.original.commit,
+    branch: f.batch.branch,
+    trustedMain: f.main,
+  });
+  assert.deepEqual(readAcceptance(f.root, 'a'), f.original);
+});
+
+test('mixed exempt and protected conflicts cannot enter composition recovery', (t) => {
+  const file = 'scripts/shared-tool.mjs',
+    f = fixture(t, { conflictPath: file });
+  writeFileSync(path.join(f.b, 'src/product.js'), 'price = 77;\n');
+  f.bGit('add', '.');
+  f.bGit('commit', '-m', 'overlapping business change');
+  const main = f.bGit('rev-parse', 'HEAD');
+  assert.throws(() => acceptedCompositionTree(f.root, f.original.commit, main), /business\/control-plane conflict/);
+  assert.equal(existsSync(path.join(f.root, '.git/task-delivery/a/composition.json')), false);
   assert.deepEqual(readAcceptance(f.root, 'a'), f.original);
 });

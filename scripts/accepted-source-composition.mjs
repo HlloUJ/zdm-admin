@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { isTechnicalPath, isNewTechnicalPath, assertSourcePath } from './accepted-source-policy.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -45,7 +46,7 @@ function frozenBase(root, accepted) {
   git(root, 'merge-base', '--is-ancestor', metadata.originalTaskBase, metadata.integrationBase);
   git(root, 'merge-base', '--is-ancestor', metadata.integrationBase, metadata.originMainAtFreeze);
   git(root, 'merge-base', '--is-ancestor', metadata.integrationBase, metadata.parent);
-  return metadata.integrationBase;
+  return { base: metadata.integrationBase, protectedPaths: metadata.protectedPaths };
 }
 export function candidateCompositionTree(root, candidate, main) {
   assert.match(candidate, SHA);
@@ -59,19 +60,53 @@ export function candidateCompositionTree(root, candidate, main) {
 export function acceptedCompositionTree(root, accepted, main) {
   assert.match(accepted, SHA);
   assert.match(main, SHA);
-  const base = frozenBase(root, accepted);
+  const { base, protectedPaths } = frozenBase(root, accepted);
   git(root, 'merge-base', '--is-ancestor', base, main);
-  const tree = git(
-    root,
-    '-c',
-    'merge.renames=false',
-    'merge-tree',
-    '--write-tree',
-    '--merge-base=' + base,
-    main,
-    accepted,
-  ).split('\n')[0];
+  const result = spawnSync(
+    'git',
+    [
+      '--no-replace-objects',
+      '-C',
+      root,
+      '-c',
+      'merge.renames=false',
+      'merge-tree',
+      '--write-tree',
+      '--name-only',
+      '-z',
+      '--merge-base=' + base,
+      main,
+      accepted,
+    ],
+    { encoding: 'utf8', stdio: 'pipe', timeout: 30_000, maxBuffer: 32 * 1024 * 1024 },
+  );
+  assert.ok(!result.error, result.error?.message);
+  assert.ok(
+    result.status === 0 || result.status === 1,
+    'Cannot compose original accepted source: ' + (result.stderr ?? 'unknown Git failure'),
+  );
+  const [tree, ...records] = result.stdout.split('\0');
   assert.match(tree, SHA, 'Cannot compose original accepted source with published main');
+  if (result.status === 1) {
+    // Git's conflict tree still contains the exact cleanly merged protected blobs.
+    // Only existing policy-exempt conflicts may remain in this comparison tree.
+    // It is never a candidate tree: the actual candidate must merge without ANY
+    // conflict, and protected bytes/modes/deletions are compared by the callers.
+    const end = records.indexOf('');
+    assert.ok(end > 0, 'Unclassified source conflict must remain blocked');
+    const conflicts = records.slice(0, end);
+    assert.ok(Array.isArray(protectedPaths), 'Original protected source paths required');
+    protectedPaths.forEach(assertSourcePath);
+    const declared = new Set(protectedPaths);
+    const known = new Set(git(root, 'ls-tree', '-r', '--name-only', '-z', accepted).split('\0').filter(Boolean));
+    for (const file of conflicts) {
+      assertSourcePath(file);
+      assert.ok(
+        isTechnicalPath(file) && !declared.has(file) && (known.has(file) || isNewTechnicalPath(file)),
+        'Frozen business/control-plane conflict requires explicit resolution: ' + file,
+      );
+    }
+  }
   return tree;
 }
 export function readAcceptedComposition(root, batch, accepted) {

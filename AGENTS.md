@@ -52,7 +52,7 @@
 - 新建或跨对话恢复先用已发布 main 的 `task:entry registry list --json` 及准确 `resolve --task <id>` 核对真实会话、目录和分支。没有本任务登记才从最新 origin/main 创建 `task:entry start --slug <id> --kind business`；基建使用 infrastructure。owner 使用真实会话身份，不编造 thread ID，不用当前预览或旧 active.json 推断开发任务。
 - 多个顶层对话各自修改独立 Worktree。一个任务中的反馈和模块沿用本任务；不同任务不共享暂存区、node_modules、缓存、构建或报告。禁止在操作系统临时目录开发。主目录仅作 main 锚点；不改写其他任务源码或登记。
 - 在 main 锚点运行 `npm run task:entry -- --worktree <准确任务目录> <入口> ...`，复用已发布实现并保留实际业务 cwd。旧任务无新命令时也调用这个主线入口，不复制整套 main 覆盖业务，不继续调用旧共享启动/停止/交付命令。候选代码不能冒充已发布能力。
-- “确认”“执行”按已批准范围实施，进行正常自检和按风险选择的必要验证；不再强制多轮复查修正、独立反向审查或逐轮材料登记，也不再以复查专用的 work scope/review/ready/status 或 developmentComplete=true 作为开发完成报告的前置条件。WIP/checkpoint 只保存本任务，不代表已推送或正式交付。“任务完成”冻结并交付当前准确任务；不等待无关任务，不将另一任务半成品带入候选。
+- “确认”“执行”按已批准范围实施，进行正常自检和按风险选择的必要验证；不再强制多轮复查修正、独立反向审查或逐轮材料登记，也不再设置复查专用开发完成门禁。task:work 仅保留 checkpoint 和普通 status 查询，查询成功不代表开发完成或验证通过。WIP/checkpoint 只保存本任务，不代表已推送或正式交付。“任务完成”冻结并交付当前准确任务；不等待无关任务，不将另一任务半成品带入候选。
 - 5173 仅展示已正式汇入的 main 组合；5175 仅展示明确选中的任务，使用 `task:entry ... preview switch --task <id>`。启动/恢复登记不抢占预览。额外端口仅按需使用 temporary，临时组合记录准确成员和提交，不作正式交付候选。
 - 临时组合通过已发布 `task:entry combination plan|create <id> --member <task@完整SHA> --member <task@完整SHA>` 创建独立、永久的只预览载体；原任务必须有准确且干净的已提交版本，不代替成员提交或丢弃未提交内容。`previewOnly` 身份不可改，组合使用独立 `isolated-combination` 数据范围，旧启动器无法识别时提前拒绝。创建只组合源码和准备私有依赖；运行前先查看并明确执行该组合的独立数据准备，再用 `combination run <id>` 按需启动临时端口。`combination status <id>` 和页面预览元数据提供成员版本清单；`combination stop <id>` 只停止准确归属的运行资源并保留代码、数据及备份。组合源码不直接编辑，版本变化创建新组合；冲突、来源变化或清单不完整均保留现场并拒绝运行，所有正式交付入口拒绝只预览载体。
 - 切换前核对 task/owner、Worktree、分支、私有依赖、API/数据和运行资源。服务端串行核对 Worktree、PID 和 selectionRevision；准备失败保留原归属，受保护交接启动失败执行实际恢复，不能假报健康。首次前端结果、切换或异常后通过已发布 `check` 证明完整代理链路；普通前端改动且本次运行身份未变时才可复用成功证明。
