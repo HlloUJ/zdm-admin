@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync, existsSync } from 'node:fs';
@@ -11,9 +10,6 @@ import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 import { completionCommand } from './completion-cli.mjs';
 import { readAcceptance, assertAcceptedSource } from './accepted-source.mjs';
 import { checkAcceptedIndex } from './accepted-source-hook.mjs';
-import { captureSource, captureIdentity } from './verification-evidence.mjs';
-import { createValidationPlan } from './check-changed-plan.mjs';
-import { scopeTask, reviewTask, readyTask } from './task-development.mjs';
 function fixture(t) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'task-context-'))),
     main = path.join(dir, 'main');
@@ -53,95 +49,6 @@ function fixture(t) {
       { commit, verification: 'Fixture completed development', recordedAt: new Date().toISOString() },
     ];
   });
-  mkdirSync(path.join(a, '.task-runtime'));
-  const evidenceFile = '.task-runtime/fixture-review.txt';
-  writeFileSync(path.join(a, evidenceFile), 'Fixture approval, implementation and reverse review for task A only');
-  const evidence = [
-    {
-      file: evidenceFile,
-      sha256: createHash('sha256')
-        .update(readFileSync(path.join(a, evidenceFile)))
-        .digest('hex'),
-    },
-  ];
-  writeFileSync(
-    path.join(a, '.task-runtime/scope.json'),
-    JSON.stringify({
-      version: 1,
-      task: 'a',
-      authorization: evidence,
-      requirements: [
-        {
-          id: 'a-only',
-          requirement: 'Task A only',
-          source: 'Fixture approval',
-          acceptance: 'Task B remains independent',
-        },
-      ],
-    }),
-  );
-  const scoped = scopeTask(a, { id: 'a', owner: 'chat-a', scope: '.task-runtime/scope.json' });
-  const review = {
-    version: 2,
-    task: 'a',
-    scopeDigest: scoped.reviewScope.digest,
-    sourceDigest: captureSource(a).digest,
-    requirements: [{ id: 'a-only', result: 'met', implementation: ['src/feature.js'], evidence }],
-    reverseReview: {
-      completed: true,
-      basis: scoped.reviewScope.digest,
-      finalDiffEvidence: evidence,
-      cases: [
-        {
-          requirement: 'a-only',
-          entry: 'src/feature.js and task B',
-          scenario: 'Task ownership isolation',
-          expected: 'B is retained',
-          observed: 'B metadata is unchanged',
-          evidence,
-        },
-      ],
-    },
-    findings: [],
-    reviewedFiles: ['src/feature.js'],
-    verification: [],
-  };
-  const plan = createValidationPlan(['src/feature.js'], (file) => existsSync(path.join(a, file)), { root: a });
-  const checks = [...plan.tasks];
-  if (plan.browserPlan?.mode === 'full' || plan.e2eFiles?.length)
-    checks.push({
-      name: 'affected E2E',
-      args: ['run', 'test:e2e:chrome', ...(plan.browserPlan.mode === 'full' ? [] : ['--', ...plan.e2eFiles])],
-      kind: 'browser',
-    });
-  mkdirSync(path.join(a, '.task-verification/logs'), { recursive: true });
-  for (const [index, check] of checks.entries()) {
-    const identity = captureIdentity({ ...check, root: a, command: 'npm', kind: check.kind ?? 'node', reuse: false });
-    const log = '.task-verification/logs/context-' + index + '.log';
-    writeFileSync(path.join(a, log), 'Synthetic fixture evidence; this test exercises context and dependency rules');
-    const file = '.task-verification/context-' + index + '.json';
-    writeFileSync(
-      path.join(a, file),
-      JSON.stringify({
-        version: 4,
-        exitCode: 0,
-        status: 'not-reusable',
-        startedAt: new Date().toISOString(),
-        completedAt: new Date().toISOString(),
-        identity: identity.identity,
-        fingerprint: identity.fingerprint,
-        artifacts: null,
-        log,
-        logDigest: createHash('sha256')
-          .update(readFileSync(path.join(a, log)))
-          .digest('hex'),
-      }),
-    );
-    review.verification.push({ name: check.name, file });
-  }
-  writeFileSync(path.join(a, '.task-runtime/review.json'), JSON.stringify(review));
-  reviewTask(a, { id: 'a', owner: 'chat-a', review: '.task-runtime/review.json' });
-  readyTask(a, { id: 'a', owner: 'chat-a', review: '.task-runtime/review.json' });
   writeFileSync(path.join(b, 'src/feature.js'), 'unfinished B');
   return { a, b, main, registry, execute, git };
 }
@@ -193,10 +100,11 @@ test('explicit acceptance preserves an incomplete business state without inventi
   f.registry.revise('a', current.revision, (record) => {
     record.development = { reviewed: false };
   });
-  assert.throws(() => planBatchDelivery(f.a), /development review is incomplete/);
+  assert.equal(planBatchDelivery(f.a).verificationProven, false);
   await completionCommand(f.a, ['freeze'], { owner: 'chat-a', execute: f.execute });
   const plan = planBatchDelivery(f.a);
-  assert.equal(plan.businessDevelopmentReviewed, false);
+  assert.equal(Object.hasOwn(plan, 'businessDevelopmentReviewed'), false);
+  assert.equal(plan.originalDevelopmentStateRetained, true);
   assert.equal(plan.modules[0].status, 'in-progress');
   assert.equal(plan.verificationProven, false);
   assert.deepEqual(plan.requiredExternalChecks, [
@@ -281,12 +189,41 @@ test('technical repair is adopted only after accepted business proof and retains
   assert.equal(f.registry.readTask('b').stage, 'developing');
 });
 
-test('legacy reviewed flags are historical and cannot grant current development readiness', (t) => {
+test('old review metadata is preserved but cannot block planning or certify current development', (t) => {
   const f = fixture(t),
     task = f.registry.readTask('a');
   f.registry.revise('a', task.revision, (record) => {
-    record.development = { reviewed: true, sourceDigest: captureSource(f.a).digest };
+    record.stage = 'dev-validated';
+    record.development = { reviewed: true, sourceDigest: 'stale', reviewVersion: 2 };
+    record.reviewScope = { digest: 'old', file: '.task-runtime/missing-scope.json' };
+    record.reviewPasses = [{ digest: 'old', file: '.task-runtime/missing-review.json' }];
   });
-  assert.equal(readActiveBatch(f.a).modules[0].status, 'in-progress');
-  assert.throws(() => planBatchDelivery(f.a), /development review is incomplete/);
+  const before = f.registry.readTask('a'),
+    batch = readActiveBatch(f.a);
+  assert.equal(Object.hasOwn(batch, 'developmentReview'), false);
+  assert.equal(batch.modules[0].status, 'in-progress');
+  assert.equal(planBatchDelivery(f.a).verificationProven, false);
+  assert.deepEqual(f.registry.readTask('a'), before);
+});
+
+test('planning still requires clean source, the exact recorded head and assigned commits', (t) => {
+  const f = fixture(t),
+    original = readFileSync(path.join(f.a, 'src/feature.js'));
+  writeFileSync(path.join(f.a, 'src/feature.js'), 'uncommitted business');
+  assert.throws(() => planBatchDelivery(f.a), /Task must be clean/);
+  writeFileSync(path.join(f.a, 'src/feature.js'), original);
+  let task = f.registry.readTask('a');
+  f.registry.revise('a', task.revision, (record) => {
+    record.recordedHead = task.base;
+  });
+  assert.throws(() => planBatchDelivery(f.a), /Checkpoint the exact current task head/);
+  writeFileSync(path.join(f.a, 'scripts/repair.mjs'), '// own additional technical change');
+  f.git(f.a, 'add', 'scripts/repair.mjs');
+  f.git(f.a, 'commit', '-m', 'unassigned task commit');
+  task = f.registry.readTask('a');
+  f.registry.revise('a', task.revision, (record) => {
+    record.recordedHead = f.git(f.a, 'rev-parse', 'HEAD');
+  });
+  assert.throws(() => planBatchDelivery(f.a), /Unassigned task commit/);
+  assert.equal(readFileSync(path.join(f.b, 'src/feature.js'), 'utf8'), 'unfinished B');
 });
