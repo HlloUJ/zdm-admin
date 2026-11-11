@@ -78,13 +78,13 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.mjs": {
-      "digest": "d2259a9a893e8e0159417e3d57be439459a43063184ecf52f69ae1fe58e261bc",
-      "imports": [],
+      "digest": "7c68cea0f9b7f4f03d1e556faaffb097173d24920c93f9db8b117cccb41457d9",
+      "imports": ["scripts/accepted-source-policy.mjs"],
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.test.mjs": {
-      "digest": "de8e168317f5e49bc645da32a5650f13734ac955ebefcf574e97e5d2ddc89b3a",
-      "imports": ["scripts/accepted-source-composition.mjs", "scripts/accepted-source.mjs"],
+      "digest": "0e06cb77e8d138bac7ee458494a9544f0b3aac05a3a5d14d16b1b22d70fb739d",
+      "imports": ["scripts/accepted-source-composition.mjs", "scripts/accepted-source.mjs", "scripts/shared-tool.mjs"],
       "dynamicImports": 0
     },
     "scripts/accepted-source-hook.mjs": {
