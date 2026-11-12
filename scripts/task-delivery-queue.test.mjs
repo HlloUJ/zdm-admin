@@ -82,17 +82,24 @@ test(
     const common = mkdtempSync(path.join(tmpdir(), 'queue-process-publication-'));
     t.after(() => rmSync(common, { recursive: true, force: true }));
     const lock = path.join(common, 'task-registry/queue-write.lock'),
-      ready = path.join(common, 'partial-ready');
+      ready = path.join(common, 'partial-ready'),
+      published = path.join(common, 'published-ready'),
+      ownerRemoved = path.join(common, 'owner-removed');
     const code = `import fs from 'node:fs';import path from 'node:path';
     const root=process.argv[1],lock=path.join(root,'task-registry/queue-write.lock'),owner=path.join(lock,'owner.json');
     const cell=new Int32Array(new SharedArrayBuffer(4)),end=Date.now()+5000;
     const wait=n=>{while(!fs.existsSync(path.join(root,n))){if(Date.now()>end)throw Error('publication barrier expired');Atomics.wait(cell,0,0,2);}};
     fs.mkdirSync(lock,{recursive:true});fs.writeFileSync(owner,'{"pid":');fs.writeFileSync(path.join(root,'partial-ready'),'ready');
     wait('publish');fs.writeFileSync(owner,JSON.stringify({pid:process.pid,token:'actual-writer'}));
+    fs.writeFileSync(path.join(root,'published-ready'),'ready');
     wait('release');if(JSON.parse(fs.readFileSync(owner)).token!=='actual-writer')throw Error('owner stolen');
-    fs.unlinkSync(owner);fs.rmdirSync(lock);`;
+    fs.unlinkSync(owner);fs.writeFileSync(path.join(root,'owner-removed'),'ready');
+    wait('unlock');fs.rmdirSync(lock);`;
     const child = spawn(process.execPath, ['--input-type=module', '-e', code, common], {
       stdio: ['ignore', 'pipe', 'pipe'],
+    });
+    t.after(() => {
+      if (child.exitCode === null) child.kill('SIGTERM');
     });
     let output = '';
     child.stdout.on('data', (value) => (output += value));
@@ -107,26 +114,36 @@ test(
       await new Promise((resolve) => setTimeout(resolve, 2));
     }
     let sawPartial = false,
-      sawPublished = false;
+      sawPublished = false,
+      sawOwnerRemoved = false;
     const queue = createTaskDeliveryQueue(common, {
       tick: async () => {
-        if (existsSync(lock)) {
-          const bytes = readFileSync(path.join(lock, 'owner.json'), 'utf8');
-          if (bytes === '{"pid":') {
-            sawPartial = true;
-            writeFileSync(path.join(common, 'publish'), 'ready');
-          } else {
-            assert.equal(JSON.parse(bytes).pid, child.pid);
-            sawPublished = true;
-            writeFileSync(path.join(common, 'release'), 'ready');
-          }
+        // Read owner.json only while the child is held at the corresponding
+        // barrier. Once released, its unlink/rmdir window is expected behavior.
+        if (!sawPartial) {
+          assert.equal(readFileSync(path.join(lock, 'owner.json'), 'utf8'), '{"pid":');
+          sawPartial = true;
+          writeFileSync(path.join(common, 'publish'), 'ready');
+        } else if (!sawPublished && existsSync(published)) {
+          assert.deepEqual(JSON.parse(readFileSync(path.join(lock, 'owner.json'), 'utf8')), {
+            pid: child.pid,
+            token: 'actual-writer',
+          });
+          sawPublished = true;
+          writeFileSync(path.join(common, 'release'), 'ready');
+        } else if (!sawOwnerRemoved && existsSync(ownerRemoved)) {
+          assert.equal(existsSync(path.join(lock, 'owner.json')), false);
+          assert.equal(existsSync(lock), true, 'the original writer still owns its directory');
+          assert.equal(queue.inspect().tickets.length, 0, 'no ticket before the original writer unlocks');
+          sawOwnerRemoved = true;
+          writeFileSync(path.join(common, 'unlock'), 'ready');
         }
         await new Promise((resolve) => setTimeout(resolve, 2));
       },
     });
     assert.equal((await queue.enqueue(source('a'))).task, 'a');
     assert.equal(await ended, 0, output);
-    assert.ok(sawPartial && sawPublished);
+    assert.ok(sawPartial && sawPublished && sawOwnerRemoved);
   },
 );
 test('independent tasks queue FIFO while development takes no main lease', async (t) => {
