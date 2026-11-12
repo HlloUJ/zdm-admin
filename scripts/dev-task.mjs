@@ -709,7 +709,7 @@ async function requestStatus(url, timeoutMs = 1_000) {
   return (await requestResponse(url, timeoutMs)).statusCode;
 }
 
-export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000) {
+export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_000, runtimeId = null) {
   return new Promise((resolve) => {
     const request = http.request(
       {
@@ -717,7 +717,13 @@ export function taskPreviewControlRequest(port, method = 'GET', timeoutMs = 1_00
         port,
         path: TASK_PREVIEW_CONTROL_PATH,
         method,
-        headers: method === 'DELETE' ? { [TASK_PREVIEW_CONTROL_HEADER]: TASK_PREVIEW_CONTROL_VALUE } : undefined,
+        headers:
+          method === 'DELETE'
+            ? {
+                [TASK_PREVIEW_CONTROL_HEADER]: TASK_PREVIEW_CONTROL_VALUE,
+                ...(runtimeId ? { 'x-zdm-task-runtime-id': runtimeId } : {}),
+              }
+            : undefined,
         timeout: timeoutMs,
         agent: false,
       },
@@ -1350,13 +1356,17 @@ export async function handoffDatabaseTask(
   console.log(`任务运行环境已交接到集成环境：${branch}`);
 }
 
-function targetViteConfig(root) {
+function targetViteConfig(root, runtimeId = null) {
   const localConfig = path.join(root, 'vite.config.js');
-  if (existsSync(localConfig) && readFileSync(localConfig, 'utf8').includes('ZDM_TASK_PREVIEW')) return localConfig;
+  if (existsSync(localConfig)) {
+    const source = readFileSync(localConfig, 'utf8');
+    if (source.includes('ZDM_TASK_PREVIEW') && (!runtimeId || source.includes('ZDM_TASK_RUNTIME_ID')))
+      return localConfig;
+  }
   return path.join(launcherRoot, 'vite.config.js');
 }
 
-function spawnFrontend({ root, branch, port, apiTarget, mode }) {
+function spawnFrontend({ root, branch, port, apiTarget, mode, runtimeId = null }) {
   const viteBin = path.join(root, 'node_modules', 'vite', 'bin', 'vite.js');
   if (!existsSync(viteBin)) throw new Error(`缺少 Vite：${viteBin}`);
   return spawn(
@@ -1366,7 +1376,7 @@ function spawnFrontend({ root, branch, port, apiTarget, mode }) {
       '--configLoader',
       'runner',
       '--config',
-      targetViteConfig(root),
+      targetViteConfig(root, runtimeId),
       '--host',
       '127.0.0.1',
       '--port',
@@ -1382,6 +1392,7 @@ function spawnFrontend({ root, branch, port, apiTarget, mode }) {
         ZDM_TASK_MODE: mode,
         VITE_PUBLIC_APP_ORIGIN: taskPublicOrigin(port),
         ZDM_TASK_PREVIEW: '1',
+        ZDM_TASK_RUNTIME_ID: runtimeId ?? '',
         ZDM_FRONTEND_PORT: String(port),
         ZDM_API_PROXY_TARGET: apiTarget,
       },
@@ -1497,8 +1508,21 @@ Options:
   --stop                    仅停止当前任务前端和后端；不删除数据库或备份`);
 }
 
-export async function main(args = process.argv.slice(2)) {
+export async function main(args = process.argv.slice(2), { independent = false } = {}) {
   const options = parseTaskPreviewArgs(args);
+  if (independent) {
+    assert.ok(
+      (options.temporary || options.port >= 5177) &&
+        !options.validationCandidate &&
+        !options.check &&
+        !options.stop &&
+        !options.handoff &&
+        !options.pause &&
+        !options.apiTarget &&
+        options.mode === 'full',
+      'Independent preview requires an isolated full runtime and private port',
+    );
+  }
   if (options.help) {
     printHelp();
     return;
@@ -1711,6 +1735,7 @@ export async function main(args = process.argv.slice(2)) {
         : {}),
     });
     let leasedFrontend = null;
+    let runtimeId = null;
     if (registeredTask && frontendPort >= 5177) {
       const leases = createResourceLeases(registeredTask.repository.commonDir);
       const current = leases.inspect('temporary-port-' + frontendPort);
@@ -1718,6 +1743,7 @@ export async function main(args = process.argv.slice(2)) {
         if (current?.task !== registeredTask.id) throw new Error('验证端口不属于当前准确任务');
       } else {
         const lease = leases.acquire('temporary-port-' + frontendPort, registeredTask.id);
+        if (independent) runtimeId = lease.token;
         process.once('exit', () => {
           if (leasedFrontend && leasedFrontend.exitCode === null && !leasedFrontend.signalCode) return;
           leases.release(lease);
@@ -1802,7 +1828,7 @@ export async function main(args = process.argv.slice(2)) {
           restartingFrontend = true;
           await stopChild(frontend);
           mode = 'full';
-          frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode }));
+          frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode, runtimeId }));
           try {
             await waitForManagedPreviewReady({
               port: frontendPort,
@@ -1851,7 +1877,7 @@ export async function main(args = process.argv.slice(2)) {
       startupWatch.close();
     };
 
-    frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode }));
+    frontend = attachFrontend(spawnFrontend({ root, branch, port: frontendPort, apiTarget, mode, runtimeId }));
     try {
       await waitForManagedPreviewReady({
         port: frontendPort,

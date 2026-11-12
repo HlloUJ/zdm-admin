@@ -1,10 +1,10 @@
 {
   "version": 1,
-  "image": "ghcr.io/hllouj/zdm-admin-browser@sha256:6020c964d0a4f53d0e7ed6c0095153ef25be6c86245b25cbe9d912a7fc84b63d",
+  "image": "ghcr.io/hllouj/zdm-admin-browser@sha256:18c96001816d87b67a3b147ac797c546d1a87295ed1712716df9740501c8a2b2",
   "origin": {
     "version": 1,
-    "sourceRevision": "108f93118a8ec40f54754bb8bffde93734acf0e9",
-    "sourceRun": "https://github.com/HlloUJ/zdm-admin/actions/runs/42741870694",
+    "sourceRevision": "cb100bca46efb2670e8e34973abdad45809696de",
+    "sourceRun": "https://github.com/HlloUJ/zdm-admin/actions/runs/43140588375",
     "ubuntuBase": "ubuntu:24.04@sha256:68ee22004a9109b44973313b02ff7b1de250f1de0f5ecb628d73f579aaff33ac",
     "nodeBase": "node:22-bookworm-slim@sha256:de170b39439eb0e5a3444ad7d60b015614a381e10fecae2e30ec9e735122f38d",
     "inventory": {
@@ -12,14 +12,14 @@
       "platform": "linux/amd64",
       "node": "v22.23.4",
       "nodeSha256": "94efd062ed066c1a0b332e18249859c905e920eeada5df55d24c99b919629a90",
-      "chrome": "Google Chrome 157.0.8103.50",
-      "chromePackage": "install ok installed|157.0.8103.50-1",
+      "chrome": "Google Chrome 157.0.8103.78",
+      "chromePackage": "install ok installed|157.0.8103.78-1",
       "playwright": "1.62.0",
-      "packages": "42d38f0b0f0cd7d728d32df145142dd31ac1896d3eb9fd4bd4daa11d4cf5db58",
+      "packages": "ddb0e9507f191e8fa365ab98ec0a78fa5e8038372ed6d667b3155f344c91fa8e",
       "osRelease": "87458b3b1f1ca0e5c693ade771de7007c3783bdc692fa6b39eb6414bf2af2763",
       "fonts": "d506338be3caed21ff28b6f5d6fb275fe39a78adc95b9aba3e3a615cff25d94e",
       "fontConfig": "309c42cac588d8524c3e261cc05a6143334668e7e6b18d924cd6fa3905f80518",
-      "browser": "a906a6846f477e3bb36f579da2a481127aa558504d3df34e33ac31eb9a2a465b"
+      "browser": "4c5ea6d3afc3f61a4a5f256bae64d8e25a6e268f91f0296807546707f60262bf"
     }
   }
 }

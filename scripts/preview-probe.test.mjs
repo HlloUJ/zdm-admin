@@ -106,7 +106,6 @@ test('real probe rejects wrong identity, unhealthy API, invalid metadata, and ne
   assert.match(previewProbeFailure(failed), /ECONNRESET/);
   assert.match(previewProbeFailure({ statusCode: 503 }), /HTTP 503/);
 });
-
 test('host preflight uses fresh Unix control connections after synchronous phases without retrying requests', async (t) => {
   // A short private socket path also fits macOS sockaddr_un limits.
   const directory = mkdtempSync('/tmp/zpp-');

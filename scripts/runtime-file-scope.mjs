@@ -12,6 +12,8 @@ const RUNTIME_FILES = new Set([
   'scripts/delivery-launcher.mjs',
   'scripts/integration-handoff-state.mjs',
   'scripts/task-preview-service.mjs',
+  'scripts/task-preview-control.mjs',
+  'scripts/task-preview-independent.mjs',
   'scripts/macos/launchd-dev.mjs',
   'scripts/macos/启动装点猫.command',
   'scripts/macos/停止装点猫.command',

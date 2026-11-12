@@ -3,7 +3,7 @@
   "sourceGuards": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
   "files": {
     ".codex/zdm-project-workflow.yaml": {
-      "digest": "f6f61a78016f14636b1a10a59834b196364997c831ea9187554c3a75eabb5e70",
+      "digest": "f517a0a5fa1d8e60e9e477fb2b69b0da57a6958fe544abe43499b2cf75834572",
       "imports": [],
       "dynamicImports": 0
     },
@@ -23,7 +23,7 @@
       "dynamicImports": 0
     },
     "ci/browser-image.lock.json": {
-      "digest": "a024a97eb1b4901eb06a2c90dd8123296b023b505a2bad32ea78a9a6cff717dc",
+      "digest": "7b21321a33e3300406b9790c8439338241cfb3e11a33dada8e75fa1580489d09",
       "imports": [],
       "dynamicImports": 0
     },
@@ -541,17 +541,19 @@
       "dynamicImports": 0
     },
     "scripts/completion-preview-parallel.test.mjs": {
-      "digest": "0b5e6fd660b8a692f176d6f13a7d7ad8251f0f8f4a80a21d2f44e08e9091960b",
+      "digest": "f8e5aedf21bc807e43bf6b40087ac3d4ab3fb79821e47f60a7e517979ce5a0d2",
       "imports": ["scripts/completion-preview.mjs", "scripts/dev-task.mjs", "scripts/task-data-environment.mjs"],
       "dynamicImports": 0
     },
     "scripts/completion-preview.mjs": {
-      "digest": "bddc143660307b0e730e3f103d6c6d1d0f284737315e3b0b68bb81325d8120e5",
+      "digest": "f2e8674ae9d59ee590f451d28057b123853ec85fdef085ca89ffb5878de2b77e",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/preview-policy.mjs",
         "scripts/preview-transition.mjs",
+        "scripts/resource-lease.mjs",
         "scripts/task-data-environment.mjs",
+        "scripts/task-preview-independent.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-registry.mjs",
         "scripts/task-runtime-references.mjs"
@@ -717,7 +719,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "501fe317c6b42b2d01ed5704b9bea3e6612fbb60660e7c6db2484264323c939a",
+      "digest": "2bfe7a96a472b64c45d9065a2ef0b7b7c1bccccfa69654b44b73aad0f25329c4",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
@@ -736,7 +738,7 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.test.mjs": {
-      "digest": "383b0137b6a1f04ffea414de0dd13e7412aa1acb02fab40bb9543e571b177405",
+      "digest": "1c3f842be31edc0c93734b07b4549bdf7420370c013a48b4972c2a932fa2e250",
       "imports": [
         "scripts/backend-test-plan.mjs",
         "scripts/dev-task.mjs",
@@ -1220,7 +1222,7 @@
       "dynamicImports": 0
     },
     "scripts/preview-probe.test.mjs": {
-      "digest": "c86e5f2a04ce33ab7cd587538103e459be7f5697d9944069db3a80f61d1a0ad3",
+      "digest": "45506f7a5da09d5b58f8ef80fc339965de9f270adaa960545c7d0b19d174da67",
       "imports": ["scripts/dev-task.mjs", "scripts/parallel-upgrade-preflight.mjs"],
       "dynamicImports": 4
     },
@@ -1260,12 +1262,12 @@
       "dynamicImports": 0
     },
     "scripts/resource-lease.mjs": {
-      "digest": "53d202159037a80f2f0e9cdb971077c70a6b2d471bf0ae4b4fbf4d12cd9fc2d4",
+      "digest": "1534190c055e0c4628b642cc43aaae8d2db8e1822d11a425f6c4a7606f5e8a42",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/resource-lease.test.mjs": {
-      "digest": "d2a994b4e84ccc87ff4f80209a9bbeb453083c787d20debaec51e60ac50cfc40",
+      "digest": "003a5a2845ad59df1ea4663629a24152616a6aa886151dad06e0cffcf8e61ebd",
       "imports": ["scripts/resource-lease.mjs"],
       "dynamicImports": 0
     },
@@ -1350,7 +1352,7 @@
       "dynamicImports": 0
     },
     "scripts/runtime-file-scope.mjs": {
-      "digest": "020e1a98c74b7f4bb53f5b81ca267ca18cce9b0a933bbc8ff61dc07f1e7e8114",
+      "digest": "f27ac257d11de53b17bf8a46b8173fbfe9cf086ef389170da6c879d0326148c3",
       "imports": [
         "scripts/backend-runtime.mjs",
         "scripts/delivery-launcher.mjs",
@@ -1361,13 +1363,15 @@
         "scripts/macos/launchd-dev.mjs",
         "scripts/run-integration.mjs",
         "scripts/sync-integration.mjs",
+        "scripts/task-preview-control.mjs",
+        "scripts/task-preview-independent.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-runtime-state.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/runtime-file-scope.test.mjs": {
-      "digest": "837292f238c14193ed4c777a8214176c3fedba4af084fbbd9828e16a115f4160",
+      "digest": "6fe839b071a231fd0552cfbbf1c37516dbadebb8b759700ad2a70b988da57e73",
       "imports": [
         "scripts/backend-runtime.mjs",
         "scripts/business-regression.mjs",
@@ -1380,6 +1384,8 @@
         "scripts/run-integration.mjs",
         "scripts/runtime-file-scope.mjs",
         "scripts/sync-integration.mjs",
+        "scripts/task-preview-control.mjs",
+        "scripts/task-preview-independent.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-runtime-state.mjs",
         "scripts/verification-impact.mjs"
@@ -1591,7 +1597,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-queue.test.mjs": {
-      "digest": "7f54e75bc528289f53f7ab4a1d7a8c5500a678dc2d8f2f8345c372a405241c4e",
+      "digest": "17fcd940a8f1a590a4074f89f67a921b4a8470ed2de3831c365946fd27686159",
       "imports": ["scripts/task-delivery-queue.mjs"],
       "dynamicImports": 0
     },
@@ -1631,7 +1637,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "3fe58f74bf17a6e756697229eaa367f820f6dc4a5427510ce4d63d6a8e5cdddb",
+      "digest": "3917a77200752dc252c978aa4ed02d85e5a1527cefab18d04895e9bd3e1573d0",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/task-completion.mjs",
@@ -1645,7 +1651,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "4246b6960ec0aa49eced032063db7a3e54b22fe52ff3ac9adf585c466dacc01e",
+      "digest": "c3e1bfabe89496b328a5844f7f867059b2b2562fb9a6bb6e5673e95fbb41cd10",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
@@ -1662,6 +1668,43 @@
     "scripts/task-maven.test.mjs": {
       "digest": "d7a30c087a8e117eeb06e8da1cbb21f5fcc4784082a53498eaf5ff71c81a3136",
       "imports": ["scripts/task-maven.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-control-http.test.mjs": {
+      "digest": "87aabbb9a5e4197edd6f48f6e2c668c8e75b0b8f368eb6481800d5f1ebca2faf",
+      "imports": ["scripts/dev-task.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-control.mjs": {
+      "digest": "78635031017592901d6e503c0c6950fc5c7a4e0e60f6f21bb1be1f2ef65a1bce",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-control.test.mjs": {
+      "digest": "4ff2cea5412d205e596ab928b306b64bfd0810aefdf302d3a02eb888cc34f67b",
+      "imports": ["scripts/task-preview-control.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-independent.mjs": {
+      "digest": "95d79e00a35a13830fa9039304dce13b2d8e3039350e1025b1052de9f616b8cf",
+      "imports": [
+        "scripts/dev-task.mjs",
+        "scripts/preview-consumers.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/task-data-environment.mjs",
+        "scripts/task-data-scope.mjs",
+        "scripts/task-registry.mjs",
+        "scripts/task-runtime-references.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-independent.test.mjs": {
+      "digest": "ba5d79c2f1c8ed2a4445656a6af8e2435ca9cf29a391a9047327a4db7ce86ccd",
+      "imports": [
+        "scripts/preview-consumers.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/task-preview-independent.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
@@ -1682,17 +1725,18 @@
       "dynamicImports": 2
     },
     "scripts/task-preview.mjs": {
-      "digest": "6f3002845b65ef4759d90a1ff5efe7e42a1d1c2923fb1357660e5aa7d4dcd362",
+      "digest": "641fc398ae500c2d3eb96851bca8e08c5d53fbc014410ff0911752b3e0d7ccbf",
       "imports": [
         "scripts/preview-policy.mjs",
         "scripts/preview-transition.mjs",
+        "scripts/task-preview-independent.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/task-preview.test.mjs": {
-      "digest": "a6ef9927200f8023904c6f6625fbfcd6b0fd4dab3064b29c989cec1dbef70808",
+      "digest": "75b52d998f04c3ca8d82d1be8c4898261b225d1ef8f120e68469a6d442762b95",
       "imports": ["scripts/task-preview.mjs"],
       "dynamicImports": 0
     },
@@ -1977,8 +2021,8 @@
       "dynamicImports": 0
     },
     "vite.config.js": {
-      "digest": "05d21517fdbb9a85db839f84211fc507b0efc45afef8a7aa84a1ed3fdfaa85a0",
-      "imports": [],
+      "digest": "806aaf4d174f43f7844d1a722b420c434551e22505fd5433dc0ea0ccb93407b3",
+      "imports": ["scripts/task-preview-control.mjs"],
       "dynamicImports": 0
     },
     "vite.e2e.config.mjs": {

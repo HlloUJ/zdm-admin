@@ -7,6 +7,8 @@ import { createTaskRegistry } from './task-registry.mjs';
 import { assertPreviewOwner, previewOwner } from './preview-transition.mjs';
 import { assertDevelopmentApi } from './preview-policy.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
+import { createResourceLeases } from './resource-lease.mjs';
+import { stopLeasedTaskFrontend } from './task-preview-independent.mjs';
 
 // Use the installed compatible service; never install, replace its launcher or choose integration API.
 export function createCompletionPreviewControl({
@@ -16,6 +18,8 @@ export function createCompletionPreviewControl({
   inspect = inspectManagedPreview,
   registry = createTaskRegistry,
   references = taskRuntimeReferences,
+  stopIndependent = stopLeasedTaskFrontend,
+  readLease = (common, resource) => createResourceLeases(common).inspect(resource),
   request = requestJson,
   readInstalled = () => {
     assert.ok(
@@ -195,6 +199,14 @@ export function createCompletionPreviewControl({
       installed = installedLauncher(plan);
     for (const frontend of snapshot.owned.filter((item) => item.port >= 5177)) {
       assert.equal(frontend.metadata.branch, task.branch, 'Temporary preview branch changed');
+      if (frontend.metadata.runtimeId) {
+        const lease = readLease(plan.common, 'temporary-port-' + frontend.port);
+        assert.ok(
+          lease && lease.task === task.id && lease.token === frontend.metadata.runtimeId,
+          'Independent preview lease changed; preserve source and runtime',
+        );
+        await stopIndependent(task, { ...lease, port: frontend.port });
+      }
       execute(task.worktree, installed.nodePath, [
         installed.launcherPath,
         '--worktree',
