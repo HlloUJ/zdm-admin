@@ -55,3 +55,19 @@ test('the published parallel mode disables old singleton creation even before th
   assert.throws(() => legacyStart({ slug: 'old-shared' }, { cwd: f.a }), /旧共享任务入口已停用/);
   assert.equal(createTaskRegistry(f.main).legacy(), null);
 });
+test('forwarded or repeated worktree flags cannot change the already verified task identity', (t) => {
+  const f = fixture(t);
+  createTaskRegistry(f.main).register({ id: 'a', worktree: f.a, owner: 'chat-a' });
+  const unchanged = f.git('status', '--porcelain');
+  for (const command of ['check', 'temporary', 'preview', 'complete', 'registry']) {
+    for (const override of [['--worktree', f.main], ['--worktree=' + f.main]]) {
+      const result = f.run(undefined, '--worktree', f.a, command, ...override);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /forwarded task identity cannot override/);
+    }
+  }
+  const valid = f.run(undefined, '--worktree', f.a, 'registry', 'resolve', '--task', 'a');
+  assert.equal(valid.status, 0, valid.stderr);
+  assert.equal(JSON.parse(valid.stdout).worktree, f.a);
+  assert.equal(f.git('status', '--porcelain'), unchanged);
+});
