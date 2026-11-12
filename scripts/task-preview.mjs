@@ -28,10 +28,10 @@ export async function taskPreview(root, args, dependencies = {}) {
     values[flags[i]] = flags[i + 1];
   }
   assert.ok(
-    ['roles', 'status', 'switch', 'start', 'stop'].includes(command),
-    'Expected start, status --task, stop, roles, or legacy switch',
+    ['roles', 'status', 'check', 'switch', 'start', 'stop'].includes(command),
+    'Expected start, status --task, check --task, stop, roles, or legacy switch',
   );
-  if (['start', 'stop'].includes(command) || (command === 'status' && values['--task'])) {
+  if (['start', 'stop', 'check'].includes(command) || (command === 'status' && values['--task'])) {
     assert.ok(values['--task'], 'Independent preview requires --task <exact task id>');
     assert.ok(
       command === 'start' || (!values['--port'] && !values['--backend-port']),
@@ -47,13 +47,16 @@ export async function taskPreview(root, args, dependencies = {}) {
       backendPort === null || (Number.isInteger(backendPort) && backendPort >= 8081 && backendPort <= 8099),
       'Task backend port must be 8081-8099',
     );
-    return system.independent(root, {
-      command,
+    const result = await system.independent(root, {
+      command: command === 'check' ? 'status' : command,
       id: values['--task'],
       owner: values['--owner'] ?? system.owner,
       port,
       backendPort,
     });
+    if (command === 'check')
+      assert.equal(result.runtimeReady, true, 'Task preview is not ready; preserve its current runtime');
+    return result;
   }
   assert.ok(!values['--port'] && !values['--backend-port'], 'Legacy preview does not accept port allocation');
   if (command === 'roles') {

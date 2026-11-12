@@ -3,7 +3,7 @@
   "sourceGuards": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
   "files": {
     ".codex/zdm-project-workflow.yaml": {
-      "digest": "f517a0a5fa1d8e60e9e477fb2b69b0da57a6958fe544abe43499b2cf75834572",
+      "digest": "600754a6384e748a97f589bc999d2e6d046703695e6e31a0a28d1b12dbe83a0a",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1725,7 +1725,7 @@
       "dynamicImports": 2
     },
     "scripts/task-preview.mjs": {
-      "digest": "641fc398ae500c2d3eb96851bca8e08c5d53fbc014410ff0911752b3e0d7ccbf",
+      "digest": "1264f15f652ed3cfe38a9063ae9bc6cf05bede925f10b091972c031a67f62d4a",
       "imports": [
         "scripts/preview-policy.mjs",
         "scripts/preview-transition.mjs",
@@ -1736,7 +1736,7 @@
       "dynamicImports": 0
     },
     "scripts/task-preview.test.mjs": {
-      "digest": "75b52d998f04c3ca8d82d1be8c4898261b225d1ef8f120e68469a6d442762b95",
+      "digest": "a3a9916f8e261e4d7659ab57dd442f86a8fd458857728f3a819d345fe89947d8",
       "imports": ["scripts/task-preview.mjs"],
       "dynamicImports": 0
     },
