@@ -110,8 +110,12 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source.mjs": {
-      "digest": "289d61d620d35143e9cc22b657194d8ef6cac1e722e7468c8069e227a5765f62",
-      "imports": ["scripts/accepted-source-composition.mjs", "scripts/accepted-source-policy.mjs"],
+      "digest": "53383e58348fd6c3d623f9b4b9254d679798f507e1ad8cdd0e3713c738d3678b",
+      "imports": [
+        "scripts/accepted-source-composition.mjs",
+        "scripts/accepted-source-policy.mjs",
+        "scripts/task-registry.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/accepted-source.test.mjs": {
@@ -450,7 +454,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "bf875289a981ec105c05c7ed841128a1477012ddc5ff3eb42ce7fc3e461de673",
+      "digest": "98a6765c4d063c35fff6caf6313065391438a39164054469f88df6ac23e06548",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -1571,12 +1575,13 @@
       "dynamicImports": 0
     },
     "scripts/task-data-scope.mjs": {
-      "digest": "65887d1df2366cfba374cbdc21d65c4b19bcb8ad9f306e2bbe19c619e2b958db",
+      "digest": "70835525fa4d5e29ebd9e6f6bae2f4674fffedd5911f83e0833eab2c858b2bc4",
       "imports": [
         "scripts/completion-status.mjs",
         "scripts/dev-task.mjs",
         "scripts/integration-resource.mjs",
         "scripts/task-data-environment.mjs",
+        "scripts/task-preview-combination.mjs",
         "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
@@ -1637,13 +1642,14 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "3917a77200752dc252c978aa4ed02d85e5a1527cefab18d04895e9bd3e1573d0",
+      "digest": "1d0a85d1b21a9015c5de5aad905c6e8e93fb6f7390ae957b3db15fcc7259e0b8",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/task-completion.mjs",
         "scripts/task-data-scope.mjs",
         "scripts/task-development.mjs",
         "scripts/task-entry.mjs",
+        "scripts/task-preview-combination.mjs",
         "scripts/task-preview.mjs",
         "scripts/task-registry.mjs",
         "scripts/task-start.mjs"
@@ -1670,6 +1676,28 @@
       "imports": ["scripts/task-maven.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-preview-combination.mjs": {
+      "digest": "ea14e1f88281916f07de191db7799bd402fd79a0d5b5f12a4b5f0c83e17dd72b",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/integration-resource.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/task-registry.mjs",
+        "scripts/task-runtime-references.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-preview-combination.test.mjs": {
+      "digest": "7dc75dd501c8f8ddfd712fa64e0101fa3d22246152f2b7da93678680a64b4e99",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/completion-cli.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/task-preview-combination.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 1
+    },
     "scripts/task-preview-control-http.test.mjs": {
       "digest": "87aabbb9a5e4197edd6f48f6e2c668c8e75b0b8f368eb6481800d5f1ebca2faf",
       "imports": ["scripts/dev-task.mjs"],
@@ -1686,13 +1714,14 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-independent.mjs": {
-      "digest": "95d79e00a35a13830fa9039304dce13b2d8e3039350e1025b1052de9f616b8cf",
+      "digest": "72033b71ffcbac118cf6fbd5c9aecb80c1c3630f605216c7bfae68122d44abc4",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/preview-consumers.mjs",
         "scripts/resource-lease.mjs",
         "scripts/task-data-environment.mjs",
         "scripts/task-data-scope.mjs",
+        "scripts/task-preview-combination.mjs",
         "scripts/task-registry.mjs",
         "scripts/task-runtime-references.mjs"
       ],
@@ -1746,7 +1775,7 @@
       "dynamicImports": 2
     },
     "scripts/task-registry.mjs": {
-      "digest": "50268a299c326cb8f45997bd7772f31ab1c7ca9a1f77be61cd567378a81bb88e",
+      "digest": "77b4d318da9354c4a43a541b9e15e411ff7ca898d012583808c361d192b11061",
       "imports": [],
       "dynamicImports": 0
     },

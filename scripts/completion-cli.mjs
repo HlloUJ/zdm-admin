@@ -601,6 +601,7 @@ export async function completionCommand(root, args, options = {}) {
     : null;
   const task = explicit ? registry.readTask(explicit) : selectedTaskBatch(root);
   if (task) {
+    assert.ok(!task.previewOnly, 'Temporary combined previews cannot enter formal completion');
     assert.ok(!task.compatibility?.readOnly, 'Legacy frozen task remains on its reviewed recovery path');
     const readOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
     if (!readOnly)
