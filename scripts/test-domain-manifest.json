@@ -63,7 +63,7 @@
       "dynamicImports": 1
     },
     "package.json": {
-      "digest": "d24834dc29f39317a7726cb81a33f65e233d7b2eb719b1f580b24d7375a9fdc6",
+      "digest": "b30854e9434b20c44b59e611ba936b49c12d7d95d2b4651b8624c645f973558f",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1077,6 +1077,16 @@
         "scripts/sync-integration.mjs"
       ],
       "dynamicImports": 4
+    },
+    "scripts/lint-changed.mjs": {
+      "digest": "01a48d5bf41d33a3f24f0613b1cf68e3d2fa03b5c829b2f69100d17e88fa53be",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/lint-changed.test.mjs": {
+      "digest": "a9c30472dfb601ef8b8eef58255c73bc2221fa3a537c2e9ee7a42f9699c7f721",
+      "imports": ["scripts/lint-changed.mjs", "scripts/verification-policy.mjs"],
+      "dynamicImports": 0
     },
     "scripts/lint-policy.test.mjs": {
       "digest": "8b986d61c1a5329838876480e702cab9346e2e751991c2c21a29d38f95dc21af",
