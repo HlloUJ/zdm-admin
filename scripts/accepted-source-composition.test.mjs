@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { createTaskRegistry } from './task-registry.mjs';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -41,12 +42,26 @@ function fixture(t, { legacy = false, overwritesA = false, freezeAfterMainSync =
   git('remote', 'add', 'origin', remote);
   git('push', 'origin', 'main');
   git('switch', '-c', 'codex/a');
+  const registry = createTaskRegistry(root);
+  if (!legacy) registry.register({ id: 'a', owner: 'fixture-a', worktree: root });
+  const checkpoint = (commit) => {
+    if (legacy) return;
+    const task = registry.readTask('a');
+    registry.revise('a', task.revision, (record) => {
+      record.recordedHead = commit;
+      record.checkpoints.push({
+        commit,
+        verification: 'Explicit fixture task/composition ownership, no quality claim',
+      });
+    });
+  };
   writeFileSync(path.join(root, 'src/product.js'), 'price = 20;\n');
   rmSync(path.join(root, 'src/obsolete.js'));
   if (conflictPath) writeFileSync(path.join(root, conflictPath), 'accepted task\n');
   git('add', '.');
   git('commit', '-m', 'task A approved feature');
   const head = git('rev-parse', 'HEAD');
+  checkpoint(head);
   const batch = { id: 'a', worktree: root, branch: 'codex/a', base, ...(legacy ? {} : { taskRegistryVersion: 2 }) };
   let original = freezeAfterMainSync ? null : freezeAcceptedSource(root, batch);
   const b = path.join(root, '.task-runtime/b');
@@ -62,6 +77,7 @@ function fixture(t, { legacy = false, overwritesA = false, freezeAfterMainSync =
   git('fetch', 'origin');
   if (freezeAfterMainSync) {
     git('merge', '--no-edit', main);
+    checkpoint(git('rev-parse', 'HEAD'));
     original = freezeAcceptedSource(root, batch);
   }
   return { root, git, b, bGit, batch, original, head: git('rev-parse', 'HEAD'), base, main };

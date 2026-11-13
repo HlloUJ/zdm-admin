@@ -83,8 +83,13 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.test.mjs": {
-      "digest": "0e06cb77e8d138bac7ee458494a9544f0b3aac05a3a5d14d16b1b22d70fb739d",
-      "imports": ["scripts/accepted-source-composition.mjs", "scripts/accepted-source.mjs", "scripts/shared-tool.mjs"],
+      "digest": "239b0481554b72504bb8f8a93f7446f55d431b67641a7731cfc1a5d0cbfe5b77",
+      "imports": [
+        "scripts/accepted-source-composition.mjs",
+        "scripts/accepted-source.mjs",
+        "scripts/shared-tool.mjs",
+        "scripts/task-registry.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/accepted-source-hook.mjs": {
