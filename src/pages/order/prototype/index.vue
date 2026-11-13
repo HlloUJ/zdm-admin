@@ -209,25 +209,27 @@
           </AdminListPage>
           <AdminListPage
             v-else
-            v-model:filter-values="settingsFilters"
-            :tabs="configTabs"
-            :active-tab="settingGroup"
             :actions="configActions"
             :table-props="{
               rowKey: 'id',
               data: settingsRows,
               columns: settingColumns,
-              pagination: { ...settingsPagination, total: settingsRows.length },
+              pagination: { ...settingsPagination, total: settingsTotal },
+              loading: settingsLoading,
             }"
             @page-change="updateListPagination(settingsPagination, $event)"
             @action="openSetting()"
           >
-            <template #createdByName="{ row }">{{
-              row.createdBy === context.accountId ? context.name : row.createdByName || '—'
-            }}</template>
+            <template v-if="settingsError" #empty
+              ><t-space
+                >{{ settingsError
+                }}<t-link :theme="buttonTheme('search')" hover="color" @click="loadSettings">重试</t-link></t-space
+              ></template
+            >
+            <template #createdByName="{ row }">{{ row.createdByName || '—' }}</template>
             <template #createdAt="{ row }">{{ time(row.createdAt) }}</template>
             <template #enabled="{ row }"
-              ><t-tag :theme="row.enabled ? 'success' : 'default'" variant="light">{{
+              ><t-tag :theme="row.enabled ? 'success' : 'danger'" variant="light">{{
                 row.enabled ? '启用' : '停用'
               }}</t-tag></template
             ><template #operation="{ row }"
@@ -272,6 +274,7 @@
       :label="actionLabel"
       :order="actionOrder"
       :state="state"
+      :payment-names="paymentNameOptions"
       :record-id="recordId"
       :execute="execute"
     />
@@ -282,12 +285,14 @@
       :data="{ name: settingName }"
       :confirm-function="editingSettingId ? 'edit' : 'create'"
       :confirmation="formConfirmation(editingSettingId ? 'edit' : 'create')"
+      :confirm-btn="{ loading: settingsSaving, disabled: settingsSaving }"
       @confirm="addSetting"
       ><t-form-item label="名称" required v-bind="settingFeedback.field('name', settingName)"
-        ><t-input v-model="settingName" placeholder="请输入名称" /></t-form-item
+        ><t-input v-model="settingName" :maxlength="10" placeholder="请输入名称" /></t-form-item
     ></AdminFormDialog>
     <AdminConfirmDialog
       v-model:visible="toggleSettingVisible"
+      :confirm-btn="{ loading: settingsSaving, disabled: settingsSaving }"
       :function="pendingToggleSetting?.enabled ? 'disable' : 'enable'"
       :action="pendingToggleSetting?.enabled ? '停用' : '启用'"
       object-type="款项名称"
@@ -296,6 +301,7 @@
     />
     <AdminConfirmDialog
       v-model:visible="deleteSettingVisible"
+      :confirm-btn="{ loading: settingsSaving, disabled: settingsSaving }"
       function="delete"
       action="删除"
       object-type="款项名称"
@@ -361,7 +367,17 @@ import OrderEditor from './OrderEditor.vue';
 import SalesOrderList from './SalesOrderList.vue';
 import OrderActionDialog, { type ActionForm } from './OrderActionDialog.vue';
 import { generateOrderNumber } from './orderNumber';
-import { prefix, salesActions, taskActions, settingTabs, type SalesAction } from './resources';
+import {
+  listStorePaymentNames,
+  listStorePaymentNameOptions,
+  createStorePaymentName,
+  updateStorePaymentName,
+  setStorePaymentNameStatus,
+  deleteStorePaymentName,
+  type StorePaymentName,
+  type StorePaymentNameOption,
+} from '@/services/storePaymentNames';
+import { prefix, salesActions, taskActions, type SalesAction } from './resources';
 import {
   statuses,
   clone,
@@ -374,7 +390,7 @@ import {
   warnings,
   scopeKey,
   createState,
-  removeDefaultSettings,
+  restorePrototypeState,
   blankOrder,
   saveDraft,
   copyOrder,
@@ -393,7 +409,6 @@ import {
   type State,
   type Order,
   type Log,
-  type Setting,
   type Status,
 } from './model';
 const route = useRoute(),
@@ -419,7 +434,7 @@ watch(
       const saved = raw ? (JSON.parse(raw) as State) : null;
       state.value =
         saved?.version === 1 && scopeKey(saved.context) === key.value
-          ? removeDefaultSettings(saved)
+          ? restorePrototypeState(saved)
           : createState(context.value);
     } catch {
       state.value = createState(context.value);
@@ -431,7 +446,7 @@ try {
   const raw = localStorage.getItem(key.value);
   if (raw) {
     const saved = JSON.parse(raw) as State;
-    if (saved.version === 1 && scopeKey(saved.context) === key.value) state.value = removeDefaultSettings(saved);
+    if (saved.version === 1 && scopeKey(saved.context) === key.value) state.value = restorePrototypeState(saved);
   }
 } catch {
   /* Invalid prototype storage is replaced by isolated fixtures. */
@@ -476,8 +491,7 @@ const status = ref<Status>('pending'),
 const selected = computed(() => scopedOrders.value.find((o) => o.id === selectedId.value));
 const can = (a: string, o?: Order) => hasPermission(user.value, `${prefix}.sales.${o?.status ?? status.value}.${a}`);
 const canTask = (a: string) => hasPermission(user.value, `${prefix}.fulfillment.${a}`);
-const settingGroup = ref('nature');
-const canSetting = (a: string) => hasPermission(user.value, `${prefix}.settings.${settingGroup.value}.${a}`);
+const canSetting = (a: string) => hasPermission(user.value, `${prefix}.settings.nature.${a}`);
 const tabs = computed(() =>
   statuses
     .filter((s) => hasPermission(user.value, `${prefix}.sales.${s.value}.view`))
@@ -486,20 +500,10 @@ const tabs = computed(() =>
       label: `${s.label}（${scopedOrders.value.filter((order) => order.status === s.value).length}）`,
     })),
 );
-const configTabs = computed(() =>
-  settingTabs.filter((s) => hasPermission(user.value, `${prefix}.settings.${s.value}.view`)),
-);
 watch(
   tabs,
   (list) => {
     if (list.length && !list.some((s) => s.value === status.value)) status.value = list[0]!.value;
-  },
-  { immediate: true },
-);
-watch(
-  configTabs,
-  (list) => {
-    if (list.length && !list.some((s) => s.value === settingGroup.value)) settingGroup.value = list[0]!.value;
   },
   { immediate: true },
 );
@@ -519,9 +523,6 @@ function clampListPage(pagination: { current: number; pageSize: number }, total:
 }
 watch(selectedId, () => {
   detailPagination.value.current = 1;
-});
-watch(settingGroup, () => {
-  settingsPagination.value.current = 1;
 });
 watch(
   () => selected.value?.logs.length ?? 0,
@@ -641,7 +642,8 @@ function findOrder(id: string) {
   demand(o, '订单不在当前数据范围内');
   return o;
 }
-function openAction(id: string, o?: Order, rid = '') {
+async function openAction(id: string, o?: Order, rid = '') {
+  const openingScope = key.value;
   try {
     demand(getUserFunctionAudience(user.value) === 'store', '仅门店端可访问订单原型');
     if (id === 'ship' || id === 'receive') demand(canTask(id), '没有操作权限');
@@ -666,12 +668,21 @@ function openAction(id: string, o?: Order, rid = '') {
       return;
     }
     demand(o, '请选择订单');
+    const actionScope = key.value;
+    if (
+      id === 'receipt' ||
+      (id === 'correct-payment' && o.payments.find((entry) => entry.id === rid)?.kind === 'receipt')
+    ) {
+      const options = await listStorePaymentNameOptions();
+      if (actionScope !== key.value) return;
+      paymentNameOptions.value = options;
+    }
     action.value = id;
     recordId.value = rid;
     actionOrderId.value = o.id;
     actionVisible.value = true;
   } catch (e) {
-    adminFeedback.error(e instanceof Error ? e.message : '操作失败');
+    if (openingScope === key.value) adminFeedback.error(e instanceof Error ? e.message : '操作失败');
   }
 }
 function saveEditor(o: Order, reason: string) {
@@ -687,7 +698,7 @@ function saveEditor(o: Order, reason: string) {
     adminFeedback.error(e instanceof Error ? e.message : '保存失败');
   }
 }
-function execute(f: ActionForm) {
+async function execute(f: ActionForm) {
   const o = findOrder(actionOrderId.value),
     c = context.value;
   demand(
@@ -698,6 +709,23 @@ function execute(f: ActionForm) {
   else if (['receipt', 'refund', 'correct-payment'].includes(action.value)) {
     const existing = o.payments.find((p) => p.id === recordId.value),
       kind = action.value === 'correct-payment' ? existing!.kind : action.value === 'receipt' ? 'receipt' : 'refund';
+    const unchangedHistoricalName =
+      action.value === 'correct-payment' &&
+      f.nature === existing?.nature &&
+      f.paymentNameId === existing?.paymentNameId;
+    if (kind === 'receipt' && !unchangedHistoricalName) {
+      demand(f.paymentNameId, '请选择款项名称');
+      const actionScope = key.value;
+      const options = await listStorePaymentNameOptions();
+      if (actionScope !== key.value) throw new Error('当前身份已变化，请重新操作');
+      paymentNameOptions.value = options;
+      demand(
+        options.some(
+          (entry) => entry.id === f.paymentNameId && entry.version === f.paymentNameVersion && entry.name === f.nature,
+        ),
+        '款项配置已变化，请重新选择',
+      );
+    }
     recordPayment(
       o,
       {
@@ -705,6 +733,8 @@ function execute(f: ActionForm) {
         kind,
         amount: f.amount,
         nature: f.nature,
+        paymentNameId: f.paymentNameId,
+        paymentNameVersion: f.paymentNameVersion,
         method: f.method,
         at: f.at,
         reason: f.reason,
@@ -782,89 +812,165 @@ const tasks = computed(() =>
       .map((p) => ({ ...p, orderId: o.id, name: o.lines.find((l) => l.sku === p.sku)?.name })),
   ),
 );
-const settingsFilters = ref<FilterValues>({});
-const settingsRows = computed(() =>
-  state.value.settings
-    .filter((s) => s.group === settingGroup.value)
-    .sort((a, b) => (b.createdAt ? Date.parse(b.createdAt) : 0) - (a.createdAt ? Date.parse(a.createdAt) : 0)),
-);
-watch(
-  () => tasks.value.length,
-  (total) => clampListPage(fulfillmentPagination.value, total),
-);
-watch(
-  () => settingsRows.value.length,
-  (total) => clampListPage(settingsPagination.value, total),
-);
+const settingsRows = ref<StorePaymentName[]>([]);
+const settingsTotal = ref(0),
+  settingsLoading = ref(false),
+  settingsError = ref(''),
+  settingsSaving = ref(false);
+const paymentNameOptions = ref<StorePaymentNameOption[]>([]);
+let settingsRequest = 0;
 const configActions = computed<ListAction[]>(() =>
   canSetting('create') ? [{ id: 'create', label: '新增', function: 'create' }] : [],
 );
 const settingVisible = ref(false),
   settingName = ref(''),
   editingSettingId = ref('');
-const deletingSetting = ref<Setting | null>(null),
+const editingSettingVersion = ref(0);
+const deletingSetting = ref<StorePaymentName | null>(null),
   deleteSettingVisible = ref(false);
-const pendingToggleSetting = ref<Setting | null>(null),
+const pendingToggleSetting = ref<StorePaymentName | null>(null),
   toggleSettingVisible = ref(false);
 const settingDialog = ref<InstanceType<typeof AdminFormDialog>>();
 const settingFeedback = useFormFeedback(settingVisible);
-function openSetting(row?: Setting) {
+async function loadSettings() {
+  const scope = key.value,
+    requestId = ++settingsRequest;
+  settingsError.value = '';
+  if (page.value !== 'settings' || !canSetting('view')) {
+    settingsRows.value = [];
+    settingsTotal.value = 0;
+    settingsLoading.value = false;
+    return;
+  }
+  settingsLoading.value = true;
+  try {
+    const result = await listStorePaymentNames(settingsPagination.value.current, settingsPagination.value.pageSize);
+    if (scope !== key.value || requestId !== settingsRequest) return;
+    const last = Math.max(1, Math.ceil(result.total / settingsPagination.value.pageSize));
+    if (settingsPagination.value.current > last) {
+      settingsPagination.value.current = last;
+      return;
+    }
+    settingsRows.value = result.items;
+    settingsTotal.value = result.total;
+  } catch (error) {
+    if (scope !== key.value || requestId !== settingsRequest) return;
+    settingsRows.value = [];
+    settingsTotal.value = 0;
+    settingsError.value = error instanceof Error ? error.message : '款项配置加载失败';
+  } finally {
+    if (scope === key.value && requestId === settingsRequest) settingsLoading.value = false;
+  }
+}
+watch(
+  [
+    key,
+    page,
+    () => settingsPagination.value.current,
+    () => settingsPagination.value.pageSize,
+    () => canSetting('view'),
+  ],
+  (_next, previous) => {
+    if (previous && previous[0] !== key.value) {
+      settingsRows.value = [];
+      paymentNameOptions.value = [];
+      settingsTotal.value = 0;
+      settingVisible.value = false;
+      toggleSettingVisible.value = false;
+      deleteSettingVisible.value = false;
+      deletingSetting.value = null;
+      pendingToggleSetting.value = null;
+      settingsSaving.value = false;
+    }
+    void loadSettings();
+  },
+  { immediate: true },
+);
+watch(
+  () => tasks.value.length,
+  (total) => clampListPage(fulfillmentPagination.value, total),
+);
+function openSetting(row?: StorePaymentName) {
   if (!canSetting(row ? 'edit' : 'create')) return;
   editingSettingId.value = row?.id ?? '';
+  editingSettingVersion.value = row?.version ?? 0;
   settingName.value = row?.name ?? '';
   settingVisible.value = true;
 }
 async function addSetting() {
-  if (!canSetting(editingSettingId.value ? 'edit' : 'create')) return;
+  if (settingsSaving.value || !canSetting(editingSettingId.value ? 'edit' : 'create')) return;
   const name = settingName.value.trim();
-  if (
-    !name ||
-    state.value.settings.some(
-      (s) => s.group === settingGroup.value && s.name === name && s.id !== editingSettingId.value,
-    )
-  ) {
-    settingFeedback.reject('name', settingName.value, !name ? '请输入名称' : '该名称已存在');
+  if (!name || Array.from(name).length > 10) {
+    settingFeedback.reject('name', settingName.value, !name ? '请输入名称' : '名称不能超过10个字符');
     await rejectFormSubmission(settingDialog.value);
     return;
   }
-  if (editingSettingId.value) {
-    const row = state.value.settings.find((s) => s.id === editingSettingId.value && s.group === settingGroup.value);
-    if (!row) return;
-    row.name = name;
-  } else {
-    state.value.settings.push({
-      id: uid(),
-      group: settingGroup.value as 'nature' | 'method',
-      name,
-      enabled: true,
-      createdBy: context.value.accountId,
-      createdByName: context.value.name,
-      createdAt: now(),
-    });
+  const scope = key.value,
+    editing = Boolean(editingSettingId.value);
+  settingsSaving.value = true;
+  try {
+    if (editing) await updateStorePaymentName(editingSettingId.value, name, editingSettingVersion.value);
+    else await createStorePaymentName(name);
+    if (scope !== key.value) return;
+    settingVisible.value = false;
+    adminFeedback.actionSuccess({ action: editing ? '修改' : '新增', target: name });
+    await loadSettings();
+  } catch (error) {
+    if (scope !== key.value) return;
+    const message = error instanceof Error ? error.message : '保存失败';
+    settingFeedback.reject('name', settingName.value, message);
+    await rejectFormSubmission(settingDialog.value);
+    await loadSettings();
+  } finally {
+    if (scope === key.value) settingsSaving.value = false;
   }
-  settingVisible.value = false;
-  adminFeedback.actionSuccess({ action: editingSettingId.value ? '修改' : '新增', target: name });
 }
-function openToggleSetting(s: Setting) {
+function openToggleSetting(row: StorePaymentName) {
   if (!canSetting('toggle-status')) return;
-  pendingToggleSetting.value = s;
+  pendingToggleSetting.value = row;
   toggleSettingVisible.value = true;
 }
-function confirmToggleSetting() {
-  const s = pendingToggleSetting.value;
-  if (!s || !canSetting('toggle-status')) return;
-  s.enabled = !s.enabled;
-  toggleSettingVisible.value = false;
-  pendingToggleSetting.value = null;
-  adminFeedback.actionSuccess({ action: s.enabled ? '启用' : '停用', target: s.name });
+async function confirmToggleSetting() {
+  const row = pendingToggleSetting.value;
+  if (!row || settingsSaving.value || !canSetting('toggle-status')) return;
+  const scope = key.value;
+  settingsSaving.value = true;
+  try {
+    await setStorePaymentNameStatus(row.id, !row.enabled, row.version);
+    if (scope !== key.value) return;
+    toggleSettingVisible.value = false;
+    pendingToggleSetting.value = null;
+    adminFeedback.actionSuccess({ action: row.enabled ? '停用' : '启用', target: row.name });
+    await loadSettings();
+  } catch (error) {
+    if (scope === key.value) {
+      adminFeedback.error(error instanceof Error ? error.message : '操作失败');
+      await loadSettings();
+    }
+  } finally {
+    if (scope === key.value) settingsSaving.value = false;
+  }
 }
-function deleteSetting() {
+async function deleteSetting() {
   const row = deletingSetting.value;
-  if (!row || !canSetting('delete')) return;
-  state.value.settings = state.value.settings.filter((s) => s.id !== row.id);
-  deleteSettingVisible.value = false;
-  deletingSetting.value = null;
-  adminFeedback.deleted(row.name);
+  if (!row || settingsSaving.value || !canSetting('delete')) return;
+  const scope = key.value;
+  settingsSaving.value = true;
+  try {
+    await deleteStorePaymentName(row.id, row.version);
+    if (scope !== key.value) return;
+    deleteSettingVisible.value = false;
+    deletingSetting.value = null;
+    adminFeedback.deleted(row.name);
+    await loadSettings();
+  } catch (error) {
+    if (scope === key.value) {
+      adminFeedback.error(error instanceof Error ? error.message : '删除失败');
+      await loadSettings();
+    }
+  } finally {
+    if (scope === key.value) settingsSaving.value = false;
+  }
 }
 const proofUrl = ref(''),
   logDetail = ref<Log | null>(null);
