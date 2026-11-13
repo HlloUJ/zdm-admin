@@ -1,3 +1,4 @@
+import { stripLocalPaymentConfiguration } from './paymentNames';
 import { generateOrderNumber } from './orderNumber';
 /** Front-end prototype only. No business API calls or production inventory. */
 export const statuses = [
@@ -55,6 +56,8 @@ export interface Payment {
   kind: 'receipt' | 'refund';
   amount: number;
   nature: string;
+  paymentNameId?: string;
+  paymentNameVersion?: number;
   method: string;
   at: string;
   reason: string;
@@ -124,22 +127,12 @@ export interface Order {
   shipments: Shipment[];
   logs: Log[];
 }
-export interface Setting {
-  id: string;
-  group: 'nature' | 'method';
-  name: string;
-  enabled: boolean;
-  createdBy?: number;
-  createdByName?: string;
-  createdAt?: string;
-}
 export interface State {
   version: 1;
   context: Context;
   products: Product[];
   customers: Customer[];
   orders: Order[];
-  settings: Setting[];
 }
 export const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value)) as T;
 export const uid = () => `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -630,7 +623,6 @@ export function createState(c: Context): State {
     ],
     customers: [{ id: 'customer-1', name: '小李（示例）', phone: '13800000001', ownerId: c.accountId, reason: '' }],
     orders: [],
-    settings: [],
   };
   for (const [i, entry] of statuses.entries()) {
     const status = entry.value;
@@ -672,9 +664,9 @@ export function createState(c: Context): State {
   return state;
 }
 
-/** Remove old setting fixtures and update only legacy demo numbers; preserve user-created data. */
-export function removeDefaultSettings(state: State) {
-  state.settings = state.settings.filter((s) => !/^(nature-[0-4]|method-[0-3])$/.test(s.id));
+/** Normalize saved prototype data without rewriting historical order content. */
+export function restorePrototypeState(state: State) {
+  stripLocalPaymentConfiguration(state);
   for (const order of state.orders) {
     if (
       /^XS-DEMO-00[1-5]$/.test(order.id) ||

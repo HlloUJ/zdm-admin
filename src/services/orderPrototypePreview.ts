@@ -3,6 +3,8 @@ import { getUserFunctionAudience } from './functionAudience';
 
 /** Local task preview only; never modifies the signed-in user's real grants. */
 export function canPreviewStoreOrders(user: LoginUser, permission?: string) {
+  if (permission === 'store.order-management.settings' || permission?.startsWith('store.order-management.settings.'))
+    return false;
   if (!import.meta.env.DEV || typeof window === 'undefined') return false;
   const { hostname, port, protocol } = window.location;
   return (

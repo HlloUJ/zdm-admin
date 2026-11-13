@@ -198,5 +198,9 @@
   {
     "prefix": "admin.accessory-management.off-shelf.edit",
     "scope": "removed"
+  },
+  {
+    "prefix": "store.order-management",
+    "scope": "store-only"
   }
 ]

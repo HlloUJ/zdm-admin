@@ -15,6 +15,7 @@ const entries = {
   complete: 'scripts/task-completion.mjs',
   check: 'scripts/dev-task.mjs',
   temporary: 'scripts/dev-task.mjs',
+  combination: 'scripts/task-preview-combination.mjs',
 };
 export function publishedTaskEntry(root, args) {
   const git = (cwd, ...flags) => execFileSync('git', ['-C', cwd, ...flags], { encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -31,7 +32,7 @@ export function publishedTaskEntry(root, args) {
   const [command, ...rest] = args;
   assert.ok(
     entries[command],
-    'task:entry [--worktree <exact path>] <start|registry|preview|data|work|schedule|complete|check|temporary> [args]',
+    'task:entry [--worktree <exact path>] <start|registry|preview|data|work|schedule|complete|check|temporary|combination> [args]',
   );
   const registry = createTaskRegistry(root),
     targetRegistry = createTaskRegistry(target);
@@ -63,7 +64,7 @@ export function publishedTaskEntry(root, args) {
 export function main(root = process.cwd(), args = process.argv.slice(2)) {
   if (args.includes('--help')) {
     console.log(
-      'task:entry [--worktree <exact path>] <start|registry|preview|data|work|schedule|complete|check|temporary> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
+      'task:entry [--worktree <exact path>] <start|registry|preview|data|work|schedule|complete|check|temporary|combination> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
     );
     return;
   }

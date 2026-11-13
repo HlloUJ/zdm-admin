@@ -15,22 +15,35 @@ export function processScope(state, event, save, run) {
 // foreground descendants inherit the group even if the completion owner exits.
 // No command arguments, environment values or command output enter the journal.
 const supervisor = `
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { forwardIntegrationEnvironment } from ${JSON.stringify(new URL('./integration-resource.mjs', import.meta.url).href)};
 import os from 'node:os';
-const [file, token, command, ...args] = process.argv.slice(1);
+const [file, token, stopMode, command, ...args] = process.argv.slice(1);
 const intent = JSON.parse(readFileSync(file, 'utf8'));
-if (intent.token !== token || intent.status !== 'pending') throw Error('Invalid child intent');
+if (!['group', 'direct'].includes(stopMode) || intent.token !== token || intent.status !== 'pending') throw Error('Invalid child intent');
 const record = { token, host: os.hostname(), pgid: process.pid, status: 'started' };
 const publish = () => { writeFileSync(file + '.tmp', JSON.stringify(record), { mode: 0o600, flag: 'wx' }); renameSync(file + '.tmp', file); };
-publish();
-let result;
-try { result = spawnSync(command, args, { stdio: 'inherit', env: forwardIntegrationEnvironment() }); }
-catch (error) { process.stderr.write(error.message + '\\n'); result = {status:1,signal:null}; }
-record.status = 'exited'; record.exitCode = result.status; record.signal = result.signal;
-publish();
-process.exit(result.status ?? 1);
+// A started record authorizes group termination, so publish it only after the
+// child exists. Publishing before spawn allows TERM to race with a later fork.
+let child;
+let stopping = false;
+// Keep the supervisor alive to reap its direct child. The outer stop already
+// signals the entire owned group, including the child, exactly once.
+if (stopMode === 'group') process.on('SIGTERM', () => {
+  stopping = true;
+});
+try { child = spawn(command, args, { stdio: 'inherit', env: forwardIntegrationEnvironment() }); }
+catch (error) {
+  record.status = 'exited'; record.exitCode = 1; record.signal = null;
+  publish(); process.stderr.write(error.message + '\\n'); process.exit(1);
+}
+child.once('spawn', () => { publish(); });
+child.once('error', (error) => { process.stderr.write(error.message + '\\n'); });
+child.once('close', (code, signal) => {
+  record.status = 'exited'; record.exitCode = code ?? 1; record.signal = signal;
+  publish(); process.exit(stopping && code === 0 ? 143 : (code ?? 1));
+});
 `;
 export function runCompletionProcess(command, args, options = {}) {
   const current = scope.getStore();
@@ -44,14 +57,19 @@ export function runCompletionProcess(command, args, options = {}) {
   writeFileSync(file, JSON.stringify({ token, status: 'pending' }), { flag: 'wx', mode: 0o600 });
   (event.processes ??= []).push({ token });
   save(state); // Commit intent before spawn. A crash in this window blocks recovery.
-  const result = spawnSync(process.execPath, ['--input-type=module', '-e', supervisor, file, token, command, ...args], {
-    ...options,
-    detached: true,
-  });
+  const result = spawnSync(
+    process.execPath,
+    ['--input-type=module', '-e', supervisor, file, token, 'direct', command, ...args],
+    {
+      ...options,
+      detached: true,
+    },
+  );
   assertProcessesGone({ processTracking: 1, processes: [{ token }] }, directory);
   return result;
 }
 export function startCompletionProcess(command, args, options = {}) {
+  assert.ok(!options.timeout && !options.signal, 'Owned group processes must be stopped through stopCompletionProcess');
   const current = scope.getStore();
   assert.ok(current, 'Long-lived validation process requires its exact completion stage');
   const { state, event, save } = current,
@@ -62,10 +80,14 @@ export function startCompletionProcess(command, args, options = {}) {
   writeFileSync(file, JSON.stringify({ token, status: 'pending' }), { flag: 'wx', mode: 0o600 });
   (event.processes ??= []).push({ token });
   save(state);
-  const child = spawn(process.execPath, ['--input-type=module', '-e', supervisor, file, token, command, ...args], {
-    ...options,
-    detached: true,
-  });
+  const child = spawn(
+    process.execPath,
+    ['--input-type=module', '-e', supervisor, file, token, 'group', command, ...args],
+    {
+      ...options,
+      detached: true,
+    },
+  );
   child.completionProof = { directory, token, file };
   return child;
 }
@@ -88,6 +110,23 @@ export async function stopCompletionProcess(child) {
     }
   };
   if (alive()) process.kill(-record.pgid, 'SIGTERM');
+  // Reap our exact supervisor before probing its group again. Darwin can report
+  // EPERM for the zombie-only group until Node dispatches this child's exit.
+  // This is not proof that descendants are gone: the group check below remains
+  // mandatory and still fails closed on EPERM or any other unknown error.
+  if (child.exitCode === null && child.signalCode === null) {
+    await new Promise((resolve, reject) => {
+      const onExit = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        child.removeListener('exit', onExit);
+        reject(new Error('Validation supervisor did not exit; retain its original process proof'));
+      }, 5000);
+      child.once('exit', onExit);
+    });
+  }
   const deadline = Date.now() + 5000;
   while (alive() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
   // Do not kill an unknown/reused group after its supervisor disappeared.

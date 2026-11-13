@@ -1,7 +1,9 @@
 package com.zdm.platform.catalog;
 
 import com.zdm.platform.account.CreatorAwareService;
+import com.zdm.platform.common.CategoryProductCounts;
 import com.zdm.platform.security.CurrentIdentityProvider;
+import com.zdm.platform.security.DataScope;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
@@ -75,7 +77,9 @@ public class ProductCategoryService extends CreatorAwareService<ProductCategoryM
     } catch (DuplicateKeyException exception) {
       throw new IllegalArgumentException(DUPLICATE_NAME_MESSAGE, exception);
     }
-    return attachActualFinishedProductCounts(List.of(getById(id))).get(0);
+    return listNewestFirst(List.of(existing.getScope())).stream()
+        .filter(category -> java.util.Objects.equals(category.getId(), id))
+        .findFirst().orElseThrow(() -> new IllegalArgumentException("分类不存在"));
   }
 
   @Transactional
@@ -127,6 +131,14 @@ public class ProductCategoryService extends CreatorAwareService<ProductCategoryM
         .filter(category -> List.of("finished", "accessory").contains(category.getScope()))
         .forEach(category -> category.setProductCount(
             countByCategoryId.getOrDefault(category.getId(), 0)));
+    var countedCategories = DataScope.filter(identityProvider.require(), categories).stream()
+        .filter(category -> List.of("finished", "accessory").contains(category.getScope())).toList();
+    var totals = CategoryProductCounts.rollUp(
+        countedCategories, ProductCategory::getId, ProductCategory::getParentId,
+        ProductCategory::getProductCount,
+        (child, parent) -> java.util.Objects.equals(child.getScope(), parent.getScope())
+            && java.util.Objects.equals(child.getTenantId(), parent.getTenantId()));
+    countedCategories.forEach(category -> category.setProductCount(totals.get(category.getId())));
     return categories;
   }
 

@@ -23,7 +23,8 @@ describe('local order prototype preview permission boundary', () => {
   it('opens only order menu, tabs and simulated actions for an ungranted store identity on 5175', () => {
     location();
     expect(hasMenuPermission(user, 'store.order-management.sales')).toBe(true);
-    expect(hasPermissionPrefix(user, 'store.order-management.settings')).toBe(true);
+    expect(hasPermissionPrefix(user, 'store.order-management.settings')).toBe(false);
+    expect(hasPermission(user, 'store.order-management.settings.nature.create')).toBe(false);
     expect(hasPermission(user, 'store.order-management.sales.pending.view')).toBe(true);
     expect(hasPermission(user, 'store.order-management.sales.pending.create')).toBe(true);
     expect(hasPermission(user, 'store.order-management.fulfillment.ship')).toBe(true);
