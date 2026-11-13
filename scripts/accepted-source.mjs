@@ -1,4 +1,5 @@
 import { createTaskRegistry } from './task-registry.mjs';
+import { assertTaskCommitOwnership } from './task-commit-ownership.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -94,8 +95,12 @@ export function freezeAcceptedSource(root, batch) {
   assert.ok(!registered?.previewOnly, 'Temporary combined previews cannot be frozen or delivered');
   const prior = readAcceptance(root, batch.id);
   if (prior) return prior; // Never rebuild a baseline from a repaired candidate.
-  assert.equal(acceptedGit(root, ['branch', '--show-current']), batch.branch);
   const head = acceptedGit(root, ['rev-parse', 'HEAD']);
+  if (batch.taskRegistryVersion === 2) {
+    assert.ok(registered, 'Exact registered task required before freeze');
+    assertTaskCommitOwnership(root, registered, head);
+  }
+  assert.equal(acceptedGit(root, ['branch', '--show-current']), batch.branch);
   let integrationBase, originMainAtFreeze;
   if (batch.taskRegistryVersion === 2) {
     assert.match(batch.base, oid, 'Original task integration base required');
@@ -168,7 +173,11 @@ export function freezeAcceptedSource(root, batch) {
   };
   const file = location(root, batch.id);
   mkdirSync(path.dirname(file), { recursive: true, mode: 0o700 });
-  acceptedGit(root, ['update-ref', 'refs/zdm/accepted/' + batch.id, commit, '0'.repeat(40)]);
+  assert.equal(acceptedGit(root, ['rev-parse', 'HEAD']), head, 'Source HEAD moved while freezing');
+  assert.equal(acceptedGit(root, ['branch', '--show-current']), batch.branch, 'Source branch moved while freezing');
+  acceptedGit(root, ['update-ref', '--stdin'], {
+    input: `start\nverify HEAD ${head}\nupdate refs/zdm/accepted/${batch.id} ${commit} ${'0'.repeat(40)}\nprepare\ncommit\n`,
+  });
   writeFileSync(file, JSON.stringify(record, null, 2) + '\n', { flag: 'wx', mode: 0o400 });
   return readAcceptance(root, batch.id);
 }
