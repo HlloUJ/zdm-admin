@@ -1756,12 +1756,12 @@
       "dynamicImports": 0
     },
     "scripts/task-resource-broker.mjs": {
-      "digest": "b28850f2df69f8550be2da28cbb849c1989b51a5cb2e9d57a96179b9cf43becb",
-      "imports": ["scripts/task-resource-scheduler.mjs"],
+      "digest": "62c3a85911162d434357dcfe7d968bee9772933acce8255beb154dd19fb8b313",
+      "imports": ["scripts/task-resource-runner.mjs", "scripts/task-resource-scheduler.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-resource-broker.test.mjs": {
-      "digest": "e794bdc4538d5456de8903a22515bc66c38eaa20837088bb7987556b0696148c",
+      "digest": "cdb5660e037deb4d2f163c120ce6eb01a2e54913de43bfc1eb248b92a66c3df1",
       "imports": [
         "scripts/task-resource-broker.mjs",
         "scripts/task-resource-scheduler-store.mjs",
@@ -1826,7 +1826,7 @@
       "dynamicImports": 0
     },
     "scripts/task-resource-service.mjs": {
-      "digest": "bc98d2714af4de3bc5deda9415cfec2c12b1a33b3eb48dc4c2415d3a49dd8c50",
+      "digest": "efc633cd379f0f9dd209d5bfae5a4c1dd4ab12ff50f7b9dd5afce89006cd2f6e",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1846,12 +1846,12 @@
       "dynamicImports": 0
     },
     "scripts/task-resource-verification.mjs": {
-      "digest": "ff9e8dc2f0172fc224d2249437d4689121a2eaca2e571210855b0c257b870d27",
+      "digest": "63ceca0a5a1ef6fdda72bfb446aefedff4e7322678843dd6fcaa1a5d8dbf13c6",
       "imports": ["scripts/verification-evidence.mjs", "scripts/verification-runner.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-resource-verification.test.mjs": {
-      "digest": "63122a59a0cc7507cf086f9f37493901c93287bcba1f84e3439e6640338161e0",
+      "digest": "27c2e9a379902e5b9b6a3774a7c93a6d94257d35888899391e474b56a7f869b6",
       "imports": ["scripts/task-resource-verification.mjs"],
       "dynamicImports": 0
     },
@@ -1983,9 +1983,13 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "34846471d8be4d8eb58589b6bed034c0dc7ae4d820156e082108870c5810495a",
+      "digest": "0a2da7fe727163d603a60ea88c5ff97ce6074934eb42ac021f673576ee6a71e9",
       "imports": [
         "scripts/run-frontend-tests.mjs",
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-event-link.mjs",
+        "scripts/task-resource-scheduler.mjs",
+        "scripts/task-resource-verification.mjs",
         "scripts/verification-evidence.mjs",
         "scripts/verification-runner.mjs",
         "scripts/verify.mjs"
@@ -2065,7 +2069,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "c6ba7fbb1a83c753e4e922ee2b207ca222a9cc2263b9a900c89a0c162506f577",
+      "digest": "08fdda0b229f3cf9c273f5dc0bb495c9804bd07a9e1cb67663f264e6fbef2292",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",

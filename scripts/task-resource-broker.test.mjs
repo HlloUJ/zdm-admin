@@ -25,7 +25,7 @@ const sample = (at) => ({
   swapGrowing: false,
   ioCongested: false,
 });
-function setup(initial = initialSchedulerState()) {
+function setup(initial = initialSchedulerState(), extraOptions = {}) {
   let saved = structuredClone(initial),
     clock = 0,
     fail = false;
@@ -41,6 +41,7 @@ function setup(initial = initialSchedulerState()) {
     budget: () => ({ macPeakBytes: G, dockerPeakBytes: G }),
     validateEvidence: (r) => r.evidence === 'valid',
     now: () => clock,
+    ...extraOptions,
   };
   const broker = createAdmissionBroker(options);
   return {
@@ -217,4 +218,25 @@ test('broker persists through actual private state store, retaining delivered re
     store?.close();
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+test('spawn proof links an admitted stage once without changing lock/preemption policy', async () => {
+  const s = setup(initialSchedulerState(), { inspectSpawn: () => ({ pid: 1234, pgid: 99, startTime: 'birth' }) });
+  const ticket = await admit(s);
+  const proof = { pid: 1234, runToken: 'attempt-one', fingerprint: 'hash' };
+  assert.equal((await s.broker.recordSpawn(ticket, proof)).duplicate, false);
+  assert.equal((await s.broker.recordSpawn(ticket, proof)).duplicate, true);
+  assert.equal(s.saved.events.filter((e) => e.executionStarted).length, 1);
+  assert.equal(s.saved.jobs[0].spawnProof.pgid, 99);
+  assert.equal(s.saved.jobs[0].restartable, false);
+  await assert.rejects(s.broker.recordSpawn(ticket, { ...proof, runToken: 'new-attempt' }), /Second execution/);
+});
+test('missing actual PID identity never manufactures a start event', async () => {
+  const s = setup(initialSchedulerState(), { inspectSpawn: () => null });
+  const ticket = await admit(s);
+  await assert.rejects(
+    s.broker.recordSpawn(ticket, { pid: 1234, runToken: 'attempt', fingerprint: 'hash' }),
+    /identity unavailable/,
+  );
+  assert.equal(s.saved.events.filter((e) => e.executionStarted).length, 0);
 });

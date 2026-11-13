@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
+import { inspectProcess } from './task-resource-runner.mjs';
 import { registerJob, planTick, acknowledgeNotification } from './task-resource-scheduler.mjs';
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function transition(state, job, to, reason, now) {
@@ -19,7 +20,14 @@ function transition(state, job, to, reason, now) {
 }
 // In-process single-owner admission coordinator with durable storage. No socket/server/daemon is installed here.
 // Only legacy, non-preemptible verifier stages are accepted. Owned interruptible runners use a separate lifecycle.
-export function createAdmissionBroker({ store, budget, validateEvidence, now = Date.now, policy }) {
+export function createAdmissionBroker({
+  store,
+  budget,
+  validateEvidence,
+  now = Date.now,
+  policy,
+  inspectSpawn = inspectProcess,
+}) {
   for (const fn of [budget, validateEvidence, store?.read, store?.write]) assert.equal(typeof fn, 'function');
   let state = store.read(),
     fault = null;
@@ -119,6 +127,30 @@ export function createAdmissionBroker({ store, budget, validateEvidence, now = D
         assert.equal(digest(descriptor), j.descriptorDigest, 'Stage descriptor changed');
         transition(s, j, 'running', 'Verified gate stage admitted', now());
       });
+    },
+    async recordSpawn(ticket, proof) {
+      healthy();
+      const j = jobFor(state, ticket);
+      assert.equal(j.status, 'running', 'Only admitted executing stage may report spawn');
+      assert.ok(typeof proof.runToken === 'string' && proof.runToken.length > 0);
+      assert.equal(proof.fingerprint, j.fingerprint, 'Spawn fingerprint changed');
+      if (j.spawnProof) {
+        assert.equal(j.spawnProof.runToken, proof.runToken, 'Second execution is not authorized');
+        assert.equal(j.spawnProof.pid, proof.pid, 'Duplicate proof PID differs');
+        return { recorded: true, duplicate: true };
+      }
+      const actual = inspectSpawn(proof.pid);
+      assert.ok(
+        actual && actual.pid === proof.pid && Number.isSafeInteger(actual.pgid) && actual.pgid > 0 && actual.startTime,
+        'Spawn process identity unavailable',
+      );
+      transact((s) => {
+        const job = jobFor(s, ticket);
+        job.spawnProof = { ...proof, pgid: actual.pgid, startTime: actual.startTime };
+        transition(s, job, 'running', 'Original verifier process actually spawned and identity verified', now());
+        Object.assign(s.events.at(-1), { executionStarted: true, runToken: proof.runToken });
+      });
+      return { recorded: true, duplicate: false };
     },
     async complete(ticket, result) {
       healthy();

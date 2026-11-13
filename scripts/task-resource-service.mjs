@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import net from 'node:net';
 import { chmodSync, lstatSync } from 'node:fs';
 import { createHash, timingSafeEqual } from 'node:crypto';
-const MUTATIONS = new Set(['enqueue', 'assertAdmission', 'complete', 'block', 'acknowledge']);
+const MUTATIONS = new Set(['enqueue', 'assertAdmission', 'recordSpawn', 'complete', 'block', 'acknowledge']);
 const READS = new Set(['snapshot', 'pendingNotifications', 'waitAdmission']);
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 // Durable at-most-once mutations. A crash between effect and receipt deliberately blocks replay.

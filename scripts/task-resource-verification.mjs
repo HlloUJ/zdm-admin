@@ -43,7 +43,30 @@ export function createScheduledVerification({ taskId, broker, run = runVerificat
       assert.equal(commandIdentity(task), descriptor.commandDigest, 'Gate command or environment changed while queued');
       await broker.assertAdmission(ticket, admission, descriptor);
       // Preserve exact task, options, environment, command, coverage, evidence validator and failed-attempt history.
-      const result = await run(task, options);
+      let spawnObservationError;
+      const runOptions =
+        typeof broker.recordSpawn === 'function'
+          ? {
+              ...options,
+              onSpawn(proof) {
+                // Start recording immediately; notification errors do not alter gate evidence or retry semantics.
+                try {
+                  Promise.resolve(broker.recordSpawn(ticket, proof)).catch((error) => {
+                    spawnObservationError = error.message;
+                  });
+                } catch (error) {
+                  spawnObservationError = error.message;
+                }
+                try {
+                  Promise.resolve(options.onSpawn?.(proof)).catch(() => {});
+                } catch {
+                  /* advisory only */
+                }
+              },
+            }
+          : options;
+      const result = await run(task, runOptions);
+      if (spawnObservationError) result.spawnObservationError = spawnObservationError;
       executionEnded = true;
       const unchanged = inspect(task).fingerprint === descriptor.fingerprint;
       if (result.exitCode !== 0 || !unchanged) {

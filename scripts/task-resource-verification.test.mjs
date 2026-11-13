@@ -134,3 +134,34 @@ test('queued command/environment mutation rejected even if source identity uncha
   await assert.rejects(fn(t));
   assert.equal(ran, false);
 });
+
+test('spawn callback reports original process proof to admission broker; observer failure does not change gate result', async () => {
+  const calls = [];
+  const broker = {
+    enqueue: async () => 't',
+    waitAdmission: async () => 'a',
+    assertAdmission: async () => {},
+    complete: async () => {},
+    block: async () => {},
+    recordSpawn: async (ticket, proof) => {
+      calls.push([ticket, proof]);
+      throw Error('notification evidence unavailable');
+    },
+  };
+  const proof = { pid: 2222, runToken: 'original-attempt', fingerprint: 'same' };
+  const run = createScheduledVerification({
+    taskId: '921',
+    broker,
+    inspect: () => ({ fingerprint: 'same' }),
+    run: async (t, options) => {
+      options.onSpawn(proof);
+      await Promise.resolve();
+      return { exitCode: 0, evidence: 'original' };
+    },
+  });
+  const result = await run(task);
+  assert.deepEqual(calls, [['t', proof]]);
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.evidence, 'original');
+  assert.match(result.spawnObservationError, /unavailable/);
+});
