@@ -33,6 +33,7 @@ export function createAdmissionBroker({
   let state = store.read(),
     fault = null;
   assert.ok(Number.isFinite(waiterLeaseMs) && waiterLeaseMs >= 1000);
+  let accepting = true;
   const pollingLeases = new Map();
   const waiting = new Map();
   const localTickets = new Set();
@@ -68,6 +69,7 @@ export function createAdmissionBroker({
   return {
     async enqueue(descriptor) {
       healthy();
+      assert.ok(accepting, 'Coordinator is draining; no new tasks');
       assert.equal(descriptor.restartable, false);
       assert.equal(descriptor.externalResources, true);
       const allocation = budget(descriptor);
@@ -100,6 +102,7 @@ export function createAdmissionBroker({
     },
     async pollAdmission(ticket, claimId) {
       healthy();
+      assert.ok(accepting, 'Coordinator is draining; no new admission');
       assert.ok(typeof claimId === 'string' && claimId.length >= 16, 'Stable caller claim required');
       const prior = jobFor(state, ticket);
       assert.ok(!prior.pollClaimId || prior.pollClaimId === claimId, 'Another caller owns this admission');
@@ -128,6 +131,7 @@ export function createAdmissionBroker({
     },
     tick(sample) {
       healthy();
+      if (!accepting) return [];
       assert.ok(!state.jobs.some((j) => j.runtimeUncertain), 'Active stage termination is unresolved');
       // A new coordinator cannot revive an orphaned queued caller. Its command/env was deliberately not persisted.
       const actions = transact((s) => {
@@ -157,6 +161,7 @@ export function createAdmissionBroker({
       return actions;
     },
     async assertAdmission(ticket, admission, descriptor) {
+      assert.ok(accepting, 'Coordinator is draining; no new execution');
       transact((s) => {
         const j = jobFor(s, ticket);
         assert.equal(j.status, 'starting');
@@ -213,6 +218,19 @@ export function createAdmissionBroker({
       const waiter = waiting.get(ticket.id);
       waiting.delete(ticket.id);
       waiter?.reject(Error(reason));
+    },
+    quiesce() {
+      accepting = false;
+      transact((s) => {
+        for (const j of s.jobs)
+          if (['queued', 'starting'].includes(j.status)) {
+            delete j.admissionToken;
+            transition(s, j, 'waiting-client', 'Coordinator draining; unexecuted admission withdrawn', now());
+          }
+      });
+      for (const w of waiting.values()) w.reject(Error('Coordinator draining before stage execution'));
+      waiting.clear();
+      return { accepting: false };
     },
     pendingNotifications() {
       healthy();

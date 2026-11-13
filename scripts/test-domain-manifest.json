@@ -1758,7 +1758,7 @@
       "dynamicImports": 0
     },
     "scripts/task-resource-broker.mjs": {
-      "digest": "a8dbc6f56ff1b5a9fddeb88ed22aae70652084523980c76bd52c2299c21e9043",
+      "digest": "fec6266e16dfdefd0e6ed1ce222f13097087e7eea3e465197c583610dea82d3a",
       "imports": ["scripts/task-resource-runner.mjs", "scripts/task-resource-scheduler.mjs"],
       "dynamicImports": 0
     },
@@ -1791,6 +1791,22 @@
       "digest": "d36ca661ceae74c675e7f0ca144f15f206cf068e51a442515901e9e47a455e97",
       "imports": ["scripts/task-resource-event-link.mjs", "scripts/task-resource-notifications.mjs"],
       "dynamicImports": 0
+    },
+    "scripts/task-resource-lifecycle.mjs": {
+      "digest": "c2ef97367ebb0058dde8ec5cbae7de3f2c6ed296985a9c73b57883cd36521856",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-lifecycle.test.mjs": {
+      "digest": "037a0bfa2a83a44f8f63fbc668e0f27e586f40ac859876a4ee65d2f07c70b0b3",
+      "imports": [
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-lifecycle.mjs",
+        "scripts/task-resource-recovery.mjs",
+        "scripts/task-resource-scheduler-store.mjs",
+        "scripts/task-resource-scheduler.mjs"
+      ],
+      "dynamicImports": 6
     },
     "scripts/task-resource-notifications.mjs": {
       "digest": "e8f3197d7e01600bb273346a73d2d2581d19b4898863352432034d524b48ba72",
