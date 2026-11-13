@@ -28,7 +28,7 @@
     "typecheck": "vue-tsc --noEmit",
     "typecheck:cached": "vue-tsc --noEmit --incremental --tsBuildInfoFile .task-runtime/cache/vue-tsc.tsbuildinfo",
     "lint": "eslint . --cache --cache-location .task-runtime/cache/eslint --max-warnings=0",
-    "lint:changed": "eslint --cache --cache-location .task-runtime/cache/eslint --max-warnings=0",
+    "lint:changed": "node scripts/lint-changed.mjs --cache --cache-location .task-runtime/cache/eslint --max-warnings=0",
     "lint:fix": "eslint . --fix --max-warnings=0",
     "format": "prettier . --write",
     "format:check": "prettier . --check",

@@ -1,9 +1,11 @@
 import { productWarehouseUrl } from './product-test-navigation';
 import { expect, test, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
+import { installPaymentNameMocks } from './store-payment-name-mocks';
 
 async function setup(page: Page, store = false) {
   await installAdminApiMocks(page);
+  if (store) await installPaymentNameMocks(page);
   await page.addInitScript((store) => {
     localStorage.setItem('zdm-admin-token', 'pagination-regression');
     localStorage.setItem(
@@ -107,13 +109,18 @@ for (const width of [1366, 768, 390]) {
           after: '{}',
         })),
       }));
-      state.settings = Array.from({ length: 45 }, (_, index) => ({
-        id: `setting${index}`,
-        group: 'nature',
-        name: `款项${index}`,
-        enabled: true,
-      }));
       localStorage.setItem(key, JSON.stringify(state));
+    });
+    await page.evaluate(async () => {
+      await Promise.all(
+        Array.from({ length: 45 }, (_, index) =>
+          fetch('/api/store/payment-names', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: `款项${index}` }),
+          }),
+        ),
+      );
     });
     for (const [route, total] of [
       ['fulfillment', 30],

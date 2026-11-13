@@ -1,8 +1,10 @@
 import { productWarehouseUrl } from './product-test-navigation';
 import { test, expect, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
+import { installPaymentNameMocks } from './store-payment-name-mocks';
 async function setup(page: Page, audience = 'store', permissions = ['all']) {
   await installAdminApiMocks(page);
+  await installPaymentNameMocks(page);
   await page.addInitScript(
     ({ audience, permissions }) => {
       localStorage.setItem('zdm-admin-token', 'prototype-test-token');
@@ -143,7 +145,8 @@ test('payment configuration starts empty and supports CRUD without rewriting his
   await expect(row).toHaveCount(0);
   await expect(page.getByText('已删除“成交款”', { exact: true })).toBeVisible();
   const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('zdm-order-prototype-v1:1:2:7:7') || 'null'));
-  expect(saved.settings).toEqual([]);
+  expect(saved).not.toHaveProperty('paymentNames');
+  expect(saved).not.toHaveProperty('settings');
   expect(saved.orders.find((o: { status: string }) => o.status === 'completed').payments[0].nature).toBe('全款');
   await expect(page.locator('.t-tabs__nav-item')).toHaveCount(0);
   await expect(page.getByText('收退款渠道', { exact: true })).toHaveCount(0);
@@ -154,7 +157,7 @@ test('payment configuration starts empty and supports CRUD without rewriting his
   await page.evaluate(() => {
     const key = 'zdm-order-prototype-v1:1:2:7:7';
     const state = JSON.parse(localStorage.getItem(key) || 'null');
-    state.settings.push({ id: 'nature-0', group: 'nature', name: '首付款', enabled: true });
+    state.settings = [{ id: 'nature-0', group: 'nature', name: '首付款', enabled: true }];
     localStorage.setItem(key, JSON.stringify(state));
   });
   await page.reload();
@@ -364,4 +367,119 @@ test('unchanged pagination events preserve expanded goods while real page change
   await expect(page.locator('.order-goods')).toHaveCount(0);
   await previous.click();
   await expect(page.locator('.order-card')).toHaveCount(10);
+});
+
+test('payment configuration API failures never fall back to local names and can be retried', async ({ page }) => {
+  await setup(page);
+  await page.route(
+    '**/api/store/payment-names?*',
+    async (route) =>
+      route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 400, message: '款项配置暂时不可用', data: null }),
+      }),
+    { times: 1 },
+  );
+  await page.goto(productWarehouseUrl('/store/order-management/settings'));
+  await expect(page.getByText('款项配置暂时不可用', { exact: true })).toBeVisible();
+  await page.getByText('重试', { exact: true }).click();
+  await expect(page.getByText('款项配置暂时不可用', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('cell', { name: '定金', exact: true })).toHaveCount(0);
+  await page.getByRole('button', { name: '新增', exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  await dialog.getByPlaceholder('请输入名称', { exact: true }).fill('十个字符名称测试文字');
+  await page.route('**/api/store/payment-names', async (route) => {
+    if (route.request().method() === 'POST')
+      return route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({ code: 400, message: '该名称已存在', data: null }),
+      });
+    return route.fallback();
+  });
+  await dialog.getByRole('button', { name: '确认新增', exact: true }).click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByPlaceholder('请输入名称', { exact: true })).toHaveValue('十个字符名称测试文字');
+  await expect(dialog.getByText('该名称已存在', { exact: true })).toBeVisible();
+});
+
+test('payment name changes during receipt entry require explicit reselection and retain the old label', async ({
+  page,
+}) => {
+  await setup(page);
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
+  await page.evaluate(async () => {
+    await fetch('/api/store/payment-names', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '定金' }),
+    });
+  });
+  await page.getByRole('button', { name: '操作', exact: true }).click();
+  await page.getByText('登记收款', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  await dialog.getByPlaceholder('请选择款项名称', { exact: true }).click();
+  await page.getByText('定金', { exact: true }).last().click();
+  await page.evaluate(async () => {
+    await fetch('/api/store/payment-names/1', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '预付款', version: 1 }),
+    });
+  });
+  await dialog.getByPlaceholder('请输入金额', { exact: false }).fill('100');
+  await dialog.getByRole('button', { name: '确认登记收款', exact: true }).click();
+  await expect(dialog.locator('.t-form-item-tips').filter({ hasText: '款项配置已变化，请重新选择' })).toBeVisible();
+  await expect(dialog.getByPlaceholder('请选择款项名称', { exact: true })).toHaveValue('定金');
+  const state = await page.evaluate(() => JSON.parse(localStorage.getItem('zdm-order-prototype-v1:1:2:7:7')!));
+  expect(state.orders.find((order: { status: string }) => order.status === 'pending').payments).toEqual([]);
+});
+
+test('payment configuration uses server totals and corrects an emptied last page', async ({ page }) => {
+  await setup(page);
+  await page.goto(productWarehouseUrl('/store/order-management/settings'));
+  await page.evaluate(async () => {
+    for (let index = 1; index <= 11; index++)
+      await fetch('/api/store/payment-names', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: `货款${index}` }),
+      });
+  });
+  await page.reload();
+  const next = page.locator('.zdm-official-list-page .t-pagination__btn-next');
+  await expect(next).not.toHaveClass(/t-is-disabled/);
+  await next.click();
+  const row = page.getByRole('row').filter({ has: page.getByRole('cell', { name: '货款1', exact: true }) });
+  await expect(row).toBeVisible();
+  await row.getByText('删除', { exact: true }).click();
+  await page.locator('.t-dialog:visible').getByRole('button', { name: '确认删除', exact: true }).click();
+  await expect(page.getByRole('cell', { name: '货款11', exact: true })).toBeVisible();
+  await expect(page.locator('.t-pagination__number.t-is-current')).toHaveText('1');
+  await expect(page.getByRole('cell', { name: '货款1', exact: true })).toHaveCount(0);
+});
+
+test('concurrent payment-name deletion refreshes the list and preserves the edit input', async ({ page }) => {
+  await setup(page);
+  await page.goto(productWarehouseUrl('/store/order-management/settings'));
+  await page.evaluate(async () => {
+    await fetch('/api/store/payment-names', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: '待编辑货款' }),
+    });
+  });
+  await page.reload();
+  await page.getByRole('row').filter({ hasText: '待编辑货款' }).getByText('编辑', { exact: true }).click();
+  const dialog = page.locator('.t-dialog:visible');
+  await dialog.getByPlaceholder('请输入名称', { exact: true }).fill('填写中货款');
+  await page.evaluate(async () => {
+    await fetch('/api/store/payment-names/1?version=1', { method: 'DELETE' });
+  });
+  await dialog.getByRole('button', { name: '确认保存', exact: true }).click();
+  await expect(dialog.locator('.t-form-item-tips').filter({ hasText: '款项名称不存在或已删除' })).toBeVisible();
+  await expect(dialog.getByPlaceholder('请输入名称', { exact: true })).toHaveValue('填写中货款');
+  await expect(page.getByRole('cell', { name: '待编辑货款', exact: true })).toHaveCount(0);
+  expect(await page.evaluate(async () => (await (await fetch('/api/store/payment-names')).json()).data.total)).toBe(0);
 });
