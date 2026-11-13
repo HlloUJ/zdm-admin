@@ -2,6 +2,7 @@ package com.zdm.platform.store;
 
 import com.baomidou.mybatisplus.core.toolkit.Wrappers;
 import com.zdm.platform.account.CreatorAwareService;
+import com.zdm.platform.common.CategoryProductCounts;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.HashSet;
 import java.util.List;
@@ -45,6 +46,17 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
   }
 
   public List<StoreCategory> listOrdered(String scope) {
+    var categories = listDirectCounts(scope);
+    var totals = CategoryProductCounts.rollUp(
+        categories, StoreCategory::getId, StoreCategory::getParentId,
+        StoreCategory::getProductCount,
+        (child, parent) -> Objects.equals(child.getScope(), parent.getScope())
+            && Objects.equals(child.getStoreId(), parent.getStoreId()));
+    categories.forEach(category -> category.setProductCount(totals.get(category.getId())));
+    return categories;
+  }
+
+  private List<StoreCategory> listDirectCounts(String scope) {
     requireScope(scope);
     var categories = lambdaQuery().eq(StoreCategory::getStoreId, requireStoreId())
         .eq(StoreCategory::getScope, scope).orderByAsc(StoreCategory::getSortOrder)
@@ -62,6 +74,11 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
       categories.forEach(category -> category.setProductCount(counts.getOrDefault(category.getId(), 0)));
     }
     return categories;
+  }
+
+  private StoreCategory countedCategory(Long id, String scope) {
+    return listOrdered(scope).stream().filter(category -> Objects.equals(id, category.getId()))
+        .findFirst().orElseThrow(() -> new IllegalArgumentException("分类不存在或已被删除"));
   }
 
   public StoreCategory requireCategory(Long id, String scope) {
@@ -155,7 +172,7 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
     if (request.status() != null && !request.status().equals(category.getStatus())) {
       updateStatus(id, scope, request.status());
     }
-    return requireCategory(id, scope);
+    return countedCategory(id, scope);
   }
 
   @Transactional
@@ -184,7 +201,7 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
     update(Wrappers.<StoreCategory>lambdaUpdate()
         .eq(StoreCategory::getStoreId, category.getStoreId()).eq(StoreCategory::getScope, scope)
         .in(StoreCategory::getId, familyIds).set(StoreCategory::getStatus, status));
-    return requireCategory(id, scope);
+    return countedCategory(id, scope);
   }
 
   @Transactional
@@ -231,7 +248,7 @@ public class StoreCategoryService extends CreatorAwareService<StoreCategoryMappe
   }
 
   private List<StoreCategory> listSiblings(String scope, Long parentId) {
-    return listOrdered(scope).stream().filter(category -> Objects.equals(parentId, category.getParentId())).toList();
+    return listDirectCounts(scope).stream().filter(category -> Objects.equals(parentId, category.getParentId())).toList();
   }
 
   private void requireUniqueName(String scope, Long parentId, String name, Long excludedId) {
