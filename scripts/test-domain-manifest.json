@@ -585,12 +585,12 @@
       "dynamicImports": 0
     },
     "scripts/completion-process.mjs": {
-      "digest": "97633a69b62df46447435c58c92561dba8c0b783d91d1893ecfba5c37c1ea56f",
+      "digest": "a5998924ba1d6fc736d7ea2d244f82766ed72f2910b42ddba38a129e30b85580",
       "imports": ["scripts/integration-resource.mjs"],
       "dynamicImports": 0
     },
     "scripts/completion-process.test.mjs": {
-      "digest": "9a2423740879bce17369acbd3859dd6bfccb0274f8ea82bbabee5b8e3139452c",
+      "digest": "03622d5fcb1d865495ba72cbd1e313a6c9cd4c1282a9f8117601abcb241ff17b",
       "imports": ["scripts/completion-process.mjs", "scripts/completion-session.mjs"],
       "dynamicImports": 0
     },
