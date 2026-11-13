@@ -1876,7 +1876,7 @@
       "dynamicImports": 0
     },
     "scripts/task-resource-notifications.test.mjs": {
-      "digest": "acd85908d20d0dc3aaa70ef75e3bb68ebeda7a1d4c08e690cf4ed0599a30ae91",
+      "digest": "d78654f0f9877a1399814eba11f75e45ebe812b52158e5a0a61ee978d919c3a8",
       "imports": ["scripts/task-resource-notifications.mjs"],
       "dynamicImports": 0
     },
