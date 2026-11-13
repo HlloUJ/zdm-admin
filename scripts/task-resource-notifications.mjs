@@ -25,13 +25,17 @@ export function schedulingNotice(event, { taskLabel = event.task, timeZone = 'As
     eventId,
     task: event.task,
     taskLabel,
+    ...(event.taskStableId ? { taskStableId: event.taskStableId } : {}),
+    ...(Number.isInteger(event.parallelBefore) && Number.isInteger(event.parallelAfter)
+      ? { parallelBefore: event.parallelBefore, parallelAfter: event.parallelAfter }
+      : {}),
     stage: event.stage,
     from: event.from,
     to: event.to,
     reason: event.reason,
     at: event.at,
     title: '装点猫任务调度',
-    body: `任务 ${taskLabel}：${statuses[event.from] ?? event.from} → ${statuses[event.to] ?? event.to}\n${event.reason}\n${new Date(event.at).toLocaleString('zh-CN', { timeZone, hour12: false })}`,
+    body: `任务 ${taskLabel}：${statuses[event.from] ?? event.from} → ${statuses[event.to] ?? event.to}\n${event.reason}${Number.isInteger(event.parallelBefore) && Number.isInteger(event.parallelAfter) ? `\n并行组数：${event.parallelBefore} → ${event.parallelAfter}` : ''}\n${new Date(event.at).toLocaleString('zh-CN', { timeZone, hour12: false })}`,
   };
 }
 // Never interprets a successful osascript exit as a visible/read notification.
