@@ -88,6 +88,23 @@ export async function stopCompletionProcess(child) {
     }
   };
   if (alive()) process.kill(-record.pgid, 'SIGTERM');
+  // Reap our exact supervisor before probing its group again. Darwin can report
+  // EPERM for the zombie-only group until Node dispatches this child's exit.
+  // This is not proof that descendants are gone: the group check below remains
+  // mandatory and still fails closed on EPERM or any other unknown error.
+  if (child.exitCode === null && child.signalCode === null) {
+    await new Promise((resolve, reject) => {
+      const onExit = () => {
+        clearTimeout(timer);
+        resolve();
+      };
+      const timer = setTimeout(() => {
+        child.removeListener('exit', onExit);
+        reject(new Error('Validation supervisor did not exit; retain its original process proof'));
+      }, 5000);
+      child.once('exit', onExit);
+    });
+  }
   const deadline = Date.now() + 5000;
   while (alive() && Date.now() < deadline) await new Promise((resolve) => setTimeout(resolve, 50));
   // Do not kill an unknown/reused group after its supervisor disappeared.
