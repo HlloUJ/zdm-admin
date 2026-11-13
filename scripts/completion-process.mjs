@@ -19,14 +19,20 @@ import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { forwardIntegrationEnvironment } from ${JSON.stringify(new URL('./integration-resource.mjs', import.meta.url).href)};
 import os from 'node:os';
-const [file, token, command, ...args] = process.argv.slice(1);
+const [file, token, stopMode, command, ...args] = process.argv.slice(1);
 const intent = JSON.parse(readFileSync(file, 'utf8'));
-if (intent.token !== token || intent.status !== 'pending') throw Error('Invalid child intent');
+if (!['group', 'direct'].includes(stopMode) || intent.token !== token || intent.status !== 'pending') throw Error('Invalid child intent');
 const record = { token, host: os.hostname(), pgid: process.pid, status: 'started' };
 const publish = () => { writeFileSync(file + '.tmp', JSON.stringify(record), { mode: 0o600, flag: 'wx' }); renameSync(file + '.tmp', file); };
 // A started record authorizes group termination, so publish it only after the
 // child exists. Publishing before spawn allows TERM to race with a later fork.
 let child;
+let stopping = false;
+// Keep the supervisor alive to reap its direct child. The outer stop already
+// signals the entire owned group, including the child, exactly once.
+if (stopMode === 'group') process.on('SIGTERM', () => {
+  stopping = true;
+});
 try { child = spawn(command, args, { stdio: 'inherit', env: forwardIntegrationEnvironment() }); }
 catch (error) {
   record.status = 'exited'; record.exitCode = 1; record.signal = null;
@@ -36,7 +42,7 @@ child.once('spawn', () => { publish(); });
 child.once('error', (error) => { process.stderr.write(error.message + '\\n'); });
 child.once('close', (code, signal) => {
   record.status = 'exited'; record.exitCode = code ?? 1; record.signal = signal;
-  publish(); process.exit(code ?? 1);
+  publish(); process.exit(stopping && code === 0 ? 143 : (code ?? 1));
 });
 `;
 export function runCompletionProcess(command, args, options = {}) {
@@ -51,14 +57,19 @@ export function runCompletionProcess(command, args, options = {}) {
   writeFileSync(file, JSON.stringify({ token, status: 'pending' }), { flag: 'wx', mode: 0o600 });
   (event.processes ??= []).push({ token });
   save(state); // Commit intent before spawn. A crash in this window blocks recovery.
-  const result = spawnSync(process.execPath, ['--input-type=module', '-e', supervisor, file, token, command, ...args], {
-    ...options,
-    detached: true,
-  });
+  const result = spawnSync(
+    process.execPath,
+    ['--input-type=module', '-e', supervisor, file, token, 'direct', command, ...args],
+    {
+      ...options,
+      detached: true,
+    },
+  );
   assertProcessesGone({ processTracking: 1, processes: [{ token }] }, directory);
   return result;
 }
 export function startCompletionProcess(command, args, options = {}) {
+  assert.ok(!options.timeout && !options.signal, 'Owned group processes must be stopped through stopCompletionProcess');
   const current = scope.getStore();
   assert.ok(current, 'Long-lived validation process requires its exact completion stage');
   const { state, event, save } = current,
@@ -69,10 +80,14 @@ export function startCompletionProcess(command, args, options = {}) {
   writeFileSync(file, JSON.stringify({ token, status: 'pending' }), { flag: 'wx', mode: 0o600 });
   (event.processes ??= []).push({ token });
   save(state);
-  const child = spawn(process.execPath, ['--input-type=module', '-e', supervisor, file, token, command, ...args], {
-    ...options,
-    detached: true,
-  });
+  const child = spawn(
+    process.execPath,
+    ['--input-type=module', '-e', supervisor, file, token, 'group', command, ...args],
+    {
+      ...options,
+      detached: true,
+    },
+  );
   child.completionProof = { directory, token, file };
   return child;
 }
