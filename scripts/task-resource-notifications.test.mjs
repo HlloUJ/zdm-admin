@@ -106,9 +106,9 @@ test('restart during sending preserves ambiguity instead of generating duplicate
   const outbox = createNotificationOutbox({ store, mac: async () => {}, board: async () => {} });
   assert.equal(outbox.snapshot()[notice.eventId].mac.status, 'unknown');
 });
-test('osascript transport passes text as argv, never modifies notification/security settings', () => {
+test('osascript transport passes text as argv, never modifies notification/security settings', async () => {
   let called;
-  const result = submitMacNotification(
+  const result = await submitMacNotification(
     { ...notice, body: '" & malicious text' },
     {
       execute: (command, args) => {
@@ -122,11 +122,13 @@ test('osascript transport passes text as argv, never modifies notification/secur
   assert.equal(result.status, 'submitted');
   assert.equal(result.visibility, 'unverified');
   assert.equal(
-    submitMacNotification(notice, {
-      execute: () => {
-        throw Error('unavailable');
-      },
-    }).status,
+    (
+      await submitMacNotification(notice, {
+        execute: () => {
+          throw Error('unavailable');
+        },
+      })
+    ).status,
     'unknown',
   );
 });

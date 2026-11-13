@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+const executeAsync = promisify(execFile);
 const statuses = {
   queued: '等待资源',
   starting: '准备执行',
@@ -39,10 +41,10 @@ export function schedulingNotice(event, { taskLabel = event.task, timeZone = 'As
   };
 }
 // Never interprets a successful osascript exit as a visible/read notification.
-export function submitMacNotification(notice, { execute = execFileSync } = {}) {
+export async function submitMacNotification(notice, { execute = executeAsync } = {}) {
   const script = 'on run argv\n display notification (item 2 of argv) with title (item 1 of argv)\nend run';
   try {
-    execute('/usr/bin/osascript', ['-e', script, '--', notice.title, notice.body], {
+    await execute('/usr/bin/osascript', ['-e', script, '--', notice.title, notice.body], {
       encoding: 'utf8',
       timeout: 5000,
       maxBuffer: 65536,
