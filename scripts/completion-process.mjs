@@ -15,7 +15,7 @@ export function processScope(state, event, save, run) {
 // foreground descendants inherit the group even if the completion owner exits.
 // No command arguments, environment values or command output enter the journal.
 const supervisor = `
-import { spawnSync } from 'node:child_process';
+import { spawn } from 'node:child_process';
 import { readFileSync, writeFileSync, renameSync } from 'node:fs';
 import { forwardIntegrationEnvironment } from ${JSON.stringify(new URL('./integration-resource.mjs', import.meta.url).href)};
 import os from 'node:os';
@@ -24,13 +24,20 @@ const intent = JSON.parse(readFileSync(file, 'utf8'));
 if (intent.token !== token || intent.status !== 'pending') throw Error('Invalid child intent');
 const record = { token, host: os.hostname(), pgid: process.pid, status: 'started' };
 const publish = () => { writeFileSync(file + '.tmp', JSON.stringify(record), { mode: 0o600, flag: 'wx' }); renameSync(file + '.tmp', file); };
-publish();
-let result;
-try { result = spawnSync(command, args, { stdio: 'inherit', env: forwardIntegrationEnvironment() }); }
-catch (error) { process.stderr.write(error.message + '\\n'); result = {status:1,signal:null}; }
-record.status = 'exited'; record.exitCode = result.status; record.signal = result.signal;
-publish();
-process.exit(result.status ?? 1);
+// A started record authorizes group termination, so publish it only after the
+// child exists. Publishing before spawn allows TERM to race with a later fork.
+let child;
+try { child = spawn(command, args, { stdio: 'inherit', env: forwardIntegrationEnvironment() }); }
+catch (error) {
+  record.status = 'exited'; record.exitCode = 1; record.signal = null;
+  publish(); process.stderr.write(error.message + '\\n'); process.exit(1);
+}
+child.once('spawn', () => { publish(); });
+child.once('error', (error) => { process.stderr.write(error.message + '\\n'); });
+child.once('close', (code, signal) => {
+  record.status = 'exited'; record.exitCode = code ?? 1; record.signal = signal;
+  publish(); process.exit(code ?? 1);
+});
 `;
 export function runCompletionProcess(command, args, options = {}) {
   const current = scope.getStore();
