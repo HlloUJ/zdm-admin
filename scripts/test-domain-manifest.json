@@ -1771,22 +1771,22 @@
       "dynamicImports": 2
     },
     "scripts/task-resource-event-link.mjs": {
-      "digest": "b6f96a1d45689964dbc497f781bcd2ffcc51e15fa37e2cc30c2f29bfb136a888",
+      "digest": "d27189488d0d25dc4667962a44c1b8c8fba82099d1aa35f65e0ba80d6b55bb31",
       "imports": ["scripts/task-resource-notifications.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-resource-event-link.test.mjs": {
-      "digest": "fdf53950c6b5a18b9ad039888aa2f09ca49f949741b3c6732aa30e6c8b5ae98b",
+      "digest": "d36ca661ceae74c675e7f0ca144f15f206cf068e51a442515901e9e47a455e97",
       "imports": ["scripts/task-resource-event-link.mjs", "scripts/task-resource-notifications.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-resource-notifications.mjs": {
-      "digest": "758e2d429da630b73a14f760f1f6f8b94cd5846f369f2fea3a8b03df7fe83a8b",
+      "digest": "183bcc26d8144abc50a022f5ec7b36548cf8784298cde9de63b2427fe456cdd8",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/task-resource-notifications.test.mjs": {
-      "digest": "9f29ca0fd2f6e3e704fe785bec997695282295da7a5184fd44031cb47cd07873",
+      "digest": "3ae3a19eefc3bdd69d56118a6e92073c6c7dfe6bc744154f548eeecf952ed564",
       "imports": ["scripts/task-resource-notifications.mjs"],
       "dynamicImports": 0
     },

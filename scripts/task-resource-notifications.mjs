@@ -61,7 +61,7 @@ export function submitMacNotification(notice, { execute = execFileSync } = {}) {
 // and retain safety scheduling, while exposing notification health separately.
 export function createNotificationOutbox({ store, mac, board, now = Date.now, maxAttempts = 3 }) {
   assert.equal(typeof mac, 'function');
-  assert.equal(typeof board, 'function');
+  assert.ok(board === undefined || typeof board === 'function');
   let state = store.read();
   state.notices ??= {};
   let busy = false;
@@ -72,6 +72,15 @@ export function createNotificationOutbox({ store, mac, board, now = Date.now, ma
   // A process may have submitted a notification just before dying. Do not create duplicate popups blindly.
   const restored = structuredClone(state);
   let changed = false;
+  // Local-only mode does not require or fabricate an online dashboard receipt.
+  if (!board) {
+    for (const record of Object.values(restored.notices)) {
+      if (record.board && record.board.status !== 'disabled') {
+        record.board = { ...record.board, previousStatus: record.board.status, status: 'disabled' };
+        changed = true;
+      }
+    }
+  }
   for (const record of Object.values(restored.notices))
     for (const channel of ['mac', 'board'])
       if (record[channel].status === 'sending') {
@@ -95,7 +104,7 @@ export function createNotificationOutbox({ store, mac, board, now = Date.now, ma
       next.notices[notice.eventId] = {
         notice: structuredClone(notice),
         mac: { status: 'pending', attempts: 0, nextAt: 0 },
-        board: { status: 'pending', attempts: 0, nextAt: 0 },
+        board: { status: board ? 'pending' : 'disabled', attempts: 0, nextAt: 0 },
       };
       save(next);
       return true;
@@ -109,6 +118,7 @@ export function createNotificationOutbox({ store, mac, board, now = Date.now, ma
             ['mac', mac],
             ['board', board],
           ]) {
+            if (!transport) continue;
             let entry = state.notices[id][channel];
             if (entry.status !== 'pending' || entry.nextAt > now()) continue;
             let next = structuredClone(state);

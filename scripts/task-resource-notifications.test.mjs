@@ -136,3 +136,15 @@ test('board receipt mismatch does not claim written', async () => {
   await s.outbox.pump();
   assert.equal(s.outbox.snapshot()[notice.eventId].board.status, 'unknown');
 });
+
+test('Mac-only mode disables legacy pending dashboard channel without fabricating delivery', async () => {
+  const s = setup();
+  s.outbox.enqueue(notice);
+  const { board: unused, ...localOptions } = s.options;
+  const local = createNotificationOutbox(localOptions);
+  await local.pump();
+  const record = local.snapshot()[notice.eventId];
+  assert.equal(record.board.status, 'disabled');
+  assert.equal(record.board.previousStatus, 'pending');
+  assert.deepEqual(s.calls, ['mac']);
+});

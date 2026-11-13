@@ -9,25 +9,46 @@ const snapshot = {
   ],
   events: [
     { id: 1, job: 'a', task: 'task-a', stage: 'tests', from: 'queued', to: 'starting', reason: 'ready', at: 1 },
-    { id: 2, job: 'a', task: 'task-a', stage: 'tests', from: 'starting', to: 'running', reason: 'started', at: 2 },
+    {
+      id: 2,
+      job: 'a',
+      task: 'task-a',
+      stage: 'tests',
+      from: 'starting',
+      to: 'running',
+      reason: 'started',
+      executionStarted: true,
+      runToken: 'run-a',
+      at: 2,
+    },
     { id: 3, job: 'b', task: 'task-b', stage: 'tests', from: 'queued', to: 'starting', reason: 'ready', at: 3 },
-    { id: 4, job: 'b', task: 'task-b', stage: 'tests', from: 'starting', to: 'running', reason: 'started', at: 4 },
+    {
+      id: 4,
+      job: 'b',
+      task: 'task-b',
+      stage: 'tests',
+      from: 'starting',
+      to: 'running',
+      reason: 'started',
+      executionStarted: true,
+      runToken: 'run-b',
+      at: 4,
+    },
     { id: 5, job: 'a', task: 'task-a', stage: 'tests', from: 'running', to: 'done', reason: 'passed', at: 5 },
   ],
 };
 const resolveTask = (id) => ({ stableId: 'stable-' + id, label: id === 'task-a' ? '921' : '756' });
-test('records each scheduling change with exact count before/after and stable task identity', () => {
+test('only actual starts produce notices with stable identity', () => {
   const ns = schedulerNotices(snapshot, resolveTask);
   assert.deepEqual(
     ns.map((n) => [n.parallelBefore, n.parallelAfter]),
     [
-      [0, 1],
-      [1, 2],
-      [2, 1],
+      [1, 1],
+      [2, 2],
     ],
   );
   assert.equal(ns[0].taskStableId, 'stable-task-a');
-  assert.match(ns[0].body, /并行组数：0 → 1/);
+  assert.match(ns[0].body, /任务 921 开始执行/);
 });
 test('source reconstruction and IDs remain stable across exports', () => {
   const first = schedulerNotices(snapshot, resolveTask);
@@ -66,7 +87,7 @@ test('outbox storage failure leaves source events intact for later export', () =
   assert.equal(result.notificationHealth, 'pending-error');
   assert.equal(snapshot.events.length, 5);
 });
-test('restart repeats no already submitted notice; board unavailable remains explicit', async () => {
+test('restart repeats no already submitted notice; dashboard is disabled', async () => {
   let state = { notices: {} },
     macCalls = 0;
   const options = {
@@ -75,15 +96,20 @@ test('restart repeats no already submitted notice; board unavailable remains exp
       macCalls++;
       return { eventId: n.eventId, status: 'submitted' };
     },
-    board: async () => ({ status: 'not-submitted', error: 'No approved interface' }),
   };
   let outbox = createNotificationOutbox(options);
   const broker = { snapshot: () => snapshot };
-  assert.equal(exportSchedulerNotices({ broker, outbox, resolveTask }).added, 3);
+  assert.equal(exportSchedulerNotices({ broker, outbox, resolveTask }).added, 2);
   await outbox.pump();
   outbox = createNotificationOutbox(options);
   assert.equal(exportSchedulerNotices({ broker, outbox, resolveTask }).added, 0);
   await outbox.pump();
-  assert.equal(macCalls, 3);
-  assert.equal(Object.values(outbox.snapshot())[0].board.status, 'pending');
+  assert.equal(macCalls, 2);
+  assert.equal(Object.values(outbox.snapshot())[0].board.status, 'disabled');
+});
+
+test('admitted running without spawn proof does not claim work started', () => {
+  const s = structuredClone(snapshot);
+  for (const e of s.events) delete e.executionStarted;
+  assert.deepEqual(schedulerNotices(s, resolveTask), []);
 });
