@@ -1,3 +1,4 @@
+import { fixedPreviewConfigFile, hasFixedPreview, inspectFixedCompletionPreview } from './completion-fixed-preview.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
@@ -166,7 +167,12 @@ export function previewContract(record, commonDir) {
 export async function checkCompletionRuntime(
   root,
   commonDir,
-  { allowPreviewUnavailable = false, request = requestResponse } = {},
+  {
+    allowPreviewUnavailable = false,
+    request = requestResponse,
+    fixedConfigFile = fixedPreviewConfigFile(),
+    fixedProbe = inspectFixedCompletionPreview,
+  } = {},
 ) {
   const file = path.join(commonDir, 'preview-environment/environment.json');
   assert.ok(lstatSync(file).isFile() && !lstatSync(file).isSymbolicLink(), 'Unsafe preview registration');
@@ -180,11 +186,13 @@ export async function checkCompletionRuntime(
     const checked = previewContract(JSON.parse(readFileSync(published, 'utf8')), commonDir);
     result.publishedProfileFingerprint = checked.profileFingerprint;
   }
-  let previewHealthy = false;
+  const fixed = hasFixedPreview(fixedConfigFile);
+  const fixedProof = fixed ? await fixedProbe(commonDir, { configFile: fixedConfigFile }) : null;
+  let previewHealthy = Boolean(fixedProof);
   for (const url of [
     'http://127.0.0.1:5173',
     'http://127.0.0.1:8080/actuator/health',
-    'http://127.0.0.1:5175/__zdm_task_preview_api_health__',
+    ...(fixed ? [] : ['http://127.0.0.1:5175/__zdm_task_preview_api_health__']),
   ]) {
     const response = await request(url, 15000);
     const isPreview = url.includes(':5175/');
@@ -204,6 +212,7 @@ export async function checkCompletionRuntime(
     integrationHealthy: true,
     previewHealthy,
     runtimeHealthy: previewHealthy,
+    ...(fixedProof ? { preservedFixedPreview: fixedProof } : {}),
     servicesChanged: false,
   };
 }

@@ -1,3 +1,4 @@
+import { hasFixedPreview, createFixedCompletionPreviewControl } from './completion-fixed-preview.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -29,6 +30,10 @@ export function createCompletionPreviewControl({
     return JSON.parse(readFileSync(paths.configFile, 'utf8'));
   },
 } = {}) {
+  const directory = paths.runtimeDirectory ?? (paths.configFile ? path.dirname(paths.configFile) : null);
+  const fixedConfig = directory ? path.join(path.dirname(directory), 'fixed-frontend', 'config.json') : null;
+  if (hasFixedPreview(fixedConfig))
+    return createFixedCompletionPreviewControl({ configFile: fixedConfig, execute, inspect, references, registry });
   async function assertOwner(plan) {
     const status = await readStatus();
     assert.equal(status?.type, 'zdm-task-preview-service', 'Preview ownership is unknown');

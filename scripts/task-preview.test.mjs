@@ -87,3 +87,42 @@ test('normal task preview operations use independent lifecycle without reading o
   ])
     await assert.rejects(taskPreview('/repo/a', args, dependencies));
 });
+
+test('read-only task check preserves status identity and fails closed unless runtimeReady is true', async () => {
+  for (const readiness of [false, undefined, null, 'true', 1, true]) {
+    const calls = [];
+    const dependencies = {
+      owner: 'chat-a',
+      independent: async (root, options) => {
+        calls.push({ root, options });
+        return { runtimeReady: readiness, verificationProven: false };
+      },
+      readStatus: () => assert.fail('must not inspect shared preview'),
+      request: () => assert.fail('must not start or switch runtime'),
+    };
+    const result = taskPreview('/repo/a', ['check', '--task', 'a'], dependencies);
+    if (readiness === true) assert.equal((await result).verificationProven, false);
+    else await assert.rejects(result, /Task preview is not ready/);
+    assert.deepEqual(calls, [
+      {
+        root: '/repo/a',
+        options: {
+          command: 'status',
+          id: 'a',
+          owner: 'chat-a',
+          port: null,
+          backendPort: null,
+        },
+      },
+    ]);
+  }
+  await assert.rejects(taskPreview('/repo/a', ['check'], { independent: () => assert.fail('missing identity') }));
+  await assert.rejects(
+    taskPreview('/repo/a', ['check', '--task', 'a'], {
+      independent: async () => {
+        throw new Error('Preview ownership changed');
+      },
+    }),
+    /Preview ownership changed/,
+  );
+});

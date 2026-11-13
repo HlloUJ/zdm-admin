@@ -1,3 +1,4 @@
+import { assertCombinationRuntime } from './task-preview-combination.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +13,7 @@ export async function isolateTaskData(root, { id, owner, apply = false }, depend
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id });
   assert.equal(task.owner, owner, 'Exact task owner required for isolated data preparation');
+  assertCombinationRuntime(root, task);
   assert.ok(!task.recovery?.runtimeBlocked, 'Historical recovery is not verified; data preparation remains blocked');
   assert.ok(
     !['merged', 'main-verified', 'handoff-verified', 'closed'].includes(task.stage) &&
