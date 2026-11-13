@@ -58,6 +58,12 @@ export function assessExternalRecovery({ job, observations, now = Date.now(), ma
   )
     reasons.push('Process observation identity does not match original proof');
   const manifest = job?.externalManifest;
+  if (
+    manifest?.runToken !== job?.spawnProof?.runToken ||
+    !job?.fingerprint ||
+    manifest?.fingerprint !== job.fingerprint
+  )
+    reasons.push('Resource manifest source/execution mismatch');
   if (!manifest?.complete || !Array.isArray(manifest.containers) || !Array.isArray(manifest.leases))
     reasons.push('Complete external-resource manifest missing');
   if (observations?.process?.status !== 'absent' && observations?.process?.status !== 'identity-reused')
@@ -82,7 +88,13 @@ export function assessExternalRecovery({ job, observations, now = Date.now(), ma
     }
     for (const expected of manifest.leases ?? []) {
       const actual = observations?.leases?.find((v) => v.resource === expected.resource);
-      if (!actual || actual.runToken !== job.spawnProof?.runToken || actual.status !== 'released-by-owner')
+      if (
+        !expected.tokenDigest ||
+        !actual ||
+        actual.tokenDigest !== expected.tokenDigest ||
+        actual.runToken !== job.spawnProof?.runToken ||
+        actual.status !== 'released-by-owner'
+      )
         reasons.push('Original resource lease is unresolved');
     }
   }

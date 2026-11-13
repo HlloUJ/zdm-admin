@@ -1792,13 +1792,23 @@
       "imports": ["scripts/task-resource-event-link.mjs", "scripts/task-resource-notifications.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-resource-external-manifest.mjs": {
+      "digest": "d87b22529825f68db85c60bbc3312680af444f835dd369b93404e9b54caa85ff",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-external-manifest.test.mjs": {
+      "digest": "c1fd8bcee4ed0c6b7bc2e4aabba79365f78ef09246a20f17d01834b9f7789714",
+      "imports": ["scripts/resource-lease.mjs", "scripts/task-resource-external-manifest.mjs"],
+      "dynamicImports": 4
+    },
     "scripts/task-resource-lifecycle.mjs": {
-      "digest": "c2ef97367ebb0058dde8ec5cbae7de3f2c6ed296985a9c73b57883cd36521856",
+      "digest": "bacf85cc065df7462742030a2a8ced6f12c3b9af6fcc620ddd9e86d98b8003ff",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/task-resource-lifecycle.test.mjs": {
-      "digest": "037a0bfa2a83a44f8f63fbc668e0f27e586f40ac859876a4ee65d2f07c70b0b3",
+      "digest": "ca03c552c36221048233ab4ef7473f934bc4ce53ca6394af2cc9eb505f7c06dc",
       "imports": [
         "scripts/task-resource-broker.mjs",
         "scripts/task-resource-lifecycle.mjs",

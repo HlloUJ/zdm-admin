@@ -6,10 +6,13 @@ import { initialSchedulerState } from './task-resource-scheduler.mjs';
 const proof = { pid: 1234, startTime: 'original', runToken: 'run' };
 const job = {
   spawnProof: proof,
+  fingerprint: 'source',
   externalManifest: {
+    runToken: 'run',
+    fingerprint: 'source',
     complete: true,
     containers: [{ id: 'exact-container', runToken: 'run' }],
-    leases: [{ resource: 'exact-lease' }],
+    leases: [{ resource: 'exact-lease', tokenDigest: 'hash' }],
   },
 };
 const observations = {
@@ -18,7 +21,7 @@ const observations = {
   observedAt: 2,
   process: { status: 'absent', pid: 1234, expectedStartTime: 'original' },
   containers: [{ id: 'exact-container', runToken: 'run', status: 'stopped' }],
-  leases: [{ resource: 'exact-lease', runToken: 'run', status: 'released-by-owner' }],
+  leases: [{ resource: 'exact-lease', tokenDigest: 'hash', runToken: 'run', status: 'released-by-owner' }],
 };
 test('external recovery never equates termination to success or automatic retry', () => {
   const r = assessExternalRecovery({ job, observations, now: 2 });
