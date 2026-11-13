@@ -18,7 +18,7 @@ npm run task:entry -- --worktree <exact-task-directory> preview stop --task <tas
 
 `preview start` 复用原前台启动器，保持在该任务的执行会话运行，不新增守护服务或另一个后台调度器。它返回并输出当前任务自己的预览地址；各任务可同时访问。已有健康预览会先核验再复用，无法核验时保留现场。Ctrl+C沿用底层规则只关闭前端并保留后端；需要完整停止任务运行资源时使用准确的 `preview stop --task`。
 
-`preview status --task` 检查端口归属、Worktree、分支、运行 nonce、API代理及已登记数据绑定。运行就绪不等于业务质量通过，结果明确保留 `verificationProven: false`。不带任务的历史 status、显式 switch 与已有5175保留兼容，普通任务无需抢占它们。
+`preview status --task` 检查端口归属、Worktree、分支、运行 nonce、API代理及已登记数据绑定。必须明确返回 `runtimeReady: true` 才能判定运行就绪；`not-previewing`、`unhealthy` 或 `runtimeReady: false` 都不通过，即使命令退出码为0。运行就绪不等于业务质量通过，结果明确保留 `verificationProven: false`。独立任务的适配检查入口使用 `preview check --task <task-id>`：复用上述只读查询并强制要求 `runtimeReady: true`，否则返回非零，不启动或重启任务。适配检查不使用默认指向兼容5175的裸 `check`；只有定向诊断时使用 `check --port <该任务实际端口>`，不得猜测或固定其他任务的端口。不带任务的历史 status、显式 switch 与已有5175保留兼容，普通任务无需抢占它们。
 
 只有 start 接受可选 `--port 5177至5199`、`--backend-port 8081至8099`；默认按现有端口池分配。固定5173、5174、5175、5176不属于独立任务分配范围。端口不足时报告错误，不停用其他任务腾位置。
 

@@ -51,7 +51,9 @@ preview:
   commands:
     check:
       cwd: repository
-      run: 'npm run task:entry -- --worktree "{task_worktree}" check'
+      # The read-only check requires runtimeReady: true and otherwise exits nonzero.
+      # This remains runtime evidence only, never a replacement for quality gates.
+      run: 'npm run task:entry -- --worktree "{task_worktree}" preview check --task "{batch_slug}"'
     start:
       cwd: repository
       run: 'npm run task:entry -- --worktree "{task_worktree}" preview start --task "{batch_slug}"'

@@ -467,7 +467,9 @@ export function createTaskRegistry(root) {
       ];
       const before = Object.fromEntries(identities.map((key) => [key, structuredClone(record[key])]));
       const frozen = record.frozen ? structuredClone(record.frozen) : null;
+      const previewOnly = record.previewOnly ? structuredClone(record.previewOnly) : null;
       change(record);
+      if (previewOnly) assert.deepEqual(record.previewOnly, previewOnly, 'Preview-only identity is immutable');
       if (frozen) assert.deepEqual(record.frozen, frozen, 'Original accepted-source identity is immutable');
       assert.deepEqual(
         Object.fromEntries(identities.map((key) => [key, record[key]])),
