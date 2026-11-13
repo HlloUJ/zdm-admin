@@ -1755,6 +1755,31 @@
       "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-resource-sampler.mjs": {
+      "digest": "bdfc17ae418e1a37e333f356433d6154cae76173153fc7b32167f4c3240baf39",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-sampler.test.mjs": {
+      "digest": "99d10bb9ca391a5bf2e4ee1ebb9383ed8a07d808752fe36ee763eaa2a1bceed1",
+      "imports": ["scripts/task-resource-sampler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-scheduler-store.mjs": {
+      "digest": "d6fe2098d0c5e88f9b7ebee13f45f9fadbad3f4fa28cbe1c79351498bf28eddb",
+      "imports": ["scripts/task-resource-scheduler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-scheduler.mjs": {
+      "digest": "d4a04f8c20723cc12e56dd2873e7c74e5a3543db4b998d81abcef313be802348",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-scheduler.test.mjs": {
+      "digest": "fc84803aec29028e37a272a76a7903c4ecdf77cf0dfb7b28a7aeb33301e63d58",
+      "imports": ["scripts/task-resource-scheduler-store.mjs", "scripts/task-resource-scheduler.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-runtime-check.mjs": {
       "digest": "e071fb4363867a443712242eb52344ffd64e912b6f954d4c51104be5095393ab",
       "imports": ["scripts/resource-lease.mjs", "scripts/task-registry.mjs"],
