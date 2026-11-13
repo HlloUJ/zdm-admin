@@ -1,3 +1,4 @@
+import { createFixedCompletionPreviewControl } from './completion-fixed-preview.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -205,4 +206,28 @@ test('late target edits are preserved and reject materialization', async (t) => 
   );
   assert.equal(readFileSync(path.join(f.roots.combined, 'a.txt'), 'utf8'), 'late edit');
   assert.equal(f.registry.readTask('combined').previewOnly.previewOnly, true);
+});
+
+test('healthy fixed preview never permits a combined carrier to enter formal delivery', async (t) => {
+  const f = fixture(t),
+    plan = planPreviewCombination(f.main, ['a', 'b']);
+  await applyPreviewCombination(f.main, 'combined', plan, 'test-owner', {
+    references: async () => ({ owned: [], backendPorts: [] }),
+  });
+  let probes = 0;
+  const previewControl = createFixedCompletionPreviewControl({
+    probe: async () => {
+      probes++;
+      return { worktree: '/fixed/source', protectedPaths: ['/fixed/source'], proofDigest: 'fixed-healthy' };
+    },
+    taskProject: () => 'unrelated-task',
+  });
+  await previewControl.check({ task: f.roots.combined, preview: '/published/carrier', common: f.registry.commonDir });
+  assert.equal(probes, 1);
+  for (const args of [['freeze'], ['deliver', 'combined', plan.base], ['settle', 'combined', plan.base, '1']])
+    await assert.rejects(
+      completionCommand(f.roots.combined, args, { owner: 'test-owner', previewControl }),
+      /cannot enter formal completion/,
+    );
+  assert.equal(probes, 1, 'combination rejected before the healthy fixed preview could authorize handoff');
 });
