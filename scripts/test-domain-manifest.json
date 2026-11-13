@@ -1790,6 +1790,21 @@
       "imports": ["scripts/task-resource-notifications.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-resource-plan-entry.mjs": {
+      "digest": "28576747da2300bf804a7ac9a6df198f244721249b0235b291d5de0e99074895",
+      "imports": [
+        "scripts/task-registry.mjs",
+        "scripts/task-resource-verification.mjs",
+        "scripts/verification-evidence.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-plan-entry.test.mjs": {
+      "digest": "ceea695e08b8de00c070d69c5f814e7292a98eb5976fee4e0a3e7386e2061ab5",
+      "imports": ["scripts/task-resource-plan-entry.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-resource-policy-sample.mjs": {
       "digest": "8505164d1d1f6ffc762732f61fd8b08a425745232dc0b24fb03a07fb84b0adb3",
       "imports": [],
@@ -1798,6 +1813,16 @@
     "scripts/task-resource-policy-sample.test.mjs": {
       "digest": "10ca442e912a227c1d76ec6670cce0ec836396d00362a40a777b2aca5cf9afb0",
       "imports": ["scripts/task-resource-policy-sample.mjs", "scripts/task-resource-sampler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-recovery.mjs": {
+      "digest": "8d255105e399a375ac041681e381178bba3034733f9b860b31a5efae88b9afd2",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-recovery.test.mjs": {
+      "digest": "edfcf7a43231c61109ecd78dba8ab9fcb4d79fc38009aebd89e16171ee8d8c2b",
+      "imports": ["scripts/task-resource-recovery.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-resource-runner.mjs": {
