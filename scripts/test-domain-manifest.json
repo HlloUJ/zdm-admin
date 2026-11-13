@@ -450,7 +450,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "bf875289a981ec105c05c7ed841128a1477012ddc5ff3eb42ce7fc3e461de673",
+      "digest": "8822e0e3226d82e5b0ffa26c6fff8806a3849c13f84d8e102f5f847e64bd1ed5",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -487,6 +487,16 @@
         "scripts/test-support/completion-preview-fixture.mjs"
       ],
       "dynamicImports": 0
+    },
+    "scripts/completion-fixed-preview.mjs": {
+      "digest": "441646896c199f0cb5f3a6a61ec24bb43af4e9e795aa4dcba3b3f20ff66a54af",
+      "imports": ["scripts/dev-task.mjs", "scripts/task-registry.mjs", "scripts/task-runtime-references.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/completion-fixed-preview.test.mjs": {
+      "digest": "731d824aa05520c318fea04bc08435595c3aec20149fe9dc2fd46b7ca6db90cd",
+      "imports": ["scripts/completion-fixed-preview.mjs", "scripts/task-completion.mjs"],
+      "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
       "digest": "fb2f7ef36db8b1f8b63000549fc26697d7b61f37081e9840d3319bd22b9df652",
@@ -541,13 +551,14 @@
       "dynamicImports": 0
     },
     "scripts/completion-preview-parallel.test.mjs": {
-      "digest": "f8e5aedf21bc807e43bf6b40087ac3d4ab3fb79821e47f60a7e517979ce5a0d2",
+      "digest": "978b1793cc247a293e5c8348c7eff4eea52c18d5675898da9f6eb5ed0f0e1f07",
       "imports": ["scripts/completion-preview.mjs", "scripts/dev-task.mjs", "scripts/task-data-environment.mjs"],
       "dynamicImports": 0
     },
     "scripts/completion-preview.mjs": {
-      "digest": "f2e8674ae9d59ee590f451d28057b123853ec85fdef085ca89ffb5878de2b77e",
+      "digest": "302720bef0c9895e54ba1c513f1a155a1825c8c5a51bef7ae8a15451a51d6619",
       "imports": [
+        "scripts/completion-fixed-preview.mjs",
         "scripts/dev-task.mjs",
         "scripts/preview-policy.mjs",
         "scripts/preview-transition.mjs",
@@ -561,7 +572,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-preview.test.mjs": {
-      "digest": "1ac711f881a240d52b6f88698676fa3a4f907342f8240fe852b8d455033d5518",
+      "digest": "5e8eaa03bed9b0e5649c530fa301c4abb38f50e42fe0a18e8468d814aa1b00a7",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/task-completion.mjs",
@@ -1518,9 +1529,10 @@
       "dynamicImports": 0
     },
     "scripts/task-completion.mjs": {
-      "digest": "694316d375d4419d8f37bb66be99deb82e7518490159c2000da5b6aa0da12b9b",
+      "digest": "d531466dd2418dfc26860dfe2eb927372e99576475a18fa332a4afe9e371b087",
       "imports": [
         "scripts/completion-cli.mjs",
+        "scripts/completion-fixed-preview.mjs",
         "scripts/dev-task.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-dependency-retention.mjs",

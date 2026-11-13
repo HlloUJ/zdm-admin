@@ -516,13 +516,30 @@ async function completionCommandLocked(
         },
       },
       preserve: {
-        run: () =>
-          existsSync(batch.worktree)
+        run: async () => {
+          if (previewControl.assertCleanupSafe)
+            await previewControl.assertCleanupSafe({
+              anchor,
+              task: batch.worktree,
+              preview,
+              common,
+              main: expectedMain,
+            });
+          return existsSync(batch.worktree)
             ? preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id))
-            : preserved.result,
+            : preserved.result;
+        },
       },
       cleanup: {
         run: async () => {
+          if (previewControl.assertCleanupSafe)
+            await previewControl.assertCleanupSafe({
+              anchor,
+              task: batch.worktree,
+              preview,
+              common,
+              main: expectedMain,
+            });
           if (batch.taskRegistryVersion === 2) {
             const task = createTaskRegistry(anchor).readTask(batch.id);
             assert.equal(task.stage, 'handoff-verified', 'Current task handoff is incomplete');

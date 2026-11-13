@@ -104,26 +104,30 @@ test('only preflight may tolerate missing preview; final runtime and integration
     requestResponse(
       `http://127.0.0.1:${server.address().port}/${url.includes(':5175/') ? 'preview' : url.includes(':8080/') ? 'backend' : 'frontend'}`,
     );
-  const before = await checkCompletionRuntime(root, root, { request, allowPreviewUnavailable: true });
+  const before = await checkCompletionRuntime(root, root, {
+    request,
+    allowPreviewUnavailable: true,
+    fixedConfigFile: null,
+  });
   assert.equal(before.integrationHealthy, true);
   assert.equal(before.runtimeHealthy, false);
   assert.equal(before.backupRetained, true);
-  await assert.rejects(checkCompletionRuntime(root, root, { request }), /Runtime unavailable/);
+  await assert.rejects(checkCompletionRuntime(root, root, { request, fixedConfigFile: null }), /Runtime unavailable/);
   failing = 'backend';
   await assert.rejects(
-    checkCompletionRuntime(root, root, { request, allowPreviewUnavailable: true }),
+    checkCompletionRuntime(root, root, { request, allowPreviewUnavailable: true, fixedConfigFile: null }),
     /Runtime unavailable/,
   );
   failing = 'preview';
   malformed = true;
-  await assert.rejects(checkCompletionRuntime(root, root, { request }), /Runtime unavailable/);
+  await assert.rejects(checkCompletionRuntime(root, root, { request, fixedConfigFile: null }), /Runtime unavailable/);
   failing = 'none';
-  const after = await checkCompletionRuntime(root, root, { request });
+  const after = await checkCompletionRuntime(root, root, { request, fixedConfigFile: null });
   assert.equal(after.runtimeHealthy, true);
   assert.equal(after.profileFingerprint, before.profileFingerprint);
   rmSync(backupFile);
   await assert.rejects(
-    checkCompletionRuntime(root, root, { request, allowPreviewUnavailable: true }),
+    checkCompletionRuntime(root, root, { request, allowPreviewUnavailable: true, fixedConfigFile: null }),
     /backup is unavailable/,
   );
 });
