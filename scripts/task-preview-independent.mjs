@@ -1,3 +1,4 @@
+import { assertCombinationRuntime } from './task-preview-combination.mjs';
 import assert from 'node:assert/strict';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
@@ -93,6 +94,7 @@ export async function independentTaskPreview(root, options, dependencies = {}) {
   const registry = system.registry(root);
   const task = registry.resolve({ id, worktree: root });
   assert.equal(owner, task.owner, 'Current chat must own this exact task');
+  if (command === 'start') assertCombinationRuntime(root, task);
   const common = registry.commonDir;
   const resources = system.leases(common);
   const ownLeases = () => system.readLeases(common).filter((lease) => lease.task === task.id);
