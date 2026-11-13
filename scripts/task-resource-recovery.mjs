@@ -50,7 +50,9 @@ export function inspectSchedulerRecovery(directory) {
     ownerRecorded: !!owner,
     cleanOpenPossible: !lockExists && unresolved.length === 0,
     unresolved,
-    orphanedQueued: jobs.filter((j) => j.status === 'queued').map((j) => ({ id: j.id, task: j.task })),
+    orphanedQueued: jobs
+      .filter((j) => ['queued', 'waiting-client'].includes(j.status))
+      .map((j) => ({ id: j.id, task: j.task })),
     automaticReplay: false,
     automaticUnlock: false,
     guidance: lockExists

@@ -2,7 +2,15 @@ import assert from 'node:assert/strict';
 import net from 'node:net';
 import { chmodSync, lstatSync } from 'node:fs';
 import { createHash, timingSafeEqual } from 'node:crypto';
-const MUTATIONS = new Set(['enqueue', 'assertAdmission', 'recordSpawn', 'complete', 'block', 'acknowledge']);
+const MUTATIONS = new Set([
+  'enqueue',
+  'assertAdmission',
+  'pollAdmission',
+  'recordSpawn',
+  'complete',
+  'block',
+  'acknowledge',
+]);
 const READS = new Set(['snapshot', 'pendingNotifications', 'waitAdmission']);
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 // Durable at-most-once mutations. A crash between effect and receipt deliberately blocks replay.
@@ -135,7 +143,11 @@ export function callScheduler({ socketPath, secret, id, method, args = [], timeo
     const socket = net.createConnection(socketPath);
     let data = '';
     socket.setTimeout(timeoutMs, () =>
-      socket.destroy(Error('Scheduler response timed out; retain request ID for diagnosis/replay')),
+      socket.destroy(
+        Object.assign(Error('Scheduler response timed out; retain request ID for diagnosis/replay'), {
+          code: 'ETIMEDOUT',
+        }),
+      ),
     );
     socket.once('connect', () => socket.write(JSON.stringify({ secret, id, method, args }) + '\n'));
     socket.on('data', (chunk) => {

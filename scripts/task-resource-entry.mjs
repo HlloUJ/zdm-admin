@@ -41,29 +41,48 @@ function privatePath(file, socket) {
   assert.equal(parent.mode & 0o077, 0);
   assert.ok(socket ? stat.isSocket() : stat.isFile());
 }
-export function createSchedulerClient({ socketPath, secret, request = callScheduler }) {
-  return Object.fromEntries(
-    ['enqueue', 'waitAdmission', 'assertAdmission', 'recordSpawn', 'complete', 'block'].map((method) => [
+export function createSchedulerClient({
+  socketPath,
+  secret,
+  request = callScheduler,
+  sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
+}) {
+  const invoke = async (method, args, id = randomUUID()) => {
+    try {
+      return await request({ socketPath, secret, id, method, args, timeoutMs: 30000 });
+    } catch (error) {
+      error.schedulerRequest = { id, method };
+      throw error;
+    }
+  };
+  const client = Object.fromEntries(
+    ['enqueue', 'assertAdmission', 'recordSpawn', 'complete', 'block'].map((method) => [
       method,
-      async (...args) => {
-        const id = randomUUID();
-        try {
-          return await request({
-            socketPath,
-            secret,
-            id,
-            method,
-            args,
-            timeoutMs: method === 'waitAdmission' ? 0 : 30000,
-          });
-        } catch (error) {
-          error.schedulerRequest = { id, method };
-          throw error;
-        } // Retain request identity; never blind retry.
-      },
+      (...args) => invoke(method, args),
     ]),
   );
+  client.waitAdmission = async (ticket) => {
+    const claimId = randomUUID();
+    for (;;) {
+      const id = randomUUID();
+      let response;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          response = await invoke('pollAdmission', [ticket, claimId], id);
+          break;
+        } catch (error) {
+          if (attempt >= 2 || !['ECONNRESET', 'ECONNREFUSED', 'EPIPE', 'ETIMEDOUT'].includes(error.code)) throw error;
+          await sleep(1000); // Same request ID, only idempotent poll, bounded recovery.
+        }
+      }
+      if (response?.status === 'admitted') return response.admission;
+      assert.equal(response?.status, 'pending', 'Unknown scheduler wait response');
+      await sleep(5000);
+    }
+  };
+  return client;
 }
+
 export async function main(args = process.argv.slice(2)) {
   const parsed = parseSchedulerEntry(args);
   const readOnly = parsed.verificationArgs.includes('--list') || parsed.verificationArgs.includes('--help');

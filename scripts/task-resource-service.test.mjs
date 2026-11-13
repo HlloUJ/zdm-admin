@@ -178,3 +178,87 @@ test('request receipt survives actual disk store reopen without reissuing effect
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('real socket renewable wait survives long injected pressure and lost admission reply without duplicate start', async (t) => {
+  const { createAdmissionBroker } = await import('./task-resource-broker.mjs');
+  const { initialSchedulerState } = await import('./task-resource-scheduler.mjs');
+  const { createSchedulerClient } = await import('./task-resource-entry.mjs');
+  const dir = mkdtempSync('/tmp/zdm921-wait-');
+  chmodSync(dir, 0o700);
+  let state = initialSchedulerState(),
+    ledger = {},
+    clock = 0,
+    dropped = false;
+  const G = 1024 ** 3;
+  const broker = createAdmissionBroker({
+    store: {
+      read: () => structuredClone(state),
+      write: (v) => {
+        state = structuredClone(v);
+      },
+    },
+    budget: () => ({ macPeakBytes: G, dockerPeakBytes: 0 }),
+    validateEvidence: () => true,
+    now: () => clock,
+  });
+  const dispatch = createSchedulerRpc({
+    broker,
+    journal: {
+      read: () => structuredClone(ledger),
+      write: (v) => {
+        ledger = structuredClone(v);
+      },
+    },
+  });
+  const server = await startSchedulerSocket({ socketPath: dir + '/s', secret, dispatch });
+  t.after(async () => {
+    await server.close();
+    rmSync(dir, { recursive: true, force: true });
+  });
+  const client = createSchedulerClient({
+    socketPath: dir + '/s',
+    secret,
+    request: async (r) => {
+      const value = await callScheduler(r);
+      if (r.method === 'pollAdmission' && value.status === 'admitted' && !dropped) {
+        dropped = true;
+        throw Object.assign(Error('injected lost reply'), { code: 'ECONNRESET' });
+      }
+      return value;
+    },
+    sleep: async (ms) => {
+      clock += ms === 1000 ? 1000 : 20000;
+      assert.ok(clock < 400000);
+      broker.tick({
+        at: clock,
+        macAvailableBytes: 10 * G,
+        dockerAvailableBytes: 6 * G,
+        diskAvailableBytes: 20 * G,
+        cpuBusyPercent: clock < 200000 ? 99 : 10,
+        memoryPressure: false,
+        swapGrowing: false,
+        ioCongested: false,
+      });
+    },
+  });
+  const descriptor = {
+    task: 'isolated',
+    stage: 'gate',
+    worktree: '/isolated',
+    fingerprint: 'fixture',
+    commandDigest: 'fixture',
+    restartable: false,
+    externalResources: true,
+    resources: ['isolated'],
+    kind: 'node',
+  };
+  const ticket = await client.enqueue(descriptor);
+  const admission = await client.waitAdmission(ticket);
+  assert.ok(clock >= 260000);
+  assert.equal(dropped, true);
+  await client.assertAdmission(ticket, admission, descriptor);
+  assert.equal(state.jobs.length, 1);
+  assert.equal(state.jobs[0].status, 'running');
+  assert.equal(state.events.filter((e) => e.to === 'running').length, 1);
+  await assert.rejects(client.assertAdmission(ticket, admission, descriptor));
+});

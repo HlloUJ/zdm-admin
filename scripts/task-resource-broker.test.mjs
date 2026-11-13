@@ -240,3 +240,78 @@ test('missing actual PID identity never manufactures a start event', async () =>
   );
   assert.equal(s.saved.events.filter((e) => e.executionStarted).length, 0);
 });
+
+test('unclaimed admission expires and same caller can safely reattach with a new token', async () => {
+  const s = setup();
+  const ticket = await s.broker.enqueue(descriptor),
+    claim = 'same-caller-claim';
+  await s.broker.pollAdmission(ticket, claim);
+  s.broker.tick(sample(0));
+  for (const at of [20000, 40000, 60000]) {
+    s.time = at;
+    await s.broker.pollAdmission(ticket, claim);
+    s.broker.tick(sample(at));
+  }
+  const old = (await s.broker.pollAdmission(ticket, claim)).admission;
+  assert.ok(old);
+  s.time = 100000;
+  s.broker.tick(sample(100000));
+  assert.equal(s.saved.jobs[0].status, 'waiting-client');
+  await assert.rejects(s.broker.assertAdmission(ticket, old, descriptor));
+  await s.broker.pollAdmission(ticket, claim);
+  s.broker.tick(sample(100000));
+  const fresh = (await s.broker.pollAdmission(ticket, claim)).admission;
+  assert.ok(fresh);
+  assert.notEqual(fresh.token, old.token);
+  await s.broker.assertAdmission(ticket, fresh, descriptor);
+  assert.equal(s.saved.jobs[0].status, 'running');
+  await assert.rejects(s.broker.pollAdmission(ticket, claim), /cannot be replayed/);
+});
+test('long resource pressure uses renewed polls, never grants a second caller execution', async () => {
+  const s = setup();
+  const ticket = await s.broker.enqueue(descriptor),
+    claim = 'same-caller-claim';
+  for (let at = 0; at <= 180000; at += 20000) {
+    s.time = at;
+    assert.equal((await s.broker.pollAdmission(ticket, claim)).status, 'pending');
+    s.broker.tick({ ...sample(at), cpuBusyPercent: 99 });
+  }
+  assert.equal(s.saved.jobs[0].status, 'queued');
+  await assert.rejects(s.broker.pollAdmission(ticket, 'other-caller-claim'), /Another caller/);
+  for (let at = 200000; at <= 260000; at += 20000) {
+    s.time = at;
+    await s.broker.pollAdmission(ticket, claim);
+    s.broker.tick(sample(at));
+  }
+  assert.equal((await s.broker.pollAdmission(ticket, claim)).status, 'admitted');
+});
+test('expired polling lease cannot authorize execution before next tick', async () => {
+  const s = setup();
+  const ticket = await s.broker.enqueue(descriptor),
+    claim = 'same-caller-claim';
+  for (let at = 0; at <= 60000; at += 20000) {
+    s.time = at;
+    await s.broker.pollAdmission(ticket, claim);
+    s.broker.tick(sample(at));
+  }
+  const a = (await s.broker.pollAdmission(ticket, claim)).admission;
+  s.time = 100000;
+  await assert.rejects(s.broker.assertAdmission(ticket, a, descriptor), /lease expired/);
+  assert.equal(s.saved.jobs[0].status, 'starting');
+});
+
+test('coordinator restart preserves waiting identity but never grants stale admission', async () => {
+  const s = setup();
+  const ticket = await s.broker.enqueue(descriptor),
+    claim = 'same-caller-claim';
+  await s.broker.pollAdmission(ticket, claim);
+  const restored = createAdmissionBroker(s.options);
+  restored.tick(sample(0));
+  assert.equal(restored.snapshot().jobs[0].status, 'waiting-client');
+  assert.equal((await restored.pollAdmission(ticket, claim)).status, 'pending');
+  await assert.rejects(restored.pollAdmission(ticket, 'different-caller-claim'), /Another caller/);
+  assert.equal(
+    restored.snapshot().events.some((e) => e.to === 'running'),
+    false,
+  );
+});

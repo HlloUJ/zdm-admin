@@ -27,10 +27,13 @@ export function createAdmissionBroker({
   now = Date.now,
   policy,
   inspectSpawn = inspectProcess,
+  waiterLeaseMs = 30000,
 }) {
   for (const fn of [budget, validateEvidence, store?.read, store?.write]) assert.equal(typeof fn, 'function');
   let state = store.read(),
     fault = null;
+  assert.ok(Number.isFinite(waiterLeaseMs) && waiterLeaseMs >= 1000);
+  const pollingLeases = new Map();
   const waiting = new Map();
   const localTickets = new Set();
   const claimedWaiters = new Set();
@@ -88,17 +91,52 @@ export function createAdmissionBroker({
     waitAdmission(ticket) {
       healthy();
       const j = jobFor(state, ticket);
+      assert.ok(!j.pollClaimId, 'Polling caller already owns this stage');
       assert.equal(claimedWaiters.has(ticket.id), false, 'Only one live waiter may own a stage');
       claimedWaiters.add(ticket.id);
       if (j.status === 'starting') return Promise.resolve({ id: j.id, token: j.admissionToken });
       assert.equal(j.status, 'queued', 'Stage is not waiting for admission');
       return new Promise((resolve, reject) => waiting.set(ticket.id, { resolve, reject }));
     },
+    async pollAdmission(ticket, claimId) {
+      healthy();
+      assert.ok(typeof claimId === 'string' && claimId.length >= 16, 'Stable caller claim required');
+      const prior = jobFor(state, ticket);
+      assert.ok(!prior.pollClaimId || prior.pollClaimId === claimId, 'Another caller owns this admission');
+      assert.ok(!claimedWaiters.has(ticket.id), 'Legacy waiter already owns this stage');
+      assert.ok(
+        ['queued', 'waiting-client', 'starting'].includes(prior.status),
+        'Execution or terminal stage cannot be replayed',
+      );
+      const expired = !pollingLeases.has(ticket.id) || pollingLeases.get(ticket.id) <= now();
+      transact((s) => {
+        const j = jobFor(s, ticket);
+        j.pollClaimId = claimId;
+        if (j.status === 'starting' && expired) {
+          delete j.admissionToken;
+          transition(s, j, 'waiting-client', 'Unclaimed admission expired; no execution was authorized', now());
+        }
+        if (j.status === 'waiting-client')
+          transition(s, j, 'queued', 'Same verified caller reattached before execution', now());
+      });
+      localTickets.add(ticket.id);
+      pollingLeases.set(ticket.id, now() + waiterLeaseMs);
+      const j = jobFor(state, ticket);
+      return j.status === 'starting'
+        ? { status: 'admitted', admission: { id: j.id, token: j.admissionToken } }
+        : { status: 'pending' };
+    },
     tick(sample) {
       healthy();
       assert.ok(!state.jobs.some((j) => j.runtimeUncertain), 'Active stage termination is unresolved');
       // A new coordinator cannot revive an orphaned queued caller. Its command/env was deliberately not persisted.
       const actions = transact((s) => {
+        for (const j of s.jobs) {
+          if (j.pollClaimId && ['queued', 'starting'].includes(j.status) && (pollingLeases.get(j.id) ?? 0) <= now()) {
+            delete j.admissionToken;
+            transition(s, j, 'waiting-client', 'Waiting caller lease expired; execution remains unauthorized', now());
+          }
+        }
         const detached = s.jobs.filter((j) => j.status === 'queued' && !localTickets.has(j.id));
         for (const j of detached)
           transition(s, j, 'blocked', 'Queued caller is absent; explicit reattachment required', now());
@@ -122,6 +160,7 @@ export function createAdmissionBroker({
       transact((s) => {
         const j = jobFor(s, ticket);
         assert.equal(j.status, 'starting');
+        if (j.pollClaimId) assert.ok((pollingLeases.get(j.id) ?? 0) > now(), 'Caller admission lease expired');
         assert.equal(admission?.id, j.id);
         assert.equal(admission?.token, j.admissionToken);
         assert.equal(digest(descriptor), j.descriptorDigest, 'Stage descriptor changed');
