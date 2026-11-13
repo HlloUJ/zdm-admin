@@ -1824,6 +1824,25 @@
       ],
       "dynamicImports": 2
     },
+    "scripts/task-resource-coordinator.mjs": {
+      "digest": "8c7ae6ab335e6da62b84cd9fd76df4fdbec8c7d4133224da56f3d975dd5682c0",
+      "imports": [
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-lifecycle.mjs",
+        "scripts/task-resource-notifications.mjs",
+        "scripts/task-resource-policy-sample.mjs",
+        "scripts/task-resource-sampler.mjs",
+        "scripts/task-resource-scheduler.mjs",
+        "scripts/task-resource-service.mjs",
+        "scripts/task-resource-session.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-coordinator.test.mjs": {
+      "digest": "463d32ff53a9fa117705f19ee76ef587c3d4834c2b5dfb41928c5eff811ce9c1",
+      "imports": ["scripts/task-resource-coordinator.mjs", "scripts/task-resource-scheduler.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-resource-entry.mjs": {
       "digest": "44504f1bcacf4fc42be7bc653b5d0b1c6787cd901f49d16a2fe56a086cbf079e",
       "imports": ["scripts/task-resource-plan-entry.mjs", "scripts/task-resource-service.mjs", "scripts/verify.mjs"],
