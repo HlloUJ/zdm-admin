@@ -1,3 +1,4 @@
+import { createTaskRegistry } from './task-registry.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -83,11 +84,14 @@ export function readAcceptance(root, batch) {
   return { ...record, protectedPaths: metadata.protectedPaths, developmentState: metadata.developmentState };
 }
 export function freezeAcceptedSource(root, batch) {
+  assert.ok(!batch.previewOnly, 'Temporary combined previews cannot be frozen or delivered');
   assert.equal(
     path.resolve(root),
     path.resolve(batch.worktree),
     'Freeze the registered developer worktree, not main or a retained preview',
   );
+  const registered = createTaskRegistry(root).readTask(batch.id);
+  assert.ok(!registered?.previewOnly, 'Temporary combined previews cannot be frozen or delivered');
   const prior = readAcceptance(root, batch.id);
   if (prior) return prior; // Never rebuild a baseline from a repaired candidate.
   assert.equal(acceptedGit(root, ['branch', '--show-current']), batch.branch);

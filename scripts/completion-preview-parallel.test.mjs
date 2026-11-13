@@ -30,6 +30,7 @@ function fixture(t) {
   };
   const events = [];
   const options = {
+    paths: { configFile: path.join(directory, 'legacy/config.json') },
     execute: (root, command, args) => {
       if (command === 'git') return plan.common;
       assert.deepEqual(args, [launcher, '--check', '--worktree', foreign.worktree]);
