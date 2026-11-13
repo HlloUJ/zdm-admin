@@ -35,6 +35,7 @@ export function createScheduledVerification({ taskId, broker, run = runVerificat
       kind: task.kind ?? 'node',
     };
     let ticket;
+    let executionEnded = false;
     try {
       ticket = await broker.enqueue(descriptor);
       const admission = await broker.waitAdmission(ticket);
@@ -43,11 +44,13 @@ export function createScheduledVerification({ taskId, broker, run = runVerificat
       await broker.assertAdmission(ticket, admission, descriptor);
       // Preserve exact task, options, environment, command, coverage, evidence validator and failed-attempt history.
       const result = await run(task, options);
+      executionEnded = true;
       const unchanged = inspect(task).fingerprint === descriptor.fingerprint;
       if (result.exitCode !== 0 || !unchanged) {
         await broker.block(
           ticket,
           unchanged ? 'Gate failed; explicit diagnosis required' : 'Gate inputs changed during execution',
+          { stageEnded: true },
         );
         return unchanged
           ? result
@@ -56,7 +59,7 @@ export function createScheduledVerification({ taskId, broker, run = runVerificat
       await broker.complete(ticket, result);
       return result;
     } catch (error) {
-      if (ticket) await broker.block(ticket, error.message);
+      if (ticket) await broker.block(ticket, error.message, { stageEnded: executionEnded });
       throw error;
     }
   };

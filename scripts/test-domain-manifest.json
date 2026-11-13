@@ -1755,6 +1755,21 @@
       "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-resource-broker.mjs": {
+      "digest": "b28850f2df69f8550be2da28cbb849c1989b51a5cb2e9d57a96179b9cf43becb",
+      "imports": ["scripts/task-resource-scheduler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-broker.test.mjs": {
+      "digest": "e794bdc4538d5456de8903a22515bc66c38eaa20837088bb7987556b0696148c",
+      "imports": [
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-scheduler-store.mjs",
+        "scripts/task-resource-scheduler.mjs",
+        "scripts/task-resource-verification.mjs"
+      ],
+      "dynamicImports": 2
+    },
     "scripts/task-resource-runner.mjs": {
       "digest": "34155bca70033bbc54111102e4f053c6df735cd03dda14423b0ad19103f09824",
       "imports": [],
@@ -1791,7 +1806,7 @@
       "dynamicImports": 0
     },
     "scripts/task-resource-verification.mjs": {
-      "digest": "d8d64b96673fcd53d9b47d4b52c6a5252e3ec2eb7c7001e0353351215360f089",
+      "digest": "ff9e8dc2f0172fc224d2249437d4689121a2eaca2e571210855b0c257b870d27",
       "imports": ["scripts/verification-evidence.mjs", "scripts/verification-runner.mjs"],
       "dynamicImports": 0
     },
