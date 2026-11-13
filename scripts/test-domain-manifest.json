@@ -1770,6 +1770,16 @@
       ],
       "dynamicImports": 2
     },
+    "scripts/task-resource-notifications.mjs": {
+      "digest": "f25600363d6c3ab3e12ec5bc9bd3d974a4e44ff3f8b5b5ab7450345538f9b4c5",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-notifications.test.mjs": {
+      "digest": "9f29ca0fd2f6e3e704fe785bec997695282295da7a5184fd44031cb47cd07873",
+      "imports": ["scripts/task-resource-notifications.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-resource-runner.mjs": {
       "digest": "34155bca70033bbc54111102e4f053c6df735cd03dda14423b0ad19103f09824",
       "imports": [],
