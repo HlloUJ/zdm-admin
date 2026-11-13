@@ -1637,7 +1637,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "3917a77200752dc252c978aa4ed02d85e5a1527cefab18d04895e9bd3e1573d0",
+      "digest": "bff8562749e76b486b4b7001784f9751d1c0b5841ceae48d933cae1df971f2f9",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/task-completion.mjs",
@@ -1646,17 +1646,19 @@
         "scripts/task-entry.mjs",
         "scripts/task-preview.mjs",
         "scripts/task-registry.mjs",
+        "scripts/task-resource-entry.mjs",
         "scripts/task-start.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "c3e1bfabe89496b328a5844f7f867059b2b2562fb9a6bb6e5673e95fbb41cd10",
+      "digest": "5feae048980f40698c527ed63fd21796a6e882d10e76ede1cabbfe01fbb4cc59",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-entry.mjs",
-        "scripts/task-registry.mjs"
+        "scripts/task-registry.mjs",
+        "scripts/task-resource-entry.mjs"
       ],
       "dynamicImports": 0
     },
@@ -1769,6 +1771,16 @@
         "scripts/task-resource-verification.mjs"
       ],
       "dynamicImports": 2
+    },
+    "scripts/task-resource-entry.mjs": {
+      "digest": "d9e2ad9d560bdf88bb4518759398fc301dc21c322e153c30f9ac995a4aedd9aa",
+      "imports": ["scripts/task-resource-plan-entry.mjs", "scripts/task-resource-service.mjs", "scripts/verify.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-entry.test.mjs": {
+      "digest": "3bf0ea7420fa4d134d973aef9e7f5a319dd5ab684151365aec32f1cbda272330",
+      "imports": ["scripts/task-resource-entry.mjs"],
+      "dynamicImports": 0
     },
     "scripts/task-resource-event-link.mjs": {
       "digest": "d27189488d0d25dc4667962a44c1b8c8fba82099d1aa35f65e0ba80d6b55bb31",
@@ -2139,7 +2151,7 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "daa14afbb2689405820be78d01d128a9f58c33d751e6f22ad1a68ed14e20ab46",
+      "digest": "36f2703348ef258229783fc1983b1664e48c7be8159d86742961b9802e4c5082",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",

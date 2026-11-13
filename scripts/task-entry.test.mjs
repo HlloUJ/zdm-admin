@@ -59,7 +59,7 @@ test('forwarded or repeated worktree flags cannot change the already verified ta
   const f = fixture(t);
   createTaskRegistry(f.main).register({ id: 'a', worktree: f.a, owner: 'chat-a' });
   const unchanged = f.git('status', '--porcelain');
-  for (const command of ['check', 'temporary', 'preview', 'complete', 'registry']) {
+  for (const command of ['check', 'temporary', 'preview', 'complete', 'registry', 'schedule']) {
     for (const override of [['--worktree', f.main], ['--worktree=' + f.main]]) {
       const result = f.run(undefined, '--worktree', f.a, command, ...override);
       assert.notEqual(result.status, 0);
@@ -70,4 +70,21 @@ test('forwarded or repeated worktree flags cannot change the already verified ta
   assert.equal(valid.status, 0, valid.stderr);
   assert.equal(JSON.parse(valid.stdout).worktree, f.a);
   assert.equal(f.git('status', '--porcelain'), unchanged);
+});
+
+test('scheduled entry forwards through published main only, not an unpublished candidate', (t) => {
+  const f = fixture(t);
+  writeFileSync(
+    path.join(f.main, 'scripts/task-resource-entry.mjs'),
+    'console.log(JSON.stringify({args:process.argv.slice(2),cwd:process.cwd()}));',
+  );
+  f.git('add', '.');
+  f.git('commit', '-m', 'publish scheduling fixture');
+  f.git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  const result = f.run(undefined, 'schedule', '--task', 'a', '--', '--list');
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(JSON.parse(result.stdout), { args: ['--task', 'a', '--', '--list'], cwd: f.a });
+  const candidate = f.run(path.join(f.a, 'scripts/task-entry.mjs'), 'schedule', '--task', 'a', '--', '--list');
+  assert.notEqual(candidate.status, 0);
+  assert.match(candidate.stderr, /main anchor entry/);
 });

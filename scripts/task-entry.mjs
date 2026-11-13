@@ -11,6 +11,7 @@ const entries = {
   preview: 'scripts/task-preview.mjs',
   data: 'scripts/task-data-scope.mjs',
   work: 'scripts/task-development.mjs',
+  schedule: 'scripts/task-resource-entry.mjs',
   complete: 'scripts/task-completion.mjs',
   check: 'scripts/dev-task.mjs',
   temporary: 'scripts/dev-task.mjs',
@@ -30,7 +31,7 @@ export function publishedTaskEntry(root, args) {
   const [command, ...rest] = args;
   assert.ok(
     entries[command],
-    'task:entry [--worktree <exact path>] <start|registry|preview|data|work|complete|check|temporary> [args]',
+    'task:entry [--worktree <exact path>] <start|registry|preview|data|work|schedule|complete|check|temporary> [args]',
   );
   const registry = createTaskRegistry(root),
     targetRegistry = createTaskRegistry(target);
@@ -62,7 +63,7 @@ export function publishedTaskEntry(root, args) {
 export function main(root = process.cwd(), args = process.argv.slice(2)) {
   if (args.includes('--help')) {
     console.log(
-      'task:entry [--worktree <exact path>] <start|registry|preview|data|work|complete|check|temporary> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
+      'task:entry [--worktree <exact path>] <start|registry|preview|data|work|schedule|complete|check|temporary> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
     );
     return;
   }
