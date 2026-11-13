@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import {
   createState,
-  removeDefaultSettings,
+  restorePrototypeState,
   blankOrder,
   addProduct,
   saveDraft,
@@ -382,7 +382,7 @@ describe('demo order number migration', () => {
     state.orders[3]!.id = 'XS261021004007';
     state.orders[4]!.id = 'XS20261021004007';
     const before = clone(state.orders);
-    removeDefaultSettings(state);
+    restorePrototypeState(state);
     expect(state.orders[0]!.id).toMatch(/^XS\d{13}$/);
     expect(state.orders[1]!.id).toBe('KEEP-EXISTING-ORDER');
     expect(state.orders[2]!.id).toMatch(/^XS\d{13}$/);

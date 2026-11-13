@@ -181,6 +181,8 @@
         "backend/src/main/java/com/zdm/platform/inventory/WarehouseEntryInformation.java",
         "backend/src/main/java/com/zdm/platform/media/MediaAdminController.java",
         "backend/src/main/java/com/zdm/platform/media/MediaLifecycleMigrationService.java",
+        "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameController.java",
+        "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameService.java",
         "backend/src/main/java/com/zdm/platform/role/RoleController.java",
         "backend/src/main/java/com/zdm/platform/role/RoleService.java",
         "backend/src/main/java/com/zdm/platform/role/TerminalFunctionPolicyController.java",
@@ -413,8 +415,8 @@
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
         "tests/e2e/accessory-api-mocks.ts": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
-        "tests/e2e/pagination-responsive.spec.ts": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
-        "tests/e2e/store-order-prototype.spec.ts": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+        "tests/e2e/pagination-responsive.spec.ts": "62db9539f24b7323c1e6436b8153047fb9064ea7c9f237bb95f1082588164fea",
+        "tests/e2e/store-order-prototype.spec.ts": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
@@ -2661,6 +2663,42 @@
           "before": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
           "after": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
           "reason": "parallel-environment-final 技术收尾：CI 42612230860 的 Validation scope 因漏登已审查测试同步修复而失败。保留原批量删除35条用例及全部业务断言；仅在弹窗入场完成后确认、并发观察POST响应并显式传播form-options等待失败；不增加超时、重试或修改业务。对应原修复 b6ae13f8cf6dfa74fcdadb2900f18a4340a1f6b9、f0d018ace3e1c3a5cb969ba1a0ea0ce2c8b438c1。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "f99fa8dcbb38af2513a1de56bd63c4fb15ebc9221097a7cf95af9226c45baebf",
+          "reason": "用户要求清理款项配置旧分组和渠道配置；仅将持久化断言改为paymentNames并增加旧settings移除断言，保留历史名称快照与全部CRUD覆盖。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "f99fa8dcbb38af2513a1de56bd63c4fb15ebc9221097a7cf95af9226c45baebf",
+          "after": "34297af17241bc187b59fdfba33ac85defac79162b1ed50c12fd53cc8ee6acbc",
+          "reason": "已确认款项配置后端接入：改用真实API夹具并断言不持久化本地配置，增加失败重试与配置变化需明确重选的用例；保留原有完整CRUD、订单、权限及历史快照覆盖。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "34297af17241bc187b59fdfba33ac85defac79162b1ed50c12fd53cc8ee6acbc",
+          "reason": "已确认真实款项配置：保留原订单和CRUD回归，替换仅本地配置持久化断言，增加API失败与 stale 选择不可静默覆盖用例。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "ca47819f23559a0029510e8d01e7116104101f7907b6c2e46bfedb3d920a7cf8",
+          "reason": "按确认后的款项配置PRD接入真实API；保留原订单行为覆盖，增加接口异常、过期版本、分页删除及并发写入保护验证。"
+        },
+        {
+          "file": "tests/e2e/pagination-responsive.spec.ts",
+          "before": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
+          "after": "62db9539f24b7323c1e6436b8153047fb9064ea7c9f237bb95f1082588164fea",
+          "reason": "款项配置改由真实API供给：保留分页、数量和订单回归全部断言，移除旧本地group夹具，补充并发删除后刷新且保留输入验证。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "reason": "款项配置改由真实API供给：保留分页、数量和订单回归全部断言，移除旧本地group夹具，补充并发删除后刷新且保留输入验证。"
         }
       ],
       "routes": [
@@ -2730,6 +2768,40 @@
         "src/services/batchActionPermissions.test.ts",
         "src/services/customerCatalog.test.ts",
         "tests/e2e/form-options-mock.ts"
+      ]
+    },
+    {
+      "id": "store-payment-names",
+      "roots": [
+        "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameService.java",
+        "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameController.java",
+        "src/services/storePaymentNames.ts"
+      ],
+      "tables": ["store_payment_names", "store_payment_name_events"],
+      "consumers": [
+        "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameController.java",
+        "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameService.java",
+        "src/pages/order/prototype/OrderActionDialog.vue",
+        "src/pages/order/prototype/index.vue",
+        "src/services/storePaymentNames.ts"
+      ],
+      "routes": ["/store/order-management/settings"],
+      "browserConsumers": ["tests/e2e/store-order-prototype.spec.ts"],
+      "browserTests": ["tests/e2e/store-order-prototype.spec.ts"],
+      "backendTests": ["backend/src/test/java/com/zdm/platform/payment/StorePaymentNameApiTest.java"],
+      "supportFiles": ["tests/e2e/store-payment-name-mocks.ts"],
+      "protectedTests": {
+        "tests/e2e/store-order-prototype.spec.ts": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+        "backend/src/test/java/com/zdm/platform/payment/StorePaymentNameApiTest.java": "f0bc7785d0361355519a740488364d7f51e051d7ce4cbcd71708763143dae440",
+        "tests/e2e/store-payment-name-mocks.ts": "94ca072074a9dde740187611c7d3627f03fa04450b73cba6f27c18887d0edbe2"
+      },
+      "testChanges": [
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "34297af17241bc187b59fdfba33ac85defac79162b1ed50c12fd53cc8ee6acbc",
+          "reason": "已确认真实款项配置：保留原订单和CRUD回归，替换仅本地配置持久化断言，增加API失败与 stale 选择不可静默覆盖用例。"
+        }
       ]
     }
   ]
