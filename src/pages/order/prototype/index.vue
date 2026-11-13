@@ -229,7 +229,7 @@
             <template #createdByName="{ row }">{{ row.createdByName || '—' }}</template>
             <template #createdAt="{ row }">{{ time(row.createdAt) }}</template>
             <template #enabled="{ row }"
-              ><t-tag :theme="row.enabled ? 'success' : 'default'" variant="light">{{
+              ><t-tag :theme="row.enabled ? 'success' : 'danger'" variant="light">{{
                 row.enabled ? '启用' : '停用'
               }}</t-tag></template
             ><template #operation="{ row }"
