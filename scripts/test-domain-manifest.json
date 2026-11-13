@@ -1835,6 +1835,16 @@
       "imports": ["scripts/task-resource-scheduler-store.mjs", "scripts/task-resource-service.mjs"],
       "dynamicImports": 1
     },
+    "scripts/task-resource-start-evidence.mjs": {
+      "digest": "c30cff606a86cf58539fec5a2e08cb73bafab4cf794f2cebd16afc14ec3b1098",
+      "imports": ["scripts/task-resource-event-link.mjs", "scripts/task-resource-runner.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-start-evidence.test.mjs": {
+      "digest": "d28fec58b7345e042c5bc8043785dc9e9997ea540164ec011feed319bee5484f",
+      "imports": ["scripts/task-resource-notifications.mjs", "scripts/task-resource-start-evidence.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-resource-verification.mjs": {
       "digest": "ff9e8dc2f0172fc224d2249437d4689121a2eaca2e571210855b0c257b870d27",
       "imports": ["scripts/verification-evidence.mjs", "scripts/verification-runner.mjs"],
