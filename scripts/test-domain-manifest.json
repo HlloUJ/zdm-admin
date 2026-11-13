@@ -1790,6 +1790,16 @@
       "imports": ["scripts/task-resource-notifications.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-resource-policy-sample.mjs": {
+      "digest": "8505164d1d1f6ffc762732f61fd8b08a425745232dc0b24fb03a07fb84b0adb3",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-policy-sample.test.mjs": {
+      "digest": "10ca442e912a227c1d76ec6670cce0ec836396d00362a40a777b2aca5cf9afb0",
+      "imports": ["scripts/task-resource-policy-sample.mjs", "scripts/task-resource-sampler.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-resource-runner.mjs": {
       "digest": "34155bca70033bbc54111102e4f053c6df735cd03dda14423b0ad19103f09824",
       "imports": [],
@@ -1801,7 +1811,7 @@
       "dynamicImports": 0
     },
     "scripts/task-resource-sampler.mjs": {
-      "digest": "bdfc17ae418e1a37e333f356433d6154cae76173153fc7b32167f4c3240baf39",
+      "digest": "f83c5948c81a034014ccf1270da768cbb9698b2e38fa68b5c12c2fe2c90dc9ad",
       "imports": [],
       "dynamicImports": 0
     },
