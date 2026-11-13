@@ -110,10 +110,11 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source.mjs": {
-      "digest": "53383e58348fd6c3d623f9b4b9254d679798f507e1ad8cdd0e3713c738d3678b",
+      "digest": "7efa6b0577166565e61e1a6d1c8b1bca344c9e077607ffc98e81ae9fb99da874",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
+        "scripts/task-commit-ownership.mjs",
         "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
@@ -1542,6 +1543,11 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-commit-ownership.mjs": {
+      "digest": "7505dd878d4190042f94056481a868a455815a1bf5ad77807f4b1d74ffef6b60",
+      "imports": ["scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-completion.mjs": {
       "digest": "d531466dd2418dfc26860dfe2eb927372e99576475a18fa332a4afe9e371b087",
       "imports": [
@@ -1654,8 +1660,14 @@
       "dynamicImports": 0
     },
     "scripts/task-development.mjs": {
-      "digest": "e487dc4b4275ca75604b92189ebd10866a9d38299d98259a1a0d096fc85af54b",
-      "imports": ["scripts/completion-status.mjs", "scripts/task-registry.mjs"],
+      "digest": "a1ed58754497b3acfda233a765290d7bdc859ccca73f471c336d98d19ffeb109",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/completion-status.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/task-commit-ownership.mjs",
+        "scripts/task-registry.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-development.test.mjs": {
@@ -1684,6 +1696,17 @@
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-entry.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-frozen-history.test.mjs": {
+      "digest": "35b98594b3ca7f25f42dc0b34018580944d0ea2f5af905fe4362606190e0e70e",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/task-commit-ownership.mjs",
+        "scripts/task-development.mjs",
         "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
