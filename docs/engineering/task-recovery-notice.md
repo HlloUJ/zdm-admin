@@ -8,12 +8,15 @@
 
 新 attempt 成功结束证明真实重新执行过，才生成“编号｜名称：已成功续接。”；新 attempt 失败生成“编号｜名称：续接失败。”以及有证据的失败类别。没有具体根因时明确写“具体原因待查”，不推断资源不足、网络故障等原因。
 
-用户希望开始重新执行后及时通知。当前项目进程 journal 有 token/host/pgid 和子进程 spawn 后写入的 started，但没有可验证进程出生标识；PID 存在不能排除复用。为了不把 stale running/仅唤醒当恢复成功，本版本保守延迟到原阶段的成功回执。未实现即时 running 通知，不应宣称全覆盖。没有原 session 的普通开发仍不支持；原 owner 不一致、显式暂停、旧完成任务和缺失证据不生成成功通知。
+及时启动通知采用原监督器的 post-spawn 证据，而不是 PID alive：根线程必须在续接前 `armRecoveryNotice`，生成随机 nonce 并记录 task/owner/worker/HEAD/原中断事件/阶段 key、已有 attempt 与 token。续接后独立读回 nonce 之后的新 attempt 及其引用的新 token；只有原 `completion-process` 在真实 child `spawn` 后写出的 owner-only `process-{token}.json` 状态 `started`，且 host/token/pgid 与原事件关联匹配，才生成成功续接通知。通知仅陈述已经发生重新启动，不声称进程此刻仍活着、不用 PID 存在作为证据。
+
+没有 post-spawn 证明、nonce 过期或身份变动时不猜测，保守等待已完成的新阶段回执；旧 token、spawn 前 pending、仅 running 字段和普通验证器 `.started` 文件均不认可。没有原正式 session 的普通开发目前仍不支持即时通知。成功启动后同一 attempt 完成不会重复成功通知；若同一 attempt 随后失败，则是独立失败结果通知。
 
 ## 根线程接入
 
 根线程提供经过实际任务映射核实的 binding：`taskId/taskNumber/taskName/owner/authorizationRef/interruptionEventId/roomId`。模块不能验证用户消息语义或判断任务名称映射，根线程必须先完成核验，不能从历史 nickname 猜编号。
 
+0. 根线程先核实原 worker 与用户授权，调用 `armRecoveryNotice({root,binding})`；保存返回的新 binding（含 nonce）后才通过原入口续接。nonce 只绑定观察，不授权执行。
 1. `claimRecoveryNotice({root,binding,directory})` 读取证据，独占持久 claim，仅返回事件 ID。已有 claim 时返回 reconcile-existing，禁止盲目重发。
 2. 在实际发送前调用 `beginRecoveryNoticeSend({directory,eventId})`，重新读取全部证据，确认未变化且 claim 不超过两分钟。它先独占持久 send 记录，然后一次性返回原房间与消息文字。
 3. 只有返回 send-once 时，根线程通过原 ChatGPT 消息工具发送。不能改发到新对话。

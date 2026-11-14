@@ -2329,14 +2329,19 @@
       "dynamicImports": 0
     },
     "scripts/task-recovery-notice.mjs": {
-      "digest": "a0bf7cd8d4871713c69f20f41f03a5f340a480942025f715cacb9b6f3c7f9666",
+      "digest": "b6e6500e0bfeac304d88af51416fca4465d1a701f4767f2fbc359201fbed4cb5",
       "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-recovery-notice.test.mjs": {
-      "digest": "5a61bdb1bf6ca587cc9cf436633b72eac7f5b56318a1f478cc64de5596569657",
-      "imports": ["scripts/task-recovery-notice.mjs", "scripts/task-registry.mjs"],
-      "dynamicImports": 1
+      "digest": "a3752b614efdbbc22917c54421e7427e06c4d6d28bcc23e6ff7d7c374ac8920a",
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/task-recovery-notice.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 10
     }
   }
 }

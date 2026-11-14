@@ -1,10 +1,22 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, openSync, writeFileSync, fsyncSync, closeSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
 
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const noticeIdentity = (task, binding, attemptId) =>
+  digest({
+    task: task.id,
+    owner: task.owner,
+    head: task.recordedHead,
+    interruption: binding.interruptionEventId,
+    attemptId,
+    roomId: binding.roomId,
+    taskNumber: binding.taskNumber,
+    taskName: binding.taskName,
+    authorizationRef: binding.authorizationRef,
+  });
 function noLinks(file) {
   for (let p = path.resolve(file); ; p = path.dirname(p)) {
     if (existsSync(p)) assert.ok(!lstatSync(p).isSymbolicLink(), 'Linked notification evidence or state');
@@ -97,7 +109,7 @@ export function evaluateRecoveryNotice(task, session, binding) {
     owner: task.owner,
     interruption: interrupted.id,
     attempt: attempt.id,
-    status: attempt.status,
+    outcome: success ? 'resumed' : 'failed',
   });
   return {
     status: 'ready',
@@ -111,16 +123,162 @@ export function evaluateRecoveryNotice(task, session, binding) {
     roomId: binding.roomId,
     text: `${binding.taskNumber}｜${binding.taskName}：${success ? '已成功续接。' : `续接失败。${reason}。`}`,
     evidenceDigest: digest({ task, session, binding }),
+    identityDigest: noticeIdentity(task, binding, attempt.id),
     taskCompleted: false,
   };
 }
-export function readRecoveryNotice(root, binding) {
-  const registry = createTaskRegistry(root);
-  const task = registry.readTask(binding.taskId);
-  const file = path.join(registry.commonDir, 'task-delivery', binding.taskId, 'completion-session.json');
+function source(root, binding) {
+  const registry = createTaskRegistry(root),
+    task = registry.readTask(binding.taskId);
+  const directory = path.join(registry.commonDir, 'task-delivery', binding.taskId);
+  const file = path.join(directory, 'completion-session.json');
   noLinks(file);
-  if (!existsSync(file)) return { status: 'blocked', reason: 'Original completion session unavailable' };
-  return evaluateRecoveryNotice(task, JSON.parse(readFileSync(file, 'utf8')), binding);
+  if (!existsSync(file)) return { registry, task, directory, session: null };
+  return { registry, task, directory, session: JSON.parse(readFileSync(file, 'utf8')) };
+}
+function ticketDirectory(registry, taskId) {
+  const directory = path.join(registry.commonDir, 'task-recovery-notices', taskId);
+  noLinks(directory);
+  return directory;
+}
+// Called before root follows up the exact original worker. It grants no execution authority.
+export function armRecoveryNotice({ root, binding }) {
+  assert.match(binding.worker ?? '', /^\/root\/[a-z0-9_/]+$/);
+  const { registry, task, session } = source(root, binding);
+  assert.ok(session && session.version === 1 && Number.isFinite(session.startedAt));
+  assert.equal(task?.id, binding.taskId);
+  assert.equal(task.owner, binding.owner);
+  assert.equal(session.batch, binding.taskId);
+  assert.notEqual(task.stage, 'closed');
+  assert.match(task.recordedHead ?? '', /^[a-f0-9]{40}$/);
+  assert.ok(binding.taskNumber && binding.taskName && binding.roomId && binding.authorizationRef);
+  const original = session.events.find((e) => e.id === binding.interruptionEventId);
+  assert.ok(original?.status === 'failure' && original.failure?.category === 'interrupted');
+  assert.ok(original.name && original.key && Number.isFinite(original.finishedAt));
+  assert.ok(original.finishedAt <= Date.now());
+  const nonce = randomUUID(),
+    directory = ticketDirectory(registry, task.id);
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  const ticket = {
+    version: 1,
+    nonce,
+    bindingDigest: digest({ ...binding, nonce: undefined }),
+    task: task.id,
+    owner: task.owner,
+    worker: binding.worker,
+    head: task.recordedHead,
+    interruptionEventId: original.id,
+    originalEventDigest: digest(original),
+    stage: original.name,
+    key: original.key,
+    createdAt: Date.now(),
+    previousEventIds: session.events.map((e) => e.id),
+    previousTokens: session.events.flatMap((e) => (e.processes ?? []).map((p) => p.token)),
+    mayRunBusinessActions: false,
+  };
+  durableCreate(path.join(directory, nonce + '.json'), ticket);
+  return { nonce, binding: { ...binding, nonce }, mayRunBusinessActions: false };
+}
+function spawnedNotice(data, binding) {
+  const { registry, task, session, directory } = data;
+  if (!binding.nonce) return null;
+  assert.match(binding.nonce, /^[a-f0-9-]{36}$/);
+  const file = path.join(ticketDirectory(registry, task.id), binding.nonce + '.json');
+  noLinks(file);
+  const ticket = JSON.parse(readFileSync(file, 'utf8'));
+  if (
+    ticket.version !== 1 ||
+    ticket.nonce !== binding.nonce ||
+    ticket.task !== task.id ||
+    ticket.owner !== task.owner ||
+    ticket.worker !== binding.worker ||
+    ticket.originalEventDigest !== digest(session.events.find((e) => e.id === ticket.interruptionEventId)) ||
+    ticket.head !== task.recordedHead ||
+    ticket.bindingDigest !== digest({ ...binding, nonce: undefined }) ||
+    ticket.mayRunBusinessActions !== false ||
+    Date.now() < ticket.createdAt ||
+    Date.now() - ticket.createdAt > 600000
+  )
+    return { status: 'blocked', reason: 'Fresh original task/worker/HEAD nonce binding unavailable' };
+  const attempt = [...session.events].reverse().find((e) => e.name === ticket.stage && e.key === ticket.key);
+  if (
+    attempt &&
+    (ticket.previousEventIds.includes(attempt.id) ||
+      !Number.isFinite(attempt.startedAt) ||
+      attempt.startedAt < ticket.createdAt)
+  )
+    return { status: 'blocked', reason: 'Attempt predates the armed nonce' };
+  if (!attempt || attempt.status !== 'running') return null;
+  if (
+    !attempt.id ||
+    ticket.previousEventIds.includes(attempt.id) ||
+    attempt.startedAt < ticket.createdAt ||
+    !Number.isFinite(attempt.startedAt) ||
+    attempt.processTracking !== 1 ||
+    !Array.isArray(attempt.processes) ||
+    !attempt.owner?.host ||
+    !Number.isSafeInteger(attempt.owner.pid) ||
+    attempt.owner.pid < 2
+  )
+    return { status: 'pending', reason: 'No new original attempt after nonce' };
+  for (const child of attempt.processes) {
+    if (!/^[a-f0-9-]{36}$/.test(child.token ?? '') || ticket.previousTokens.includes(child.token)) continue;
+    const journalFile = path.join(directory, 'process-' + child.token + '.json');
+    noLinks(journalFile);
+    if (!existsSync(journalFile)) continue;
+    const stat = lstatSync(journalFile);
+    if (!stat.isFile() || stat.mode & 0o077) continue;
+    const journal = JSON.parse(readFileSync(journalFile, 'utf8'));
+    // The original supervisor writes started only after child 'spawn'. A stale PID alone is never used.
+    if (
+      journal.status !== 'started' ||
+      journal.token !== child.token ||
+      journal.host !== attempt.owner.host ||
+      !Number.isSafeInteger(journal.pgid) ||
+      journal.pgid < 2
+    )
+      continue;
+    const eventId = digest({
+      task: task.id,
+      owner: task.owner,
+      interruption: ticket.interruptionEventId,
+      attempt: attempt.id,
+      outcome: 'resumed',
+    });
+    return {
+      status: 'ready',
+      eventId,
+      task: task.id,
+      originalOwner: task.owner,
+      interruptionEventId: ticket.interruptionEventId,
+      attemptId: attempt.id,
+      success: true,
+      reason: null,
+      roomId: binding.roomId,
+      text: `${binding.taskNumber}｜${binding.taskName}：已成功续接。`,
+      evidenceDigest: digest({
+        task: task.id,
+        owner: task.owner,
+        head: task.recordedHead,
+        nonce: binding.nonce,
+        attemptId: attempt.id,
+        token: child.token,
+      }),
+      identityDigest: noticeIdentity(task, binding, attempt.id),
+      taskCompleted: false,
+      executionCurrentlyAlive: 'not-claimed',
+      evidenceKind: 'original-post-spawn-journal',
+      token: child.token,
+    };
+  }
+  return { status: 'pending', reason: 'No exact original post-spawn journal; running field alone is insufficient' };
+}
+export function readRecoveryNotice(root, binding) {
+  const data = source(root, binding);
+  if (!data.session) return { status: 'blocked', reason: 'Original completion session unavailable' };
+  const evaluated = evaluateRecoveryNotice(data.task, data.session, binding);
+  if (!['ready', 'pending'].includes(evaluated.status)) return evaluated;
+  return spawnedNotice(data, binding) ?? evaluated;
 }
 // Two-phase local interface for a root whose messaging connector runs outside Node.
 export function claimRecoveryNotice({ root, binding, directory }) {
@@ -156,7 +314,12 @@ function readClaim(directory, eventId) {
 export function beginRecoveryNoticeSend({ directory, eventId }) {
   const claim = readClaim(directory, eventId);
   const fresh = readRecoveryNotice(claim.root, claim.binding);
-  if (fresh.status !== 'ready' || fresh.evidenceDigest !== claim.notice.evidenceDigest)
+  if (
+    fresh.status !== 'ready' ||
+    fresh.eventId !== claim.notice.eventId ||
+    fresh.success !== claim.notice.success ||
+    fresh.identityDigest !== claim.notice.identityDigest
+  )
     return { status: 'blocked', reason: 'Original evidence changed before dispatch', eventId };
   if (Date.now() - claim.at > 120000 || claim.at > Date.now())
     return { status: 'blocked', reason: 'Claim is stale; explicit reconciliation required', eventId };

@@ -202,3 +202,148 @@ test('malformed formal sessions and missing/duplicate event identity fail closed
   ])
     assert.notEqual(evaluate(value).status, 'ready');
 });
+
+test('nonce binds a real original supervisor post-spawn launch before stage completion', async () => {
+  const { armRecoveryNotice, readRecoveryNotice } = await import('./task-recovery-notice.mjs');
+  const { completionStage } = await import('./completion-session.mjs');
+  const { completionDirectory, startCompletionProcess, stopCompletionProcess } =
+    await import('./completion-process.mjs');
+  const { setTimeout: pause } = await import('node:timers/promises');
+  const f = fixture(),
+    b = { ...binding, worker: '/root/original_worker' };
+  const state = { version: 1, startedAt: 1, batch: binding.taskId, events: [interrupted] };
+  writeFileSync(f.file, JSON.stringify(state));
+  const armed = armRecoveryNotice({ root: f.root, binding: b });
+  state[completionDirectory] = path.dirname(f.file);
+  const save = () => writeFileSync(f.file, JSON.stringify(state));
+  let sent = 0;
+  await completionStage(
+    state,
+    'prepare',
+    'candidate',
+    async () => {
+      const child = startCompletionProcess(process.execPath, ['-e', 'setTimeout(()=>{},10000)'], { stdio: 'ignore' });
+      try {
+        const until = Date.now() + 3000;
+        while (Date.now() < until && JSON.parse(readFileSync(child.completionProof.file)).status !== 'started')
+          await pause(10);
+        const notice = readRecoveryNotice(f.root, armed.binding);
+        assert.equal(notice.status, 'ready');
+        assert.equal(notice.evidenceKind, 'original-post-spawn-journal');
+        assert.equal(notice.executionCurrentlyAlive, 'not-claimed');
+        const receipt = await dispatchRecoveryNotice({
+          ...f,
+          binding: armed.binding,
+          send: async (n) => {
+            sent++;
+            return { status: 'delivered', messageId: 'm', roomId: n.roomId, eventId: n.eventId };
+          },
+        });
+        assert.equal(receipt.status, 'delivered');
+        assert.equal(state.events.at(-1).status, 'running');
+      } finally {
+        await stopCompletionProcess(child);
+      }
+      return { fixture: true };
+    },
+    { save },
+  );
+  assert.equal(
+    (await dispatchRecoveryNotice({ ...f, binding: armed.binding, send: async () => assert.fail('duplicate') })).status,
+    'reconcile-existing',
+  );
+  assert.equal(sent, 1);
+});
+test('nonce path rejects old token, pre-spawn, mismatched journal and task identity', async () => {
+  const { armRecoveryNotice, readRecoveryNotice } = await import('./task-recovery-notice.mjs');
+  const { randomUUID } = await import('node:crypto');
+  const f = fixture(),
+    oldToken = randomUUID(),
+    token = randomUUID();
+  const original = { ...interrupted, processes: [{ token: oldToken }] };
+  writeFileSync(f.file, JSON.stringify({ ...session(), events: [original] }));
+  const armed = armRecoveryNotice({ root: f.root, binding: { ...binding, worker: '/root/original_worker' } });
+  const running = {
+    ...attempt,
+    id: 'after-nonce',
+    status: 'running',
+    startedAt: Date.now(),
+    finishedAt: undefined,
+    processes: [{ token }],
+  };
+  const write = (record) => writeFileSync(f.file, JSON.stringify({ ...session(), events: [original, record] }));
+  const journal = (record, t = token) =>
+    writeFileSync(path.join(path.dirname(f.file), 'process-' + t + '.json'), JSON.stringify(record), { mode: 0o600 });
+  write(running);
+  assert.equal(readRecoveryNotice(f.root, armed.binding).status, 'pending');
+  journal({ token, status: 'pending' });
+  assert.equal(readRecoveryNotice(f.root, armed.binding).status, 'pending');
+  journal({ token: oldToken, status: 'started', host: 'fixture-host', pgid: 1234 });
+  assert.equal(readRecoveryNotice(f.root, armed.binding).status, 'pending');
+  journal({ token: oldToken, status: 'started', host: 'fixture-host', pgid: 1234 }, oldToken);
+  write({ ...running, processes: [{ token: oldToken }] });
+  assert.equal(readRecoveryNotice(f.root, armed.binding).status, 'pending');
+  write(running);
+  journal({ token, status: 'started', host: 'fixture-host', pgid: 1234 });
+  assert.equal(readRecoveryNotice(f.root, { ...armed.binding, worker: '/root/other' }).status, 'blocked');
+  assert.equal(readRecoveryNotice(f.root, { ...armed.binding, owner: 'other' }).status, 'blocked');
+  const registry = createTaskRegistry(f.root),
+    record = registry.readTask(binding.taskId);
+  registry.revise(record.id, record.revision, (r) => {
+    r.recordedHead = 'a'.repeat(40);
+  });
+  assert.equal(readRecoveryNotice(f.root, armed.binding).status, 'blocked');
+});
+
+test('same nonce attempt can complete between claim and send, but failure or new attempt blocks', async () => {
+  const { armRecoveryNotice, claimRecoveryNotice, beginRecoveryNoticeSend } =
+    await import('./task-recovery-notice.mjs');
+  const { randomUUID } = await import('node:crypto');
+  for (const transition of ['success', 'failure', 'different-attempt']) {
+    const f = fixture();
+    writeFileSync(f.file, JSON.stringify({ ...session(), events: [interrupted] }));
+    const armed = armRecoveryNotice({ root: f.root, binding: { ...binding, worker: '/root/original_worker' } }),
+      token = randomUUID();
+    const fresh = {
+      ...attempt,
+      id: 'post-arm',
+      status: 'running',
+      startedAt: Date.now(),
+      finishedAt: undefined,
+      processes: [{ token }],
+    };
+    writeFileSync(f.file, JSON.stringify({ ...session(), events: [interrupted, fresh] }));
+    writeFileSync(
+      path.join(path.dirname(f.file), 'process-' + token + '.json'),
+      JSON.stringify({ token, status: 'started', host: 'fixture-host', pgid: 1234 }),
+      { mode: 0o600 },
+    );
+    const claim = claimRecoveryNotice({ ...f, binding: armed.binding });
+    assert.equal(claim.status, 'claimed');
+    writeFileSync(
+      f.file,
+      JSON.stringify({
+        ...session(),
+        events: [
+          interrupted,
+          {
+            ...fresh,
+            id: transition === 'different-attempt' ? 'another' : fresh.id,
+            status: transition === 'failure' ? 'failure' : 'success',
+            finishedAt: Date.now(),
+          },
+        ],
+      }),
+    );
+    assert.equal(
+      beginRecoveryNoticeSend({ directory: f.directory, eventId: claim.eventId }).status,
+      transition === 'success' ? 'send-once' : 'blocked',
+    );
+  }
+});
+test('arming after existing completed attempt never treats it as nonce-bound new recovery', async () => {
+  const { armRecoveryNotice, readRecoveryNotice } = await import('./task-recovery-notice.mjs');
+  const f = fixture(),
+    armed = armRecoveryNotice({ root: f.root, binding: { ...binding, worker: '/root/original_worker' } });
+  assert.equal(readRecoveryNotice(f.root, armed.binding).status, 'blocked');
+});
