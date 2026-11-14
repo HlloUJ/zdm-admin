@@ -2386,6 +2386,21 @@
       "digest": "63bf7811ae45bde932675d5992835c8025354966443b620e02f67f1888ce0ef4",
       "imports": ["scripts/e2e-app.mjs", "vite.config.js"],
       "dynamicImports": 0
+    },
+    "scripts/task-recovery-notice.mjs": {
+      "digest": "b6e6500e0bfeac304d88af51416fca4465d1a701f4767f2fbc359201fbed4cb5",
+      "imports": ["scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-recovery-notice.test.mjs": {
+      "digest": "a3752b614efdbbc22917c54421e7427e06c4d6d28bcc23e6ff7d7c374ac8920a",
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/task-recovery-notice.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 10
     }
   }
 }
