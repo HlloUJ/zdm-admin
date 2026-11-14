@@ -9,6 +9,10 @@ import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { captureIdentity, captureArtifacts, captureSource, verificationAttempts } from './verification-evidence.mjs';
 import { createVerificationReporter, runVerificationTask } from './verification-runner.mjs';
+import { createAdmissionBroker } from './task-resource-broker.mjs';
+import { initialSchedulerState } from './task-resource-scheduler.mjs';
+import { createScheduledVerification } from './task-resource-verification.mjs';
+import { schedulerNotices } from './task-resource-event-link.mjs';
 import { collectDeliveryChanges, createVerificationPlan, executeVerification } from './verify.mjs';
 
 function fixture(t) {
@@ -896,4 +900,69 @@ test('changing only local diagnostic run and output directory cannot clear a fai
   assert.equal(record(second).executed, false);
   assert.equal(record(second).firstFailure.attemptId, record(first).attemptId);
   assert.equal(readFileSync(path.join(root, '.task-verification/nonce-count'), 'utf8'), '1');
+});
+
+test('advisory spawn observer only sees real execution; reuse and first-failure blocking never notify', async (t) => {
+  const { root } = fixture(t);
+  const started = [];
+  const options = {
+    ...silent,
+    onSpawn(proof) {
+      started.push(proof);
+      throw Error('observer unavailable');
+    },
+  };
+  const success = task(root, 'setTimeout(() => process.exit(0), 50)');
+  assert.equal((await runVerificationTask(success, options)).exitCode, 0);
+  assert.equal(started.length, 1);
+  assert.ok(started[0].pid > 1 && started[0].runToken && started[0].fingerprint);
+  assert.equal((await runVerificationTask(success, options)).reused, true);
+  assert.equal(started.length, 1);
+  const failed = task(root, 'process.exit(1)');
+  assert.equal((await runVerificationTask(failed, options)).exitCode, 1);
+  const second = await runVerificationTask(failed, options);
+  assert.equal(second.status, 'blocked');
+  assert.equal(second.executed, false);
+  assert.equal(started.length, 2);
+});
+
+test('real lightweight verifier spawn flows through admission broker to one start event', async (t) => {
+  const { root } = fixture(t);
+  let saved = initialSchedulerState(),
+    clock = 0;
+  const G = 1024 ** 3;
+  const broker = createAdmissionBroker({
+    store: {
+      read: () => structuredClone(saved),
+      write: (s) => {
+        saved = structuredClone(s);
+      },
+    },
+    budget: () => ({ macPeakBytes: G, dockerPeakBytes: 0 }),
+    validateEvidence: (r) => r.exitCode === 0 && !!r.evidence,
+    now: () => clock,
+  });
+  const run = createScheduledVerification({ taskId: 'isolated-921', broker });
+  const pending = run(task(root, 'setTimeout(() => process.exit(0), 150)'), silent);
+  await new Promise((resolve) => setImmediate(resolve));
+  const sample = () => ({
+    at: clock,
+    macAvailableBytes: 10 * G,
+    dockerAvailableBytes: 6 * G,
+    diskAvailableBytes: 20 * G,
+    cpuBusyPercent: 10,
+    memoryPressure: false,
+    swapGrowing: false,
+    ioCongested: false,
+  });
+  broker.tick(sample());
+  clock = 60000;
+  broker.tick(sample());
+  const result = await pending;
+  assert.equal(result.exitCode, 0);
+  assert.equal(result.spawnObservationError, undefined);
+  const notices = schedulerNotices(broker.snapshot(), () => ({ stableId: 'isolated-921', label: '921 test' }));
+  assert.equal(notices.length, 1);
+  assert.equal(saved.jobs[0].status, 'done');
+  assert.ok(saved.jobs[0].spawnProof.startTime);
 });

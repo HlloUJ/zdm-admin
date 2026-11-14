@@ -309,7 +309,7 @@ export async function executeVerification(
   return finish(code);
 }
 
-export async function main(args = process.argv.slice(2)) {
+export async function main(args = process.argv.slice(2), { execute = executeVerification } = {}) {
   const allowed = new Set(['--list', '--force', '--no-reuse', '--browser', '--affected', '--runtime', '--help', '-h']);
   let browser;
   for (let index = 0; index < args.length; index++) {
@@ -379,7 +379,7 @@ export async function main(args = process.argv.slice(2)) {
   }
   const report = createVerificationReporter(process.cwd());
   try {
-    return await executeVerification(plan, { force: args.includes('--force') || args.includes('--no-reuse'), report });
+    return await execute(plan, { force: args.includes('--force') || args.includes('--no-reuse'), report });
   } finally {
     await report.close();
   }
