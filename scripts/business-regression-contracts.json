@@ -435,7 +435,7 @@
         "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
         "tests/e2e/slab-collaboration.spec.ts": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
-        "tests/e2e/store-finished-stock.spec.ts": "725053a21098ccb2e8c0db1f9cc44a7a4b7e2defc8c5c84872cc3c598ad58713",
+        "tests/e2e/store-finished-stock.spec.ts": "73f5125a48c61b0fec0b1629364c066b0101cf47a7ffa9c4057d0c0dc95871cf",
         "tests/e2e/store-accessory-management.spec.ts": "c3d66e8e0832358a40ba33a6b583d857fc8f395b8ab1bb888f8dc130631bc1e3",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "480ec0600c494a8b4649fcb29291ab87ed018638052c479ebbd405a6ba5236a4",
         "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "1f91cf7db291864add3fe7bc99e3dee804e5b113a6cab112ca24cd4d72faea1c",
@@ -470,7 +470,7 @@
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
         "tests/e2e/accessory-api-mocks.ts": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
         "tests/e2e/pagination-responsive.spec.ts": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
-        "tests/e2e/store-order-prototype.spec.ts": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+        "tests/e2e/store-order-prototype.spec.ts": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "2933e0202a0088396c118d4324137fd5ef20145c6996bf8ea90199554495e5e3",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
@@ -3032,6 +3032,30 @@
           "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
           "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
           "reason": "672+134 accepted-source composition: retain all main payment-name assertions; add store-context/cache-exit API mocks and removed-store identity/cache cleanup regressions from accepted 825de7c09, with no assertion removal or tolerance relaxation."
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "725053a21098ccb2e8c0db1f9cc44a7a4b7e2defc8c5c84872cc3c598ad58713",
+          "after": "73f5125a48c61b0fec0b1629364c066b0101cf47a7ffa9c4057d0c0dc95871cf",
+          "reason": "PR121 CI43602325943: align exact header assertion with user-approved frozen label 价格; all price/value/privacy/read-only assertions retained."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "PR121 CI43602325943: wait for disabled status tag rather than ambiguous action text before enable; strengthens async CRUD state assertion, no timeout or retry changes."
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
+          "after": "73f5125a48c61b0fec0b1629364c066b0101cf47a7ffa9c4057d0c0dc95871cf",
+          "reason": "Confirmed selection-center PRD: replace retired modal selection with actual new-tab selection, current-store-only pricing, name-only search, dynamic read-only details, video playback and cross-page whole-basket join; retain all unrelated lifecycle/price editor assertions. PR121 CI43602325943 precise follow-up: approved price label or wait for actual disabled status tag; no assertion removals, retries, or tolerance relaxation."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "672+134 accepted-source composition: retain all main payment-name assertions; add store-context/cache-exit API mocks and removed-store identity/cache cleanup regressions from accepted 825de7c09, with no assertion removal or tolerance relaxation. PR121 CI43602325943 precise follow-up: approved price label or wait for actual disabled status tag; no assertion removals, retries, or tolerance relaxation."
         }
       ],
       "routes": [
@@ -3279,7 +3303,7 @@
       "backendTests": ["backend/src/test/java/com/zdm/platform/payment/StorePaymentNameApiTest.java"],
       "supportFiles": ["tests/e2e/store-payment-name-mocks.ts"],
       "protectedTests": {
-        "tests/e2e/store-order-prototype.spec.ts": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+        "tests/e2e/store-order-prototype.spec.ts": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
         "backend/src/test/java/com/zdm/platform/payment/StorePaymentNameApiTest.java": "f0bc7785d0361355519a740488364d7f51e051d7ce4cbcd71708763143dae440",
         "tests/e2e/store-payment-name-mocks.ts": "94ca072074a9dde740187611c7d3627f03fa04450b73cba6f27c18887d0edbe2"
       },
@@ -3343,6 +3367,18 @@
           "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
           "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
           "reason": "672 accepted removed-store context/cache regressions and isolated API mocks; retain main payment-name assertions unchanged."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "PR121 CI43602325943: wait for disabled status tag rather than ambiguous action text before enable; strengthens async CRUD state assertion, no timeout or retry changes."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "672 accepted removed-store context/cache regressions and isolated API mocks; retain main payment-name assertions unchanged. PR121 CI43602325943 precise follow-up: approved price label or wait for actual disabled status tag; no assertion removals, retries, or tolerance relaxation."
         }
       ]
     },
@@ -3596,7 +3632,7 @@
       ],
       "protectedTests": {
         "tests/e2e/store-exit.spec.ts": "40ccc3d52c2e6b3ee78c9e654b5e1fbcb69eea8bd018c877f04fc9d7f3851bf9",
-        "tests/e2e/store-order-prototype.spec.ts": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+        "tests/e2e/store-order-prototype.spec.ts": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
         "tests/e2e/pagination-responsive.spec.ts": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
         "tests/e2e/admin-foundation.spec.ts": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
         "tests/e2e/feedback-foundation.spec.ts": "cad6465de30701955cff10f92344f4f0ab32d20fa3c4d0e6f51555c9ca4f816a",
@@ -3837,6 +3873,12 @@
           "before": "a52110a86449f08b351cbdb2cbd38e4251b1cd13a8757510983af177f5e85750",
           "after": "7c2fa0912fc06d22191a9adbc3a66cd31b74b8c3e8d00ca34f07fd0adf8f1f21",
           "reason": "672 accepted scoped selection technical-cache tests, preserving unrelated store and account data."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "PR121 CI43602325943: wait for disabled status tag rather than ambiguous action text before enable; strengthens async CRUD state assertion, no timeout or retry changes."
         }
       ]
     }

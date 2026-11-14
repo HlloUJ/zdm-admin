@@ -292,7 +292,7 @@ for (const displayMode of ['single', 'layered'] as const) {
     await expect(drawer.getByText('选品中心只读详情')).toBeVisible();
     await expect(drawer.getByText('基础信息', { exact: true })).toBeVisible();
     await expect(drawer.getByText('家具 / 桌椅 / 餐桌', { exact: true })).toBeVisible();
-    for (const name of ['销售属性（共享）', '销售属性（专属）', '门店适用价格'])
+    for (const name of ['销售属性（共享）', '销售属性（专属）', '价格'])
       await expect(drawer.getByRole('columnheader', { name, exact: true })).toBeVisible();
     await expect(drawer.getByRole('columnheader', { name: '商品规格', exact: true })).toHaveCount(
       displayMode === 'single' ? 1 : 0,

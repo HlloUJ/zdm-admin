@@ -496,12 +496,16 @@ test('page loading stays centered above content and disappears after the request
   const box = await loading.boundingBox();
   expect(box!.x).toBe(0);
   expect(box!.y).toBe(0);
-  expect(box!.width).toBe(1440);
-  expect(box!.height).toBe(900);
+  const viewport = await page.evaluate(() => ({
+    width: document.documentElement.clientWidth,
+    height: document.documentElement.clientHeight,
+  }));
+  expect(box!.width).toBe(viewport.width);
+  expect(box!.height).toBe(viewport.height);
   const icon = loading.locator('.t-loading__gradient-conic');
   const iconBox = await icon.boundingBox();
-  expect(iconBox!.x + iconBox!.width / 2).toBeCloseTo(720, 0);
-  expect(iconBox!.y + iconBox!.height / 2).toBeCloseTo(450, 0);
+  expect(iconBox!.x + iconBox!.width / 2).toBeCloseTo(viewport.width / 2, 0);
+  expect(iconBox!.y + iconBox!.height / 2).toBeCloseTo(viewport.height / 2, 0);
   expect(await loading.evaluate((el) => Number(getComputedStyle(el).zIndex))).toBeGreaterThan(1500);
   release();
   await expect(loading).toBeHidden();
@@ -556,7 +560,8 @@ for (const width of [1440, 1024, 640]) {
     const drawer = page.locator('.t-drawer--open');
     await expect(drawer.getByText('基础信息', { exact: true })).toBeVisible();
     const content = drawer.locator('.t-drawer__content-wrapper');
-    await expect.poll(async () => (await content.boundingBox())?.width).toBe(Math.min(1120, width));
+    const layoutWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    await expect.poll(async () => (await content.boundingBox())?.width).toBe(Math.min(1120, layoutWidth));
     await expect
       .poll(async () => {
         const rect = await content.boundingBox();

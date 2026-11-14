@@ -153,7 +153,7 @@ test('payment configuration starts empty and supports CRUD without rewriting his
   await row.getByText('停用', { exact: true }).click();
   await page.locator('.t-dialog:visible').getByRole('button', { name: '确认停用', exact: true }).click();
   await expect(page.getByText('已停用“成交款”', { exact: true })).toBeVisible();
-  await expect(row.getByText('停用', { exact: true })).toBeVisible();
+  await expect(row.locator('.t-tag')).toHaveText('停用');
   await row.getByText('启用', { exact: true }).click();
   await expect(row.locator('.t-tag')).toHaveText('停用');
   await page.locator('.t-dialog:visible').getByRole('button', { name: '确认启用', exact: true }).click();
