@@ -1,3 +1,4 @@
+import { monitoringRegistration } from './task-monitor-registration.mjs';
 import { prepareTaskArtifacts } from './task-artifacts.mjs';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -31,10 +32,17 @@ export function parseTaskStart(args) {
       options.resume = true;
       continue;
     }
-    const key = { '--slug': 'slug', '--kind': 'kind', '--owner': 'owner', '--task-parent': 'taskParent' }[value];
+    const key = {
+      '--slug': 'slug',
+      '--kind': 'kind',
+      '--owner': 'owner',
+      '--task-parent': 'taskParent',
+      '--monitor-context': 'monitorContext',
+    }[value];
     assert.ok(key && args[i + 1] && !args[i + 1].startsWith('--'), 'Unknown task option or missing value: ' + value);
     options[key] = args[++i];
   }
+  if (options.monitorContext !== undefined) options.monitorContext = JSON.parse(options.monitorContext);
   if (options.slug) {
     assert.match(options.slug, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.ok(options.slug.length <= 64, 'Task id too long');
@@ -86,6 +94,7 @@ export function startParallelTask(
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   assert.ok(!options.resume, 'Task is not registered; do not adopt an unknown branch or worktree');
+  monitoringRegistration(owner, options.monitorContext); // Validate before creating any worktree.
   const entries = registeredTaskWorktrees(root),
     mains = entries.filter((x) => x.branch === 'main');
   assert.equal(mains.length, 1, 'Exact main anchor required');
@@ -150,7 +159,13 @@ export function startParallelTask(
     git(anchor, 'worktree', 'add', '-b', branch, target, base);
     record.state = 'worktree-created';
     writeFileSync(intent, JSON.stringify(record, null, 2) + '\n');
-    const task = registry.register({ id: options.slug, worktree: target, owner, kind: options.kind });
+    const task = registry.register({
+      id: options.slug,
+      worktree: target,
+      owner,
+      kind: options.kind,
+      monitorContext: options.monitorContext,
+    });
     record.state = 'registered';
     writeFileSync(intent, JSON.stringify(record, null, 2) + '\n');
     result = { task, resumed: false, previewSwitched: false, remoteFetched: true, remoteMain: base };
