@@ -4,6 +4,10 @@ import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
+import { setTimeout as pause } from 'node:timers/promises';
+
+// Only a currently waiting invocation can consume a waiting-worker grant.
+const waitingInvocations = new WeakMap();
 import { createTaskRegistry } from './task-registry.mjs';
 import {
   completionDirectory,
@@ -122,9 +126,67 @@ export function setDevelopmentControl(root, { taskId, expectedRevision, paused, 
     return next;
   });
 }
+// The root verifies the live original worker and this request while this invocation
+// is waiting. Its fresh receipt is consumed locally, not after another cloud wake.
+export async function runWaitingDevelopmentContinuation(root, options) {
+  const { task, directory } = context(root, options.taskId);
+  assert.match(options.checkpointId, /^[a-f0-9-]{36}$/);
+  const checkpoint = read(path.join(directory, `checkpoint-${options.checkpointId}.json`));
+  for (const key of ['taskId', 'worker', 'rootThreadId', 'authorizationRef'])
+    assert.equal(checkpoint[key], options[key]);
+  assert.equal(checkpoint.owner, task.owner);
+  assert.equal(checkpoint.registryRevision, task.revision);
+  assert.equal(checkpoint.head, cleanHead(task));
+  const allowed = control(directory);
+  assert.equal(allowed.paused, false, 'Task explicitly paused');
+  assert.equal(allowed.authorizationRef, options.authorizationRef);
+  assert.ok(!fs.existsSync(path.join(directory, 'active-attempt.json')), 'Active or unresolved continuation');
+  assert.ok(!fs.existsSync(path.join(directory, `attempt-${checkpoint.id}.json`)), 'Checkpoint already consumed');
+  const waitMs = options.waitMs ?? 300000;
+  assert.ok(Number.isInteger(waitMs) && waitMs > 0 && waitMs <= 600000, 'Bounded handoff wait required');
+  const id = randomUUID();
+  const request = {
+    version: 1,
+    id,
+    checkpoint,
+    controlRevision: allowed.revision,
+    workerState: 'waiting-for-handoff',
+    pid: process.pid,
+    host: os.hostname(),
+    createdAt: Date.now(),
+    expiresAt: Date.now() + waitMs,
+  };
+  const requestFile = path.join(directory, `handoff-${id}.json`);
+  const receiptFile = path.join(directory, `handoff-${id}.receipt.json`);
+  create(requestFile, request);
+  const token = {};
+  waitingInvocations.set(token, request);
+  try {
+    // Publication is only a request, never execution evidence.
+    const publication = options.onWaiting?.({ request, requestFile, receiptFile });
+    assert.ok(!publication || typeof publication.then !== 'function', 'Waiting publication must return synchronously');
+    while (Date.now() <= request.expiresAt) {
+      assert.deepEqual(control(directory), allowed, 'Control changed while waiting');
+      if (fs.existsSync(receiptFile)) {
+        const reachability = read(receiptFile);
+        assert.equal(reachability.handoffId, id, 'Wrong waiting handoff');
+        assert.equal(reachability.receiverPid, process.pid, 'Wrong waiting receiver');
+        assert.equal(reachability.receiverHost, os.hostname(), 'Wrong waiting host');
+        assert.ok(reachability.observedAt >= request.createdAt, 'Receipt predates request');
+        return await runDevelopmentContinuation(root, { ...options, reachability, waitingToken: token });
+      }
+      await pause(50);
+    }
+    throw Error('Waiting handoff expired; no continuation executed');
+  } finally {
+    waitingInvocations.delete(token);
+    create(path.join(directory, `handoff-${id}.closed.json`), { id, closedAt: Date.now() });
+  }
+}
+
 export async function runDevelopmentContinuation(
   root,
-  { taskId, checkpointId, worker, rootThreadId, authorizationRef, reachability, execute },
+  { taskId, checkpointId, worker, rootThreadId, authorizationRef, reachability, execute, waitingToken },
 ) {
   const { task, directory } = context(root, taskId);
   assert.match(checkpointId, /^[a-f0-9-]{36}$/);
@@ -140,12 +202,19 @@ export async function runDevelopmentContinuation(
   const allowed = control(directory);
   assert.equal(allowed.paused, false, 'Task explicitly paused');
   assert.equal(allowed.authorizationRef, authorizationRef);
+  const waiting = waitingInvocations.get(waitingToken);
+  const validWorkerState = waiting
+    ? reachability?.workerState === 'waiting-for-handoff' &&
+      reachability.handoffId === waiting.id &&
+      Date.now() <= waiting.expiresAt
+    : reachability?.workerState === 'idle';
   // The trusted root must independently obtain this receipt using native collaboration tools.
   // This local module cannot prove cloud identity; no caller-supplied owner replacement is allowed.
   assert.ok(
     reachability &&
       reachability.worker === worker &&
       reachability.rootThreadId === rootThreadId &&
+      reachability.authorizationRef === authorizationRef &&
       reachability.taskId === taskId &&
       reachability.owner === task.owner &&
       reachability.checkpointId === checkpointId &&
@@ -153,7 +222,7 @@ export async function runDevelopmentContinuation(
       reachability.nonce === checkpoint.nonce &&
       typeof reachability.receiptId === 'string' &&
       reachability.receiptId.length > 0 &&
-      reachability.workerState === 'idle' &&
+      validWorkerState &&
       reachability.interruptionConfirmed === true &&
       reachability.effectsReconciled === true &&
       reachability.resourcesResolved === true &&

@@ -30,3 +30,15 @@
 定向 `node --test scripts/task-development-recovery.test.mjs` 使用临时 Git 仓库和原监督器，覆盖默认暂停、revision 冲突、错误 owner、脏工作区、错误或过期 reachability、unknown 不重放、新 checkpoint 不得绕过、同/不同 checkpoint 并发排他、真实 spawn 证明、执行未结束、暂停后禁止启动、没有监督执行不得算完成。测试不操作真实任务或预览，不更改系统安全配置。
 
 剩余真实接入验收必须另行核实：原持久 root → 原 worker 可达、重启后原 worker 不可达时失败关闭、持久唤醒读取相同状态、通知准确投递与 receipt，以及旧普通开发入口的资源排他。不得把隔离通过当作上述场景已全部覆盖。
+
+## 原 worker 等待交接适配
+
+`runWaitingDevelopmentContinuation(root, options)` 保留上述身份、授权、干净 HEAD、控制和排他规则。原 worker 发布不可变 waiting request 后，在同一执行进程内有界等待原 root 的原子 receipt，避免先生成五秒交接证据、再跨云唤醒而过期。默认等待五分钟，上限十分钟；五秒 receipt 新鲜度没有放宽。
+
+request 记录准确 checkpoint、handoff ID、receiver PID/host、控制 revision、创建及截止时间。root 必须先通过真实平台确认原 worker 正在等待该交接，再独立核实原结果与资源，才以临时文件加原子 rename 写入对应 receipt。receipt 的 workerState 必须是 `waiting-for-handoff`，并精确绑定 handoffId、receiverPid、receiverHost、原 owner/task/worker/root/HEAD/checkpoint/nonce；observedAt 不能早于 request，消费时不得超过五秒。不可将任意 running worker 写成 idle，不可把 request 本身当成核验成功。
+
+本次活跃调用的 WeakMap token 才允许消费 waiting receipt；直接调用普通入口并传入同形对象不能伪造该 token。超时、暂停、错误身份或资源未核清均不执行、不消费 checkpoint；消费成功后不可重复执行。等待结束保留 closed 证据，未知 execution 继续按原规则保留现场。原 worker 消失仍失败关闭，不能由新 worker 接管其身份。
+
+隔离测试中的 receipt writer 仅用于验证契约与原子读入，不是生产平台身份自证。真实平台等待确认、实际 root 写入与跨会话可达仍必须单独验收；不得因测试通过宣称生产调度已经启用。
+
+`onWaiting` 仅允许同步发布 request 的位置或元信息；返回 Promise/thenable 立即拒绝并关闭 request，不得在回调里异步等待 root 或执行外部 I/O。root 的独立读取和原子写 receipt 在该回调之外完成，真正等待由有界轮询负责。
