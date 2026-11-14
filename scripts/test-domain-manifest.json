@@ -1593,6 +1593,55 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-continuity-board.mjs": {
+      "digest": "5cbe9a3449edf57e08d8960933b0c9dd0614a81274ba498b2817c14460cf6f8f",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-board.test.mjs": {
+      "digest": "f1c8f1775f6a8aa0ca63d459eb820d50e68699347d079f86060dc85142de4f4c",
+      "imports": [
+        "scripts/task-continuity-board.mjs",
+        "scripts/task-continuity-handoff.mjs",
+        "scripts/task-continuity.mjs"
+      ],
+      "dynamicImports": 9
+    },
+    "scripts/task-continuity-ci.mjs": {
+      "digest": "ace1e410c0e63f45f2420e574b4228e75cc8dc6243a9009e10ff86d02e7975a4",
+      "imports": ["scripts/task-continuity.mjs", "scripts/task-entry.mjs", "scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-ci.test.mjs": {
+      "digest": "317d7b0c4c361f409ceeafa812c6afb15568e21611b8b587afedde19b7401a93",
+      "imports": ["scripts/task-continuity-ci.mjs", "scripts/task-continuity.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-cli.mjs": {
+      "digest": "87d5f3ed93a7633908966fa048bb19565560ff3fdccab4b73c2893a5fc548961",
+      "imports": ["scripts/task-continuity.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-handoff.mjs": {
+      "digest": "0405b5bf8eec2777954261720d49897ca9c76f0b1e732962fe23646122474e54",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-handoff.test.mjs": {
+      "digest": "1284f7b65619909b70e999e122462087a5519633561c9250e3d4e75dd73b93c6",
+      "imports": ["scripts/task-continuity-handoff.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity.mjs": {
+      "digest": "9255bf6bbc0906092da98339bcc20f8316dede761e7026efbcd7824d8ce43e33",
+      "imports": ["scripts/task-registry.mjs", "scripts/task-resource-notifications.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity.test.mjs": {
+      "digest": "03098616213117032094038f17ebd4f7ee7f9c15527d73d596ef44b0c4eaf2c4",
+      "imports": ["scripts/task-continuity-cli.mjs", "scripts/task-continuity.mjs"],
+      "dynamicImports": 8
+    },
     "scripts/task-data-environment.mjs": {
       "digest": "16a31c2480ad03f1f12dd1a701309808d3319833c4e0aa66a3aa5cbeeb7c2c38",
       "imports": ["scripts/integration-resource.mjs", "scripts/task-registry.mjs"],
@@ -1726,6 +1775,16 @@
     "scripts/task-maven.test.mjs": {
       "digest": "d7a30c087a8e117eeb06e8da1cbb21f5fcc4784082a53498eaf5ff71c81a3136",
       "imports": ["scripts/task-maven.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-owner-handoff-assessment.mjs": {
+      "digest": "539db27a750c3022f14697afaedd19ab2155d9738b0ce06e2f3930cb89a81a65",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-owner-handoff-assessment.test.mjs": {
+      "digest": "03e5e4dccc11744018f29dc08053aab557fbb51567cf74cb86329cdb937e294f",
+      "imports": ["scripts/task-owner-handoff-assessment.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-preview-combination.mjs": {
