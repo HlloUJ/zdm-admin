@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { createHash, randomUUID } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { createTaskRegistry } from './task-registry.mjs';
 import { readContinuityAdmission } from './task-continuity-admission.mjs';
 const hash = (v) => createHash('sha256').update(v).digest('hex');
@@ -214,4 +214,138 @@ test('legacy running verification and linked policy stay observable but never di
   const result = readContinuityAdmission(g.root);
   assert.equal(result.handoffs.length, 0);
   assert.ok(result.observations.length);
+});
+
+function formalFixture() {
+  const f = fixture();
+  const old = f.registry.readTask('admission');
+  const tree = execFileSync('git', ['-C', f.worktree, 'rev-parse', 'HEAD^{tree}'], { encoding: 'utf8' }).trim();
+  f.registry.revise(old.id, old.revision, (v) => {
+    v.stage = 'frozen';
+    v.frozen = { accepted: old.recordedHead, tree, businessDigest: 'a'.repeat(64) };
+  });
+  const current = f.registry.readTask(old.id);
+  f.patch('bindings.candidate.json', (v) => {
+    v.bindings[0].registryRevisionObserved = current.revision;
+    delete v.bindings[0].checkpointId;
+  });
+  const directory = path.join(f.registry.commonDir, 'task-delivery', old.id);
+  fs.mkdirSync(directory, { recursive: true });
+  const file = path.join(directory, 'completion-session.json');
+  const session = {
+    version: 1,
+    batch: old.id,
+    startedAt: Date.now() - 2000,
+    events: [
+      {
+        id: randomUUID(),
+        name: 'prepare',
+        key: current.recordedHead,
+        status: 'success',
+        startedAt: Date.now() - 1500,
+        finishedAt: Date.now() - 1000,
+        owner: { host: os.hostname(), pid: spawnSync(process.execPath, ['-e', '']).pid },
+        processTracking: 1,
+        processes: [],
+      },
+    ],
+  };
+  const writeSession = (value) => fs.writeFileSync(file, JSON.stringify(value));
+  writeSession(session);
+  return { ...f, file, session, writeSession };
+}
+test('frozen formal terminal journal yields inspect-only original-owner candidate without mutation', () => {
+  const f = formalFixture();
+  const registryBefore = JSON.stringify(f.registry.list()),
+    journalBefore = fs.readFileSync(f.file, 'utf8');
+  const result = readContinuityAdmission(f.root);
+  assert.equal(result.handoffs.length, 1, JSON.stringify(result.blocked));
+  const handoff = result.handoffs[0];
+  assert.equal(handoff.canExecute, false);
+  assert.equal(handoff.action, 'inspect-original-formal-owner-only');
+  assert.equal(handoff.effectsReconciled, false);
+  assert.equal(handoff.requiresOriginalFormalReconciliation, true);
+  assert.equal(handoff.formalSessionDigest, hash(JSON.stringify(f.session)));
+  assert.equal(handoff.canReplayCommands, false);
+  assert.equal(handoff.requiresIndependentRootVerification, true);
+  assert.equal(handoff.owner, f.binding.owner);
+  assert.equal(handoff.worker, f.binding.worker);
+  assert.equal(handoff.interruptionProven, false);
+  assert.equal(JSON.stringify(f.registry.list()), registryBefore);
+  assert.equal(fs.readFileSync(f.file, 'utf8'), journalBefore);
+});
+test('formal active, paused, malformed or missing sessions never yield safe continuation', () => {
+  for (const mutate of [
+    (f) => {
+      f.session.events[0].owner.pid = process.pid;
+      f.writeSession(f.session);
+    },
+    (f) => {
+      f.session.events[0].status = 'running';
+      f.session.events[0].owner.pid = process.pid;
+      delete f.session.events[0].finishedAt;
+      f.writeSession(f.session);
+    },
+    (f) => {
+      f.session.pauses = [{ startedAt: Date.now() - 1000 }];
+      f.writeSession(f.session);
+    },
+    (f) => {
+      f.session.batch = 'foreign-task';
+      f.writeSession(f.session);
+    },
+    (f) => {
+      f.session.version = 99;
+      f.writeSession(f.session);
+    },
+    (f) => {
+      f.session.events = [];
+      f.writeSession(f.session);
+    },
+    (f) => fs.renameSync(f.file, f.file + '.retained'),
+    (f) => fs.mkdirSync(f.file + '.lock'),
+    (f) => {
+      f.session.events[0].processTracking = 0;
+      f.writeSession(f.session);
+    },
+    (f) => {
+      f.session.events[0].processes = [{ token: randomUUID() }];
+      f.writeSession(f.session);
+    },
+    (f) => {
+      f.session.events[0].status = 'running';
+      f.session.events[0].owner = { host: 'foreign-host', pid: 123 };
+      f.writeSession(f.session);
+    },
+  ]) {
+    const f = formalFixture();
+    mutate(f);
+    const result = readContinuityAdmission(f.root);
+    assert.equal(result.handoffs.length, 0, JSON.stringify(result));
+    assert.ok(result.blocked.length);
+  }
+});
+test('formal closed, changed HEAD and paused bindings veto inspection handoff', () => {
+  for (const mutate of [
+    (f) => {
+      const t = f.registry.readTask('admission');
+      f.registry.revise(t.id, t.revision, (v) => {
+        v.stage = 'closed';
+      });
+    },
+    (f) =>
+      execFileSync('git', ['-C', f.worktree, 'commit', '--allow-empty', '-m', 'unbound candidate'], { stdio: 'pipe' }),
+    (f) =>
+      f.patch('bindings.candidate.json', (v) => {
+        v.pauseAllBusinessResumption = true;
+      }),
+    (f) =>
+      f.patch('bindings.candidate.json', (v) => {
+        v.bindings[0].resumeAllowed = false;
+      }),
+  ]) {
+    const f = formalFixture();
+    mutate(f);
+    assert.equal(readContinuityAdmission(f.root).handoffs.length, 0);
+  }
 });
