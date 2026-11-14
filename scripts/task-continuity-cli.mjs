@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { collectTaskContinuity, notifyContinuityChanges } from './task-continuity.mjs';
+import { readContinuityAdmission } from './task-continuity-admission.mjs';
 
 const args = process.argv.slice(2),
   selected = [];
@@ -14,7 +15,10 @@ for (let index = 0; index < args.length; index++) {
     assert.match(id ?? '', /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     selected.push(id);
   } else
-    assert.ok(['--once', '--watch', '--notify'].includes(arg), 'Use --once or --watch [--task exact-id] [--notify]');
+    assert.ok(
+      ['--once', '--watch', '--notify', '--admission'].includes(arg),
+      'Use --once or --watch [--task exact-id] [--notify] [--admission]',
+    );
 }
 assert.equal(args.filter((a) => ['--once', '--watch'].includes(a)).length, 1);
 assert.ok(!args.includes('--notify') || selected.length, 'Notification requires explicit task scope');
@@ -31,8 +35,25 @@ process.once('SIGTERM', () => controller.abort());
 process.once('SIGINT', () => controller.abort());
 do {
   const observedAt = new Date().toISOString();
-  const tasks = collectTaskContinuity(root).filter((task) => !selected.length || selected.includes(task.task));
-  const snapshot = { version: 1, observedAt, readOnly: true, automaticResumptionEnabled: false, tasks };
+  const admission = args.includes('--admission') ? readContinuityAdmission(root) : null;
+  const tasks = (admission?.observations ?? collectTaskContinuity(root)).filter(
+    (task) => !selected.length || selected.includes(task.task),
+  );
+  const snapshot = {
+    version: 1,
+    observedAt,
+    readOnly: true,
+    automaticResumptionEnabled: false,
+    tasks,
+    ...(admission
+      ? {
+          admission: {
+            ...admission,
+            handoffs: admission.handoffs.filter((event) => !selected.length || selected.includes(event.task)),
+          },
+        }
+      : {}),
+  };
   const temporary = path.join(directory, `snapshot-${randomUUID()}.json`);
   writeFileSync(temporary, JSON.stringify(snapshot, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
   renameSync(temporary, path.join(directory, 'latest.json'));
