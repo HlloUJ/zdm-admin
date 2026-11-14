@@ -23,3 +23,34 @@ export function continuityBoardPatch(observation, binding, current, observedAt, 
     evidence: `中断观察：${observation.task}；${observation.reason}；${new Date(observedAt).toISOString()}。未改变任务栏位，未声称已经恢复。`,
   };
 }
+
+// Connector transport is supplied by the root; a revision conflict is never retried against
+// a new revision without refreshing the original task observation.
+export async function syncContinuityBoard({ observation, binding, observedAt, readTask, updateTask, now = Date.now }) {
+  const current = await readTask(binding.taskStableId);
+  const patch = continuityBoardPatch(observation, binding, current, observedAt, now());
+  if (!patch) return { status: 'unchanged', resumePermitted: false };
+  try {
+    const result = await updateTask(patch);
+    if (
+      result?.conflict === true ||
+      result?.isError === true ||
+      result?.id !== patch.id ||
+      result?.revision !== patch.revision + 1
+    )
+      return {
+        status: 'unconfirmed',
+        reason: 'Update receipt conflicts or lacks exact new revision; re-read before another action',
+        resumePermitted: false,
+      };
+    return {
+      status: 'updated',
+      task: patch.id,
+      revision: result.revision,
+      nextAction: 'notify-owner-with-exact-blocker',
+      resumePermitted: false,
+    };
+  } catch (error) {
+    return { status: 'unconfirmed', reason: error.message, resumePermitted: false };
+  }
+}
