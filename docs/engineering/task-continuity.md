@@ -46,3 +46,9 @@ Mac通知必须显式指定`--task <准确任务ID>`，不对全部旧登记广�
 一次性真实automation已从同一Mac读取匹配的challenge/event/nonce，证明持久状态可达；该运行无法找到原native worker，故未claim、未唤醒、未伪造receipt。这是明确的阻断结果，而不是自动续接成功。同一持久root可读也不证明其旧native子agent可恢复。
 
 发布前仍需原正式门禁与根线程受控接入审查；不得依据此文安装常驻服务或开启真实owner交接。
+
+### 原持久根线程桥接验证
+
+后续一次隔离验证通过受支持的消息入口投递到已核实的原持久根线程，由其在自己的 native 树中联系准确原 worker。原 worker 实际读取同一 challenge，核验 nonce、真实 owner 与 `mayRunBusinessActions=false`，回传后由根线程确认，再写入持久 delivered receipt。本次 challenge 创建至 worker 读回为 37,438 ms。只读往返成功，不代表业务已恢复，也不是自动调度延迟承诺。
+
+因此不需要把“新 automation 找不到原 native worker”误作必须转移 owner：可先尝试原持久 root 桥。仅当原 root 与原 worker 身份均准确可达、原任务授权和执行结果重新核验后，才能由原 worker 使用其原入口继续。原 root/worker 缺失、结果不明或消息回执不明时仍失败关闭，不重复唤醒、不伪造身份。周期调度、真实任务续接、关机重启后可达性尚未启用或证明。
