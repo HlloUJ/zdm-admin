@@ -335,17 +335,10 @@ export async function runVerificationTask(task, options = {}) {
         cwd: root,
         env: childEnv,
         stdio: ['ignore', 'pipe', 'pipe'],
-      });
-      // Optional advisory observer runs only after actual spawn. It cannot change locks,
-      // command results, immutable attempts, reuse decisions, or first-failure policy.
-      child.once('spawn', () => {
-        try {
-          Promise.resolve(
-            options.onSpawn?.({ pid: child.pid, runToken: record.attemptId, fingerprint: before.fingerprint }),
-          ).catch(() => {});
-        } catch {
-          /* Notification/observer failure never changes verification outcome. */
-        }
+        // The supervisor's spawn is not the command's spawn. Only its authenticated
+        // IPC receipt may report the actual command PID to the advisory observer.
+        onCommandSpawn: ({ pid }) =>
+          options.onSpawn?.({ pid, runToken: record.attemptId, fingerprint: before.fingerprint }),
       });
       child.stdout.on('data', append);
       child.stderr.on('data', append);
