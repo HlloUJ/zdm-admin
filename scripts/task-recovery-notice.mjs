@@ -1,3 +1,4 @@
+import { readDevelopmentNotice } from './task-development-recovery.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, openSync, writeFileSync, fsyncSync, closeSync, readFileSync } from 'node:fs';
@@ -274,6 +275,7 @@ function spawnedNotice(data, binding) {
   return { status: 'pending', reason: 'No exact original post-spawn journal; running field alone is insufficient' };
 }
 export function readRecoveryNotice(root, binding) {
+  if (binding.kind === 'development') return readDevelopmentNotice(root, binding);
   const data = source(root, binding);
   if (!data.session) return { status: 'blocked', reason: 'Original completion session unavailable' };
   const evaluated = evaluateRecoveryNotice(data.task, data.session, binding);
