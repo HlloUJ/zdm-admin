@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdirSync, realpathSync, writeFileSync, renameSync, lstatSync } from 'node:fs';
+import { mkdirSync, realpathSync, writeFileSync, renameSync, lstatSync, existsSync } from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
@@ -20,6 +20,10 @@ assert.equal(args.filter((a) => ['--once', '--watch'].includes(a)).length, 1);
 assert.ok(!args.includes('--notify') || selected.length, 'Notification requires explicit task scope');
 const root = realpathSync(process.cwd());
 const directory = path.join(root, '.task-runtime', 'continuity-observer');
+for (let p = directory; ; p = path.dirname(p)) {
+  if (existsSync(p)) assert.ok(!lstatSync(p).isSymbolicLink(), 'Linked observer state path');
+  if (p === path.dirname(p)) break;
+}
 mkdirSync(directory, { recursive: true, mode: 0o700 });
 assert.ok(!lstatSync(directory).isSymbolicLink());
 const controller = new AbortController();

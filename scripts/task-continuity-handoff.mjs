@@ -19,6 +19,12 @@ function create(file, value) {
   } finally {
     closeSync(fd);
   }
+  const parent = openSync(path.dirname(file), 'r');
+  try {
+    fsyncSync(parent);
+  } finally {
+    closeSync(parent);
+  }
 }
 // Mapping is supplied by the coordinating root from actual worker assignments, never inferred
 // from a repository owner UUID or a process name. This module cannot wake a cloud agent.

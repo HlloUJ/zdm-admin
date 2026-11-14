@@ -8,7 +8,7 @@ const head = 'a'.repeat(40);
 const input = () => ({
   intent: { task: 'task-a', head, owner: 'original-owner', mode: 'wait-existing-ci', runId: '123' },
   task: { id: 'task-a', owner: 'original-owner', recordedHead: head, frozen: { accepted: head }, stage: 'pr-pending' },
-  session: { batch: 'task-a', startedAt: 1, events: [{ name: 'ci', key: '123:' + head, status: 'running' }] },
+  session: { batch: 'task-a', startedAt: 1, events: [{ name: 'ci', key: head + ':123', status: 'running' }] },
   currentOwner: 'original-owner',
   currentHead: head,
   clean: true,
@@ -60,4 +60,10 @@ test('real isolated process exit yields absent owner, not success or an automati
   const child = spawnSync(process.execPath, ['-e', 'process.exit(0)']);
   assert.equal(child.status, 0);
   assert.equal(probeOwner({ host: os.hostname(), pid: child.pid }), 'absent');
+});
+
+test('same candidate with another CI run is never resumed as the original run', () => {
+  const data = input();
+  data.session.events[0].key = head + ':456';
+  assert.equal(assessCiContinuation(data).ready, false);
 });

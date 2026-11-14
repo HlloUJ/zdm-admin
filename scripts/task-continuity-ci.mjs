@@ -36,7 +36,7 @@ export function assessCiContinuation({
     reasons.push('Formal session missing');
   if ((session?.pauses ?? []).some((p) => p.finishedAt == null)) reasons.push('Explicit pause');
   const running = (session?.events ?? []).filter((e) => e.status === 'running');
-  if (running.length !== 1 || running[0].name !== 'ci' || !running[0].key?.includes(intent.head))
+  if (running.length !== 1 || running[0].name !== 'ci' || running[0].key !== `${intent.head}:${intent.runId}`)
     reasons.push('No exact interrupted CI stage');
   if ((session?.events ?? []).some((e) => e.status === 'failure'))
     reasons.push('Existing failure needs original diagnosis');

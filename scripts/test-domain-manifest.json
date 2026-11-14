@@ -1608,22 +1608,22 @@
       "dynamicImports": 9
     },
     "scripts/task-continuity-ci.mjs": {
-      "digest": "af5c10856c6e893b95fa073f98b9aab23135cb2bb3cfdaaf8590e542ec513d92",
+      "digest": "ace1e410c0e63f45f2420e574b4228e75cc8dc6243a9009e10ff86d02e7975a4",
       "imports": ["scripts/task-continuity.mjs", "scripts/task-entry.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity-ci.test.mjs": {
-      "digest": "a0eaae7e430e3b9623b739b3c42433e412bdb5afc42d3ad595918eb3438ae295",
+      "digest": "317d7b0c4c361f409ceeafa812c6afb15568e21611b8b587afedde19b7401a93",
       "imports": ["scripts/task-continuity-ci.mjs", "scripts/task-continuity.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity-cli.mjs": {
-      "digest": "578835856e22a35b3a74b42d653e7dd5a11c4b8c75ac60d3bea2c1b3467b673f",
+      "digest": "87d5f3ed93a7633908966fa048bb19565560ff3fdccab4b73c2893a5fc548961",
       "imports": ["scripts/task-continuity.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity-handoff.mjs": {
-      "digest": "17a029aba607b09efaa46ca762b58ea3a394f71ec509ea5e42d2ef3f63ccfecd",
+      "digest": "0405b5bf8eec2777954261720d49897ca9c76f0b1e732962fe23646122474e54",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1638,9 +1638,9 @@
       "dynamicImports": 0
     },
     "scripts/task-continuity.test.mjs": {
-      "digest": "7a06655aff204fc8ff07cfc62643198d808156ef7015fc44e37c0348e43f6ca4",
-      "imports": ["scripts/task-continuity.mjs"],
-      "dynamicImports": 5
+      "digest": "03098616213117032094038f17ebd4f7ee7f9c15527d73d596ef44b0c4eaf2c4",
+      "imports": ["scripts/task-continuity-cli.mjs", "scripts/task-continuity.mjs"],
+      "dynamicImports": 8
     },
     "scripts/task-data-environment.mjs": {
       "digest": "16a31c2480ad03f1f12dd1a701309808d3319833c4e0aa66a3aa5cbeeb7c2c38",

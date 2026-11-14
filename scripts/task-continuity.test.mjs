@@ -220,3 +220,20 @@ test('separate observer sessions retain state and refuse active, completed and u
   // These are local process/read/decision measurements, not automation polling or production SLA.
   console.log('isolated cross-session timing ' + JSON.stringify(measurements));
 });
+
+test('CLI refuses linked state ancestor before creating state directory', async () => {
+  const { symlinkSync, readdirSync } = await import('node:fs');
+  const { spawnSync } = await import('node:child_process');
+  const { fileURLToPath } = await import('node:url');
+  const cwd = directory(),
+    outside = directory();
+  symlinkSync(outside, path.join(cwd, '.task-runtime'));
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./task-continuity-cli.mjs', import.meta.url)), '--once'],
+    { cwd, encoding: 'utf8' },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Linked observer state path/);
+  assert.deepEqual(readdirSync(outside), []);
+});
