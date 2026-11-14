@@ -2327,6 +2327,16 @@
       "digest": "63bf7811ae45bde932675d5992835c8025354966443b620e02f67f1888ce0ef4",
       "imports": ["scripts/e2e-app.mjs", "vite.config.js"],
       "dynamicImports": 0
+    },
+    "scripts/verification-interruption.mjs": {
+      "digest": "98d8014e6e1d720cf6dbd6cc9802af3a06e698af6e5fc5e8875700edab148727",
+      "imports": ["scripts/task-resource-runner.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-interruption.test.mjs": {
+      "digest": "aa27a538dc595f6765087b56573eabfc52ab256790427f35f305103fd80df273",
+      "imports": ["scripts/verification-interruption.mjs"],
+      "dynamicImports": 0
     }
   }
 }
