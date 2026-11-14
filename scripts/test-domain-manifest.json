@@ -1638,9 +1638,9 @@
       "dynamicImports": 0
     },
     "scripts/task-continuity.test.mjs": {
-      "digest": "7cc912484f1272871788fa5291ca6861807c87b2dc57e41c44f89f77301ad2c8",
+      "digest": "7a06655aff204fc8ff07cfc62643198d808156ef7015fc44e37c0348e43f6ca4",
       "imports": ["scripts/task-continuity.mjs"],
-      "dynamicImports": 2
+      "dynamicImports": 5
     },
     "scripts/task-data-environment.mjs": {
       "digest": "16a31c2480ad03f1f12dd1a701309808d3319833c4e0aa66a3aa5cbeeb7c2c38",

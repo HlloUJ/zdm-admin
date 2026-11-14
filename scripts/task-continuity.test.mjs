@@ -146,3 +146,77 @@ test('legacy validation running records are surfaced without inventing a live pr
   assert.equal(result.candidateDigest, 'old-candidate');
   assert.equal(readFileSync(file, 'utf8'), original);
 });
+
+test('separate observer sessions retain state and refuse active, completed and unreachable-owner replay', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const { writeFileSync } = await import('node:fs');
+  const { performance } = await import('node:perf_hooks');
+  const dir = directory();
+  const file = path.join(dir, 'cross-session.json');
+  const moduleUrl = new URL('./task-continuity.mjs', import.meta.url).href;
+  const scenarios = [
+    {
+      name: 'active',
+      stage: 'validating',
+      state: 'running',
+      owner: 'present-unverified',
+      expected: 'unverified-running',
+    },
+    { name: 'blocked', stage: 'validating', state: 'failure', owner: 'absent', expected: 'blocked' },
+    { name: 'completed', stage: 'closed', state: 'success', owner: 'absent', expected: 'closed' },
+    { name: 'unreachable', stage: 'validating', state: 'running', owner: 'unknown', expected: 'unverified-running' },
+  ];
+  const measurements = [];
+  for (const scenario of scenarios) {
+    const input = {
+      task: { id: 'isolated-session', stage: scenario.stage },
+      session: {
+        version: 1,
+        batch: 'isolated-session',
+        events: [{ id: scenario.name, name: 'verify', status: scenario.state }],
+      },
+      ownerObservation: scenario.owner,
+    };
+    const bytes = JSON.stringify(input);
+    writeFileSync(file, bytes);
+    for (let sessionNumber = 1; sessionNumber <= 2; sessionNumber++) {
+      const start = performance.now();
+      const child = spawnSync(
+        process.execPath,
+        [
+          '--input-type=module',
+          '-e',
+          `
+        import { readFileSync } from 'node:fs';
+        import { inspectTaskContinuity, continueVerifiedTask } from ${JSON.stringify(moduleUrl)};
+        const input = JSON.parse(readFileSync(process.argv[1]));
+        const observed = inspectTaskContinuity(input.task, input.session, { observeOwner: () => input.ownerObservation });
+        let executions = 0;
+        const outcome = await continueVerifiedTask({ intent: { task: input.task.id, head: 'a'.repeat(40),
+          owner: 'original-fixture-owner', authorization: 'fixture-only' }, directory: process.argv[2],
+          inspect: async () => ({ supported: false }), executeOriginal: async () => { executions++; } });
+        console.log(JSON.stringify({ observed, outcome, executions }));
+      `,
+          file,
+          path.join(dir, scenario.name),
+        ],
+        { encoding: 'utf8' },
+      );
+      assert.equal(child.status, 0, child.stderr);
+      const result = JSON.parse(child.stdout);
+      assert.equal(result.observed.status, scenario.expected);
+      assert.equal(result.outcome.status, 'blocked');
+      assert.equal(result.executions, 0);
+      measurements.push({
+        scenario: scenario.name,
+        sessionNumber,
+        detectionAndDecisionMs: performance.now() - start,
+        recoveryLatencyMs: null,
+        reason: 'No supported original-owner proof; no recovery attempted',
+      });
+      assert.equal(readFileSync(file, 'utf8'), bytes);
+    }
+  }
+  // These are local process/read/decision measurements, not automation polling or production SLA.
+  console.log('isolated cross-session timing ' + JSON.stringify(measurements));
+});
