@@ -1,3 +1,4 @@
+import { observeValidation } from './parallel-task-timing.mjs';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import path from 'node:path';
@@ -96,6 +97,7 @@ export function observeValidationTiming(root, attempt, env = process.env) {
   if (env.CI || env.GITHUB_ACTIONS === 'true') return;
   try {
     const batch = readActiveBatch(root);
+    if (batch && belongsToBatch(root, batch)) observeValidation(batch, attempt);
     if (batch && belongsToBatch(root, batch) && readTimeline(batch.repository.commonDir, batch.id))
       recordValidationTiming(batch.repository.commonDir, batch.id, attempt);
   } catch (error) {

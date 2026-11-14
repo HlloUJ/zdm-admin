@@ -214,8 +214,13 @@
       "dynamicImports": 0
     },
     "scripts/batch-timing-runtime.mjs": {
-      "digest": "450d51cd8a5d37cf98535b7500f007d74142ebf49153814b639b535fab20fc00",
-      "imports": ["scripts/batch-timing-core.mjs", "scripts/batch-timing-store.mjs", "scripts/task-batch.mjs"],
+      "digest": "72fcd3acf1b0643a963b374eaf2386c33af1e4b93a06466a0e21174a9ac37155",
+      "imports": [
+        "scripts/batch-timing-core.mjs",
+        "scripts/batch-timing-store.mjs",
+        "scripts/parallel-task-timing.mjs",
+        "scripts/task-batch.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/batch-timing-runtime.test.mjs": {
@@ -1175,6 +1180,16 @@
       "imports": ["scripts/parallel-acceptance.mjs"],
       "dynamicImports": 0
     },
+    "scripts/parallel-task-timing.mjs": {
+      "digest": "a003f3f0662113ca31b03cdfcbf69cd65ff110e74914bf577adfe38ad2f1ca1a",
+      "imports": ["scripts/batch-timing-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/parallel-task-timing.test.mjs": {
+      "digest": "1c1fc8728f3b3deeca687da23ee47b37267edb8f0dbe46f4d3bc7a09b066681d",
+      "imports": ["scripts/parallel-task-timing.mjs", "scripts/task-registry.mjs", "scripts/task-timing.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/parallel-task-transition.mjs": {
       "digest": "af47f2710148ff314773c45319e88814056bfd2135e7c79ab6c86806bd53a1b3",
       "imports": ["scripts/task-registry.mjs", "scripts/verification-evidence.mjs"],
@@ -1681,9 +1696,10 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "004891fbfd2ced504f2de6989b78bf01d5f4c04f67205400168acc8e6298d10e",
+      "digest": "be6b4b10949c98e1ce32db16036d7d41a4c25ab7564b6045990309e0305101fd",
       "imports": [
         "scripts/dev-task.mjs",
+        "scripts/parallel-task-timing.mjs",
         "scripts/task-completion.mjs",
         "scripts/task-data-scope.mjs",
         "scripts/task-development.mjs",
@@ -1697,7 +1713,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "5feae048980f40698c527ed63fd21796a6e882d10e76ede1cabbfe01fbb4cc59",
+      "digest": "b59a238c62d108855bdbadf218045be1c523ba4c1e5ecbeb0c49f48638606a3a",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
@@ -2079,9 +2095,10 @@
       "dynamicImports": 0
     },
     "scripts/task-start.mjs": {
-      "digest": "fc03011aad2599e1abffece78ec6d0d398d76d0ff680ff971fbc04733dd1be96",
+      "digest": "6b4e795bc5b4f411574599dbf5e23ea78cdb6883a5bb635a90dbea6a1f69cd5b",
       "imports": [
         "scripts/batch-timing-store.mjs",
+        "scripts/parallel-task-timing.mjs",
         "scripts/resource-lease.mjs",
         "scripts/task-artifacts.mjs",
         "scripts/task-registry.mjs"
@@ -2094,11 +2111,13 @@
       "dynamicImports": 0
     },
     "scripts/task-timing.mjs": {
-      "digest": "1b2603f8c9502e2c00e591f20b9038c6250ad48dd5e809a2091178452515b30d",
+      "digest": "ac9ceb2c04d1b7ee743fb456fa799a630f7bb67a8ebb54cbada601bcc97931fc",
       "imports": [
         "scripts/batch-timing-runtime.mjs",
         "scripts/batch-timing-store.mjs",
-        "scripts/completion-session.mjs"
+        "scripts/completion-session.mjs",
+        "scripts/parallel-task-timing.mjs",
+        "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
     },

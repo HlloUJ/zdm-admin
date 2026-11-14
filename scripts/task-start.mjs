@@ -1,3 +1,4 @@
+import { observeBinding, observeEntry } from './parallel-task-timing.mjs';
 import { prepareTaskArtifacts } from './task-artifacts.mjs';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -55,7 +56,11 @@ export function startParallelTask(
   root = realpathSync(root);
   const owner = options.owner || process.env.CODEX_THREAD_ID;
   function ready(result) {
-    result.artifacts = prepare(result.task);
+    result.artifacts = observeEntry(
+      { command: 'measure', originalArgs: ['dependencies'], cwd: result.task.worktree },
+      registry,
+      () => ({ status: 0, value: prepare(result.task) }),
+    ).value;
     try {
       const mains = registeredTaskWorktrees(root).filter((entry) => entry.branch === 'main');
       assert.equal(mains.length, 1);
@@ -67,6 +72,7 @@ export function startParallelTask(
     } catch (error) {
       result.timing = { status: 'unavailable', reason: error.message };
     }
+    observeBinding(result.task, result.timing);
     return result;
   }
   assert.ok(
