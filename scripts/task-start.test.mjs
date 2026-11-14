@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { startParallelTask, parseTaskStart } from './task-start.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 function fixture(t) {
@@ -35,10 +36,21 @@ function fixture(t) {
   git(root, 'push', '-u', 'origin', 'main');
   return { dir, root, parent, git, registry: createTaskRegistry(root) };
 }
+// Isolated test process identity; no production owner is impersonated.
+process.env.CODEX_THREAD_ID ??= 'isolated-ci-start-suite';
 const options = (slug, parent) => ({
   slug,
   kind: 'business',
-  owner: 'chat-' + slug,
+  owner: process.env.CODEX_THREAD_ID,
+  monitorContext: {
+    taskNumber: 'fixture',
+    taskName: slug,
+    taskStableId: slug,
+    worker: '/root/fixture',
+    rootThreadId: 'fixture-root',
+    roomId: 'fixture-room',
+    authorizationRef: 'fixture-only',
+  },
   taskParent: parent,
   resume: false,
 });
@@ -61,7 +73,7 @@ test('exact resume does not fetch or perform a Git mutation', (t) => {
   const f = fixture(t);
   startParallelTask(options('a', f.parent), { root: f.root });
   const result = startParallelTask(
-    { ...options('a', f.parent), resume: true },
+    { ...options('a', f.parent), monitorContext: undefined, resume: true },
     { root: f.root, git: () => assert.fail('resume must not fetch, switch or create') },
   );
   assert.equal(result.resumed, true);
@@ -147,4 +159,68 @@ test('new task creation atomically records complete monitoring context without b
     /Missing monitoring roomId/,
   );
   assert.equal(existsSync(path.join(f.parent, 'bad')), false);
+});
+
+test('new task without context refuses before Git mutation and supports invocation environment context', (t) => {
+  const f = fixture(t),
+    initial = f.git(f.root, 'rev-parse', 'HEAD'),
+    prior = process.env.ZDM_TASK_MONITOR_CONTEXT;
+  delete process.env.ZDM_TASK_MONITOR_CONTEXT;
+  t.after(() => {
+    if (prior === undefined) delete process.env.ZDM_TASK_MONITOR_CONTEXT;
+    else process.env.ZDM_TASK_MONITOR_CONTEXT = prior;
+  });
+  const base = options('guarded', f.parent),
+    { monitorContext, ...missing } = base;
+  assert.throws(
+    () => startParallelTask(missing, { root: f.root, git: () => assert.fail('must not run Git mutation') }),
+    /requires complete/,
+  );
+  assert.equal(f.registry.readTask('guarded'), null);
+  assert.equal(existsSync(path.join(f.parent, 'guarded')), false);
+  assert.equal(f.git(f.root, 'rev-parse', 'HEAD'), initial);
+  process.env.ZDM_TASK_MONITOR_CONTEXT = JSON.stringify(monitorContext);
+  const created = startParallelTask(missing, { root: f.root });
+  assert.equal(created.task.monitoring.state, 'registered');
+});
+
+test('all public aliases share the guarded start entry; CLI failure leaves no task', (t) => {
+  const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
+  assert.equal(pkg.scripts['task:start'], 'node scripts/task-start.mjs');
+  assert.equal(pkg.scripts['task:micro'], 'node scripts/task-start.mjs');
+  assert.match(readFileSync(new URL('./task-entry.mjs', import.meta.url), 'utf8'), /start: 'scripts\/task-start.mjs'/);
+  const f = fixture(t),
+    env = { ...process.env };
+  delete env.ZDM_TASK_MONITOR_CONTEXT;
+  const result = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./task-start.mjs', import.meta.url)), '--slug', 'cli-missing', '--kind', 'business'],
+    { cwd: f.root, encoding: 'utf8', env },
+  );
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /requires complete/);
+  assert.equal(f.registry.readTask('cli-missing'), null);
+  assert.equal(f.git(f.root, 'branch', '--show-current'), 'main');
+});
+
+test('explicit context does not silently fall back to stale environment context', (t) => {
+  const f = fixture(t),
+    prior = process.env.ZDM_TASK_MONITOR_CONTEXT;
+  t.after(() => {
+    if (prior === undefined) delete process.env.ZDM_TASK_MONITOR_CONTEXT;
+    else process.env.ZDM_TASK_MONITOR_CONTEXT = prior;
+  });
+  process.env.ZDM_TASK_MONITOR_CONTEXT = JSON.stringify(options('old-task', f.parent).monitorContext);
+  assert.throws(
+    () =>
+      startParallelTask(
+        { ...options('null-context', f.parent), monitorContext: null },
+        { root: f.root, git: () => assert.fail('must not mutate') },
+      ),
+    /Monitoring context must be an object/,
+  );
+  assert.equal(f.registry.readTask('null-context'), null);
+  process.env.ZDM_TASK_MONITOR_CONTEXT = 'invalid JSON';
+  const created = startParallelTask(options('explicit', f.parent), { root: f.root });
+  assert.equal(created.task.monitoring.taskStableId, 'explicit');
 });

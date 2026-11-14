@@ -30,6 +30,6 @@
 
 新任务 `task-entry start` 调用 registry.register 时同一记录原子写入 `monitoring`，不回填或批量关联旧任务。根线程创建看板任务并分派原 worker 后，将实际上下文传入 `--monitor-context '<JSON>'`：`taskNumber`、`taskName`、`taskStableId`、`worker`、`rootThreadId`、`roomId`、`authorizationRef`。原 worker 的真实 `CODEX_THREAD_ID` 必须等于 registry owner，字段缺失在创建工作区前拒绝。
 
-兼容旧调用无上下文时登记为 `pending-context`，明确缺少准确通知条件，不声称覆盖；新任务编排路径应始终传入完整参数。宿主并不自动提供看板编号或 native worker 路径，本地文件不能冒充平台身份验证。根线程每次投递前仍须核对用户最新暂停指令、准确对象、原执行者及观察时效。
+统一新建入口缺完整上下文在任何 Git 修改前拒绝；可显式传入 `--monitor-context`，或本次命令的 `ZDM_TASK_MONITOR_CONTEXT`。已有任务 resume 不受影响；仅底层 registry 兼容调用仍可能登记为 `pending-context`，明确缺少通知条件，不计入统一流程覆盖。宿主并不自动提供看板编号或 native worker 路径，本地文件不能冒充平台身份验证。根线程每次投递前仍须核对用户最新暂停指令、准确对象、原执行者及观察时效。
 
 `monitoring.paused=false` 仅表示新任务登记时的初始状态，不证明用户此后未暂停；正式阶段 pause 记录和根线程当前用户暂停指令优先。正常完成、主动暂停、机器断线、未记录执行、模型推理中无本地进程均不得因此判定任务中断。

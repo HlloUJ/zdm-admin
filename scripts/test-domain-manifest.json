@@ -2153,7 +2153,7 @@
       "dynamicImports": 0
     },
     "scripts/task-start.mjs": {
-      "digest": "73f55e2819567ed2901f3a24ef329e2729e044924f719ec3c2cc88f7f4d6e234",
+      "digest": "a3841c5a33b12a0034d135010ad5a4cbe56903c6f6ae682edb5c832771d041fa",
       "imports": [
         "scripts/batch-timing-store.mjs",
         "scripts/resource-lease.mjs",
@@ -2164,8 +2164,8 @@
       "dynamicImports": 0
     },
     "scripts/task-start.test.mjs": {
-      "digest": "ba708ddda12da3c821cd2c0fb3852a082140b6d33dc0abdd861b25b33f76a3c9",
-      "imports": ["scripts/task-registry.mjs", "scripts/task-start.mjs"],
+      "digest": "c625f926a00e61a77d058297e36b634f7750397d6bc0601f377b6ff0f505974b",
+      "imports": ["scripts/task-entry.mjs", "scripts/task-registry.mjs", "scripts/task-start.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-timing.mjs": {

@@ -94,7 +94,13 @@ export function startParallelTask(
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   assert.ok(!options.resume, 'Task is not registered; do not adopt an unknown branch or worktree');
-  monitoringRegistration(owner, options.monitorContext); // Validate before creating any worktree.
+  const input = options.monitorContext === undefined ? process.env.ZDM_TASK_MONITOR_CONTEXT : options.monitorContext;
+  assert.ok(
+    input !== undefined && input !== '',
+    'New task requires complete --monitor-context or ZDM_TASK_MONITOR_CONTEXT; no task created',
+  );
+  const monitorContext = typeof input === 'string' ? JSON.parse(input) : input;
+  monitoringRegistration(owner, monitorContext); // Validate before any Git mutation.
   const entries = registeredTaskWorktrees(root),
     mains = entries.filter((x) => x.branch === 'main');
   assert.equal(mains.length, 1, 'Exact main anchor required');
@@ -164,7 +170,7 @@ export function startParallelTask(
       worktree: target,
       owner,
       kind: options.kind,
-      monitorContext: options.monitorContext,
+      monitorContext,
     });
     record.state = 'registered';
     writeFileSync(intent, JSON.stringify(record, null, 2) + '\n');
@@ -178,7 +184,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseTaskStart(args);
   if (options.help) {
     console.log(
-      'Usage: task:start -- --slug <task-id> --owner <owner> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services.',
+      'Usage: task:start -- --slug <task-id> --owner <owner> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>] --monitor-context <JSON>\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services. New tasks require exact monitoring context; existing task resume does not. ZDM_TASK_MONITOR_CONTEXT is an invocation-only alternative.',
     );
     return;
   }
