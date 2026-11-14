@@ -1,12 +1,11 @@
 // Local-only, same-executor proof. This contract cannot authorize CI report reuse.
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { execFileSync } from 'node:child_process';
 import { readFileSync, writeFileSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { captureSource, hashPaths } from './verification-evidence.mjs';
+import { captureSource, hashPaths, gitConfigurationIdentity } from './verification-evidence.mjs';
 import { DIAGNOSTIC_FILES, diagnosticEnvironment } from './ci-diagnostic-evidence.mjs';
 import { nodeTestReport } from './node-test-evidence.mjs';
 import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
@@ -22,7 +21,6 @@ export function localDiagnosticIdentity(root, env = process.env) {
     'Unreviewed Node preload',
   );
   const effective = diagnosticEnvironment(env);
-  const git = (...args) => execFileSync('git', args, { cwd: root, env: effective, encoding: 'utf8' }).trim();
   return {
     version: 1,
     contract: 'same-local-execution-diagnostics-v1',
@@ -47,15 +45,7 @@ export function localDiagnosticIdentity(root, env = process.env) {
       'script-test-plan.mjs',
     ]),
     dependencies: hashPaths(root, ['node_modules'], { dependency: true }),
-    git: [
-      git('--version'),
-      hashPaths('/', [
-        path.resolve(root, git('rev-parse', '--git-path', 'config')),
-        path.join(env.HOME ?? os.homedir(), '.gitconfig'),
-        path.join(env.HOME ?? os.homedir(), '.config/git/config'),
-        '/etc/gitconfig',
-      ]),
-    ],
+    git: gitConfigurationIdentity(root, effective),
     platform: [process.platform, process.arch, os.release()],
     resources: [os.cpus().length, os.totalmem()],
   };

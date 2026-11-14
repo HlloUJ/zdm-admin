@@ -63,6 +63,21 @@ export function hashPaths(root, paths, { dependency = false } = {}) {
   return hash.digest('hex');
 }
 
+// Shared by the outer engineering attempt and its inner diagnostic packet.
+// Keep the full existing configuration proof: no ignored keys or relaxed retries.
+export function gitConfigurationIdentity(root, env = process.env) {
+  const git = (...args) => capture(root, 'git', args, env).trim();
+  return [
+    git('--version'),
+    hashPaths('/', [
+      path.resolve(root, git('rev-parse', '--git-path', 'config')),
+      path.join(env.HOME ?? os.homedir(), '.gitconfig'),
+      path.join(env.HOME ?? os.homedir(), '.config/git/config'),
+      '/etc/gitconfig',
+    ]),
+  ];
+}
+
 function sourceFiles(root) {
   const files = capture(root, 'git', ['ls-files', '-z', '--cached', '--others', '--exclude-standard'])
     .split('\0')
@@ -359,6 +374,9 @@ export function captureIdentity(task, { captureCommand = capture } = {}) {
     ),
   };
   environment.env = jsonDigest(environment.variables);
+  if (args.some((arg) => arg === 'test:engineering' || /(?:^|[/\\])run-script-tests\.mjs$/.test(arg)))
+    environment.git = gitConfigurationIdentity(root, env);
+
   let reusable = eligible;
   let inputProofComplete = proveInputs;
   let reason = eligible
