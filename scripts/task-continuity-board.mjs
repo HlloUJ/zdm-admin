@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 // Produces a narrow patch for the root's existing board connector. No token, network client,
 // status-lane override, synthetic task or task completion is created by this module.
 export function continuityBoardPatch(observation, binding, current, observedAt, now = Date.now()) {
+  assert.equal(observation.task, binding.task, 'Exact source task binding required');
+  assert.ok(Number.isInteger(current.revision) && current.revision >= 0, 'Valid board revision required');
+  assert.ok(Number.isFinite(Date.parse(current.updated_at)), 'Valid board timestamp required');
   assert.equal(current.id, binding.taskStableId, 'Exact existing task required');
   assert.ok(
     Number.isFinite(observedAt) && now >= observedAt && now - observedAt <= 120000,

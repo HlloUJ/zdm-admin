@@ -82,7 +82,13 @@ export function inspectTaskContinuity(task, completion, { observeOwner = probeOw
     };
   const last = completion.events.at(-1);
   if (last?.status === 'failure')
-    return { ...base, status: 'blocked', reason: 'Original stage failure retained', stage: last.name };
+    return {
+      ...base,
+      status: 'blocked',
+      reason: 'Original stage failure retained',
+      stage: last.name,
+      failureEvent: last,
+    };
   return { ...base, status: 'awaiting-continuation', reason: 'No active stage proved; completion is not implied' };
 }
 export function verificationObservations(worktree) {
@@ -187,7 +193,7 @@ export async function notifyContinuityChanges(observations, directory, { send = 
       file = path.join(directory, eventId + '.json');
     try {
       // An unknown OS receipt is never retried blindly, including after this observer restarts.
-      writeFileSync(file, JSON.stringify({ eventId, status: 'submitting' }), { flag: 'wx', mode: 0o600 });
+      durableCreate(file, { eventId, status: 'submitting' });
     } catch (error) {
       if (error.code === 'EEXIST') continue;
       throw error;
@@ -202,7 +208,7 @@ export async function notifyContinuityChanges(observations, directory, { send = 
     } catch (error) {
       receipt = { status: 'unknown', reason: error.message };
     }
-    writeFileSync(file + '.receipt', JSON.stringify(receipt), { flag: 'wx', mode: 0o600 });
+    durableCreate(file + '.receipt', receipt);
     outcomes.push({ task: value.task, ...receipt });
   }
   return outcomes;
