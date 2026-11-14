@@ -1681,7 +1681,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "1d0a85d1b21a9015c5de5aad905c6e8e93fb6f7390ae957b3db15fcc7259e0b8",
+      "digest": "004891fbfd2ced504f2de6989b78bf01d5f4c04f67205400168acc8e6298d10e",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/task-completion.mjs",
@@ -1691,17 +1691,19 @@
         "scripts/task-preview-combination.mjs",
         "scripts/task-preview.mjs",
         "scripts/task-registry.mjs",
+        "scripts/task-resource-entry.mjs",
         "scripts/task-start.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "c3e1bfabe89496b328a5844f7f867059b2b2562fb9a6bb6e5673e95fbb41cd10",
+      "digest": "5feae048980f40698c527ed63fd21796a6e882d10e76ede1cabbfe01fbb4cc59",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-entry.mjs",
-        "scripts/task-registry.mjs"
+        "scripts/task-registry.mjs",
+        "scripts/task-resource-entry.mjs"
       ],
       "dynamicImports": 0
     },
@@ -1835,6 +1837,218 @@
       "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-resource-broker.mjs": {
+      "digest": "fec6266e16dfdefd0e6ed1ce222f13097087e7eea3e465197c583610dea82d3a",
+      "imports": ["scripts/task-resource-runner.mjs", "scripts/task-resource-scheduler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-broker.test.mjs": {
+      "digest": "180c1321ec058959fc48f280959a87cf4d2a4c57194f5b5d71df42f0d3d04544",
+      "imports": [
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-scheduler-store.mjs",
+        "scripts/task-resource-scheduler.mjs",
+        "scripts/task-resource-verification.mjs"
+      ],
+      "dynamicImports": 2
+    },
+    "scripts/task-resource-coordinator.mjs": {
+      "digest": "8c7ae6ab335e6da62b84cd9fd76df4fdbec8c7d4133224da56f3d975dd5682c0",
+      "imports": [
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-lifecycle.mjs",
+        "scripts/task-resource-notifications.mjs",
+        "scripts/task-resource-policy-sample.mjs",
+        "scripts/task-resource-sampler.mjs",
+        "scripts/task-resource-scheduler.mjs",
+        "scripts/task-resource-service.mjs",
+        "scripts/task-resource-session.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-coordinator.test.mjs": {
+      "digest": "463d32ff53a9fa117705f19ee76ef587c3d4834c2b5dfb41928c5eff811ce9c1",
+      "imports": ["scripts/task-resource-coordinator.mjs", "scripts/task-resource-scheduler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-entry.mjs": {
+      "digest": "44504f1bcacf4fc42be7bc653b5d0b1c6787cd901f49d16a2fe56a086cbf079e",
+      "imports": ["scripts/task-resource-plan-entry.mjs", "scripts/task-resource-service.mjs", "scripts/verify.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-entry.test.mjs": {
+      "digest": "a6fb2ba3fe89fe8371f2e12cfe6220df101a6a8754e16d2d0aebe2b0ab1e9e43",
+      "imports": ["scripts/task-resource-entry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-event-link.mjs": {
+      "digest": "d27189488d0d25dc4667962a44c1b8c8fba82099d1aa35f65e0ba80d6b55bb31",
+      "imports": ["scripts/task-resource-notifications.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-event-link.test.mjs": {
+      "digest": "d36ca661ceae74c675e7f0ca144f15f206cf068e51a442515901e9e47a455e97",
+      "imports": ["scripts/task-resource-event-link.mjs", "scripts/task-resource-notifications.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-external-manifest.mjs": {
+      "digest": "d87b22529825f68db85c60bbc3312680af444f835dd369b93404e9b54caa85ff",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-external-manifest.test.mjs": {
+      "digest": "c1fd8bcee4ed0c6b7bc2e4aabba79365f78ef09246a20f17d01834b9f7789714",
+      "imports": ["scripts/resource-lease.mjs", "scripts/task-resource-external-manifest.mjs"],
+      "dynamicImports": 4
+    },
+    "scripts/task-resource-lifecycle.mjs": {
+      "digest": "bacf85cc065df7462742030a2a8ced6f12c3b9af6fcc620ddd9e86d98b8003ff",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-lifecycle.test.mjs": {
+      "digest": "ca03c552c36221048233ab4ef7473f934bc4ce53ca6394af2cc9eb505f7c06dc",
+      "imports": [
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-lifecycle.mjs",
+        "scripts/task-resource-recovery.mjs",
+        "scripts/task-resource-scheduler-store.mjs",
+        "scripts/task-resource-scheduler.mjs"
+      ],
+      "dynamicImports": 6
+    },
+    "scripts/task-resource-notifications.mjs": {
+      "digest": "e8f3197d7e01600bb273346a73d2d2581d19b4898863352432034d524b48ba72",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-notifications.test.mjs": {
+      "digest": "d78654f0f9877a1399814eba11f75e45ebe812b52158e5a0a61ee978d919c3a8",
+      "imports": ["scripts/task-resource-notifications.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-plan-entry.mjs": {
+      "digest": "28576747da2300bf804a7ac9a6df198f244721249b0235b291d5de0e99074895",
+      "imports": [
+        "scripts/task-registry.mjs",
+        "scripts/task-resource-verification.mjs",
+        "scripts/verification-evidence.mjs",
+        "scripts/verify.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-plan-entry.test.mjs": {
+      "digest": "ceea695e08b8de00c070d69c5f814e7292a98eb5976fee4e0a3e7386e2061ab5",
+      "imports": ["scripts/task-resource-plan-entry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-policy-sample.mjs": {
+      "digest": "8505164d1d1f6ffc762732f61fd8b08a425745232dc0b24fb03a07fb84b0adb3",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-policy-sample.test.mjs": {
+      "digest": "10ca442e912a227c1d76ec6670cce0ec836396d00362a40a777b2aca5cf9afb0",
+      "imports": ["scripts/task-resource-policy-sample.mjs", "scripts/task-resource-sampler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-recovery.mjs": {
+      "digest": "a42c342be9c53180b501164b03a361e7d72426bd03f7e94f4cc2471da3431eb2",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-recovery.test.mjs": {
+      "digest": "edfcf7a43231c61109ecd78dba8ab9fcb4d79fc38009aebd89e16171ee8d8c2b",
+      "imports": ["scripts/task-resource-recovery.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-runner.mjs": {
+      "digest": "34155bca70033bbc54111102e4f053c6df735cd03dda14423b0ad19103f09824",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-runner.test.mjs": {
+      "digest": "49170bf6c6bd9fc2b549d2062abea9df2a6d6566aad86dc2a6f5550a8b194e35",
+      "imports": ["scripts/task-resource-runner.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-sampler.mjs": {
+      "digest": "f83c5948c81a034014ccf1270da768cbb9698b2e38fa68b5c12c2fe2c90dc9ad",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-sampler.test.mjs": {
+      "digest": "99d10bb9ca391a5bf2e4ee1ebb9383ed8a07d808752fe36ee763eaa2a1bceed1",
+      "imports": ["scripts/task-resource-sampler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-scheduler-store.mjs": {
+      "digest": "d6fe2098d0c5e88f9b7ebee13f45f9fadbad3f4fa28cbe1c79351498bf28eddb",
+      "imports": ["scripts/task-resource-scheduler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-scheduler.mjs": {
+      "digest": "d4a04f8c20723cc12e56dd2873e7c74e5a3543db4b998d81abcef313be802348",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-scheduler.test.mjs": {
+      "digest": "fc84803aec29028e37a272a76a7903c4ecdf77cf0dfb7b28a7aeb33301e63d58",
+      "imports": ["scripts/task-resource-scheduler-store.mjs", "scripts/task-resource-scheduler.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-service.mjs": {
+      "digest": "40a17a141c20894ce3446802bd0059e1ecff53341fc73e46a33625a5c00bebc7",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-service.test.mjs": {
+      "digest": "641b5ad67762a9b5c0361a7b8f667a21bb089a6b9ee095faf128d7535135430f",
+      "imports": [
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-entry.mjs",
+        "scripts/task-resource-scheduler-store.mjs",
+        "scripts/task-resource-scheduler.mjs",
+        "scripts/task-resource-service.mjs"
+      ],
+      "dynamicImports": 4
+    },
+    "scripts/task-resource-session.mjs": {
+      "digest": "5985b8a8b31100fc1b5c3082902281deda703a5792482614682147f1a8ed8488",
+      "imports": ["scripts/task-resource-event-link.mjs", "scripts/task-resource-service.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-session.test.mjs": {
+      "digest": "edd106e06d0494ba9b84c6aa531a9fa1138bfb8c2b500e7703141e27c039d105",
+      "imports": [
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-notifications.mjs",
+        "scripts/task-resource-scheduler.mjs",
+        "scripts/task-resource-session.mjs",
+        "scripts/task-resource-verification.mjs"
+      ],
+      "dynamicImports": 4
+    },
+    "scripts/task-resource-start-evidence.mjs": {
+      "digest": "c30cff606a86cf58539fec5a2e08cb73bafab4cf794f2cebd16afc14ec3b1098",
+      "imports": ["scripts/task-resource-event-link.mjs", "scripts/task-resource-runner.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-start-evidence.test.mjs": {
+      "digest": "d28fec58b7345e042c5bc8043785dc9e9997ea540164ec011feed319bee5484f",
+      "imports": ["scripts/task-resource-notifications.mjs", "scripts/task-resource-start-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-verification.mjs": {
+      "digest": "63ceca0a5a1ef6fdda72bfb446aefedff4e7322678843dd6fcaa1a5d8dbf13c6",
+      "imports": ["scripts/verification-evidence.mjs", "scripts/verification-runner.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-resource-verification.test.mjs": {
+      "digest": "27c2e9a379902e5b9b6a3774a7c93a6d94257d35888899391e474b56a7f869b6",
+      "imports": ["scripts/task-resource-verification.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-runtime-check.mjs": {
       "digest": "e071fb4363867a443712242eb52344ffd64e912b6f954d4c51104be5095393ab",
       "imports": ["scripts/resource-lease.mjs", "scripts/task-registry.mjs"],
@@ -1963,9 +2177,13 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "34846471d8be4d8eb58589b6bed034c0dc7ae4d820156e082108870c5810495a",
+      "digest": "0a2da7fe727163d603a60ea88c5ff97ce6074934eb42ac021f673576ee6a71e9",
       "imports": [
         "scripts/run-frontend-tests.mjs",
+        "scripts/task-resource-broker.mjs",
+        "scripts/task-resource-event-link.mjs",
+        "scripts/task-resource-scheduler.mjs",
+        "scripts/task-resource-verification.mjs",
         "scripts/verification-evidence.mjs",
         "scripts/verification-runner.mjs",
         "scripts/verify.mjs"
@@ -2045,7 +2263,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "c6ba7fbb1a83c753e4e922ee2b207ca222a9cc2263b9a900c89a0c162506f577",
+      "digest": "08fdda0b229f3cf9c273f5dc0bb495c9804bd07a9e1cb67663f264e6fbef2292",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -2064,7 +2282,7 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "daa14afbb2689405820be78d01d128a9f58c33d751e6f22ad1a68ed14e20ab46",
+      "digest": "36f2703348ef258229783fc1983b1664e48c7be8159d86742961b9802e4c5082",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",

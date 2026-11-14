@@ -330,6 +330,17 @@ export async function runVerificationTask(task, options = {}) {
     };
     const exitCode = await new Promise((resolve) => {
       const child = spawn(command, args, { cwd: root, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+      // Optional advisory observer runs only after actual spawn. It cannot change locks,
+      // command results, immutable attempts, reuse decisions, or first-failure policy.
+      child.once('spawn', () => {
+        try {
+          Promise.resolve(
+            options.onSpawn?.({ pid: child.pid, runToken: record.attemptId, fingerprint: before.fingerprint }),
+          ).catch(() => {});
+        } catch {
+          /* Notification/observer failure never changes verification outcome. */
+        }
+      });
       child.stdout.on('data', append);
       child.stderr.on('data', append);
       child.on('error', (error) => append(`${error.message}\n`));
