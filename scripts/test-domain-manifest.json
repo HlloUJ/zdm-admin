@@ -1713,6 +1713,20 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-development-recovery.mjs": {
+      "digest": "4e057894f74c5a421bcbfffa1030f47a0c1efac61fce0d9bca42f49f90db8515",
+      "imports": ["scripts/completion-process.mjs", "scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-development-recovery.test.mjs": {
+      "digest": "38062bf41f959fe93ebe00c659c0db458612bca7f9514128e171db388a8e1c10",
+      "imports": [
+        "scripts/task-development-recovery.mjs",
+        "scripts/task-recovery-notice.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 3
+    },
     "scripts/task-development.mjs": {
       "digest": "a1ed58754497b3acfda233a765290d7bdc859ccca73f471c336d98d19ffeb109",
       "imports": [
@@ -1880,6 +1894,21 @@
       "digest": "a3a9916f8e261e4d7659ab57dd442f86a8fd458857728f3a819d345fe89947d8",
       "imports": ["scripts/task-preview.mjs"],
       "dynamicImports": 0
+    },
+    "scripts/task-recovery-notice.mjs": {
+      "digest": "fa61b8b2731c9d4ede7fff0dd945d2fa316a50777387de7c1927555776f43939",
+      "imports": ["scripts/task-development-recovery.mjs", "scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-recovery-notice.test.mjs": {
+      "digest": "a3752b614efdbbc22917c54421e7427e06c4d6d28bcc23e6ff7d7c374ac8920a",
+      "imports": [
+        "scripts/completion-process.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/task-recovery-notice.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 10
     },
     "scripts/task-registry-lock.test.mjs": {
       "digest": "c04deb422f110eb9e75f347a8bd268eb6f1bb8c4d5fa37930d82faa6ab7fb23f",
@@ -2386,21 +2415,6 @@
       "digest": "63bf7811ae45bde932675d5992835c8025354966443b620e02f67f1888ce0ef4",
       "imports": ["scripts/e2e-app.mjs", "vite.config.js"],
       "dynamicImports": 0
-    },
-    "scripts/task-recovery-notice.mjs": {
-      "digest": "b6e6500e0bfeac304d88af51416fca4465d1a701f4767f2fbc359201fbed4cb5",
-      "imports": ["scripts/task-registry.mjs"],
-      "dynamicImports": 0
-    },
-    "scripts/task-recovery-notice.test.mjs": {
-      "digest": "a3752b614efdbbc22917c54421e7427e06c4d6d28bcc23e6ff7d7c374ac8920a",
-      "imports": [
-        "scripts/completion-process.mjs",
-        "scripts/completion-session.mjs",
-        "scripts/task-recovery-notice.mjs",
-        "scripts/task-registry.mjs"
-      ],
-      "dynamicImports": 10
     }
   }
 }
