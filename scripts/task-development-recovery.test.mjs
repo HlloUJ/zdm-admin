@@ -11,6 +11,7 @@ import {
   createDevelopmentCheckpoint,
   setDevelopmentControl,
   runDevelopmentContinuation,
+  runWaitingDevelopmentContinuation,
   readDevelopmentStart,
 } from './task-development-recovery.mjs';
 const owner = process.env.CODEX_THREAD_ID || 'isolated-development-test-owner';
@@ -398,4 +399,164 @@ test('wrong-task checkpoint and linked evidence fail closed', async () => {
     );
     assert.equal(called, false);
   }
+});
+
+function publishIsolatedWaitingReceipt(f, { request, receiptFile }, delta = {}) {
+  const receipt = {
+    ...f.options().reachability,
+    workerState: 'waiting-for-handoff',
+    handoffId: request.id,
+    receiverPid: request.pid,
+    receiverHost: request.host,
+    observedAt: Date.now(),
+    ...delta,
+  };
+  const temporary = receiptFile + '.test-atomic';
+  fs.writeFileSync(temporary, JSON.stringify(receipt), { flag: 'wx', mode: 0o600 });
+  fs.renameSync(temporary, receiptFile);
+}
+function assertCheckpointNotConsumed(f) {
+  const directory = path.join(createTaskRegistry(f.root).commonDir, 'task-development-recovery', f.input.taskId);
+  assert.equal(fs.existsSync(path.join(directory, `attempt-${f.checkpoint.id}.json`)), false);
+  assert.equal(fs.existsSync(path.join(directory, 'active-attempt.json')), false);
+}
+test('waiting original worker consumes fresh atomic handoff and actually spawns only once', async () => {
+  const f = fixture();
+  f.enable();
+  let starts = 0,
+    publication;
+  const options = {
+    ...f.options(),
+    waitMs: 3000,
+    onWaiting(info) {
+      publication = info;
+      publishIsolatedWaitingReceipt(f, info);
+    },
+    execute: async ({ start }) => {
+      starts++;
+      const child = start(process.execPath, ['-e', 'setTimeout(()=>process.exit(0),300)'], { stdio: 'ignore' });
+      const exited = once(child, 'exit');
+      try {
+        while (JSON.parse(fs.readFileSync(child.completionProof.file)).status === 'pending') await pause(10);
+        assert.equal(
+          readDevelopmentStart(f.root, { taskId: f.input.taskId, checkpointId: f.checkpoint.id }).status,
+          'started',
+        );
+      } finally {
+        await exited;
+      }
+    },
+  };
+  assert.equal((await runWaitingDevelopmentContinuation(f.root, options)).status, 'completed');
+  assert.equal(publication.request.workerState, 'waiting-for-handoff');
+  assert.ok(fs.existsSync(publication.requestFile.replace('.json', '.closed.json')));
+  await assert.rejects(runWaitingDevelopmentContinuation(f.root, options), /consumed/);
+  assert.equal(starts, 1);
+});
+test('wrong waiting identity, resources and old receipts reject without consuming checkpoint', async () => {
+  for (const delta of [
+    { handoffId: 'wrong' },
+    { receiverPid: process.pid + 1 },
+    { receiverHost: 'wrong' },
+    { owner: 'wrong' },
+    { resourcesResolved: false },
+    { effectsReconciled: false },
+    { workerState: 'idle' },
+    { observedAt: Date.now() - 6000 },
+  ]) {
+    const f = fixture();
+    f.enable();
+    let calls = 0;
+    await assert.rejects(
+      runWaitingDevelopmentContinuation(f.root, {
+        ...f.options(),
+        waitMs: 3000,
+        onWaiting(info) {
+          publishIsolatedWaitingReceipt(f, info, delta);
+        },
+        execute() {
+          calls++;
+        },
+      }),
+    );
+    assert.equal(calls, 0);
+    assertCheckpointNotConsumed(f);
+  }
+});
+test('waiting timeout and pause do not consume checkpoint or start business execution', async () => {
+  for (const mode of ['timeout', 'pause']) {
+    const f = fixture();
+    f.enable();
+    let calls = 0;
+    await assert.rejects(
+      runWaitingDevelopmentContinuation(f.root, {
+        ...f.options(),
+        waitMs: mode === 'pause' ? 3000 : 60,
+        onWaiting() {
+          if (mode === 'pause')
+            setDevelopmentControl(f.root, {
+              taskId: f.input.taskId,
+              expectedRevision: 1,
+              paused: true,
+              authorizationRef: f.input.authorizationRef,
+            });
+        },
+        execute() {
+          calls++;
+        },
+      }),
+      mode === 'pause' ? /Control changed/ : /expired/,
+    );
+    assert.equal(calls, 0);
+    assertCheckpointNotConsumed(f);
+  }
+});
+test('waiting receipt and forged token cannot bypass live invocation WeakMap', async () => {
+  const f = fixture();
+  f.enable();
+  let calls = 0;
+  const reachability = {
+    ...f.options().reachability,
+    workerState: 'waiting-for-handoff',
+    handoffId: 'forged',
+    receiverPid: process.pid,
+    receiverHost: os.hostname(),
+  };
+  await assert.rejects(
+    runDevelopmentContinuation(f.root, {
+      ...f.options(),
+      reachability,
+      waitingToken: {},
+      execute() {
+        calls++;
+      },
+    }),
+    /handoff/,
+  );
+  assert.equal(calls, 0);
+  assertCheckpointNotConsumed(f);
+});
+
+test('asynchronous publication is rejected without consuming checkpoint', async () => {
+  const f = fixture();
+  f.enable();
+  let calls = 0,
+    requestFile;
+  await assert.rejects(
+    runWaitingDevelopmentContinuation(f.root, {
+      ...f.options(),
+      waitMs: 3000,
+      onWaiting(info) {
+        requestFile = info.requestFile;
+        return new Promise(() => {});
+      },
+      execute() {
+        calls++;
+      },
+    }),
+    /synchronously/,
+  );
+  assert.equal(calls, 0);
+  assertCheckpointNotConsumed(f);
+  assert.ok(fs.existsSync(requestFile.replace('.json', '.closed.json')));
 });

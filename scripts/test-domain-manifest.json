@@ -1714,12 +1714,12 @@
       "dynamicImports": 0
     },
     "scripts/task-development-recovery.mjs": {
-      "digest": "4e057894f74c5a421bcbfffa1030f47a0c1efac61fce0d9bca42f49f90db8515",
+      "digest": "278df92dc1a6d0a49abb1256135a0753e6453c01f5e557b207a6545698280943",
       "imports": ["scripts/completion-process.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-development-recovery.test.mjs": {
-      "digest": "38062bf41f959fe93ebe00c659c0db458612bca7f9514128e171db388a8e1c10",
+      "digest": "828c10170ff291ac7e8856811d2a9ec637432f554378fe8a8cd25b66426958b7",
       "imports": [
         "scripts/task-development-recovery.mjs",
         "scripts/task-recovery-notice.mjs",
