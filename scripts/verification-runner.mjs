@@ -1,5 +1,5 @@
 import { observeValidationTiming } from './batch-timing-runtime.mjs';
-import { spawn } from 'node:child_process';
+import { createVerificationProcessLifecycle } from './verification-process-lifecycle.mjs';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { appendFileSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync, createWriteStream } from 'node:fs';
@@ -164,9 +164,11 @@ export async function runVerificationTask(task, options = {}) {
   }
   const startedAt = new Date().toISOString();
   const start = performance.now();
+  let lifecycle;
   let attemptRecord;
   let completionWritten = false;
   try {
+    lifecycle = createVerificationProcessLifecycle({ root, lock });
     const snapshot = () => {
       try {
         return inspect(task);
@@ -329,7 +331,11 @@ export async function runVerificationTask(task, options = {}) {
       tail = `${tail}${chunk}`.slice(-6000);
     };
     const exitCode = await new Promise((resolve) => {
-      const child = spawn(command, args, { cwd: root, env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+      const child = lifecycle.start(record, command, args, {
+        cwd: root,
+        env: childEnv,
+        stdio: ['ignore', 'pipe', 'pipe'],
+      });
       // Optional advisory observer runs only after actual spawn. It cannot change locks,
       // command results, immutable attempts, reuse decisions, or first-failure policy.
       child.once('spawn', () => {
@@ -348,6 +354,7 @@ export async function runVerificationTask(task, options = {}) {
     });
     await new Promise((resolve) => stream.end(resolve));
     if (logError) throw logError;
+    lifecycle.assertGone();
     const commandMs = performance.now() - commandStarted;
     const afterProbeStarted = performance.now();
     let reportResult = null;
@@ -461,6 +468,13 @@ export async function runVerificationTask(task, options = {}) {
     report(`[failed] ${name}: ${error.message}`);
     return { exitCode: 1, reused: false };
   } finally {
-    rmSync(lock, { recursive: true });
+    try {
+      // No removal when an uncertain launch or surviving descendant can still own test resources.
+      assert.ok(lifecycle, 'Verifier owner proof was not initialized');
+      lifecycle.assertGone();
+      rmSync(lock, { recursive: true });
+    } catch (error) {
+      report(`[blocked] ${name}: retain original lock and process proof: ${error.message}`);
+    }
   }
 }

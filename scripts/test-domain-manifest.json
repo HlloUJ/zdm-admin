@@ -2263,12 +2263,13 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "08fdda0b229f3cf9c273f5dc0bb495c9804bd07a9e1cb67663f264e6fbef2292",
+      "digest": "49fab437d08cf5521ce0ccef437994647e8aee077c06865bc8a5e5e98af7c7c1",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",
         "scripts/frontend-test-evidence.mjs",
-        "scripts/verification-evidence.mjs"
+        "scripts/verification-evidence.mjs",
+        "scripts/verification-process-lifecycle.mjs"
       ],
       "dynamicImports": 0
     },
@@ -2336,6 +2337,16 @@
     "scripts/verification-interruption.test.mjs": {
       "digest": "aa27a538dc595f6765087b56573eabfc52ab256790427f35f305103fd80df273",
       "imports": ["scripts/verification-interruption.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-process-lifecycle.mjs": {
+      "digest": "67deb607b632ff10e9112fb14583289c4d924f86107a3f1386773a02568a42fd",
+      "imports": ["scripts/completion-process.mjs", "scripts/task-resource-runner.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-process-lifecycle.test.mjs": {
+      "digest": "700d7901ac07c0d4c8e57bce91f6d6b95bcc64cdbb8dc0ee26fbcdde45e812d7",
+      "imports": ["scripts/verification-process-lifecycle.mjs"],
       "dynamicImports": 0
     }
   }
