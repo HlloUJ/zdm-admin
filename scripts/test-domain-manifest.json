@@ -1181,12 +1181,12 @@
       "dynamicImports": 0
     },
     "scripts/parallel-task-timing.mjs": {
-      "digest": "a003f3f0662113ca31b03cdfcbf69cd65ff110e74914bf577adfe38ad2f1ca1a",
+      "digest": "b96750a6acf40099e555b0b38bf3054c228ad6b2bf29591b220b385153832652",
       "imports": ["scripts/batch-timing-core.mjs"],
       "dynamicImports": 0
     },
     "scripts/parallel-task-timing.test.mjs": {
-      "digest": "1c1fc8728f3b3deeca687da23ee47b37267edb8f0dbe46f4d3bc7a09b066681d",
+      "digest": "87c25f72f0cdcc3e90dbfc693734b0f4be8bc36f9700195c74ace4d4e1293529",
       "imports": ["scripts/parallel-task-timing.mjs", "scripts/task-registry.mjs", "scripts/task-timing.mjs"],
       "dynamicImports": 0
     },

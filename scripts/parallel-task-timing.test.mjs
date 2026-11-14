@@ -203,7 +203,12 @@ test('old verification starts remain pending and persistent duplicate records co
     worktree = path.join(common, 'worktree'),
     dir = path.join(worktree, '.task-verification/attempts/key');
   mkdirSync(dir, { recursive: true });
-  const a = { attemptId: 'old', startedAt: new Date(10).toISOString(), status: 'running' };
+  const a = {
+    identity: { root: worktree },
+    attemptId: 'old',
+    startedAt: new Date(10).toISOString(),
+    status: 'running',
+  };
   writeFileSync(path.join(dir, 'old.started.json'), JSON.stringify(a));
   const task = { id: 'a', createdAt: 0, worktree, repository: { commonDir: common } };
   let r = readParallelTiming(common, [task], { now: 100 });
@@ -216,4 +221,51 @@ test('old verification starts remain pending and persistent duplicate records co
   assert.equal(r.tasks[0].pending.length, 0);
   assert.equal(r.tasks[0].phases.length, 1);
   assert.equal(r.observedProcessWallMs, 20);
+});
+
+test('persisted start recovers verified local end; foreign and unidentified reports remain unknown', (t) => {
+  const common = fixture(t),
+    worktree = path.join(common, 'w'),
+    dir = path.join(worktree, '.task-verification/attempts/k');
+  mkdirSync(dir, { recursive: true });
+  const task = { id: 'a', createdAt: 0, worktree, repository: { commonDir: common } };
+  const a = {
+    attemptId: 'recover',
+    identity: { root: worktree },
+    startedAt: new Date(10).toISOString(),
+    completedAt: new Date(30).toISOString(),
+    status: 'passed',
+  };
+  observeValidation(task, { ...a, completedAt: null });
+  writeFileSync(path.join(dir, 'done.json'), JSON.stringify(a));
+  writeFileSync(
+    path.join(dir, 'foreign.json'),
+    JSON.stringify({ ...a, attemptId: 'foreign', identity: { root: path.join(common, 'other') } }),
+  );
+  writeFileSync(path.join(dir, 'unknown.json'), JSON.stringify({ ...a, attemptId: 'unknown', identity: undefined }));
+  const r = readParallelTiming(common, [task], { now: 100 });
+  assert.equal(r.observedProcessWallMs, 20);
+  assert.equal(r.tasks[0].pending.length, 0);
+  assert.equal(r.tasks[0].phases.length, 1);
+  assert.equal(r.tasks[0].issues.filter((x) => x.startsWith('unverified-validation-identity:')).length, 2);
+});
+
+test('conflicting completed evidence is excluded rather than counted as certain work', (t) => {
+  const common = fixture(t),
+    worktree = path.join(common, 'w'),
+    dir = path.join(worktree, '.task-verification/attempts/k');
+  mkdirSync(dir, { recursive: true });
+  const task = { id: 'a', createdAt: 0, worktree, repository: { commonDir: common } };
+  const a = {
+    attemptId: 'conflict',
+    identity: { root: worktree },
+    startedAt: new Date(10).toISOString(),
+    completedAt: new Date(30).toISOString(),
+    status: 'passed',
+  };
+  observeValidation(task, a);
+  writeFileSync(path.join(dir, 'done.json'), JSON.stringify({ ...a, completedAt: new Date(40).toISOString() }));
+  const r = readParallelTiming(common, [task], { now: 100 });
+  assert.equal(r.observedProcessWallMs, 0);
+  assert.ok(r.tasks[0].issues.includes('conflicting-validation:conflict'));
 });

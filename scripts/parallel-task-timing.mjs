@@ -344,29 +344,54 @@ export function readParallelTiming(common, tasks, { now = Date.now(), readNative
     if (existsSync(task.worktree)) {
       const dep = load(path.join(task.worktree, '.task-runtime/dependency-install-result.json'));
       milestones.dependenciesReadyAt = dep?.exitCode === 0 && dep.task === task.id ? dep.completedAt : null;
-      const seen = new Set(events.filter((e) => e.source === 'verification-attempt').map((e) => e.id));
-      const attempts = new Map();
+      const attempts = new Map(),
+        rejectedAttempts = new Set();
       try {
         for (const f of jsonFiles(path.join(task.worktree, '.task-verification/attempts'))) {
           const a = load(f);
-          if (!a?.attemptId || seen.has(a.attemptId)) continue;
+          if (!a?.attemptId || rejectedAttempts.has(a.attemptId)) continue;
+          if (!a.identity?.root || path.resolve(a.identity.root) !== path.resolve(task.worktree)) {
+            issues.push('unverified-validation-identity:' + a.attemptId);
+            continue;
+          }
           const previous = attempts.get(a.attemptId);
-          if (previous && previous.startedAt !== a.startedAt) {
+          if (
+            previous &&
+            (previous.startedAt !== a.startedAt ||
+              (previous.completedAt && a.completedAt && previous.completedAt !== a.completedAt))
+          ) {
             issues.push('conflicting-validation:' + a.attemptId);
+            attempts.delete(a.attemptId);
+            rejectedAttempts.add(a.attemptId);
+            for (let i = events.length - 1; i >= 0; i--)
+              if (events[i].source === 'verification-attempt' && events[i].id === a.attemptId) events.splice(i, 1);
             continue;
           }
           if (!previous || a.completedAt) attempts.set(a.attemptId, a);
         }
         for (const a of attempts.values()) {
-          events.push({
-            task: task.id,
-            id: a.attemptId,
-            kind: 'start',
-            phase: 'validation',
-            at: stamp(a.startedAt),
-            source: 'verification-attempt',
-          });
-          if (a.completedAt)
+          const saved = events.filter((e) => e.source === 'verification-attempt' && e.id === a.attemptId);
+          if (
+            saved.some((e) => e.kind === 'start' && e.at !== stamp(a.startedAt)) ||
+            saved.some((e) => e.kind === 'end' && a.completedAt && e.at !== stamp(a.completedAt))
+          ) {
+            issues.push('conflicting-validation:' + a.attemptId);
+            attempts.delete(a.attemptId);
+            rejectedAttempts.add(a.attemptId);
+            for (let i = events.length - 1; i >= 0; i--)
+              if (events[i].source === 'verification-attempt' && events[i].id === a.attemptId) events.splice(i, 1);
+            continue;
+          }
+          if (!saved.some((e) => e.kind === 'start'))
+            events.push({
+              task: task.id,
+              id: a.attemptId,
+              kind: 'start',
+              phase: 'validation',
+              at: stamp(a.startedAt),
+              source: 'verification-attempt',
+            });
+          if (a.completedAt && !saved.some((e) => e.kind === 'end'))
             events.push({
               task: task.id,
               id: a.attemptId,
