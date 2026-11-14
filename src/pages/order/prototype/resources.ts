@@ -45,7 +45,6 @@ export const storeOrderPrototype: FunctionModule = {
         {
           label: '销售订单页',
           value: `${prefix}.sales`,
-          note: '前端原型，仅浏览器模拟数据；未接业务接口和后端权限',
           actions: [],
           tabs: statuses.map((s) => ({
             label: s.label,
@@ -66,7 +65,6 @@ export const storeOrderPrototype: FunctionModule = {
         {
           label: '履约任务页',
           value: `${prefix}.fulfillment`,
-          note: '本店执行任务原型；不模拟供应链真实写入',
           actions: [...taskActions.map(([value, label]) => ({ label, value: `${prefix}.fulfillment.${value}` }))],
           tabs: [],
         },
@@ -80,7 +78,6 @@ export const storeOrderPrototype: FunctionModule = {
         {
           label: '款项配置页',
           value: `${prefix}.settings`,
-          note: '款项名称配置接入门店后端；按当前门店及既有权限隔离',
           actions: [],
           tabs: [
             {
