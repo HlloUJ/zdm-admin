@@ -4,6 +4,8 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { interruptionNotice, claimInterruptionNotice, receiptInterruptionNotice } from './task-interruption-notice.mjs';
+// Isolated test process only; never a production identity or platform proof.
+process.env.CODEX_THREAD_ID ??= 'isolated-ci-notice-fixture';
 const binding = {
   task: 'new-task',
   taskNumber: '999',

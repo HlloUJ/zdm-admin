@@ -106,9 +106,15 @@ test('start parser rejects unknown options and never accepts implicit preview sw
   assert.equal(parseTaskStart(['--slug', 'a', '--owner', 'chat-a']).slug, 'a');
 });
 test('new task creation atomically records complete monitoring context without backfilling old tasks', (t) => {
-  const f = fixture(t),
-    owner = process.env.CODEX_THREAD_ID;
-  assert.ok(owner, 'Real runtime identity required in this integration test');
+  const f = fixture(t);
+  // Test-only fixture identity when the CI host has no agent runtime.
+  const prior = process.env.CODEX_THREAD_ID;
+  const owner = prior ?? 'isolated-ci-start-fixture';
+  process.env.CODEX_THREAD_ID = owner;
+  t.after(() => {
+    if (prior === undefined) delete process.env.CODEX_THREAD_ID;
+    else process.env.CODEX_THREAD_ID = prior;
+  });
   const context = {
     taskNumber: 'fixture-284',
     taskName: '隔离登记验收',

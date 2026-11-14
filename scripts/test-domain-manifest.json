@@ -1732,7 +1732,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "5feae048980f40698c527ed63fd21796a6e882d10e76ede1cabbfe01fbb4cc59",
+      "digest": "0e9b0fc64b581c6aee83fbe0c1036b16112833782eb126e53d881eed50e66cb5",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
@@ -1759,7 +1759,7 @@
       "dynamicImports": 0
     },
     "scripts/task-interruption-notice.test.mjs": {
-      "digest": "8e8a5413526702527af453ae694d9699455f17dbf7a314d80e10727f3cbd7a49",
+      "digest": "e71639696711d1796842c18403ee617e674f01c424dad05dd0b853ad004fb4e3",
       "imports": ["scripts/task-interruption-notice.mjs"],
       "dynamicImports": 0
     },
@@ -1840,7 +1840,7 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
-      "digest": "389a612c6cdadbdc1bec3be6c31765a8b5388a63665ff652a1cbcf283091a5c8",
+      "digest": "754f4e508f4466d3e2711c1a3ce016f1e00f863c48f2d301edfb65772ff10afa",
       "imports": [
         "scripts/preview-consumers.mjs",
         "scripts/preview-target.mjs",
@@ -2164,7 +2164,7 @@
       "dynamicImports": 0
     },
     "scripts/task-start.test.mjs": {
-      "digest": "ab04660db940a60ad252b32cb1c8daadd4f7905c992d7fc66e637c8815c12586",
+      "digest": "ba708ddda12da3c821cd2c0fb3852a082140b6d33dc0abdd861b25b33f76a3c9",
       "imports": ["scripts/task-registry.mjs", "scripts/task-start.mjs"],
       "dynamicImports": 0
     },
