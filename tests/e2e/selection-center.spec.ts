@@ -500,6 +500,17 @@ test('page loading stays centered above content and disappears after the request
     width: document.documentElement.clientWidth,
     height: document.documentElement.clientHeight,
   }));
+  console.log(
+    'GEOMETRY',
+    await page.evaluate(() => ({
+      inner: innerWidth,
+      client: document.documentElement.clientWidth,
+      rect: document.documentElement.getBoundingClientRect().width,
+      body: document.body.getBoundingClientRect().width,
+      gutter: getComputedStyle(document.documentElement).scrollbarGutter,
+      overflow: getComputedStyle(document.documentElement).overflow,
+    })),
+  );
   expect(box!.width).toBe(viewport.width);
   expect(box!.height).toBe(viewport.height);
   const icon = loading.locator('.t-loading__gradient-conic');
@@ -561,6 +572,17 @@ for (const width of [1440, 1024, 640]) {
     await expect(drawer.getByText('基础信息', { exact: true })).toBeVisible();
     const content = drawer.locator('.t-drawer__content-wrapper');
     const layoutWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    console.log(
+      'DRAWER_GEOMETRY',
+      await page.evaluate(() => ({
+        inner: innerWidth,
+        client: document.documentElement.clientWidth,
+        rect: document.documentElement.getBoundingClientRect().width,
+        body: document.body.getBoundingClientRect().width,
+        gutter: getComputedStyle(document.documentElement).scrollbarGutter,
+        overflow: getComputedStyle(document.documentElement).overflow,
+      })),
+    );
     await expect.poll(async () => (await content.boundingBox())?.width).toBe(Math.min(1120, layoutWidth));
     await expect
       .poll(async () => {

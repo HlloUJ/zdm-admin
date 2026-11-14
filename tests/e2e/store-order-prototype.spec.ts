@@ -425,6 +425,42 @@ test('payment configuration API failures never fall back to local names and can 
 test('payment name changes during receipt entry require explicit reselection and retain the old label', async ({
   page,
 }) => {
+  // PR121 Linux-only failure diagnosis; mock API metadata only, no payloads or credentials.
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.includes('/payment-names') || path.endsWith('/auth/contexts'))
+      console.log('RECEIPT_REQUEST', request.method(), path);
+  });
+  page.on('response', (response) => {
+    const path = new URL(response.url()).pathname;
+    if (path.includes('/payment-names') || path.endsWith('/auth/contexts'))
+      console.log('RECEIPT_RESPONSE', response.status(), path);
+  });
+  page.on('pageerror', (error) => console.log('RECEIPT_PAGE_ERROR', error.message));
+  page.on('console', (message) => {
+    if (message.text().startsWith('RECEIPT_CLICK')) console.log(message.text());
+  });
+  await page.addInitScript(() => {
+    document.addEventListener(
+      'click',
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest('.t-dropdown__item');
+        if (item)
+          console.log(
+            'RECEIPT_CLICK',
+            JSON.stringify({
+              tag: target.tagName,
+              targetClass: target.className,
+              itemClass: item.className,
+              text: item.textContent?.trim(),
+            }),
+          );
+      },
+      true,
+    );
+  });
   await setup(page);
   await page.goto(productWarehouseUrl('/store/order-management/sales'));
   await page.evaluate(async () => {
