@@ -75,7 +75,7 @@ public class TenantController {
       @Valid @RequestBody TenantPurgeRequest request) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.delete");
     requirePlatformIdentity();
-    return ApiResponse.ok(tenantService.purgeTenant(id, request.confirmationName()));
+    return ApiResponse.ok(tenantService.purgeTenant(id, request.confirmationName(), request.storePlans()));
   }
 
   private void requirePlatformIdentity() {

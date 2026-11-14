@@ -5,7 +5,17 @@ import { installPaymentNameMocks } from './store-payment-name-mocks';
 
 async function setup(page: Page, store = false) {
   await installAdminApiMocks(page);
-  if (store) await installPaymentNameMocks(page);
+  if (store) {
+    await installPaymentNameMocks(page);
+    await page.route('**/api/admin/auth/contexts', (route) =>
+      route.fulfill({
+        json: {
+          code: 0,
+          data: [{ identityId: 7, tenantId: 1, storeId: 2, identityType: 'store_admin', clientCode: 'admin' }],
+        },
+      }),
+    );
+  }
   await page.addInitScript((store) => {
     localStorage.setItem('zdm-admin-token', 'pagination-regression');
     localStorage.setItem(

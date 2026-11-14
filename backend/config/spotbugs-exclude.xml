@@ -26,4 +26,125 @@
     </Or>
     <Bug pattern="EI_EXPOSE_REP2"/>
   </Match>
+  <!-- Spring-owned JdbcTemplate uses the shared transaction-bound DataSource; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.HistoricIdentifierGuard"/>
+    <Field name="jdbc"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned ledger coordinates synchronized immutable writes and recovery reads; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.HistoricIdentifierGuard"/>
+    <Field name="journal"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-configured ObjectMapper is an injected serialization collaborator; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.HistoricIdentifierGuard"/>
+    <Field name="json"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned JdbcTemplate uses the shared transaction-bound DataSource; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitCoordinator"/>
+    <Field name="jdbc"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned ledger coordinates synchronized immutable writes and recovery reads; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitCoordinator"/>
+    <Field name="journal"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-configured ObjectMapper is an injected serialization collaborator; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitCoordinator"/>
+    <Field name="json"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned JdbcTemplate uses the shared transaction-bound DataSource; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitCoverage"/>
+    <Field name="jdbc"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-configured ObjectMapper is an injected serialization collaborator; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitCoverage"/>
+    <Field name="json"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-configured ObjectMapper is an injected serialization collaborator; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitJournal"/>
+    <Field name="json"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned JdbcTemplate uses the shared transaction-bound DataSource; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitMedia"/>
+    <Field name="jdbc"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned JdbcTemplate uses the shared transaction-bound DataSource; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitRecoveryState"/>
+    <Field name="jdbc"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned ledger coordinates synchronized immutable writes and recovery reads; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitRecoveryState"/>
+    <Field name="journal"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned JdbcTemplate uses the shared transaction-bound DataSource; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitRecoveryWorker"/>
+    <Field name="jdbc"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned ledger coordinates synchronized immutable writes and recovery reads; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitRecoveryWorker"/>
+    <Field name="journal"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-configured ObjectMapper is an injected serialization collaborator; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitRemoteLedger"/>
+    <Field name="json"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned media lifecycle worker must preserve its configured transaction and retention dependencies; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitTaskWorker"/>
+    <Field name="cleanup"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned JdbcTemplate uses the shared transaction-bound DataSource; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitTaskWorker"/>
+    <Field name="jdbc"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned ledger coordinates synchronized immutable writes and recovery reads; no public accessor. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitTaskWorker"/>
+    <Field name="journal"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Spring-owned JdbcTemplate is a private transaction-aware collaborator, never exposed. -->
+  <Match>
+    <Class name="com.zdm.platform.storeexit.StoreExitMediaFollowup"/>
+    <Field name="jdbc"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
+  <!-- Only constructor injection of Spring-owned catalog collaborators; never DTO/getter exposure. -->
+  <Match>
+    <Class name="com.zdm.platform.inventory.StoreSelectionCatalog"/>
+    <Method name="&lt;init&gt;"/>
+    <Field name="~(jdbc|json|finished|accessory)"/>
+    <Bug pattern="EI_EXPOSE_REP2"/>
+  </Match>
 </FindBugsFilter>

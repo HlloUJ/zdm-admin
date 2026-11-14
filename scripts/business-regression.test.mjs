@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import {
   validateContracts,
@@ -198,20 +199,72 @@ test('browser URL roots include test helper import consumers without selecting u
 });
 
 test('the real changed-check entry blocks an unregistered source before any task executes', async () => {
+  const fixture = mkdtempSync(path.join(os.tmpdir(), 'unregistered-business-'));
   let executions = 0;
-  const candidate = { digest: 'candidate', baseline: 'base', mergeBase: 'base', mutationStamp: 'stamp' };
-  await assert.rejects(
-    () =>
-      checkChanged(['src/router/index.ts'], {
-        root,
-        capture: () => candidate,
-        run: async () => {
-          executions++;
-          return { exitCode: 0 };
-        },
-        report: () => {},
+  const write = (file, value) => {
+    mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true });
+    writeFileSync(path.join(fixture, file), value);
+  };
+  try {
+    mkdirSync(path.join(fixture, 'backend/src/main'), { recursive: true });
+    write('src/known.ts', 'export const known = true;');
+    write('tests/e2e/known.spec.ts', 'export const browser = true;');
+    write('backend/src/test/KnownTest.java', 'class KnownTest {}');
+    const browser = 'tests/e2e/known.spec.ts',
+      backend = 'backend/src/test/KnownTest.java';
+    write(
+      'scripts/business-regression-contracts.json',
+      JSON.stringify({
+        version: 1,
+        contracts: [
+          {
+            id: 'known',
+            roots: ['src/known.ts'],
+            tables: ['known'],
+            routes: [],
+            consumers: ['src/known.ts'],
+            browserConsumers: [],
+            browserTests: [browser],
+            backendTests: [backend],
+            protectedTests: {
+              [browser]: digest(readFileSync(path.join(fixture, browser), 'utf8')),
+              [backend]: digest(readFileSync(path.join(fixture, backend), 'utf8')),
+            },
+          },
+        ],
       }),
+    );
+    const git = (...args) => execFileSync('git', args, { cwd: fixture, stdio: 'pipe' });
+    git('init');
+    git('add', '.');
+    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'fixture');
+    write('src/unknown.ts', 'export const unknown = true;');
+    const candidate = { digest: 'candidate', baseline: 'base', mergeBase: 'base', mutationStamp: 'stamp' };
+    await assert.rejects(
+      () =>
+        checkChanged(['src/unknown.ts'], {
+          root: fixture,
+          capture: () => candidate,
+          run: async () => {
+            executions++;
+            return { exitCode: 0 };
+          },
+          report: () => {},
+        }),
+      /Unregistered business change/,
+    );
+    assert.equal(executions, 0);
+  } finally {
+    rmSync(fixture, { recursive: true });
+  }
+});
+
+test('retired main consumers retain associated regression coverage while unknown deletions fail closed', () => {
+  assert.doesNotThrow(() =>
+    validateChangedBusinessCoverage(root, ['src/pages/finished-stock/shared/StoreFinishedStockPoolDetailAdapter.vue']),
+  );
+  assert.throws(
+    () => validateChangedBusinessCoverage(root, ['src/pages/unregistered-retired-consumer.vue']),
     /Unregistered business change/,
   );
-  assert.equal(executions, 0);
 });

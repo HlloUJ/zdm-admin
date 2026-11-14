@@ -63,8 +63,37 @@ export function restoreStore(id: number) {
   return request<StoreRecord>(`/admin/stores/${id}/restore`, { method: 'PATCH' });
 }
 
-export function deleteStore(id: number) {
-  return request<boolean>(`/admin/stores/${id}`, {
+export interface StoreExitPreview {
+  storeId: number;
+  tenantId: number;
+  storeName: string;
+  ruleVersion: string;
+  planHash: string;
+  counts: Record<string, number>;
+  retained: string[];
+  blockers: string[];
+  eligible: boolean;
+}
+
+export function getStorePurgePreview(id: number) {
+  return request<StoreExitPreview>(`/admin/stores/${id}/purge-preview`);
+}
+
+export interface StoreExitResult {
+  operationId: string;
+  storeId: number;
+  databaseStatus: 'CLEARED';
+  cleanupStatus: 'COMPLETE' | 'PENDING' | 'ATTENTION';
+  pendingTasks: number;
+  retained: string[];
+}
+
+export function getStorePurgeResult(id: number) {
+  return request<StoreExitResult>(`/admin/stores/${id}/purge-result`);
+}
+
+export function deleteStore(id: number, planHash: string) {
+  return request<StoreExitResult>(`/admin/stores/${id}?planHash=${encodeURIComponent(planHash)}`, {
     method: 'DELETE',
   });
 }

@@ -1,0 +1,31 @@
+{
+  "id": "selection-center-v24",
+  "approvedOn": "2026-11-07",
+  "prd": "docs/product/selection-center-prd.md",
+  "source": "approved design V24, confirmed PRD and D-01",
+  "scope": "Only selection-center presentation and explicit card detail navigation; no other module exception",
+  "cardNavigation": [
+    {
+      "file": "src/pages/selection-center/index.vue",
+      "tag": "t-card",
+      "fingerprint": "452c5e7f21683a034f9f15b72a9c90e703136b159f2e6c0ac31fb0947f42535d",
+      "reason": "PRD sections4/7 explicitly require clicking product card/row for details; standalone title navigation elsewhere stays forbidden."
+    },
+    {
+      "file": "src/pages/selection-center/index.vue",
+      "tag": "div",
+      "fingerprint": "4dba1b138b252c1322518e7be4e418c8bf3ca8abc868dae91842c8b63b55ca43",
+      "reason": "PRD sections4/7 explicitly require clicking product card/row for details; standalone title navigation elsewhere stays forbidden."
+    }
+  ],
+  "files": {
+    "src/pages/selection-center/components/CategoryChoiceSpacing.vue": "ad1a123a8776ae98de51fd87df789305945d0214700eaf307715824e356a23a6",
+    "src/pages/selection-center/components/CategoryFlatGroupSpacing.vue": "1273b38c57c268960f63b8ba1ea2e60f717a479060e5f5b3690a6a5ffc99e49f",
+    "src/pages/selection-center/components/CategoryFlatGroupSpacingDeep.vue": "7cff66cd74b0edabbfb6c41790ec0af05f16fb892ff7052bc1d1d2d9d8e14dbc",
+    "src/pages/selection-center/components/FilterGlyph.vue": "23d571eb679469e21bb759d1df4aba74c20cf3e880ec0da83b0d0246926f2ecf",
+    "src/pages/selection-center/components/SelectionCategoryPanel.vue": "8824243999bc4739c4bb05bd93fbfed0851728c93821c15e49c3d8b44b46a71c",
+    "src/pages/selection-center/components/SelectionDetail.vue": "4d8b9a6ee2e29d89e7bb45bef98a70de5fa435f6ad687aacdd1c9a458997fe71",
+    "src/pages/selection-center/index.vue": "9e302c7357a86ace68cb78bd430c0fa04824afa982f10b3a0593c0eae1afad8b",
+    "src/pages/selection-center/selection-center.css": "3f4a563b93b4ddd8993ea16926d8552b76ddcce74c6b1aea577bad52ac42d695"
+  }
+}

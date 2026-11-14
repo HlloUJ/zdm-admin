@@ -1,0 +1,1775 @@
+{
+  "tables": {
+    "store_selection_batch_items": {
+      "columns": [
+        "batch_id",
+        "error_code",
+        "id",
+        "listing_id",
+        "product_id",
+        "product_name",
+        "product_type",
+        "reason",
+        "selection_id",
+        "status"
+      ],
+      "disposition": "module",
+      "basis": "V1.3门店专属业务数据清理；选品PRD D01账号及门店归属，含全状态清单和批次；上游共享商品不删除"
+    },
+    "store_selection_batches": {
+      "columns": ["account_id", "created_at", "finished_at", "id", "request_id", "status", "store_id", "tenant_id"],
+      "disposition": "module",
+      "basis": "V1.3门店专属业务数据清理；选品PRD D01账号及门店归属，含全状态清单和批次；上游共享商品不删除"
+    },
+    "store_selection_items": {
+      "columns": ["account_id", "added_at", "id", "product_id", "product_type", "store_id", "tenant_id"],
+      "disposition": "module",
+      "basis": "V1.3门店专属业务数据清理；选品PRD D01账号及门店归属，含全状态清单和批次；上游共享商品不删除"
+    },
+    "accessory_guide_price_settings": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "price_coefficient",
+        "updated_at",
+        "updated_by_account_id",
+        "updated_by_name"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "accessory_markup_configurations": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "legacy_seeded",
+        "name",
+        "price_coefficient",
+        "sort_order",
+        "status",
+        "store_level_id",
+        "updated_at"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "accessory_operation_logs": {
+      "columns": [
+        "after_status",
+        "batch_no",
+        "before_status",
+        "business_client_code",
+        "change_details",
+        "created_at",
+        "detail_reason",
+        "id",
+        "merchant_code",
+        "operated_at",
+        "operation_source",
+        "operation_summary",
+        "operation_type",
+        "operator_account_id",
+        "operator_client_code",
+        "operator_identity_id",
+        "operator_name",
+        "product_created_by_account_id",
+        "product_id",
+        "product_name",
+        "publisher_type",
+        "standard_reason"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "accessory_product_attribute_entries": {
+      "columns": [
+        "accessory_product_id",
+        "attribute_id",
+        "attribute_name",
+        "created_at",
+        "id",
+        "status",
+        "updated_at",
+        "value"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "accessory_product_guide_prices": {
+      "columns": [
+        "accessory_product_id",
+        "cost_price",
+        "created_at",
+        "id",
+        "price",
+        "price_coefficient",
+        "price_source",
+        "sku_id",
+        "updated_at",
+        "variant_label"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "accessory_product_prices": {
+      "columns": [
+        "accessory_product_id",
+        "cost_price",
+        "created_at",
+        "id",
+        "price",
+        "price_coefficient",
+        "price_source",
+        "sku_id",
+        "source_configuration_id",
+        "store_level_id",
+        "store_level_name",
+        "updated_at",
+        "variant_label"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "accessory_product_variants": {
+      "columns": [
+        "accessory_product_id",
+        "color",
+        "cost_price",
+        "created_at",
+        "display_mode",
+        "id",
+        "length_value",
+        "material",
+        "sales_attributes",
+        "size_value",
+        "status",
+        "stock",
+        "updated_at",
+        "variant_label"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "accessory_products": {
+      "columns": [
+        "attribute_display_order",
+        "attribute_template_snapshot",
+        "category_id",
+        "cover_image",
+        "created_at",
+        "created_by_account_id",
+        "detail",
+        "guide_price",
+        "id",
+        "main_image_media_id",
+        "name",
+        "operations_deleted",
+        "operations_invalidated_at",
+        "operations_invalidated_reason",
+        "operations_invalidated_snapshot",
+        "publisher_type",
+        "selection_generation",
+        "sku",
+        "source_block_reason",
+        "source_status",
+        "spec_dimensions",
+        "status",
+        "supplier_id",
+        "template_revision",
+        "template_version_id",
+        "total_stock",
+        "updated_at",
+        "video_media_id"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "account_identities": {
+      "columns": [
+        "account_id",
+        "client_code",
+        "created_at",
+        "id",
+        "identity_type",
+        "status",
+        "store_id",
+        "subject_id",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "account_roles": {
+      "columns": ["account_id", "client_code", "created_at", "id", "role_id", "store_id", "tenant_id"],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "accounts": {
+      "columns": ["account_type", "created_at", "display_name", "gender", "id", "phone", "status", "updated_at"],
+      "disposition": "account",
+      "basis": "V1.3第四章；共享和保护账号保留，组织专属账号按实际引用处理"
+    },
+    "auth_sessions": {
+      "columns": [
+        "account_id",
+        "client_code",
+        "created_at",
+        "expires_at",
+        "id",
+        "identity_id",
+        "last_used_at",
+        "revoked_at",
+        "token_hash"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "category_template_versions": {
+      "columns": [
+        "category_id",
+        "change_note",
+        "content",
+        "created_at",
+        "created_by_account_id",
+        "draft_slot",
+        "id",
+        "published_at",
+        "published_by_name",
+        "revision",
+        "state",
+        "updated_at",
+        "version_no"
+      ],
+      "disposition": "tenant",
+      "basis": "V1.3第三章；不随单店删除，租户级流程按原授权处理"
+    },
+    "crafts": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "description",
+        "id",
+        "image_media_id",
+        "image_url",
+        "name",
+        "pricing_method",
+        "remark",
+        "status",
+        "type",
+        "updated_at",
+        "width"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "employee_invite_acceptances": {
+      "columns": [
+        "accepted_at",
+        "account_id",
+        "employee_id",
+        "employee_status",
+        "existing_employee",
+        "id",
+        "invite_id"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "employee_invites": {
+      "columns": [
+        "accepted_account_id",
+        "client_code",
+        "created_at",
+        "created_by_account_id",
+        "created_by_identity_id",
+        "expires_at",
+        "id",
+        "status",
+        "store_id",
+        "target_identity_type",
+        "tenant_id",
+        "token",
+        "updated_at",
+        "used_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "employees": {
+      "columns": [
+        "account_id",
+        "client_code",
+        "created_at",
+        "created_by_account_id",
+        "data_permission",
+        "id",
+        "remark",
+        "role_ids",
+        "status",
+        "store_id",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "finished_guide_price_settings": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "price_coefficient",
+        "updated_at",
+        "updated_by_account_id",
+        "updated_by_name"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "finished_markup_configurations": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "legacy_seeded",
+        "name",
+        "price_coefficient",
+        "sort_order",
+        "status",
+        "store_level_id",
+        "updated_at"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "finished_operation_logs": {
+      "columns": [
+        "after_status",
+        "batch_no",
+        "before_status",
+        "business_client_code",
+        "change_details",
+        "created_at",
+        "detail_reason",
+        "id",
+        "merchant_code",
+        "operated_at",
+        "operation_source",
+        "operation_summary",
+        "operation_type",
+        "operator_account_id",
+        "operator_client_code",
+        "operator_identity_id",
+        "operator_name",
+        "product_created_by_account_id",
+        "product_id",
+        "product_name",
+        "publisher_type",
+        "standard_reason"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "finished_product_attribute_entries": {
+      "columns": [
+        "attribute_id",
+        "attribute_name",
+        "created_at",
+        "finished_product_id",
+        "id",
+        "status",
+        "updated_at",
+        "value"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "finished_product_guide_prices": {
+      "columns": [
+        "cost_price",
+        "created_at",
+        "finished_product_id",
+        "id",
+        "price",
+        "price_coefficient",
+        "price_source",
+        "sku_id",
+        "updated_at",
+        "variant_label"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "finished_product_prices": {
+      "columns": [
+        "cost_price",
+        "created_at",
+        "finished_product_id",
+        "id",
+        "price",
+        "price_coefficient",
+        "price_source",
+        "sku_id",
+        "source_configuration_id",
+        "store_level_id",
+        "store_level_name",
+        "updated_at",
+        "variant_label"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "finished_product_variants": {
+      "columns": [
+        "color",
+        "cost_price",
+        "created_at",
+        "display_mode",
+        "finished_product_id",
+        "id",
+        "length_value",
+        "material",
+        "sales_attributes",
+        "size_value",
+        "status",
+        "stock",
+        "updated_at",
+        "variant_label"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "finished_products": {
+      "columns": [
+        "attribute_display_order",
+        "attribute_template_snapshot",
+        "category_id",
+        "cover_image",
+        "created_at",
+        "created_by_account_id",
+        "detail",
+        "guide_price",
+        "id",
+        "main_image_media_id",
+        "name",
+        "operations_deleted",
+        "operations_invalidated_at",
+        "operations_invalidated_reason",
+        "operations_invalidated_snapshot",
+        "publisher_type",
+        "selection_generation",
+        "sku",
+        "source_block_reason",
+        "source_status",
+        "spec_dimensions",
+        "status",
+        "supplier_id",
+        "template_revision",
+        "template_version_id",
+        "total_stock",
+        "updated_at",
+        "video_media_id"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "flyway_schema_history": {
+      "columns": [
+        "checksum",
+        "description",
+        "execution_time",
+        "installed_by",
+        "installed_on",
+        "installed_rank",
+        "script",
+        "success",
+        "type",
+        "version"
+      ],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "media_assets": {
+      "columns": [
+        "access_level",
+        "confirmed_at",
+        "created_at",
+        "created_by_account_id",
+        "deleted_at",
+        "derived_from_media_id",
+        "file_size",
+        "history_preview_error",
+        "history_preview_media_id",
+        "history_preview_state",
+        "id",
+        "last_referenced_at",
+        "media_type",
+        "mime_type",
+        "original_name",
+        "owner_client_code",
+        "pending_delete_at",
+        "public_id",
+        "status",
+        "storage_key",
+        "store_id",
+        "tenant_id",
+        "unreferenced_since",
+        "updated_at"
+      ],
+      "disposition": "media",
+      "basis": "V1.3第六章及既有媒体生命周期；业务域引用释放，原文件按有效引用判定"
+    },
+    "media_cleanup_runs": {
+      "columns": [
+        "created_at",
+        "deleted_count",
+        "failed_count",
+        "finished_at",
+        "id",
+        "released_bytes",
+        "scanned_count",
+        "started_at",
+        "status",
+        "trigger_type",
+        "updated_at"
+      ],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "media_cleanup_tasks": {
+      "columns": [
+        "created_at",
+        "id",
+        "last_error",
+        "media_id",
+        "next_retry_at",
+        "reason",
+        "retry_count",
+        "status",
+        "trigger_type",
+        "updated_at"
+      ],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "media_lifecycle_control": {
+      "columns": ["deletion_enabled", "id", "migration_completed", "updated_at"],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "media_lifecycle_events": {
+      "columns": ["event_type", "id", "media_id", "operated_at", "operator_name", "reason"],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "media_references": {
+      "columns": [
+        "business_domain",
+        "business_id",
+        "created_at",
+        "field_key",
+        "id",
+        "media_id",
+        "owner_client_code",
+        "reference_kind",
+        "retention_reason",
+        "store_id",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "media",
+      "basis": "V1.3第六章及既有媒体生命周期；业务域引用释放，原文件按有效引用判定"
+    },
+    "permissions": {
+      "columns": ["client_code", "code", "created_at", "module", "name", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "platform_clients": {
+      "columns": ["code", "created_at", "name", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "product_attribute_values": {
+      "columns": [
+        "attribute_id",
+        "code",
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "scope",
+        "status",
+        "updated_at",
+        "value"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "product_attributes": {
+      "columns": [
+        "attribute_role",
+        "created_at",
+        "created_by_account_id",
+        "deleted_at",
+        "deleted_by_account_id",
+        "deleted_by_name",
+        "id",
+        "name",
+        "scope",
+        "status",
+        "updated_at",
+        "value_type"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "product_categories": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "name",
+        "parent_id",
+        "parent_scope_key",
+        "product_count",
+        "scope",
+        "sort_order",
+        "status",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "tenant",
+      "basis": "V1.3第三章；不随单店删除，租户级流程按原授权处理"
+    },
+    "product_state_activity": {
+      "columns": [
+        "business_client_code",
+        "kind",
+        "occurred_at",
+        "operator_account_id",
+        "operator_client_code",
+        "record_id",
+        "state",
+        "warehouse_entry_detail",
+        "warehouse_entry_reason",
+        "warehouse_entry_type"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章混合记录：只处理store-finished/store-accessory对应本门店选品的状态活动，上游与其他门店保留"
+    },
+    "role_permissions": {
+      "columns": ["created_at", "id", "permission_code", "role_id"],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "roles": {
+      "columns": [
+        "builtin_key",
+        "client_code",
+        "code",
+        "created_at",
+        "created_by_account_id",
+        "created_by_client_code",
+        "data_scope",
+        "function_permissions",
+        "id",
+        "name",
+        "remark",
+        "role_scope_key",
+        "status",
+        "store_id",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "security_audit_logs": {
+      "columns": [
+        "account_id",
+        "actor_name_snapshot",
+        "client_code",
+        "id",
+        "identity_id",
+        "identity_type_snapshot",
+        "occurred_at",
+        "request_method",
+        "request_path",
+        "result",
+        "result_status",
+        "scope_snapshot_at",
+        "scope_snapshot_source",
+        "store_id_snapshot",
+        "store_name_snapshot",
+        "tenant_id_snapshot",
+        "tenant_name_snapshot"
+      ],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "slab_color_categories": {
+      "columns": ["created_at", "created_by_account_id", "id", "name", "remark", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_colors": {
+      "columns": ["category_id", "created_at", "created_by_account_id", "id", "name", "remark", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_grades": {
+      "columns": [
+        "code",
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "name",
+        "remark",
+        "sort_order",
+        "status",
+        "updated_at"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_guide_price_settings": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "price_coefficient",
+        "updated_at",
+        "updated_by_account_id",
+        "updated_by_name"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_inventory": {
+      "columns": [
+        "area_square_meter",
+        "color_id",
+        "corner1_length_mm",
+        "corner1_width_mm",
+        "corner2_length_mm",
+        "corner2_width_mm",
+        "corner3_length_mm",
+        "corner3_width_mm",
+        "corner4_length_mm",
+        "corner4_width_mm",
+        "cost_price",
+        "created_at",
+        "created_by_account_id",
+        "design_image_media_id",
+        "design_image_url",
+        "grade_id",
+        "guide_price",
+        "guide_price_coefficient",
+        "id",
+        "length_mm",
+        "main_image_media_id",
+        "main_image_url",
+        "name",
+        "operations_deleted",
+        "operations_invalidated_at",
+        "operations_invalidated_reason",
+        "operations_invalidated_snapshot",
+        "origin_id",
+        "publisher_type",
+        "scan_image_media_id",
+        "scan_image_url",
+        "serial_no",
+        "source_block_reason",
+        "source_status",
+        "status",
+        "stock",
+        "supplier_id",
+        "texture_id",
+        "thickness_mm",
+        "tolerance_mm",
+        "updated_at",
+        "variety_id",
+        "video_cover_media_id",
+        "video_cover_url",
+        "video_media_id",
+        "video_url",
+        "warehouse",
+        "width_mm"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_markup_configurations": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "legacy_seeded",
+        "name",
+        "price_coefficient",
+        "sort_order",
+        "status",
+        "store_level_id",
+        "updated_at"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_off_shelf_records": {
+      "columns": [
+        "business_client_code",
+        "detail_reason",
+        "id",
+        "off_shelved_at",
+        "off_shelved_by_account_id",
+        "off_shelved_by_name",
+        "slab_id",
+        "standard_reason"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_operation_logs": {
+      "columns": [
+        "after_status",
+        "before_status",
+        "business_client_code",
+        "change_details",
+        "created_at",
+        "detail_reason",
+        "id",
+        "operated_at",
+        "operation_source",
+        "operation_summary",
+        "operation_type",
+        "operator_account_id",
+        "operator_client_code",
+        "operator_identity_id",
+        "operator_name",
+        "product_created_by_account_id",
+        "publisher_type",
+        "slab_id",
+        "slab_name",
+        "slab_serial_no",
+        "standard_reason"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_origins": {
+      "columns": ["created_at", "created_by_account_id", "id", "name", "remark", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_prices": {
+      "columns": [
+        "cost_price",
+        "created_at",
+        "id",
+        "manual_updated_at",
+        "manual_updated_by_account_id",
+        "manual_updated_by_name",
+        "price",
+        "price_coefficient",
+        "price_source",
+        "slab_id",
+        "source_configuration_id",
+        "store_level_id",
+        "store_level_name",
+        "updated_at"
+      ],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_texture_aliases": {
+      "columns": ["created_at", "id", "name", "status", "texture_id", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_textures": {
+      "columns": ["created_at", "created_by_account_id", "id", "name", "remark", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "slab_varieties": {
+      "columns": ["color", "created_at", "created_by_account_id", "id", "name", "remark", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "store_accessory_operation_logs": {
+      "columns": [
+        "accessory_product_id",
+        "after_status",
+        "before_status",
+        "change_details",
+        "id",
+        "listing_id",
+        "operated_at",
+        "operation_summary",
+        "operation_type",
+        "operator_account_id",
+        "operator_name",
+        "product_name",
+        "store_id",
+        "tenant_id"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_accessory_products": {
+      "columns": [
+        "accessory_product_id",
+        "created_at",
+        "id",
+        "invalidated_at",
+        "invalidated_reason",
+        "invalidated_snapshot",
+        "sale_price_attention",
+        "selected_by_account_id",
+        "selection_generation",
+        "status",
+        "store_category_id",
+        "store_id",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_accessory_sale_prices": {
+      "columns": [
+        "listing_id",
+        "price_mode",
+        "sale_coefficient",
+        "sale_price",
+        "sku_id",
+        "updated_at",
+        "updated_by_account_id"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_categories": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "name",
+        "parent_id",
+        "parent_scope_key",
+        "product_count",
+        "scope",
+        "sort_order",
+        "status",
+        "store_id",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_customer_followups": {
+      "columns": [
+        "content",
+        "created_at",
+        "created_by_account_id",
+        "customer_id",
+        "followed_at",
+        "id",
+        "next_follow_at",
+        "next_follow_task",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_customers": {
+      "columns": [
+        "archived_at",
+        "calling_code",
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "name",
+        "nationality",
+        "owner_account_id",
+        "phone",
+        "phone_region",
+        "remark",
+        "requirement",
+        "status",
+        "store_id",
+        "tenant_id",
+        "updated_at",
+        "wechat"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_exit_actor_snapshots": {
+      "columns": ["account_id", "captured_at", "display_name_at_exit"],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "store_exit_events": {
+      "columns": [
+        "id",
+        "occurred_at",
+        "operation_id",
+        "operator_account_id",
+        "reason_code",
+        "result",
+        "store_id",
+        "tenant_id"
+      ],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "store_exit_operations": {
+      "columns": [
+        "created_at",
+        "operation_id",
+        "operator_account_id",
+        "operator_identity",
+        "operator_name",
+        "plan_hash",
+        "result_json",
+        "rule_version",
+        "status",
+        "store_created_by_account_id",
+        "store_id",
+        "store_name",
+        "tenant_id",
+        "tenant_name",
+        "updated_at"
+      ],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "store_exit_tasks": {
+      "columns": [
+        "attempts",
+        "created_at",
+        "id",
+        "last_error_code",
+        "media_id",
+        "next_attempt_at",
+        "operation_id",
+        "status",
+        "updated_at"
+      ],
+      "disposition": "system",
+      "basis": "V1.3第五至九章；必要审计、凭证、收尾及独立生命周期，不保留整店业务副本"
+    },
+    "store_finished_operation_logs": {
+      "columns": [
+        "after_status",
+        "before_status",
+        "change_details",
+        "finished_product_id",
+        "id",
+        "listing_id",
+        "operated_at",
+        "operation_summary",
+        "operation_type",
+        "operator_account_id",
+        "operator_name",
+        "product_name",
+        "store_id",
+        "tenant_id"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_finished_products": {
+      "columns": [
+        "created_at",
+        "finished_product_id",
+        "id",
+        "invalidated_at",
+        "invalidated_reason",
+        "invalidated_snapshot",
+        "sale_price_attention",
+        "selected_by_account_id",
+        "selection_generation",
+        "status",
+        "store_category_id",
+        "store_id",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_finished_sale_prices": {
+      "columns": [
+        "listing_id",
+        "price_mode",
+        "sale_coefficient",
+        "sale_price",
+        "sku_id",
+        "updated_at",
+        "updated_by_account_id"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_levels": {
+      "columns": ["created_at", "created_by_account_id", "id", "name", "remark", "sort_order", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "store_payment_name_events": {
+      "columns": [
+        "action",
+        "after_value",
+        "before_value",
+        "created_at",
+        "id",
+        "operator_account_id",
+        "operator_name",
+        "payment_name_id",
+        "store_id",
+        "tenant_id"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_payment_names": {
+      "columns": [
+        "created_at",
+        "created_by_account_id",
+        "deleted_at",
+        "deleted_by_account_id",
+        "enabled",
+        "id",
+        "live_name",
+        "name",
+        "store_id",
+        "tenant_id",
+        "updated_at",
+        "updated_by_account_id",
+        "version"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "store_price_rules": {
+      "columns": [
+        "category_id",
+        "coefficient",
+        "created_at",
+        "created_by_account_id",
+        "discount_status",
+        "id",
+        "kind",
+        "role_id",
+        "scope",
+        "store_id",
+        "target_key",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "stores": {
+      "columns": [
+        "address",
+        "archived_by_tenant",
+        "created_at",
+        "created_by",
+        "created_by_account_id",
+        "detail_address",
+        "id",
+        "manager",
+        "name",
+        "region",
+        "remark",
+        "shop_level",
+        "status",
+        "store_level_id",
+        "tenant_id",
+        "type",
+        "updated_at"
+      ],
+      "disposition": "root",
+      "basis": "V1.3第七章；协调入口最后删除门店主档"
+    },
+    "supplier_supply_type_links": {
+      "columns": ["created_at", "supplier_id", "supply_type_id"],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "supplier_supply_types": {
+      "columns": ["code", "created_at", "created_by_account_id", "id", "name", "status", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "suppliers": {
+      "columns": [
+        "address",
+        "contact_name",
+        "contact_phone",
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "name",
+        "owner_id",
+        "owner_scope",
+        "qualification_status",
+        "region",
+        "remark",
+        "status",
+        "store_id",
+        "tenant_id",
+        "updated_at"
+      ],
+      "disposition": "module",
+      "basis": "V1.3第三章；按目标门店关系处理，范围外记录不处理"
+    },
+    "supply_chain_admin_profiles": {
+      "columns": ["identity_id", "remark"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    },
+    "tenant_businesses": {
+      "columns": ["business_type", "created_at", "id", "status", "tenant_id", "updated_at"],
+      "disposition": "tenant",
+      "basis": "V1.3第三章；不随单店删除，租户级流程按原授权处理"
+    },
+    "tenants": {
+      "columns": [
+        "account_id",
+        "business_types",
+        "created_at",
+        "created_by_account_id",
+        "id",
+        "remark",
+        "status",
+        "updated_at"
+      ],
+      "disposition": "tenant",
+      "basis": "V1.3第三章；不随单店删除，租户级流程按原授权处理"
+    },
+    "terminal_function_policies": {
+      "columns": ["created_at", "function_permissions", "id", "terminal", "updated_at"],
+      "disposition": "shared",
+      "basis": "V1.3第三章；上游共享商品、公共配置或其他组织主体，不随单店连带删除；账号历史引用另按第四章核验"
+    }
+  },
+  "foreignKeys": [
+    "accessory_markup_configurations/store_level_id/store_levels/id/NO ACTION",
+    "accessory_product_attribute_entries/accessory_product_id/accessory_products/id/CASCADE",
+    "accessory_product_attribute_entries/attribute_id/product_attributes/id/NO ACTION",
+    "accessory_product_guide_prices/accessory_product_id/accessory_product_variants/accessory_product_id/CASCADE",
+    "accessory_product_guide_prices/accessory_product_id/accessory_products/id/CASCADE",
+    "accessory_product_guide_prices/sku_id/accessory_product_variants/id/CASCADE",
+    "accessory_product_prices/accessory_product_id/accessory_product_variants/accessory_product_id/CASCADE",
+    "accessory_product_prices/accessory_product_id/accessory_products/id/CASCADE",
+    "accessory_product_prices/sku_id/accessory_product_variants/id/CASCADE",
+    "accessory_product_prices/source_configuration_id/accessory_markup_configurations/id/NO ACTION",
+    "accessory_product_variants/accessory_product_id/accessory_products/id/CASCADE",
+    "accessory_products/category_id/product_categories/id/NO ACTION",
+    "accessory_products/main_image_media_id/media_assets/id/NO ACTION",
+    "accessory_products/supplier_id/suppliers/id/NO ACTION",
+    "accessory_products/video_media_id/media_assets/id/NO ACTION",
+    "account_identities/account_id/accounts/id/NO ACTION",
+    "account_identities/client_code/platform_clients/code/NO ACTION",
+    "account_identities/store_id/stores/id/NO ACTION",
+    "account_identities/tenant_id/tenants/id/NO ACTION",
+    "account_roles/account_id/accounts/id/NO ACTION",
+    "account_roles/client_code/platform_clients/code/NO ACTION",
+    "account_roles/role_id/roles/id/NO ACTION",
+    "account_roles/store_id/stores/id/NO ACTION",
+    "account_roles/tenant_id/tenants/id/NO ACTION",
+    "auth_sessions/account_id/accounts/id/NO ACTION",
+    "auth_sessions/client_code/platform_clients/code/NO ACTION",
+    "auth_sessions/identity_id/account_identities/id/NO ACTION",
+    "category_template_versions/category_id/product_categories/id/NO ACTION",
+    "crafts/image_media_id/media_assets/id/NO ACTION",
+    "employee_invite_acceptances/invite_id/employee_invites/id/NO ACTION",
+    "employee_invites/created_by_account_id/accounts/id/NO ACTION",
+    "employee_invites/store_id/stores/id/NO ACTION",
+    "employee_invites/tenant_id/tenants/id/NO ACTION",
+    "employees/account_id/accounts/id/NO ACTION",
+    "employees/client_code/platform_clients/code/NO ACTION",
+    "employees/store_id/stores/id/NO ACTION",
+    "employees/tenant_id/tenants/id/NO ACTION",
+    "finished_markup_configurations/store_level_id/store_levels/id/NO ACTION",
+    "finished_product_attribute_entries/attribute_id/product_attributes/id/NO ACTION",
+    "finished_product_attribute_entries/finished_product_id/finished_products/id/CASCADE",
+    "finished_product_guide_prices/finished_product_id/finished_product_variants/finished_product_id/CASCADE",
+    "finished_product_guide_prices/finished_product_id/finished_products/id/CASCADE",
+    "finished_product_guide_prices/sku_id/finished_product_variants/id/CASCADE",
+    "finished_product_prices/finished_product_id/finished_product_variants/finished_product_id/CASCADE",
+    "finished_product_prices/finished_product_id/finished_products/id/CASCADE",
+    "finished_product_prices/sku_id/finished_product_variants/id/CASCADE",
+    "finished_product_prices/source_configuration_id/finished_markup_configurations/id/NO ACTION",
+    "finished_product_variants/finished_product_id/finished_products/id/CASCADE",
+    "finished_products/category_id/product_categories/id/NO ACTION",
+    "finished_products/main_image_media_id/media_assets/id/NO ACTION",
+    "finished_products/supplier_id/suppliers/id/NO ACTION",
+    "finished_products/video_media_id/media_assets/id/NO ACTION",
+    "media_assets/derived_from_media_id/media_assets/id/NO ACTION",
+    "media_cleanup_tasks/media_id/media_assets/id/NO ACTION",
+    "media_references/media_id/media_assets/id/NO ACTION",
+    "permissions/client_code/platform_clients/code/NO ACTION",
+    "product_attribute_values/attribute_id/product_attributes/id/NO ACTION",
+    "product_categories/parent_id/product_categories/id/NO ACTION",
+    "product_categories/tenant_id/tenants/id/NO ACTION",
+    "role_permissions/permission_code/permissions/code/NO ACTION",
+    "role_permissions/role_id/roles/id/NO ACTION",
+    "roles/client_code/platform_clients/code/NO ACTION",
+    "roles/store_id/stores/id/NO ACTION",
+    "roles/tenant_id/tenants/id/NO ACTION",
+    "slab_colors/category_id/slab_color_categories/id/NO ACTION",
+    "slab_inventory/color_id/slab_colors/id/NO ACTION",
+    "slab_inventory/design_image_media_id/media_assets/id/NO ACTION",
+    "slab_inventory/grade_id/slab_grades/id/NO ACTION",
+    "slab_inventory/main_image_media_id/media_assets/id/NO ACTION",
+    "slab_inventory/origin_id/slab_origins/id/NO ACTION",
+    "slab_inventory/scan_image_media_id/media_assets/id/NO ACTION",
+    "slab_inventory/supplier_id/suppliers/id/NO ACTION",
+    "slab_inventory/texture_id/slab_textures/id/NO ACTION",
+    "slab_inventory/variety_id/slab_varieties/id/NO ACTION",
+    "slab_inventory/video_cover_media_id/media_assets/id/NO ACTION",
+    "slab_inventory/video_media_id/media_assets/id/NO ACTION",
+    "slab_markup_configurations/store_level_id/store_levels/id/NO ACTION",
+    "slab_off_shelf_records/slab_id/slab_inventory/id/CASCADE",
+    "slab_prices/slab_id/slab_inventory/id/CASCADE",
+    "slab_prices/source_configuration_id/slab_markup_configurations/id/NO ACTION",
+    "slab_texture_aliases/texture_id/slab_textures/id/CASCADE",
+    "store_accessory_operation_logs/store_id/stores/id/NO ACTION",
+    "store_accessory_products/accessory_product_id/accessory_products/id/NO ACTION",
+    "store_accessory_products/store_category_id/store_categories/id/NO ACTION",
+    "store_accessory_products/store_id/stores/id/CASCADE",
+    "store_accessory_sale_prices/listing_id/store_accessory_products/id/CASCADE",
+    "store_accessory_sale_prices/sku_id/accessory_product_variants/id/NO ACTION",
+    "store_categories/parent_id/store_categories/id/NO ACTION",
+    "store_categories/store_id/stores/id/CASCADE",
+    "store_customer_followups/created_by_account_id/accounts/id/SET NULL",
+    "store_customer_followups/customer_id/store_customers/id/NO ACTION",
+    "store_customers/created_by_account_id/accounts/id/SET NULL",
+    "store_customers/owner_account_id/accounts/id/NO ACTION",
+    "store_customers/store_id/stores/id/NO ACTION",
+    "store_customers/tenant_id/tenants/id/NO ACTION",
+    "store_finished_operation_logs/store_id/stores/id/NO ACTION",
+    "store_finished_products/finished_product_id/finished_products/id/NO ACTION",
+    "store_finished_products/store_category_id/store_categories/id/NO ACTION",
+    "store_finished_products/store_id/stores/id/CASCADE",
+    "store_finished_sale_prices/listing_id/store_finished_products/id/CASCADE",
+    "store_finished_sale_prices/sku_id/finished_product_variants/id/NO ACTION",
+    "store_payment_name_events/payment_name_id/store_payment_names/id/NO ACTION",
+    "store_payment_name_events/store_id/stores/id/NO ACTION",
+    "store_payment_names/store_id/stores/id/NO ACTION",
+    "store_price_rules/category_id/store_categories/id/CASCADE",
+    "store_price_rules/role_id/roles/id/CASCADE",
+    "store_price_rules/store_id/stores/id/CASCADE",
+    "store_selection_batch_items/batch_id/store_selection_batches/id/NO ACTION",
+    "stores/store_level_id/store_levels/id/NO ACTION",
+    "stores/tenant_id/tenants/id/NO ACTION",
+    "supplier_supply_type_links/supplier_id/suppliers/id/CASCADE",
+    "supplier_supply_type_links/supply_type_id/supplier_supply_types/id/NO ACTION",
+    "suppliers/store_id/stores/id/NO ACTION",
+    "suppliers/tenant_id/tenants/id/NO ACTION",
+    "supply_chain_admin_profiles/identity_id/account_identities/id/CASCADE",
+    "tenant_businesses/tenant_id/tenants/id/NO ACTION",
+    "tenants/account_id/accounts/id/NO ACTION"
+  ],
+  "mediaDomains": {
+    "ACCESSORY_OPERATIONS_INVALIDATION": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游平台商品失效快照，独立于门店归属，保留有效历史引用"
+    },
+    "ACCESSORY_PRODUCT": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "ACCESSORY_PRODUCT_LOG": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "FINISHED_OPERATIONS_INVALIDATION": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游平台商品失效快照，独立于门店归属，保留有效历史引用"
+    },
+    "FINISHED_PRODUCT": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "FINISHED_PRODUCT_LOG": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "FINISHED_STOCK_CRAFT": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "MANUAL_HOLD": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "SLAB": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "SLAB_LOG": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "SLAB_OPERATIONS_INVALIDATION": {
+      "disposition": "shared",
+      "basis": "V1.3第三章及媒体生命周期：上游共享业务、历史或人工保护，不按本门店上传归属删除"
+    },
+    "STORE_ACCESSORY_INVALIDATION": {
+      "disposition": "module",
+      "parent": "store_accessory_products",
+      "basis": "V1.3第六章：目标门店选品的失效快照随该选品释放；其他门店和上游快照保留"
+    },
+    "STORE_ACCESSORY_PRODUCT_LOG": {
+      "disposition": "module",
+      "parent": "store_accessory_operation_logs",
+      "basis": "V1.3第六章：随明确业务域和父对象释放对应引用"
+    },
+    "STORE_CUSTOMER_FOLLOWUP": {
+      "disposition": "module",
+      "parent": "store_customer_followups",
+      "basis": "V1.3第六章：随明确业务域和父对象释放对应引用"
+    },
+    "STORE_FINISHED_INVALIDATION": {
+      "disposition": "module",
+      "parent": "store_finished_products",
+      "basis": "V1.3第六章：目标门店选品的失效快照随该选品释放；其他门店和上游快照保留"
+    },
+    "STORE_FINISHED_PRODUCT_LOG": {
+      "disposition": "module",
+      "parent": "store_finished_operation_logs",
+      "basis": "V1.3第六章：随明确业务域和父对象释放对应引用"
+    }
+  },
+  "accountReferences": {
+    "store_selection_batches.account_id": {
+      "kind": "live",
+      "basis": "选品PRD D01当前账号与门店私有选品数据，随目标门店清理，不作为历史保留例外"
+    },
+    "store_selection_items.account_id": {
+      "kind": "live",
+      "basis": "选品PRD D01当前账号与门店私有选品数据，随目标门店清理，不作为历史保留例外"
+    },
+    "accessory_guide_price_settings.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "accessory_guide_price_settings.updated_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "accessory_markup_configurations.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "accessory_operation_logs.operator_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "accessory_operation_logs.product_created_by_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "accessory_products.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "account_identities.account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "account_roles.account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "auth_sessions.account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "category_template_versions.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "crafts.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "employee_invite_acceptances.account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "employee_invites.accepted_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "employee_invites.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "employees.account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "employees.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "finished_guide_price_settings.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "finished_guide_price_settings.updated_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "finished_markup_configurations.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "finished_operation_logs.operator_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "finished_operation_logs.product_created_by_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "finished_products.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "media_assets.created_by_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "product_attribute_values.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "product_attributes.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "product_attributes.deleted_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "product_categories.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "product_state_activity.operator_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "roles.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "security_audit_logs.account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "slab_color_categories.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_colors.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_grades.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_guide_price_settings.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_guide_price_settings.updated_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_inventory.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_markup_configurations.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_off_shelf_records.off_shelved_by_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "slab_operation_logs.operator_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "slab_operation_logs.product_created_by_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "slab_origins.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_prices.manual_updated_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_textures.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "slab_varieties.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_accessory_operation_logs.operator_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_accessory_products.selected_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_accessory_sale_prices.updated_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_categories.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_customer_followups.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_customers.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_customers.owner_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_exit_actor_snapshots.account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "store_exit_events.operator_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "store_exit_operations.operator_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "store_exit_operations.store_created_by_account_id": {
+      "kind": "history",
+      "basis": "V1.3：独立历史标识与名称快照，不要求保留登录主体"
+    },
+    "store_finished_operation_logs.operator_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_finished_products.selected_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_finished_sale_prices.updated_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_levels.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_payment_name_events.operator_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_payment_names.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_payment_names.deleted_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_payment_names.updated_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "store_price_rules.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "stores.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "supplier_supply_types.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "suppliers.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "tenants.account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    },
+    "tenants.created_by_account_id": {
+      "kind": "live",
+      "basis": "V1.3：当前业务归属、维护关系或有效责任；退出范围外的引用保留主体"
+    }
+  },
+  "stateActivityDomains": {
+    "finished/admin": {
+      "disposition": "shared",
+      "basis": "V1.3：上游独立商品状态，不随门店清理"
+    },
+    "finished/supply-chain": {
+      "disposition": "shared",
+      "basis": "V1.3：上游独立商品状态，不随门店清理"
+    },
+    "slab/admin": {
+      "disposition": "shared",
+      "basis": "V1.3：上游独立商品状态，不随门店清理"
+    },
+    "slab/supply-chain": {
+      "disposition": "shared",
+      "basis": "V1.3：上游独立商品状态，不随门店清理"
+    },
+    "accessory/admin": {
+      "disposition": "shared",
+      "basis": "V1.3：上游独立商品状态，不随门店清理"
+    },
+    "accessory/supply-chain": {
+      "disposition": "shared",
+      "basis": "V1.3：上游独立商品状态，不随门店清理"
+    },
+    "store-finished/store": {
+      "disposition": "module",
+      "basis": "V1.3：按目标门店选品标识清理混合表",
+      "parent": "store_finished_products"
+    },
+    "store-accessory/store": {
+      "disposition": "module",
+      "basis": "V1.3：按目标门店选品标识清理混合表",
+      "parent": "store_accessory_products"
+    }
+  }
+}

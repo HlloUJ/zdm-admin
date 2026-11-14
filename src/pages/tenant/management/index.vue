@@ -603,12 +603,15 @@ const handlePurge = async () => {
   if (!target || !purgePreview.value?.eligible || purgeConfirmationName.value !== target.tenantName) return;
   purgeSubmitting.value = true;
   try {
-    await purgeTenant(target.id, purgeConfirmationName.value);
+    const result = await purgeTenant(target.id, purgeConfirmationName.value, purgePreview.value.storePlans);
     tableData.value = tableData.value.filter((item) => item.id !== target.id);
     ensureCurrentPage();
     purgeSubmitting.value = false;
     closePurgeDialog();
     adminFeedback.actionSuccess({ action: '彻底删除', target: target.tenantName });
+    if (result.storeResults?.some((item) => item.cleanupStatus !== 'COMPLETE')) {
+      adminFeedback.info('经营数据已清理；门店仍有独立记录或媒体收尾事项，按原规则继续处理。');
+    }
   } catch (error) {
     purgeSubmitting.value = false;
     adminFeedback.actionError({ action: '彻底删除', target: target.tenantName, error });

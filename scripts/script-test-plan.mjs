@@ -22,6 +22,8 @@ export const ENGINEERING_EXTRA_INPUTS = [
   'ci/browser-image.lock.json',
   'ci/browser-image/package-lock.json',
   'ci/browser-image/package.json',
+  'infrastructure/store-exit-ledger/server.mjs',
+  'infrastructure/store-exit-ledger/Dockerfile',
 ];
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 function filesBelow(root, directory) {
