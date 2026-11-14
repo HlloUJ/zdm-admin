@@ -2417,12 +2417,12 @@
       "dynamicImports": 0
     },
     "scripts/task-continuity-admission.mjs": {
-      "digest": "0a99283fb17ad554f085d8f6b7d8caae6ffd7ac4792ab0e82a50371172ff2df3",
+      "digest": "3f55d5c732e7b60b5b82fe5037707470810bea47e6109395fa5f7d2ae73e71e1",
       "imports": ["scripts/task-continuity-handoff.mjs", "scripts/task-continuity.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity-admission.test.mjs": {
-      "digest": "3a8a85e0cfe74d2a9cd80104445f30537178871c197ee47dea8afeff0fdb23b1",
+      "digest": "1f1c93ee0cbee532820dece71cafb3e5ba6cc29f066658c4be59da2ff7482d98",
       "imports": ["scripts/task-continuity-admission.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },

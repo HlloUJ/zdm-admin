@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { createTaskRegistry } from './task-registry.mjs';
@@ -55,6 +56,72 @@ function developmentEvidence(registry, task, binding, sources, directories) {
     assert.equal(outcome.status, 'completed', 'Previous development effects are unknown');
   }
   return { checkpointId: checkpoint.id, checkpointNonce: checkpoint.nonce, controlRevision: revision };
+}
+
+function formalEvidence(registry, task, session, sources, directories) {
+  assert.ok(
+    task.frozen?.accepted && task.frozen?.tree && task.frozen?.businessDigest,
+    'Original frozen identity missing',
+  );
+  assert.equal(session?.version, 1, 'Original formal session required');
+  assert.equal(session.batch, task.id, 'Formal session belongs to another task');
+  assert.ok(Array.isArray(session.events) && session.events.length, 'Formal stage inventory missing');
+  assert.ok(Number.isFinite(session.startedAt), 'Formal session start missing');
+  assert.equal(new Set(session.events.map((e) => e.id)).size, session.events.length, 'Duplicate formal event identity');
+  assert.ok(!(session.pauses ?? []).some((p) => !p.finishedAt && !p.resumedAt), 'Formal task paused');
+  const directory = path.join(registry.commonDir, 'task-delivery', task.id);
+  directories.set(directory, JSON.stringify(fs.readdirSync(directory).sort()));
+  assert.ok(
+    !fs.existsSync(path.join(directory, 'completion-session.json.lock')),
+    'Formal writer requires reconciliation',
+  );
+  function absent(pid) {
+    try {
+      process.kill(pid, 0);
+    } catch (error) {
+      if (error.code === 'ESRCH') return;
+      throw error;
+    }
+    throw Error('Formal process is live or reused; preserve original execution');
+  }
+  const lastOwner = session.events.at(-1).owner;
+  assert.equal(lastOwner?.host, os.hostname(), 'Unknown latest formal owner host');
+  assert.ok(Number.isSafeInteger(lastOwner?.pid) && lastOwner.pid > 1, 'Unknown latest formal owner');
+  absent(lastOwner.pid); // A terminal stage can still be between steps of a live deliver invocation.
+  for (const event of session.events) {
+    assert.match(event.id ?? '', /^[a-f0-9-]{36}$/);
+    for (const key of ['name', 'key'])
+      assert.ok(typeof event[key] === 'string' && event[key].trim(), 'Formal event identity missing');
+    assert.ok(Number.isFinite(event.startedAt) && event.startedAt >= session.startedAt, 'Formal event start missing');
+    if (event.status !== 'running')
+      assert.ok(
+        Number.isFinite(event.finishedAt) && event.finishedAt >= event.startedAt,
+        'Formal event completion missing',
+      );
+    assert.ok(['success', 'failure', 'running'].includes(event.status), 'Unknown formal stage result');
+    if (event.status === 'running') {
+      assert.equal(event.owner?.host, os.hostname(), 'Unknown formal owner host');
+      assert.ok(Number.isSafeInteger(event.owner?.pid) && event.owner.pid > 1, 'Unknown formal owner process');
+      absent(event.owner.pid);
+    }
+    assert.equal(event.processTracking, 1, 'Legacy formal process inventory requires original owner');
+    assert.ok(Array.isArray(event.processes), 'Missing formal subprocess inventory');
+    for (const child of event.processes) {
+      assert.match(child.token ?? '', /^[a-f0-9-]{36}$/);
+      const record = read(path.join(directory, `process-${child.token}.json`), sources);
+      assert.equal(record.token, child.token);
+      assert.equal(record.host, os.hostname());
+      assert.ok(Number.isSafeInteger(record.pgid) && record.pgid > 1, 'Unknown formal process group');
+      assert.ok(['started', 'exited', 'quiescent'].includes(record.status), 'Unknown subprocess result');
+      if (record.status !== 'quiescent') absent(-record.pgid);
+    }
+  }
+  return {
+    formalSessionDigest: hash(JSON.stringify(session)),
+    formalFrozenIdentity: task.frozen,
+    effectsReconciled: false,
+    requiresOriginalFormalReconciliation: true,
+  };
 }
 
 // Read-only candidate selection. Disk metadata is never proof of a live cloud worker,
@@ -124,7 +191,8 @@ export function readContinuityAdmission(root, { now = Date.now() } = {}) {
         assert.ok(!task.previewOnly && !task.compatibility?.readOnly, 'Unsupported legacy/combined task');
         registry.validateLive(task);
         const sessionFile = path.join(registry.commonDir, 'task-delivery', task.id, 'completion-session.json');
-        if (fs.existsSync(sessionFile)) read(sessionFile, sources);
+        let formalSession;
+        if (fs.existsSync(sessionFile)) formalSession = read(sessionFile, sources);
         else absent.add(sessionFile);
         const key = fs.realpathSync(task.worktree);
         assert.ok(!seenWorktrees.has(key), 'Git execution unit already considered');
@@ -151,17 +219,18 @@ export function readContinuityAdmission(root, { now = Date.now() } = {}) {
           '',
           'Uncheckpointed changes',
         );
-        assert.equal(
-          task.stage,
-          'developing',
-          'Formal recovery effects require original runner reconciliation; no execution handoff',
-        );
-        assert.ok(!task.frozen, 'Frozen task is not ordinary development');
-        const proof = developmentEvidence(registry, task, binding, sources, directories);
+        const formal = task.stage !== 'developing' || Boolean(task.frozen);
+        const proof = formal
+          ? formalEvidence(registry, task, formalSession, sources, directories)
+          : developmentEvidence(registry, task, binding, sources, directories);
         const observation = result.observations.find((o) => o.task === taskId);
         assert.ok(!observation?.verification?.length, 'Legacy verification effects unresolved');
         assert.ok(
-          observation && ['unobserved', 'awaiting-continuation'].includes(observation.status),
+          observation &&
+            (formal
+              ? ['interrupted', 'blocked', 'awaiting-continuation']
+              : ['unobserved', 'awaiting-continuation']
+            ).includes(observation.status),
           'Prior stage or effects unresolved',
         );
         const [event] = continuityHandoffs(
@@ -175,7 +244,7 @@ export function readContinuityAdmission(root, { now = Date.now() } = {}) {
           ...event,
           ...proof,
           taskStableIds: aliases.map((a) => a.taskStableId),
-          action: 'verify-original-worker-and-effects-only',
+          action: formal ? 'inspect-original-formal-owner-only' : 'verify-original-worker-and-effects-only',
           canExecute: false,
           requiresIndependentRootVerification: true,
           interruptionProven: false,
