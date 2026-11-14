@@ -497,8 +497,9 @@ test('page loading stays centered above content and disappears after the request
   expect(box!.x).toBe(0);
   expect(box!.y).toBe(0);
   const viewport = await page.evaluate(() => ({
-    width: document.documentElement.clientWidth,
-    height: document.documentElement.clientHeight,
+    // The root border box excludes the stable classic-scrollbar gutter on Linux.
+    width: document.documentElement.getBoundingClientRect().width,
+    height: document.documentElement.getBoundingClientRect().height,
   }));
   console.log(
     'GEOMETRY',
@@ -571,7 +572,7 @@ for (const width of [1440, 1024, 640]) {
     const drawer = page.locator('.t-drawer--open');
     await expect(drawer.getByText('基础信息', { exact: true })).toBeVisible();
     const content = drawer.locator('.t-drawer__content-wrapper');
-    const layoutWidth = await page.evaluate(() => document.documentElement.clientWidth);
+    const layoutWidth = await page.evaluate(() => document.documentElement.getBoundingClientRect().width);
     console.log(
       'DRAWER_GEOMETRY',
       await page.evaluate(() => ({
