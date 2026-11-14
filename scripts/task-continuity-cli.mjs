@@ -5,12 +5,19 @@ import path from 'node:path';
 import { setTimeout } from 'node:timers/promises';
 import { collectTaskContinuity, notifyContinuityChanges } from './task-continuity.mjs';
 
-const args = process.argv.slice(2);
-assert.ok(
-  args.every((a) => ['--once', '--watch', '--notify'].includes(a)),
-  'Use --once or --watch [--notify]',
-);
+const args = process.argv.slice(2),
+  selected = [];
+for (let index = 0; index < args.length; index++) {
+  const arg = args[index];
+  if (arg === '--task') {
+    const id = args[++index];
+    assert.match(id ?? '', /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    selected.push(id);
+  } else
+    assert.ok(['--once', '--watch', '--notify'].includes(arg), 'Use --once or --watch [--task exact-id] [--notify]');
+}
 assert.equal(args.filter((a) => ['--once', '--watch'].includes(a)).length, 1);
+assert.ok(!args.includes('--notify') || selected.length, 'Notification requires explicit task scope');
 const root = realpathSync(process.cwd());
 const directory = path.join(root, '.task-runtime', 'continuity-observer');
 mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -20,7 +27,7 @@ process.once('SIGTERM', () => controller.abort());
 process.once('SIGINT', () => controller.abort());
 do {
   const observedAt = new Date().toISOString();
-  const tasks = collectTaskContinuity(root);
+  const tasks = collectTaskContinuity(root).filter((task) => !selected.length || selected.includes(task.task));
   const snapshot = { version: 1, observedAt, readOnly: true, automaticResumptionEnabled: false, tasks };
   const temporary = path.join(directory, `snapshot-${randomUUID()}.json`);
   writeFileSync(temporary, JSON.stringify(snapshot, null, 2) + '\n', { flag: 'wx', mode: 0o600 });

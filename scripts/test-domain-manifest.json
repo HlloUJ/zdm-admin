@@ -1593,6 +1593,16 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-continuity-board.mjs": {
+      "digest": "361e4a5cf01003c0804dfd00fb6319beaead3272274b65412e1cca0579137569",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-board.test.mjs": {
+      "digest": "8725988ba6746cc682e1189e5852ecd55ab17b39e406ef789ae99d0efd1e8c39",
+      "imports": ["scripts/task-continuity-board.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-continuity-ci.mjs": {
       "digest": "af5c10856c6e893b95fa073f98b9aab23135cb2bb3cfdaaf8590e542ec513d92",
       "imports": ["scripts/task-continuity.mjs", "scripts/task-entry.mjs", "scripts/task-registry.mjs"],
@@ -1604,7 +1614,7 @@
       "dynamicImports": 0
     },
     "scripts/task-continuity-cli.mjs": {
-      "digest": "8052c5826989461c1135973661ac0b35255cc7aaee275369f7ba381cab578d7d",
+      "digest": "578835856e22a35b3a74b42d653e7dd5a11c4b8c75ac60d3bea2c1b3467b673f",
       "imports": ["scripts/task-continuity.mjs"],
       "dynamicImports": 0
     },
