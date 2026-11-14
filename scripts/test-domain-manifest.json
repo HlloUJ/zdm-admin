@@ -1618,8 +1618,8 @@
       "dynamicImports": 0
     },
     "scripts/task-continuity-cli.mjs": {
-      "digest": "87d5f3ed93a7633908966fa048bb19565560ff3fdccab4b73c2893a5fc548961",
-      "imports": ["scripts/task-continuity.mjs"],
+      "digest": "12813ce77ac04290021837b508a982628a5671b184c3e9a763e139eb118a0a70",
+      "imports": ["scripts/task-continuity-admission.mjs", "scripts/task-continuity.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity-handoff.mjs": {
@@ -2414,6 +2414,30 @@
     "vite.e2e.config.mjs": {
       "digest": "63bf7811ae45bde932675d5992835c8025354966443b620e02f67f1888ce0ef4",
       "imports": ["scripts/e2e-app.mjs", "vite.config.js"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-admission.mjs": {
+      "digest": "0a99283fb17ad554f085d8f6b7d8caae6ffd7ac4792ab0e82a50371172ff2df3",
+      "imports": ["scripts/task-continuity-handoff.mjs", "scripts/task-continuity.mjs", "scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-admission.test.mjs": {
+      "digest": "3a8a85e0cfe74d2a9cd80104445f30537178871c197ee47dea8afeff0fdb23b1",
+      "imports": ["scripts/task-continuity-admission.mjs", "scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-enrollment.mjs": {
+      "digest": "675cea828f3948f81a5030e7180a947c7de45d4448cb371ef844449c47d9f982",
+      "imports": ["scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-continuity-enrollment.test.mjs": {
+      "digest": "e420be08a0a59a047b2613fa9a351f3bc9c6f0b936e165801fb09beb93d4c2ec",
+      "imports": [
+        "scripts/task-continuity-enrollment.mjs",
+        "scripts/task-development-recovery.mjs",
+        "scripts/task-registry.mjs"
+      ],
       "dynamicImports": 0
     }
   }
