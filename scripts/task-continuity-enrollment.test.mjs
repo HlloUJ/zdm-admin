@@ -5,7 +5,6 @@ import path from 'node:path';
 import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { createTaskRegistry } from './task-registry.mjs';
-import { createDevelopmentCheckpoint } from './task-development-recovery.mjs';
 import {
   readEnrollmentSnapshot,
   requestContinuityEnrollment,
@@ -175,7 +174,7 @@ test('dirty work cannot be enrolled as an exact checkpoint', () => {
   const expectedSnapshot = readEnrollmentSnapshot(f.root, { taskId: f.input.taskId });
   assert.throws(() => requestContinuityEnrollment(f.root, { ...f.input, expectedSnapshot }));
 });
-test('changed control and forged receipt fields fail closed', () => {
+test('changed completion and forged receipt fields fail closed', () => {
   for (const key of ['owner', 'worker', 'authorizationRef', 'rootThreadId', 'snapshotDigest']) {
     const f = fixture();
     const expectedSnapshot = readEnrollmentSnapshot(f.root, { taskId: f.input.taskId });
@@ -193,9 +192,12 @@ test('changed control and forged receipt fields fail closed', () => {
   const f = fixture();
   const expectedSnapshot = readEnrollmentSnapshot(f.root, { taskId: f.input.taskId });
   const request = requestContinuityEnrollment(f.root, { ...f.input, expectedSnapshot });
-  const controls = path.join(f.registry.commonDir, 'task-development-recovery', f.input.taskId);
-  fs.mkdirSync(controls, { recursive: true });
-  fs.writeFileSync(path.join(controls, 'control-0.json'), JSON.stringify({ paused: true, revision: 0 }));
+  const completion = path.join(f.registry.commonDir, 'task-delivery', f.input.taskId);
+  fs.mkdirSync(completion, { recursive: true });
+  fs.writeFileSync(
+    path.join(completion, 'completion-session.json'),
+    JSON.stringify({ version: 1, batch: f.input.taskId, events: [], pauses: [{ startedAt: Date.now() }] }),
+  );
   process.env.CODEX_THREAD_ID = rootOwner;
   assert.throws(() =>
     acceptContinuityEnrollment(f.root, { requestId: request.id, expectedSnapshot, platformReceipt: receipt(request) }),
@@ -203,25 +205,26 @@ test('changed control and forged receipt fields fail closed', () => {
   process.env.CODEX_THREAD_ID = owner;
 });
 
-test('optional ordinary checkpoint is read and preserved, never fabricated', () => {
+test('enrollment remains observation-only without any execution capability fields', () => {
   const f = fixture();
-  const checkpoint = createDevelopmentCheckpoint(f.root, { ...f.input, nextStep: 'Isolated validation only' });
   const expectedSnapshot = readEnrollmentSnapshot(f.root, { taskId: f.input.taskId });
-  assert.throws(() =>
-    requestContinuityEnrollment(f.root, {
-      ...f.input,
-      checkpointId: '00000000-0000-0000-0000-000000000000',
-      expectedSnapshot,
-    }),
-  );
-  const request = requestContinuityEnrollment(f.root, { ...f.input, checkpointId: checkpoint.id, expectedSnapshot });
+  const request = requestContinuityEnrollment(f.root, { ...f.input, expectedSnapshot });
   process.env.CODEX_THREAD_ID = rootOwner;
   const result = acceptContinuityEnrollment(f.root, {
     requestId: request.id,
     expectedSnapshot,
     platformReceipt: receipt(request),
   });
-  assert.equal(result.binding.checkpointId, checkpoint.id);
+  assert.equal(result.binding.enrollmentScope, 'observe-only');
+  assert.equal(result.binding.observationOnly, true);
   assert.equal(result.binding.resumeAllowed, false);
+  assert.equal(result.businessExecutions, 0);
+  assert.equal(result.pauseStateChanged, false);
+  assert.deepEqual(Object.keys(expectedSnapshot.inputs).sort(), [
+    'activation-receipt.json',
+    'bindings.candidate.json',
+    'completion',
+    'controlled-recovery-policy.json',
+  ]);
   process.env.CODEX_THREAD_ID = owner;
 });

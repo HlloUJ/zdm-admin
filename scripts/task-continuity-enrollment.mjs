@@ -70,22 +70,6 @@ function snapshot(root, taskId) {
   assert.equal(policy.rootThreadId, bindings.rootThreadId);
   assert.equal(activation.rootThreadId, bindings.rootThreadId);
   assert.equal(policy.roomId, bindings.roomId);
-  const controls = path.join(registry.commonDir, 'task-development-recovery', taskId);
-  safe(controls);
-  const controlFiles = fs.existsSync(controls)
-    ? fs
-        .readdirSync(controls)
-        .filter((n) => /^control-\d+\.json$/.test(n))
-        .sort()
-    : [];
-  for (const name of controlFiles) inputs['control/' + name] = bytes(path.join(controls, name));
-  const checkpointFiles = fs.existsSync(controls)
-    ? fs
-        .readdirSync(controls)
-        .filter((n) => /^checkpoint-[a-f0-9-]{36}\.json$/.test(n))
-        .sort()
-    : [];
-  for (const name of checkpointFiles) inputs['checkpoint/' + name] = bytes(path.join(controls, name));
   inputs.completion = bytes(path.join(registry.commonDir, 'task-delivery', taskId, 'completion-session.json'), true);
   const head = execFileSync('git', ['-C', task.worktree, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const worktreeStatus = execFileSync('git', ['-C', task.worktree, 'status', '--porcelain'], { encoding: 'utf8' });
@@ -101,17 +85,8 @@ function exact(current, expected) {
   assert.deepEqual(current, expected, 'Exact full snapshot required');
 }
 export function requestContinuityEnrollment(root, options) {
-  const {
-    taskId,
-    worker,
-    rootThreadId,
-    authorizationRef,
-    taskStableId,
-    taskNumber,
-    taskName,
-    expectedSnapshot,
-    checkpointId,
-  } = options;
+  const { taskId, worker, rootThreadId, authorizationRef, taskStableId, taskNumber, taskName, expectedSnapshot } =
+    options;
   const current = snapshot(root, taskId);
   exact(current, expectedSnapshot);
   assert.equal(process.env.CODEX_THREAD_ID, current.task.owner, 'Original runtime owner required');
@@ -127,24 +102,6 @@ export function requestContinuityEnrollment(root, options) {
     assert.ok(typeof field === 'string' && field.trim(), 'Explicit enrollment binding required');
   assert.equal(JSON.parse(current.inputs['bindings.candidate.json']).rootThreadId, rootThreadId);
   assert.equal(current.head, current.task.recordedHead, 'Official code checkpoint required');
-  if (checkpointId !== undefined) {
-    assert.match(checkpointId, /^[a-f0-9-]{36}$/);
-    const raw = current.inputs[`checkpoint/checkpoint-${checkpointId}.json`];
-    assert.ok(raw, 'Original development checkpoint required');
-    const checkpoint = JSON.parse(raw);
-    assert.equal(checkpoint.version, 1);
-    assert.equal(checkpoint.id, checkpointId);
-    for (const [key, value] of Object.entries({
-      taskId,
-      owner: current.task.owner,
-      worker,
-      rootThreadId,
-      authorizationRef,
-      head: current.head,
-      registryRevision: current.task.revision,
-    }))
-      assert.equal(checkpoint[key], value, 'Exact original development checkpoint binding required');
-  }
   const { directory } = context(root, taskId),
     requests = path.join(directory, 'enrollment-requests');
   safe(requests);
@@ -161,7 +118,6 @@ export function requestContinuityEnrollment(root, options) {
     taskStableId,
     taskNumber,
     taskName,
-    ...(checkpointId === undefined ? {} : { checkpointId }),
     snapshot: current,
     createdAt: Date.now(),
     observationOnly: true,
@@ -246,10 +202,7 @@ export function acceptContinuityEnrollment(root, { requestId, expectedSnapshot, 
     authorization: request.authorizationRef,
     authorizationRef: request.authorizationRef,
     head: current.head,
-    ...(request.checkpointId === undefined ? {} : { checkpointId: request.checkpointId }),
-    developmentCheckpointVerified: request.checkpointId !== undefined,
-    enrollmentScope:
-      request.checkpointId === undefined ? 'observe-only-no-development-checkpoint' : 'observe-only-checkpoint-bound',
+    enrollmentScope: 'observe-only',
     runtimeOwnerVerified: true,
     observationOnly: true,
     resumeAllowed: false,

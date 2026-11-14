@@ -105,3 +105,40 @@ test('start parser rejects unknown options and never accepts implicit preview sw
   assert.throws(() => parseTaskStart(['--slug', '../other']), /match/);
   assert.equal(parseTaskStart(['--slug', 'a', '--owner', 'chat-a']).slug, 'a');
 });
+test('new task creation atomically records complete monitoring context without backfilling old tasks', (t) => {
+  const f = fixture(t),
+    owner = process.env.CODEX_THREAD_ID;
+  assert.ok(owner, 'Real runtime identity required in this integration test');
+  const context = {
+    taskNumber: 'fixture-284',
+    taskName: '隔离登记验收',
+    taskStableId: 'fixture-only',
+    worker: '/root/implement_recovery',
+    rootThreadId: 'fixture-root',
+    roomId: 'fixture-room',
+    authorizationRef: 'fixture-only',
+  };
+  const result = startParallelTask(
+    { ...options('monitored', f.parent), owner, monitorContext: context },
+    { root: f.root },
+  );
+  const saved = f.registry.readTask('monitored');
+  assert.equal(saved.monitoring.state, 'registered');
+  assert.equal(saved.monitoring.owner, owner);
+  assert.equal(saved.monitoring.taskName, context.taskName);
+  assert.equal(saved.monitoring.automaticResumptionEnabled, false);
+  assert.equal(result.task.monitoring.registeredAt, saved.monitoring.registeredAt);
+  assert.equal(
+    parseTaskStart(['--slug', 'new', '--monitor-context', JSON.stringify(context)]).monitorContext.roomId,
+    'fixture-room',
+  );
+  assert.throws(
+    () =>
+      startParallelTask(
+        { ...options('bad', f.parent), owner, monitorContext: { ...context, roomId: '' } },
+        { root: f.root },
+      ),
+    /Missing monitoring roomId/,
+  );
+  assert.equal(existsSync(path.join(f.parent, 'bad')), false);
+});
