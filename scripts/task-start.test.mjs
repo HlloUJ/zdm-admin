@@ -1,3 +1,5 @@
+import { collectTaskProgress } from './task-progress-collector.mjs';
+import { executionOrderCommand } from './task-execution-order-cli.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -7,6 +9,12 @@ import path from 'node:path';
 import { startParallelTask, parseTaskStart } from './task-start.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 function fixture(t) {
+  const priorOwner = process.env.CODEX_THREAD_ID;
+  process.env.CODEX_THREAD_ID = priorOwner ?? 'isolated-start-fixture';
+  t.after(() => {
+    if (priorOwner === undefined) delete process.env.CODEX_THREAD_ID;
+    else process.env.CODEX_THREAD_ID = priorOwner;
+  });
   const scratch = path.join(process.cwd(), '.task-runtime/start-fixtures');
   mkdirSync(scratch, { recursive: true });
   const dir = mkdtempSync(path.join(scratch, 'task-')),
@@ -35,10 +43,20 @@ function fixture(t) {
   git(root, 'push', '-u', 'origin', 'main');
   return { dir, root, parent, git, registry: createTaskRegistry(root) };
 }
+const context = (slug) => ({
+  taskNumber: '460',
+  taskName: 'isolated fixture',
+  taskStableId: slug,
+  worker: '/root/fixture',
+  rootThreadId: 'fixture-root',
+  roomId: 'fixture-room',
+  authorizationRef: 'fixture-message',
+});
 const options = (slug, parent) => ({
   slug,
   kind: 'business',
-  owner: 'chat-' + slug,
+  owner: process.env.CODEX_THREAD_ID,
+  monitorContext: context(slug),
   taskParent: parent,
   resume: false,
 });
@@ -118,7 +136,7 @@ test('new task creation atomically records complete monitoring context without b
   const context = {
     taskNumber: 'fixture-284',
     taskName: '隔离登记验收',
-    taskStableId: 'fixture-only',
+    taskStableId: 'monitored',
     worker: '/root/implement_recovery',
     rootThreadId: 'fixture-root',
     roomId: 'fixture-room',
@@ -141,10 +159,143 @@ test('new task creation atomically records complete monitoring context without b
   assert.throws(
     () =>
       startParallelTask(
-        { ...options('bad', f.parent), owner, monitorContext: { ...context, roomId: '' } },
+        { ...options('bad', f.parent), owner, monitorContext: { ...context, taskStableId: 'bad', roomId: '' } },
         { root: f.root },
       ),
     /Missing monitoring roomId/,
   );
   assert.equal(existsSync(path.join(f.parent, 'bad')), false);
+});
+
+test('missing, malformed and mismatched monitoring is refused before worktree or resource effects', (t) => {
+  const f = fixture(t);
+  const before = f.git(f.root, 'worktree', 'list', '--porcelain');
+  for (const monitorContext of [
+    undefined,
+    null,
+    {},
+    { ...context('a'), taskStableId: 'other' },
+    { ...context('a'), worker: 'invented' },
+  ]) {
+    assert.throws(() =>
+      startParallelTask(
+        { ...options('a', f.parent), monitorContext },
+        { root: f.root, git: () => assert.fail('no mutation') },
+      ),
+    );
+    assert.equal(f.git(f.root, 'worktree', 'list', '--porcelain'), before);
+    assert.equal(existsSync(path.join(f.parent, 'a')), false);
+    assert.equal(f.registry.readTask('a'), null);
+  }
+});
+test('formal claim preflight refuses missing context without taking a development slot', (t) => {
+  const f = fixture(t);
+  const command = (name, input) => executionOrderCommand(f.root, [name, JSON.stringify(input)]);
+  const request = (sequence) => ({
+    sequence,
+    messageId: 'fixture-' + sequence,
+    roomId: 'fixture-room',
+    authorId: 'fixture-user',
+  });
+  command('initialize', request(1));
+  command('direct', { action: 'resume-all', request: request(2) });
+  const input = { lane: 'development', task: 'a', owner: process.env.CODEX_THREAD_ID };
+  command('enqueue', { ...input, request: request(3) });
+  const before = executionOrderCommand(f.root, ['status']);
+  for (const monitorContext of [undefined, { ...context('a'), taskStableId: 'other' }]) {
+    assert.throws(() => command('claim', { ...input, monitorContext }), /monitor-context|taskStableId/);
+    assert.deepEqual(executionOrderCommand(f.root, ['status']), before);
+    assert.equal(existsSync(path.join(f.parent, 'a')), false);
+  }
+  const validContext = { ...context('a'), authorizationRef: 'fixture-3' };
+  for (const monitorContext of [
+    { ...validContext, roomId: 'wrong-room' },
+    { ...validContext, authorizationRef: 'fixture-2' },
+  ]) {
+    assert.throws(() => command('claim', { ...input, monitorContext }), /original instruction/);
+    assert.deepEqual(executionOrderCommand(f.root, ['status']), before);
+  }
+  const ticket = command('claim', { ...input, monitorContext: validContext });
+  assert.equal(ticket.status, 'running');
+  const priorAdmission = process.env.ZDM_EXECUTION_ADMISSION;
+  process.env.ZDM_EXECUTION_ADMISSION = ticket.admission;
+  t.after(() => {
+    if (priorAdmission === undefined) delete process.env.ZDM_EXECUTION_ADMISSION;
+    else process.env.ZDM_EXECUTION_ADMISSION = priorAdmission;
+  });
+  const claimed = executionOrderCommand(f.root, ['status']);
+  assert.throws(
+    () =>
+      startParallelTask(
+        { ...options('a', f.parent), monitorContext: { ...validContext, worker: '/root/other' } },
+        { root: f.root },
+      ),
+    /differs from the claimed admission/,
+  );
+  assert.deepEqual(executionOrderCommand(f.root, ['status']), claimed);
+  assert.equal(existsSync(path.join(f.parent, 'a')), false);
+  const started = startParallelTask({ ...options('a', f.parent), monitorContext: validContext }, { root: f.root });
+  assert.equal(started.task.monitoring.authorizationRef, 'fixture-3');
+});
+test('successful start is readable by the unchanged progress collector', (t) => {
+  const f = fixture(t);
+  startParallelTask(options('a', f.parent), { root: f.root });
+  const reports = collectTaskProgress(f.root);
+  assert.equal(reports.length, 1);
+  assert.equal(reports[0].task, 'a');
+  assert.equal(reports[0].taskStableId, 'a');
+  assert.equal(reports[0].taskNumber, '460');
+  assert.notEqual(reports[0].status, 'registration-incomplete');
+});
+test('readback failure never prepares or replays creation; existing registration is recovered read-only', (t) => {
+  const f = fixture(t);
+  const read = f.registry.readTask;
+  let registered = false,
+    writes = 0;
+  const register = f.registry.register;
+  f.registry.register = (input) => {
+    writes++;
+    const result = register(input);
+    registered = true;
+    return result;
+  };
+  f.registry.readTask = (id) => {
+    if (registered) throw Error('injected readback outage');
+    return read(id);
+  };
+  assert.throws(
+    () =>
+      startParallelTask(options('a', f.parent), {
+        root: f.root,
+        registry: f.registry,
+        prepare: () => assert.fail('must not execute before readback'),
+      }),
+    /readback outage/,
+  );
+  assert.equal(writes, 1);
+  assert.ok(read('a').monitoring.state === 'registered');
+  f.registry.readTask = read;
+  const resumed = startParallelTask(options('a', f.parent), {
+    root: f.root,
+    registry: f.registry,
+    git: () => assert.fail('do not replay'),
+  });
+  assert.equal(resumed.resumed, true);
+  assert.equal(writes, 1);
+});
+
+test('existing registered carrier preserves its explicit different board stable ID on resume', (t) => {
+  const f = fixture(t);
+  const result = startParallelTask(options('a', f.parent), { root: f.root });
+  const recordFile = path.join(f.registry.directory, 'tasks/a.json');
+  const saved = f.registry.readTask('a');
+  saved.monitoring.taskStableId = 'original-board-task';
+  writeFileSync(recordFile, JSON.stringify(saved)); // Isolated fixture simulates an existing supported binding.
+  const resumed = startParallelTask(
+    { ...options('a', f.parent), monitorContext: { ...context('a'), taskStableId: 'original-board-task' } },
+    { root: f.root, git: () => assert.fail('resume is read-only') },
+  );
+  assert.equal(resumed.resumed, true);
+  assert.equal(resumed.task.worktree, result.task.worktree);
+  assert.equal(resumed.task.monitoring.taskStableId, 'original-board-task');
 });
