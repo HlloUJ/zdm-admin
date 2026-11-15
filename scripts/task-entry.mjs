@@ -7,6 +7,7 @@ import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs
 
 const entries = {
   start: 'scripts/task-start.mjs',
+  'execution-order': 'scripts/task-execution-order-cli.mjs',
   registry: 'scripts/task-registry.mjs',
   preview: 'scripts/task-preview.mjs',
   data: 'scripts/task-data-scope.mjs',
@@ -31,7 +32,7 @@ export function publishedTaskEntry(root, args) {
   const [command, ...rest] = args;
   assert.ok(
     entries[command],
-    'task:entry [--worktree <exact path>] <start|registry|preview|data|work|complete|check|temporary|combination> [args]',
+    'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination> [args]',
   );
   const registry = createTaskRegistry(root),
     targetRegistry = createTaskRegistry(target);
@@ -63,7 +64,7 @@ export function publishedTaskEntry(root, args) {
 export function main(root = process.cwd(), args = process.argv.slice(2)) {
   if (args.includes('--help')) {
     console.log(
-      'task:entry [--worktree <exact path>] <start|registry|preview|data|work|complete|check|temporary|combination> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
+      'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
     );
     return;
   }

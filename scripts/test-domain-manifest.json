@@ -3,7 +3,7 @@
   "sourceGuards": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
   "files": {
     ".codex/zdm-project-workflow.yaml": {
-      "digest": "600754a6384e748a97f589bc999d2e6d046703695e6e31a0a28d1b12dbe83a0a",
+      "digest": "3d90822c39e214906c99eb2dffc6d0185c3094deb1ddbe4c669e8243b7a77030",
       "imports": [],
       "dynamicImports": 0
     },
@@ -460,7 +460,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "e6d068b8071ed8edc2fe84fa092b51ff9600257a9e0bd482d7dca60b4891cb7e",
+      "digest": "c88626ee712bb3c337e4b794e55544db5f6767e0ec97ca06818bb96e09fa5479",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -481,6 +481,7 @@
         "scripts/task-completion.mjs",
         "scripts/task-context.mjs",
         "scripts/task-dependency-retention.mjs",
+        "scripts/task-execution-order.mjs",
         "scripts/task-registry.mjs",
         "scripts/task-runtime-references.mjs",
         "scripts/wait-quality.mjs"
@@ -1716,7 +1717,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "1d0a85d1b21a9015c5de5aad905c6e8e93fb6f7390ae957b3db15fcc7259e0b8",
+      "digest": "bbd65fe0b4c2e63ba0450dc922b5a179828f3b83a7b1f94253fbb57266e0f13c",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/task-completion.mjs",
@@ -1737,6 +1738,26 @@
         "scripts/task-batch.mjs",
         "scripts/task-entry.mjs",
         "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-execution-order-cli.mjs": {
+      "digest": "5198f93adb9948903ade86d351e510e8466b65778898027a0e09db02e8498222",
+      "imports": ["scripts/completion-status.mjs", "scripts/task-execution-order.mjs", "scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-execution-order.mjs": {
+      "digest": "38ce1fd63898e601f679a102b5b90622ae31444740db36b1b664003eac3c297f",
+      "imports": ["scripts/task-registry.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-execution-order.test.mjs": {
+      "digest": "b2838b0f8ad4704c821552f9e360ab8fc93784c1f5f7be5e583f4234de1937c1",
+      "imports": [
+        "scripts/completion-cli.mjs",
+        "scripts/task-entry.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-start.mjs"
       ],
       "dynamicImports": 0
     },
@@ -1939,11 +1960,12 @@
       "dynamicImports": 0
     },
     "scripts/task-start.mjs": {
-      "digest": "73f55e2819567ed2901f3a24ef329e2729e044924f719ec3c2cc88f7f4d6e234",
+      "digest": "3ac01478eb784d712e10a47c67fc4c1a8fa9fec140a4e587757e055946a3c3c8",
       "imports": [
         "scripts/batch-timing-store.mjs",
         "scripts/resource-lease.mjs",
         "scripts/task-artifacts.mjs",
+        "scripts/task-execution-order.mjs",
         "scripts/task-monitor-registration.mjs",
         "scripts/task-registry.mjs"
       ],
@@ -2129,16 +2151,6 @@
       ],
       "dynamicImports": 0
     },
-    "scripts/verification-process-identity.mjs": {
-      "digest": "cbd87e07fae6a4b953eed337ba70328c25587c11c91ed39845f14bd4628170f1",
-      "imports": [],
-      "dynamicImports": 0
-    },
-    "scripts/verification-process-identity.test.mjs": {
-      "digest": "187f10b34d05f37eca6222ce1cae6a98b30f356f41b858859fea54a36523b94f",
-      "imports": ["scripts/verification-process-identity.mjs"],
-      "dynamicImports": 0
-    },
     "scripts/verification-process-lifecycle.mjs": {
       "digest": "8de67cc87707aef0ba4138d522a3d9881c86db0f5352a2bf642355275c6880cd",
       "imports": ["scripts/completion-process.mjs", "scripts/verification-process-identity.mjs"],
@@ -2214,6 +2226,16 @@
     "vite.e2e.config.mjs": {
       "digest": "63bf7811ae45bde932675d5992835c8025354966443b620e02f67f1888ce0ef4",
       "imports": ["scripts/e2e-app.mjs", "vite.config.js"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-process-identity.mjs": {
+      "digest": "cbd87e07fae6a4b953eed337ba70328c25587c11c91ed39845f14bd4628170f1",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/verification-process-identity.test.mjs": {
+      "digest": "187f10b34d05f37eca6222ce1cae6a98b30f356f41b858859fea54a36523b94f",
+      "imports": ["scripts/verification-process-identity.mjs"],
       "dynamicImports": 0
     }
   }
