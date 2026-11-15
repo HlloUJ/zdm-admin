@@ -1,3 +1,4 @@
+import { captureCompletionProgress } from './task-delivery-status-sync.mjs';
 import { completionDirectory, processScope } from './completion-process.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -47,6 +48,7 @@ export function saveCompletion(directory, state) {
   const file = path.join(directory, 'completion-session.json'),
     lock = file + '.lock';
   assert.ok(!existsSync(file) || !lstatSync(file).isSymbolicLink(), 'Linked completion state');
+  let previous = null;
   let held = false;
   for (let attempt = 0; attempt < 100; attempt++) {
     try {
@@ -62,6 +64,7 @@ export function saveCompletion(directory, state) {
   try {
     if (existsSync(file)) {
       const disk = JSON.parse(readFileSync(file, 'utf8'));
+      previous = structuredClone(disk);
       assert.equal(disk.batch, state.batch);
       assert.equal(disk.version, state.version);
       const merge = (old, incoming, key) => {
@@ -95,12 +98,23 @@ export function saveCompletion(directory, state) {
     const pending = file + '.' + randomUUID() + '.tmp';
     writeFileSync(pending, JSON.stringify(state, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     renameSync(pending, file);
+    try {
+      captureCompletionProgress(directory, state, previous);
+    } catch (error) {
+      console.error('Progress capture failed; original completion retained: ' + error.message);
+    }
   } finally {
     unlinkSync(lock);
   }
 }
 
-export async function completionStage(state, name, key, run, { now = Date.now, save = () => {}, reuse } = {}) {
+export async function completionStage(
+  state,
+  name,
+  key,
+  run,
+  { now = Date.now, save = () => {}, reuse, progressNext } = {},
+) {
   assert.ok(
     [
       'ci',
@@ -133,6 +147,7 @@ export async function completionStage(state, name, key, run, { now = Date.now, s
     key,
     startedAt: now(),
     status: 'running',
+    ...(progressNext ? { next: progressNext } : {}),
     processTracking: 1,
     processes: [],
     owner: { host: os.hostname(), pid: process.pid },
