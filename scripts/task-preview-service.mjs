@@ -28,6 +28,7 @@ import { inspectPreviewConsumers, readPreviewResponse, temporaryPreviewLeases } 
 
 export const PREVIEW_RUNTIME_MODULES = Object.freeze([
   'task-registry.mjs',
+  'task-monitor-registration.mjs',
   'resource-lease.mjs',
   'preview-transition.mjs',
   'preview-target.mjs',
