@@ -1,3 +1,4 @@
+import { createExecutionOrder } from './task-execution-order.mjs';
 import { monitoringRegistration } from './task-monitor-registration.mjs';
 import { prepareTaskArtifacts } from './task-artifacts.mjs';
 import { tmpdir } from 'node:os';
@@ -81,6 +82,14 @@ export function startParallelTask(
     typeof owner === 'string' && owner.trim(),
     'Explicit task owner required when execution identity is unavailable',
   );
+  // The explicit root-thread receipt/claim precedes worktree creation or restoration.
+  const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;
+  createExecutionOrder(registry.commonDir).assertAdmission({
+    lane: 'development',
+    task: orderedTask,
+    owner,
+    admission: process.env.ZDM_EXECUTION_ADMISSION,
+  });
   if (!options.slug) {
     const task = registry.resolve({ worktree: root });
     assert.equal(task.owner, owner, 'Another owner controls this task');
