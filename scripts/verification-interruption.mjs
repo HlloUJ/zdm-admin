@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { lstatSync, readFileSync, realpathSync, existsSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
-import { inspectProcess } from './task-resource-runner.mjs';
+import { inspectProcess } from './verification-process-identity.mjs';
 const hash = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const readRegular = (file) => {
   assert.ok(lstatSync(file).isFile() && !lstatSync(file).isSymbolicLink(), 'Regular evidence file required');
