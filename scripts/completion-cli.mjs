@@ -1,3 +1,4 @@
+import { createExecutionOrder } from './task-execution-order.mjs';
 import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
 import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
@@ -617,6 +618,19 @@ export async function completionCommand(root, args, options = {}) {
     ? args[1]
     : null;
   const task = explicit ? registry.readTask(explicit) : selectedTaskBatch(root);
+  const orderReadOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
+  // Before private-lease recovery, freeze, automatic session restoration, or any external effect.
+  // Even legacy/unregistered mutation is denied when the explicit policy is active.
+  const executionOrder = createExecutionOrder(registry.commonDir);
+  if (!orderReadOnly && executionOrder.read()) {
+    assert.ok(task, 'No registered execution-order task; do not adopt legacy work');
+    executionOrder.assertAdmission({
+      lane: 'delivery',
+      task: task.id,
+      owner: options.owner ?? process.env.CODEX_THREAD_ID,
+      admission: process.env.ZDM_EXECUTION_ADMISSION,
+    });
+  }
   if (task) {
     assert.ok(!task.previewOnly, 'Temporary combined previews cannot enter formal completion');
     assert.ok(!task.compatibility?.readOnly, 'Legacy frozen task remains on its reviewed recovery path');

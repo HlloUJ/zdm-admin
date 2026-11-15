@@ -153,3 +153,16 @@ delivery:
   reviewed_launcher_candidate:
     cwd: task_worktree
     run: 'node scripts/delivery-launcher.mjs sync --task "{task_branch}" --reviewed-candidate "{task_head}"'
+
+# Task-level admission is explicit, distinct from the final main mutation queue.
+execution_order:
+  policy: docs/engineering/task-execution-order.md
+  registry: git-common-dir/task-registry/execution-order/state.json
+  lanes:
+    development: 3
+    delivery: 3
+  ordering: explicit-user-receipt-fifo
+  blocked_slot: retained
+  activation: explicit-initialize-paused
+  automatic_dispatch: false
+  command: npm run task:entry -- execution-order
