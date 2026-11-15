@@ -6,6 +6,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
+import { verifyCancellation } from './task-cancellation-proof.mjs';
 import { deliveryStatus } from './completion-status.mjs';
 
 const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -56,6 +57,15 @@ export function executionOrderCommand(root, [command, json]) {
   if (command === 'claim') return queue.claim(input);
   if (command === 'block') return queue.block(input);
   if (command === 'direct') return queue.direct(input);
+  if (command === 'cancel-plan') {
+    const target = queue.cancellationTarget(input);
+    const proof = verifyCancellation(registry, target);
+    assert.deepEqual(queue.cancellationTarget(input), target, 'Cancellation target changed during plan');
+    return { dryRun: true, cancelled: false, futureAuthorization: false, proof };
+  }
+  if (command === 'cancel') {
+    return queue.cancel(input, (ticket) => verifyCancellation(registry, ticket));
+  }
   if (command === 'complete') {
     const task = registry.readTask(input.task);
     assert.ok(task && task.owner === input.owner, 'Original registered owner required');
@@ -68,7 +78,7 @@ export function executionOrderCommand(root, [command, json]) {
       return true;
     });
   }
-  throw new Error('execution-order <status|initialize|enqueue|claim|block|direct|complete> [json]');
+  throw new Error('execution-order <status|initialize|enqueue|claim|block|direct|complete|cancel|cancel-plan> [json]');
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
