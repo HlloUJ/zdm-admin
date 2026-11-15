@@ -48,6 +48,8 @@
 
 ## 独立任务与预览
 
+- 已批准的任务级双 FIFO 执行顺序及其正式入口/平台编排边界见 [任务执行顺序](docs/engineering/task-execution-order.md)。开发与交付分别最多3项（试行），按真实用户收件顺序；阻碍持槽并反馈用户，不自行重排、重试或恢复。候选开发不自动激活此规则，不恢复既有暂停任务，原最终main/共享资源互斥保持不变。
+
 - 工程入口见 `.codex/zdm-project-workflow.yaml`，当前唯一模式为 `parallel-independent`。本项目的一任务一分支、永久 Worktree 和逐任务交付适配优先于通用规则里的串行共享批次默认；原来源保护、验证、授权与安全清理要求继续有效。实施追踪见 `docs/engineering/parallel-task-delivery.md`，日常交付细则以 `docs/task-completion.md` 为入口。
 - 新建或跨对话恢复先用已发布 main 的 `task:entry registry list --json` 及准确 `resolve --task <id>` 核对真实会话、目录和分支。没有本任务登记才从最新 origin/main 创建 `task:entry start --slug <id> --kind business`；基建使用 infrastructure。owner 使用真实会话身份，不编造 thread ID，不用当前预览或旧 active.json 推断开发任务。
 - 多个顶层对话各自修改独立 Worktree。一个任务中的反馈和模块沿用本任务；不同任务不共享暂存区、node_modules、缓存、构建或报告。禁止在操作系统临时目录开发。主目录仅作 main 锚点；不改写其他任务源码或登记。
