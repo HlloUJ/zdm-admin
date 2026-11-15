@@ -9,7 +9,7 @@ import {
   startCompletionProcess,
   assertProcessesGone,
 } from './completion-process.mjs';
-import { inspectProcess } from './task-resource-runner.mjs';
+import { inspectProcess } from './verification-process-identity.mjs';
 // Reuse the existing POSIX supervisor rather than adding another service or process framework.
 export function createVerificationProcessLifecycle({
   root,
