@@ -1,37 +1,8 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
-import {
-  existsSync,
-  lstatSync,
-  readFileSync,
-  writeFileSync,
-  mkdirSync,
-  openSync,
-  fsyncSync,
-  closeSync,
-  readdirSync,
-} from 'node:fs';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { createTaskRegistry } from './task-registry.mjs';
-import { submitMacNotification } from './task-resource-notifications.mjs';
-
-const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
-function durableCreate(file, value) {
-  const fd = openSync(file, 'wx', 0o600);
-  try {
-    writeFileSync(fd, JSON.stringify(value));
-    fsyncSync(fd);
-  } finally {
-    closeSync(fd);
-  }
-  const parent = openSync(path.dirname(file), 'r');
-  try {
-    fsyncSync(parent);
-  } finally {
-    closeSync(parent);
-  }
-}
 
 function noLinks(file) {
   for (let p = path.resolve(file); ; p = path.dirname(p)) {
@@ -134,82 +105,4 @@ export function collectTaskContinuity(root, options = {}) {
         };
       }
     });
-}
-
-// The supervisor only orchestrates a supported original runner. It never stores/replays shell
-// commands. A task-specific adapter must produce fresh exact-identity proof and obtain its own
-// original queue/lease before it can continue. Unsupported legacy tasks remain visibly blocked.
-export async function continueVerifiedTask({ intent, inspect, executeOriginal, directory, now = Date.now }) {
-  assert.ok(intent?.task && /^[a-f0-9]{40}$/.test(intent.head ?? '') && intent.owner && intent.authorization);
-  noLinks(directory);
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const key = digest(intent),
-    claim = path.join(directory, key + '.claim.json');
-  if (existsSync(claim)) return { status: 'blocked', reason: 'Prior continuation outcome must be reconciled', key };
-  const proof = await inspect(intent);
-  const valid =
-    proof?.task === intent.task &&
-    proof?.head === intent.head &&
-    proof?.owner === intent.owner &&
-    proof?.authorization === intent.authorization &&
-    proof?.supported === true &&
-    proof?.runnerAbsent === true &&
-    proof?.resourcesResolved === true &&
-    proof?.effectsReconciled === true &&
-    proof?.candidateUnchanged === true &&
-    proof?.paused === false &&
-    proof?.requiresConfirmation === false &&
-    proof?.ready === true &&
-    Number.isFinite(proof?.observedAt) &&
-    proof.observedAt <= now() &&
-    now() - proof.observedAt <= 5000;
-  if (!valid) return { status: 'blocked', reason: 'Fresh original-runner safety proof incomplete', key };
-  // Persist before execution. A crash after this point is unknown, never an automatic replay.
-  try {
-    durableCreate(claim, { version: 1, key, intent, status: 'starting', at: now() });
-  } catch (error) {
-    if (error.code === 'EEXIST') return { status: 'blocked', reason: 'Another continuation claimed this intent', key };
-    throw error;
-  }
-  let result;
-  try {
-    // Adapter must revalidate under the original runner's own ownership/queue lock. The observation
-    // is not a lease and cannot grant admission. No generic command executor is provided.
-    result = await executeOriginal(intent, proof);
-  } catch (error) {
-    result = { status: 'unknown', reason: error.message };
-  }
-  const outcome = { version: 1, key, result, at: now() };
-  writeFileSync(path.join(directory, key + '.outcome.json'), JSON.stringify(outcome), { flag: 'wx', mode: 0o600 });
-  return outcome;
-}
-
-export async function notifyContinuityChanges(observations, directory, { send = submitMacNotification } = {}) {
-  noLinks(directory);
-  mkdirSync(directory, { recursive: true, mode: 0o700 });
-  const outcomes = [];
-  for (const value of observations.filter((v) => ['interrupted', 'blocked'].includes(v.status))) {
-    const eventId = digest(value),
-      file = path.join(directory, eventId + '.json');
-    try {
-      // An unknown OS receipt is never retried blindly, including after this observer restarts.
-      durableCreate(file, { eventId, status: 'submitting' });
-    } catch (error) {
-      if (error.code === 'EEXIST') continue;
-      throw error;
-    }
-    let receipt;
-    try {
-      receipt = await send({
-        eventId,
-        title: '装点猫任务需要续接',
-        body: `${value.task}：${value.status}\n${value.reason}`,
-      });
-    } catch (error) {
-      receipt = { status: 'unknown', reason: error.message };
-    }
-    durableCreate(file + '.receipt', receipt);
-    outcomes.push({ task: value.task, ...receipt });
-  }
-  return outcomes;
 }

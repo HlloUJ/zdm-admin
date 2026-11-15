@@ -1,3 +1,4 @@
+import { monitoringRegistration } from './task-monitor-registration.mjs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -374,7 +375,7 @@ export function createTaskRegistry(root) {
       }
     });
   }
-  function register({ id: taskId, worktree, owner, kind = 'business', dependsOn = [] }) {
+  function register({ id: taskId, worktree, owner, kind = 'business', dependsOn = [], monitorContext }) {
     id(taskId);
     assert.ok(typeof owner === 'string' && owner.trim(), 'Explicit task owner required');
     const target = realpathSync(worktree);
@@ -419,6 +420,7 @@ export function createTaskRegistry(root) {
         stage: 'developing',
         revision: 1,
         dependsOn,
+        monitoring: monitoringRegistration(owner, monitorContext),
         resources: { dataScope: 'isolated-task' },
         checkpoints: [],
         createdAt: new Date().toISOString(),
