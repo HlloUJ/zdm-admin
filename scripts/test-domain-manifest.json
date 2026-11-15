@@ -591,7 +591,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-process.mjs": {
-      "digest": "87841defba88dfc2c3ffb6b2010a76ee3ae359d118d305ff27f9402ada030b60",
+      "digest": "dee2cd3aff4f24acc7ffd0a9a5a2bae1b0d1bfe6e8ebe037495d8918a08e9251",
       "imports": ["scripts/integration-resource.mjs"],
       "dynamicImports": 0
     },
@@ -2338,12 +2338,13 @@
       "dynamicImports": 0
     },
     "scripts/verification-runner.mjs": {
-      "digest": "08fdda0b229f3cf9c273f5dc0bb495c9804bd07a9e1cb67663f264e6fbef2292",
+      "digest": "ba33bb78da9b7ba176f2444cbae811cc998061ca929297661c0e87119994144f",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",
         "scripts/frontend-test-evidence.mjs",
-        "scripts/verification-evidence.mjs"
+        "scripts/verification-evidence.mjs",
+        "scripts/verification-process-lifecycle.mjs"
       ],
       "dynamicImports": 0
     },
@@ -2396,6 +2397,26 @@
     "vite.config.js": {
       "digest": "806aaf4d174f43f7844d1a722b420c434551e22505fd5433dc0ea0ccb93407b3",
       "imports": ["scripts/task-preview-control.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-interruption.mjs": {
+      "digest": "98d8014e6e1d720cf6dbd6cc9802af3a06e698af6e5fc5e8875700edab148727",
+      "imports": ["scripts/task-resource-runner.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-interruption.test.mjs": {
+      "digest": "aa27a538dc595f6765087b56573eabfc52ab256790427f35f305103fd80df273",
+      "imports": ["scripts/verification-interruption.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-process-lifecycle.mjs": {
+      "digest": "1a2245a816718b44bdfabc82bb04a8f533b57ad1ca277ff56cd73145b5cf33e5",
+      "imports": ["scripts/completion-process.mjs", "scripts/task-resource-runner.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/verification-process-lifecycle.test.mjs": {
+      "digest": "ac8aa5e888423c1e37613fe4ae9ddfd074e8baf7fc0c95ba1a5047feb07f878c",
+      "imports": ["scripts/verification-process-lifecycle.mjs"],
       "dynamicImports": 0
     },
     "vite.e2e.config.mjs": {
