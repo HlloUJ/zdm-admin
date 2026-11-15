@@ -1525,6 +1525,22 @@
       "imports": ["scripts/task-batch.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-cancellation-proof.mjs": {
+      "digest": "7b898455a4600106248e112d2c9d74d91a8a167d8764e6a0c65103011bb67f0d",
+      "imports": ["scripts/dev-task.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cancellation-proof.test.mjs": {
+      "digest": "6c0f43d1503228bff4718225342e76ef6499b32e1628686092eb328f60554b81",
+      "imports": [
+        "scripts/task-cancellation-proof.mjs",
+        "scripts/task-entry.mjs",
+        "scripts/task-execution-order-cli.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/task-candidate-runtime.mjs": {
       "digest": "b28661afd82e5c976872e2e257cfcfbc97dff9cf73227f5f961bcaea75634da5",
       "imports": [
@@ -1743,12 +1759,17 @@
       "dynamicImports": 0
     },
     "scripts/task-execution-order-cli.mjs": {
-      "digest": "5198f93adb9948903ade86d351e510e8466b65778898027a0e09db02e8498222",
-      "imports": ["scripts/completion-status.mjs", "scripts/task-execution-order.mjs", "scripts/task-registry.mjs"],
+      "digest": "afcaf8397a614bde8736cd5bdd1ded2d2063a52814bb25e7f7cc48f470574ca0",
+      "imports": [
+        "scripts/completion-status.mjs",
+        "scripts/task-cancellation-proof.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-registry.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-execution-order.mjs": {
-      "digest": "38ce1fd63898e601f679a102b5b90622ae31444740db36b1b664003eac3c297f",
+      "digest": "82fcd92a649e291b00bd837a379c75b656a5e66ef2bb4bb091cccec222dc9c98",
       "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
@@ -2152,6 +2173,16 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/verification-process-identity.mjs": {
+      "digest": "cbd87e07fae6a4b953eed337ba70328c25587c11c91ed39845f14bd4628170f1",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/verification-process-identity.test.mjs": {
+      "digest": "187f10b34d05f37eca6222ce1cae6a98b30f356f41b858859fea54a36523b94f",
+      "imports": ["scripts/verification-process-identity.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/verification-process-lifecycle.mjs": {
       "digest": "8de67cc87707aef0ba4138d522a3d9881c86db0f5352a2bf642355275c6880cd",
       "imports": ["scripts/completion-process.mjs", "scripts/verification-process-identity.mjs"],
@@ -2227,16 +2258,6 @@
     "vite.e2e.config.mjs": {
       "digest": "63bf7811ae45bde932675d5992835c8025354966443b620e02f67f1888ce0ef4",
       "imports": ["scripts/e2e-app.mjs", "vite.config.js"],
-      "dynamicImports": 0
-    },
-    "scripts/verification-process-identity.mjs": {
-      "digest": "cbd87e07fae6a4b953eed337ba70328c25587c11c91ed39845f14bd4628170f1",
-      "imports": [],
-      "dynamicImports": 0
-    },
-    "scripts/verification-process-identity.test.mjs": {
-      "digest": "187f10b34d05f37eca6222ce1cae6a98b30f356f41b858859fea54a36523b94f",
-      "imports": ["scripts/verification-process-identity.mjs"],
       "dynamicImports": 0
     }
   }

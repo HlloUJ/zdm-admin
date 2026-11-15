@@ -25,7 +25,7 @@ function validate(state) {
   const keys = new Set();
   for (const ticket of state.tickets) {
     assert.ok(EXECUTION_LANES.includes(ticket.lane) && id(ticket.task) && text(ticket.owner));
-    assert.ok(['queued', 'running', 'blocked', 'completed'].includes(ticket.status));
+    assert.ok(['queued', 'running', 'blocked', 'completed', 'cancelled'].includes(ticket.status));
     event(ticket.request);
     assert.ok(Number.isSafeInteger(ticket.order) && ticket.order > 0, 'Exact effective queue order required');
     const key = `${ticket.lane}:${ticket.task}`;
@@ -221,6 +221,55 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(state);
     });
   }
+  function cancellationTarget({ lane, task, owner, admission }) {
+    assert.ok(EXECUTION_LANES.includes(lane) && id(task) && text(owner) && text(admission));
+    const state = read();
+    assert.ok(state, 'Execution-order policy not activated');
+    const current = ticket(state, lane, task, owner);
+    assert.equal(current.status, 'blocked', 'Only a blocked original slot can be cancelled');
+    assert.equal(current.admission, admission, 'Exact original admission required');
+    return structuredClone(current);
+  }
+  // Cancellation is a terminal user decision, not completion or a retry.
+  function cancel({ lane, task, owner, admission, request }, verify) {
+    const source = event(request);
+    assert.ok(EXECUTION_LANES.includes(lane) && id(task) && text(owner) && text(admission));
+    assert.equal(typeof verify, 'function', 'Independent cancellation verifier required');
+    assert.ok(read(), 'Execution-order policy not activated');
+    return withTaskRegistryWriteLock(directory, () => {
+      const state = read();
+      const current = ticket(state, lane, task, owner);
+      assert.equal(current.admission, admission, 'Exact original admission required');
+      const command = { action: 'cancel', lane, task, owner, admission, request: source };
+      const prior = state.events.find((e) => e.request?.messageId === source.messageId);
+      if (prior) {
+        assert.deepEqual(prior, command, 'User event already used for a different action');
+        assert.equal(current.status, 'cancelled');
+        return structuredClone(current); // no write, probe, release or dispatch on replay
+      }
+      assert.equal(current.status, 'blocked', 'Only a blocked original slot can be cancelled');
+      assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
+      assert.equal(source.authorId, current.request.authorId, 'Original user required');
+      assert.ok(
+        [...state.events.map((e) => e.request), ...state.tickets.map((t) => t.request)]
+          .filter(Boolean)
+          .every((r) => r.sequence < source.sequence),
+        'Stale cancellation direction refused',
+      );
+      const proof = verify(structuredClone(current));
+      assert.equal(proof?.version, 1, 'Independent live cancellation proof required');
+      for (const key of ['lane', 'task', 'owner', 'admission']) assert.equal(proof[key], current[key]);
+      assert.equal(proof.outcome, 'quiescent');
+      assert.match(proof.observationDigest ?? '', /^[a-f0-9]{64}$/);
+      assert.ok(text(proof.host) && text(proof.observedAt));
+      current.status = 'cancelled';
+      current.cancellation = { request: source, proof: structuredClone(proof) };
+      state.events.push(command);
+      state.revision++;
+      write(state);
+      return structuredClone(current);
+    });
+  }
   function complete({ lane, task, owner, admission, evidence }, verify) {
     assert.equal(typeof verify, 'function', 'Independent stage evidence verifier required');
     return update((state) => {
@@ -234,5 +283,5 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(current); // never launches queued work
     });
   }
-  return { read, initialize, enqueue, claim, assertAdmission, block, direct, complete };
+  return { read, initialize, enqueue, claim, assertAdmission, block, direct, complete, cancel, cancellationTarget };
 }
