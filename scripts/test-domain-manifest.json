@@ -1724,6 +1724,7 @@
         "scripts/task-data-scope.mjs",
         "scripts/task-development.mjs",
         "scripts/task-entry.mjs",
+        "scripts/task-execution-order-cli.mjs",
         "scripts/task-preview-combination.mjs",
         "scripts/task-preview.mjs",
         "scripts/task-registry.mjs",
