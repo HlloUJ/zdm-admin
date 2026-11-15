@@ -1626,18 +1626,13 @@
       "dynamicImports": 0
     },
     "scripts/task-continuity-enrollment.mjs": {
-      "digest": "3d7b59b4c544f43677cb3f0cd2eefc027f6ef8bf9b6bf531114926223ead0ead",
-      "imports": ["scripts/task-execution-order.mjs", "scripts/task-registry.mjs"],
+      "digest": "68a3299995c5e92eecaf8a955b0fd3f84226008dbfc05171c48febf7b563275c",
+      "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity-enrollment.test.mjs": {
-      "digest": "6121411aabcb4c7926d9ffe6e4c192a03145dc545ac82fae09fad690a347816b",
-      "imports": [
-        "scripts/task-continuity-enrollment.mjs",
-        "scripts/task-execution-order.mjs",
-        "scripts/task-progress-collector.mjs",
-        "scripts/task-registry.mjs"
-      ],
+      "digest": "c19ad307f5c096a92b51c5d73dc441d606285e054b9b99086c0280d297b9fc54",
+      "imports": ["scripts/task-continuity-enrollment.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity.mjs": {
