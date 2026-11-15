@@ -30,6 +30,14 @@
 
 新任务 `task-entry start` 调用 registry.register 时同一记录原子写入 `monitoring`，不回填或批量关联旧任务。根线程创建看板任务并分派原 worker 后，将实际上下文传入 `--monitor-context '<JSON>'`：`taskNumber`、`taskName`、`taskStableId`、`worker`、`rootThreadId`、`roomId`、`authorizationRef`。原 worker 的真实 `CODEX_THREAD_ID` 必须等于 registry owner，字段缺失在创建工作区前拒绝。
 
-兼容旧调用无上下文时登记为 `pending-context`，明确缺少准确通知条件，不声称覆盖；新任务编排路径应始终传入完整参数。宿主并不自动提供看板编号或 native worker 路径，本地文件不能冒充平台身份验证。根线程每次投递前仍须核对用户最新暂停指令、准确对象、原执行者及观察时效。
+正式新任务不再允许省略上下文：`execution-order claim` 对尚未登记的新开发项，在占位前验证 `monitorContext`；已发布 `task-entry start` 与实际 `task-start` 在创建工作区/资源前再次验证。缺失、格式错误、真实 owner 不符或任务错绑均拒绝，不能用占位字符串冒充真实来源。已有登记恢复不批量回填监测；底层 registry 保留历史和隔离测试兼容，不是正式新开工入口。宿主并不自动提供看板编号或 native worker 路径，本地文件不能冒充平台身份验证。根线程每次投递前仍须核对用户最新暂停指令、准确对象、原执行者及观察时效。
 
 `monitoring.paused=false` 仅表示新任务登记时的初始状态，不证明用户此后未暂停；正式阶段 pause 记录和根线程当前用户暂停指令优先。正常完成、主动暂停、机器断线、未记录执行、模型推理中无本地进程均不得因此判定任务中断。
+
+### 新任务开工读回门槛
+
+根线程先从真实用户执行消息、任务总览已保存的任务及已分派的原 worker 获取上述字段，核验准确任务、owner、通知会话与授权，再向 claim 传 `monitorContext`，向 start 传相同 `--monitor-context`。正式 claim 将已验证上下文随原 admission 保存；通知会话和授权引用须等于原队列请求，start 核对同一 admission 绑定的全部上下文，不能换 worker 或通知对象。缺字段或来源不可核实则不 claim、不开工，不猜编号、worker 或授权。当前正式新任务 `taskStableId` 与登记 slug 一致；已登记历史接续保持原映射，不自动改写。
+
+任务登记和 monitoring 在同一记录写入后，start 必须读回准确 id、owner、worktree、branch、revision 和完整 monitoring 并核对，才返回就绪并准备任务产物。写入/读回结果未知时保留现场，先 `registry resolve` 核对已保存记录、工作区与启动 intent；不重新 enqueue、claim 或新建任务，也不自动清锁。既有记录核实后沿原入口恢复，不重复创建分支/工作区。读回不成功不得派发实际开发。
+
+这只是新任务登记门槛，不修改观察器、全局检测日程、暂停状态或旧任务覆盖范围；平台 worker 身份仍由根线程核验，登记成功不等于监测调度已运行。

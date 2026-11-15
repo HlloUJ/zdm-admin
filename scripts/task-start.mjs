@@ -1,5 +1,9 @@
 import { createExecutionOrder } from './task-execution-order.mjs';
-import { monitoringRegistration } from './task-monitor-registration.mjs';
+import {
+  requireStartMonitoring,
+  verifyStartMonitoringReadback,
+  verifyMonitoringInstruction,
+} from './task-monitor-registration.mjs';
 import { prepareTaskArtifacts } from './task-artifacts.mjs';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -64,6 +68,7 @@ export function startParallelTask(
   root = realpathSync(root);
   const owner = options.owner || process.env.CODEX_THREAD_ID;
   function ready(result) {
+    result.task = verifyStartMonitoringReadback(registry, result.task, options.monitorContext);
     result.artifacts = prepare(result.task);
     try {
       const mains = registeredTaskWorktrees(root).filter((entry) => entry.branch === 'main');
@@ -84,7 +89,7 @@ export function startParallelTask(
   );
   // The explicit root-thread receipt/claim precedes worktree creation or restoration.
   const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;
-  createExecutionOrder(registry.commonDir).assertAdmission({
+  const admission = createExecutionOrder(registry.commonDir).assertAdmission({
     lane: 'development',
     task: orderedTask,
     owner,
@@ -103,7 +108,11 @@ export function startParallelTask(
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   assert.ok(!options.resume, 'Task is not registered; do not adopt an unknown branch or worktree');
-  monitoringRegistration(owner, options.monitorContext); // Validate before creating any worktree.
+  requireStartMonitoring(owner, options.slug, options.monitorContext); // Before any resource or worktree mutation.
+  if (admission.active) {
+    verifyMonitoringInstruction(options.monitorContext, admission.ticket);
+    assert.ok(admission.ticket.monitorContext, 'New task admission lacks monitoring binding; inspect original claim');
+  }
   const entries = registeredTaskWorktrees(root),
     mains = entries.filter((x) => x.branch === 'main');
   assert.equal(mains.length, 1, 'Exact main anchor required');
@@ -187,7 +196,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseTaskStart(args);
   if (options.help) {
     console.log(
-      'Usage: task:start -- --slug <task-id> --owner <owner> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services.',
+      'Usage: task:start -- --slug <task-id> --owner <owner> --monitor-context <json> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services.',
     );
     return;
   }
