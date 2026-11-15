@@ -1733,7 +1733,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "bbd65fe0b4c2e63ba0450dc922b5a179828f3b83a7b1f94253fbb57266e0f13c",
+      "digest": "155d1e5ff5115a51fff689ad28b553ee31df8ad589feac9a3166b3ff17a33b11",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/task-completion.mjs",
@@ -1741,6 +1741,7 @@
         "scripts/task-development.mjs",
         "scripts/task-entry.mjs",
         "scripts/task-execution-order-cli.mjs",
+        "scripts/task-monitor-registration.mjs",
         "scripts/task-preview-combination.mjs",
         "scripts/task-preview.mjs",
         "scripts/task-registry.mjs",
@@ -1749,27 +1750,29 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "a92b757002d1dcdb1e71ef4f03258e9a3a6761ebc4c238bfb603554b1f66bf13",
+      "digest": "003cc915df77729b446f61250b4dd66a2b45106b05b9d96a02a7d31a7774caf6",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-entry.mjs",
-        "scripts/task-registry.mjs"
+        "scripts/task-registry.mjs",
+        "scripts/task-start.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/task-execution-order-cli.mjs": {
-      "digest": "afcaf8397a614bde8736cd5bdd1ded2d2063a52814bb25e7f7cc48f470574ca0",
+      "digest": "069006a491309abbdb1fcf608033f6942a4c24b9bdf8bb329bc27e2cee086acc",
       "imports": [
         "scripts/completion-status.mjs",
         "scripts/task-cancellation-proof.mjs",
         "scripts/task-execution-order.mjs",
+        "scripts/task-monitor-registration.mjs",
         "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/task-execution-order.mjs": {
-      "digest": "82fcd92a649e291b00bd837a379c75b656a5e66ef2bb4bb091cccec222dc9c98",
+      "digest": "090113e2619bd274c1e633d57e7a9125f91025e07280524ede8630a401a1acfb",
       "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
@@ -1815,7 +1818,7 @@
       "dynamicImports": 0
     },
     "scripts/task-monitor-registration.mjs": {
-      "digest": "c509af93939bc1cced5314fc14e6cf4316f14e72cb5382d2a8041e06335c32de",
+      "digest": "ab43e20f6942dd95398f6dfc0f22bc78319f2fe0803e9c5a16ec964e55c47ae3",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1982,7 +1985,7 @@
       "dynamicImports": 0
     },
     "scripts/task-start.mjs": {
-      "digest": "3ac01478eb784d712e10a47c67fc4c1a8fa9fec140a4e587757e055946a3c3c8",
+      "digest": "22425b4a39d59bdd5918e3f23c2a4af9a7857d3ec8d8d6daad4e963e973e9154",
       "imports": [
         "scripts/batch-timing-store.mjs",
         "scripts/resource-lease.mjs",
@@ -1994,8 +1997,13 @@
       "dynamicImports": 0
     },
     "scripts/task-start.test.mjs": {
-      "digest": "ba708ddda12da3c821cd2c0fb3852a082140b6d33dc0abdd861b25b33f76a3c9",
-      "imports": ["scripts/task-registry.mjs", "scripts/task-start.mjs"],
+      "digest": "3c9771705ef6f778141c60761efee4e26d531fdf372d4eac0fe7024757446865",
+      "imports": [
+        "scripts/task-execution-order-cli.mjs",
+        "scripts/task-progress-collector.mjs",
+        "scripts/task-registry.mjs",
+        "scripts/task-start.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-timing.mjs": {

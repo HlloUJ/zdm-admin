@@ -125,11 +125,15 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(added);
     });
   }
-  function claim({ lane, task, owner }) {
+  function claim({ lane, task, owner, monitorContext }) {
     return update((state) => {
       assert.ok(!state.paused, 'All execution launches paused');
       const current = ticket(state, lane, task, owner);
-      if (current.status === 'running') return structuredClone(current); // no new spawn is authorized by repeat claim
+      if (current.status === 'running') {
+        if (monitorContext !== undefined)
+          assert.deepEqual(monitorContext, current.monitorContext, 'Claim monitoring context differs');
+        return structuredClone(current); // no new spawn is authorized by repeat claim
+      }
       assert.equal(current.status, 'queued', 'Blocked/completed task cannot auto-resume');
       assert.ok(
         state.tickets.filter((t) => t.lane === lane && occupied.has(t.status)).length < state.limit,
@@ -139,6 +143,7 @@ export function createExecutionOrder(commonDir) {
         .filter((t) => t.lane === lane && t.status === 'queued')
         .sort((a, b) => a.order - b.order)[0];
       assert.equal(next.task, task, 'Only the FIFO head may claim');
+      if (monitorContext !== undefined) current.monitorContext = structuredClone(monitorContext);
       current.status = 'running';
       current.admission = randomUUID();
       state.events.push({ action: 'claim', lane, task, admission: current.admission });

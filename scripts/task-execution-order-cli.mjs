@@ -1,3 +1,4 @@
+import { requireStartMonitoring, verifyMonitoringInstruction } from './task-monitor-registration.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -54,7 +55,16 @@ export function executionOrderCommand(root, [command, json]) {
   const input = JSON.parse(json);
   if (command === 'initialize') return queue.initialize(input);
   if (command === 'enqueue') return queue.enqueue(input);
-  if (command === 'claim') return queue.claim(input);
+  if (command === 'claim') {
+    if (input.lane === 'development' && !registry.readTask(input.task)) {
+      requireStartMonitoring(input.owner, input.task, input.monitorContext);
+      const ticket = queue
+        .read()
+        ?.tickets.find((item) => item.lane === input.lane && item.task === input.task && item.owner === input.owner);
+      verifyMonitoringInstruction(input.monitorContext, ticket);
+    }
+    return queue.claim(input);
+  }
   if (command === 'block') return queue.block(input);
   if (command === 'direct') return queue.direct(input);
   if (command === 'cancel-plan') {

@@ -27,3 +27,66 @@ export function monitoringRegistration(owner, context, runtimeOwner = process.en
     ...Object.fromEntries(fields.map((key) => [key, context[key]])),
   };
 }
+
+// Formal new starts require real, exact metadata. Legacy registry readers remain compatible.
+export function requireStartMonitoring(owner, taskId, context) {
+  assert.ok(context !== undefined, 'Formal new task requires --monitor-context before claiming or starting');
+  const registration = monitoringRegistration(owner, context);
+  assert.equal(registration.taskStableId, taskId, 'Monitoring taskStableId must match the exact task');
+  return registration;
+}
+
+export function checkStartMonitoringArgs(args, registry) {
+  const value = (flag) => {
+    const positions = args.flatMap((arg, index) => (arg === flag ? [index] : []));
+    assert.ok(positions.length <= 1, 'Duplicate task option: ' + flag);
+    return positions.length ? args[positions[0] + 1] : undefined;
+  };
+  const slug = value('--slug');
+  if (!slug || registry.readTask(slug) || args.includes('--resume')) return;
+  const raw = value('--monitor-context');
+  requireStartMonitoring(
+    value('--owner') || process.env.CODEX_THREAD_ID,
+    slug,
+    raw === undefined ? undefined : JSON.parse(raw),
+  );
+}
+
+export function verifyStartMonitoringReadback(registry, task, context) {
+  const saved = registry.readTask(task.id);
+  assert.ok(saved, 'Task registration readback missing; inspect existing state, do not replay start');
+  for (const key of ['id', 'owner', 'worktree', 'branch', 'revision'])
+    assert.equal(saved[key], task[key], 'Task registration readback differs: ' + key);
+  assert.deepEqual(
+    saved.monitoring,
+    task.monitoring,
+    'Monitoring readback differs; inspect existing state, do not replay start',
+  );
+  if (context !== undefined) {
+    monitoringRegistration(task.owner, context); // Existing explicit carrier-to-board bindings remain valid.
+    for (const key of [
+      'taskNumber',
+      'taskName',
+      'taskStableId',
+      'worker',
+      'rootThreadId',
+      'roomId',
+      'authorizationRef',
+    ])
+      assert.equal(saved.monitoring?.[key], context[key], 'Monitoring readback differs: ' + key);
+    assert.equal(saved.monitoring.state, 'registered');
+  }
+  return saved;
+}
+
+export function verifyMonitoringInstruction(context, ticket) {
+  assert.ok(ticket?.request, 'Original queued user instruction required');
+  assert.equal(context.roomId, ticket.request.roomId, 'Monitoring room must match original instruction');
+  assert.equal(
+    context.authorizationRef,
+    ticket.request.messageId,
+    'Monitoring authorization must match original instruction',
+  );
+  if (ticket.monitorContext !== undefined)
+    assert.deepEqual(context, ticket.monitorContext, 'Monitoring context differs from the claimed admission');
+}
