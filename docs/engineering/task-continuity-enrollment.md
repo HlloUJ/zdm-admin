@@ -33,3 +33,14 @@
 兼容旧调用无上下文时登记为 `pending-context`，明确缺少准确通知条件，不声称覆盖；新任务编排路径应始终传入完整参数。宿主并不自动提供看板编号或 native worker 路径，本地文件不能冒充平台身份验证。根线程每次投递前仍须核对用户最新暂停指令、准确对象、原执行者及观察时效。
 
 `monitoring.paused=false` 仅表示新任务登记时的初始状态，不证明用户此后未暂停；正式阶段 pause 记录和根线程当前用户暂停指令优先。正常完成、主动暂停、机器断线、未记录执行、模型推理中无本地进程均不得因此判定任务中断。
+
+## 已启动旧任务补登记（195）
+
+现有请求/接受入口继续使用；不创建另一套扫描器，不启动全局检测。接受后的权威结果是任务 registry 的 `monitoring`，这是现有 `task-progress-collector` / `task-continuity-cli --once` 实际读取的位置。兼容 `bindings.candidate.json` 仍追加观察绑定，但只写旧 binding 不再算完成。
+
+- 请求使用 v2，读取原 registry、准确干净工作区与已保存 HEAD、原 completion、策略和当前执行队列快照。已有 `registered` 不覆盖；仅排队未开工或已取消的条目不补登。无历史队列的正式旧任务仍可申请，不强制迁移到队列。
+- 原 root 独立核验平台原执行者、准确看板稳定 ID/编号/名称、原 room、授权、实际正式开工、当前暂停事实；v2 平台回执必须绑定这些字段，以及 `worktree`、`head`、`formalStartVerified=true`、布尔 `paused`、`pauseEvidenceRef`。本地调用者填写 JSON 不是平台身份或实际开工的证据。
+- 现有 monitoring 明确暂停、队列全局暂停或 completion 未恢复暂停时，补登不得清除暂停。其余暂停由 root 最新用户消息及平台证据确定，不能把 `blocked` 或没有进程猜成暂停/失败。补登只写监测元数据，不改变任务阶段、执行队列、owner 或实际运行状态。
+- 接受先完整快照核验，持久保存 admission 事务，通过 registry `revise` 的 revision CAS 写 monitoring 并读回，再发布兼容 binding，最后持久保存包含 monitoring 的 v2 回执。返回成功证明两个结果均已读回，不表示定时检测已经启用。
+- 重复成功请求只读回既有 monitoring 与 binding，不重复改 revision。若任一写入后失败或回执丢失，保留原锁和事务，报结果待核验，禁止盲目重试、清锁或另起业务执行；已写入的 monitoring 可能已被观察器读取。人工核验必须对照原 request、事务、当前 registry 与 binding，不将旧 v1 回执当作新成功证明。
+- 测试仅使用临时隔离仓库，覆盖真实 collector 读取、旧无 monitoring / pending-context、主动暂停静默、已登记不覆盖、仅排队排除、错绑拒绝、CAS 后兼容写失败和丢回执不重放。正式发布前，不用候选入口修改真实旧任务。
