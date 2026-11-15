@@ -78,3 +78,16 @@ test('retired scheduler entry cannot launch work', (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /task:entry/);
 });
+
+test('canonical entry refuses missing new-task monitoring before starting a subprocess', (t) => {
+  const f = fixture(t);
+  copyFileSync(new URL('./task-start.mjs', import.meta.url), path.join(f.main, 'scripts/task-start.mjs'));
+  f.git('add', '.');
+  f.git('commit', '-m', 'published start');
+  f.git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  const before = f.git('worktree', 'list', '--porcelain');
+  const result = f.run(undefined, 'start', '--slug', 'new-task', '--owner', 'fixture-owner');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /requires --monitor-context/);
+  assert.equal(f.git('worktree', 'list', '--porcelain'), before);
+});

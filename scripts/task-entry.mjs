@@ -1,3 +1,4 @@
+import { checkStartMonitoringArgs } from './task-monitor-registration.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
@@ -53,6 +54,7 @@ export function publishedTaskEntry(root, args) {
   const script = path.join(main, entries[command]);
   assert.ok(existsSync(script) && lstatSync(script).isFile() && !lstatSync(script).isSymbolicLink());
   git(main, 'cat-file', '-e', published + ':' + entries[command]);
+  if (command === 'start') checkStartMonitoringArgs(rest, targetRegistry);
   const forwarded =
     command === 'check'
       ? ['--check', '--worktree', target, ...rest]
