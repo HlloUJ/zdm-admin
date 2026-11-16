@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { npmPackagePath } from './task-cleanup-npm-proof.mjs';
 
 const knownDirectories = [
   '.task-runtime/cache',
@@ -18,9 +19,9 @@ export const CLEANUP_TYPE_COVERAGE = Object.freeze([
   },
   {
     type: 'private-dependencies',
-    state: 'protected-preservation',
+    state: 'automatic-partial-handoff',
     reason:
-      'Links, unknown package-local content and missing rebuild proof remain protected; no expanded deletion permission',
+      'Only independently audited pristine lock/archive packages; install scripts, links, nested and unknown content remain protected',
   },
   {
     type: 'dependency-cache',
@@ -67,7 +68,11 @@ function groupFor(file) {
     /^\.task-runtime\/e2e-app(?:\/|$)/.test(file)
   )
     return 'test-output-and-fixtures';
-  if (/^\.task-runtime\/(?:task-artifacts|cleanup-dist(?:-handoff)?|dependency-install-result)\.json$/.test(file))
+  if (
+    /^\.task-runtime\/(?:task-artifacts|cleanup-dist(?:-handoff)?|dependency-install-result|dependency-cleanup-audit-result)\.json$/.test(
+      file,
+    )
+  )
     return 'necessary-evidence';
   if (/^\.task-verification(?:\/|$)/.test(file)) return 'necessary-evidence';
   return 'unclassified-owned-output';
@@ -85,6 +90,8 @@ export function buildCloseoutCleanupInventory({
   reportHandoffs = [],
   createdArtifacts = { registered: false, artifacts: [] },
   createdHandoffs = { registered: false, handedOff: [], protected: [] },
+  dependencyArtifacts = { registered: false, artifacts: [], protected: [] },
+  dependencyHandoffs = { registered: false, handedOff: [], protected: [] },
   externalDependencyTarget = null,
 }) {
   assert.match(task, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -220,6 +227,43 @@ export function buildCloseoutCleanupInventory({
       spaceReleased: false,
     });
   }
+  for (const artifact of dependencyArtifacts.artifacts) {
+    npmPackagePath(artifact.relative);
+    assert.equal(artifact.source, path.join(root, artifact.relative), 'Foreign dependency inventory source');
+    assert.equal(
+      artifact.registration,
+      path.join(common, 'task-cleanup/proofs', task, artifact.digest + '.json'),
+      'Foreign dependency audit proof',
+    );
+    assert.match(artifact.digest, /^[a-f0-9]{64}$/);
+    const handedOff = dependencyHandoffs.handedOff.find((item) => item.relative === artifact.relative),
+      protectedRecord = dependencyHandoffs.protected.find((item) => item.relative === artifact.relative);
+    if (handedOff) {
+      assert.match(handedOff.object, /^[a-f0-9]{64}$/);
+      assert.equal(
+        handedOff.manifest,
+        path.join(common, 'task-cleanup/staging', task, handedOff.object, 'manifest.json'),
+        'Foreign dependency handoff',
+      );
+    }
+    resources.push({
+      type: 'private-dependencies',
+      kind: 'npm-pristine-package-v1',
+      sourceLocations: [artifact.source],
+      disposition: handedOff
+        ? ['cleaned', 'already-absent'].includes(handedOff.state)
+          ? 'cleanup-result-recorded'
+          : 'pending-cleanup'
+        : 'protected-retention',
+      reason: handedOff
+        ? 'Independently audited pristine package accepted by the stable queue; deletion still requires formal closure and independent byte proof'
+        : (protectedRecord?.reason ?? artifact.reason ?? 'Audit retained; no completed dependency handoff'),
+      evidence: artifact.registration,
+      auditIndex: dependencyArtifacts.index,
+      ...(handedOff ? { manifest: handedOff.manifest, object: handedOff.object, cleanupState: handedOff.state } : {}),
+      spaceReleased: false,
+    });
+  }
   const gaps = CLEANUP_TYPE_COVERAGE.filter((c) => c.state === 'gap').map((c) => ({ type: c.type, reason: c.reason }));
   for (const resource of resources.filter((item) => item.disposition === 'needs-review'))
     gaps.push({
@@ -244,6 +288,13 @@ export function buildCloseoutCleanupInventory({
       index: createdArtifacts.index ?? null,
       registered: createdArtifacts.registered,
       resources: createdArtifacts.artifacts.length,
+    },
+    dependencyArtifacts: {
+      index: dependencyArtifacts.index ?? null,
+      registered: dependencyArtifacts.registered,
+      resources: dependencyArtifacts.artifacts.length,
+      summary: dependencyArtifacts.summary ?? null,
+      protected: dependencyHandoffs.registered ? dependencyHandoffs.protected : dependencyArtifacts.protected,
     },
     resources,
     typeCoverage: CLEANUP_TYPE_COVERAGE,

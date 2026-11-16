@@ -1,4 +1,5 @@
 import { readCreatedArtifactInventory } from './task-cleanup-created-artifacts.mjs';
+import { readDependencyCleanupInventory } from './task-cleanup-npm.mjs';
 import { buildCloseoutCleanupInventory } from './task-cleanup-inventory.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
@@ -190,6 +191,7 @@ export function recordCloseoutCleanupInventory({
   distHandoff,
   reportHandoffs = [],
   createdHandoffs = { registered: false, handedOff: [], protected: [] },
+  dependencyHandoffs = { registered: false, handedOff: [], protected: [] },
 }) {
   const expected = path.join(common, 'task-assets', task);
   assert.equal(path.dirname(preserved.manifest), expected, 'Foreign asset preservation manifest');
@@ -215,6 +217,8 @@ export function recordCloseoutCleanupInventory({
     reportHandoffs,
     createdArtifacts: readCreatedArtifactInventory({ root, common, task }),
     createdHandoffs,
+    dependencyArtifacts: readDependencyCleanupInventory({ root, common, task }),
+    dependencyHandoffs,
     externalDependencyTarget,
   });
   const content = JSON.stringify(inventory) + '\n';

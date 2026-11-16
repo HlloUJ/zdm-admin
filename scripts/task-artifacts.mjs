@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, realpathSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { validateTaskDependencies } from './task-dependencies.mjs';
+import { auditInstalledTaskDependencies } from './task-cleanup-npm.mjs';
 const dependencyFields = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
 function directory(root, relative) {
   let current = root;
@@ -19,7 +20,10 @@ function directory(root, relative) {
   }
   return current;
 }
-export function prepareTaskArtifacts(task, { install = true, execute = spawnSync } = {}) {
+export function prepareTaskArtifacts(
+  task,
+  { install = true, execute = spawnSync, auditDependencies = auditInstalledTaskDependencies } = {},
+) {
   assert.equal(task.version, 2);
   assert.ok(!task.compatibility?.readOnly, 'Legacy task requires reviewed preparation');
   const root = realpathSync(task.worktree);
@@ -47,7 +51,8 @@ export function prepareTaskArtifacts(task, { install = true, execute = spawnSync
       'Shared dependency symlink must be preserved; do not install through it',
     );
   let dependencies,
-    backup = null;
+    backup = null,
+    installedNow = false;
   const noDependencies =
     Object.keys(lock.packages).length === 1 &&
     dependencyFields.every(
@@ -101,6 +106,7 @@ export function prepareTaskArtifacts(task, { install = true, execute = spawnSync
       const proof = validateTaskDependencies(root);
       assert.equal(proof.modules, modules, 'Dependencies point outside task');
       dependencies = { status: 'private-validated', ...proof };
+      installedNow = true;
     }
   }
   const proof = {
@@ -117,5 +123,35 @@ export function prepareTaskArtifacts(task, { install = true, execute = spawnSync
   writeFileSync(path.join(root, '.task-runtime/task-artifacts.json'), JSON.stringify(proof, null, 2) + '\n', {
     mode: 0o600,
   });
+  // Independent byte audit, not a claim that npm's successful exit proves generated content safe.
+  if (installedNow) {
+    const audit = auditDependencies(task);
+    const receipt = path.join(root, '.task-runtime/dependency-cleanup-audit-result.json');
+    try {
+      const stat = lstatSync(receipt);
+      assert.ok(stat.isFile() && stat.nlink === 1, 'Existing audit result is not a private regular file; preserve it');
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+    const temporary = receipt + '.' + randomUUID();
+    writeFileSync(
+      temporary,
+      JSON.stringify(
+        {
+          version: 1,
+          task: task.id,
+          worktree: root,
+          kind: 'independent-archive-audit-v1',
+          ...(audit.summary
+            ? { summary: audit.summary }
+            : { state: 'protected', reason: audit.reason ?? 'No package audit available' }),
+        },
+        null,
+        2,
+      ) + '\n',
+      { mode: 0o600, flag: 'wx' },
+    );
+    renameSync(temporary, receipt);
+  }
   return proof;
 }

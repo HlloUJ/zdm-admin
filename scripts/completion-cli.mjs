@@ -1,4 +1,5 @@
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
+import { handoffAuditedDependencies } from './task-cleanup-npm.mjs';
 import { assertCleanupUnreferenced } from './task-cleanup-cli.mjs';
 import { captureCiProgress } from './task-delivery-status-sync.mjs';
 import { drainProgressHost } from './task-progress-host.mjs';
@@ -605,6 +606,39 @@ async function completionCommandLocked(
                   },
                 })
               : { registered: false, handedOff: [], protected: [] };
+          const dependencyHandoffs =
+            batch.taskRegistryVersion === 2
+              ? await handoffAuditedDependencies({
+                  root: batch.worktree,
+                  common,
+                  task: batch.id,
+                  proof: {
+                    worktree: batch.worktree,
+                    head: batch.recordedHead,
+                    accepted: readAcceptance(anchor, batch.id).commit,
+                    main: expectedMain,
+                  },
+                  assertUnreferenced: async (record) => {
+                    const current = createTaskRegistry(anchor).readTask(batch.id),
+                      references = await runtimeReferences(current);
+                    assert.equal(references.owned.length, 0, 'Task frontend still references private dependencies');
+                    assert.equal(
+                      references.backendPorts.length,
+                      0,
+                      'Task backend still references private dependencies',
+                    );
+                    if (previewControl.assertCleanupSafe)
+                      await previewControl.assertCleanupSafe({
+                        anchor,
+                        task: batch.worktree,
+                        preview,
+                        common,
+                        main: expectedMain,
+                      });
+                    assertCleanupUnreferenced(record);
+                  },
+                })
+              : { registered: false, handedOff: [], protected: [] };
           const preservedAssets = preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id));
           const reportHandoffs =
             batch.taskRegistryVersion === 2
@@ -649,8 +683,16 @@ async function completionCommandLocked(
             distHandoff: cleanupHandoff,
             reportHandoffs,
             createdHandoffs,
+            dependencyHandoffs,
           });
-          return { ...preservedAssets, cleanupHandoff, reportHandoffs, createdHandoffs, cleanupInventory };
+          return {
+            ...preservedAssets,
+            cleanupHandoff,
+            reportHandoffs,
+            createdHandoffs,
+            dependencyHandoffs,
+            cleanupInventory,
+          };
         },
       },
       cleanup: {

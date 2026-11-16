@@ -159,7 +159,7 @@ export function createCleanupQueue(commonDir) {
       rmdirSync(p);
     };
   }
-  function validate(r) {
+  function validate(r, phase = 'consume') {
     assert.equal(r.version, 1);
     assert.match(r.task, ID);
     assert.ok(['rebuildable', 'preserved-duplicate'].includes(r.disposition), 'Unknown artifact disposition');
@@ -183,11 +183,11 @@ export function createCleanupQueue(commonDir) {
     const registration = read(rebuild.record),
       bytes = readFileSync(rebuild.record);
     assert.equal(createHash('sha256').update(bytes).digest('hex'), rebuild.digest, 'Rebuild proof bytes changed');
-    validateCleanupTypeRegistration(r, registration, commonDir);
+    validateCleanupTypeRegistration(r, registration, commonDir, { phase });
     return { key: object, registration };
   }
   function handoff(record) {
-    const { key, registration } = validate(record),
+    const { key, registration } = validate(record, 'handoff'),
       release = lock();
     try {
       const i = index(),
@@ -209,7 +209,10 @@ export function createCleanupQueue(commonDir) {
         return old;
       }
       assert.deepEqual(cleanupIdentity(record.path), record.identity, 'Handoff object changed');
-      validateCleanupTypeContent(record, registration, record.path, commonDir);
+      // A newly audited npm package is only staged here. Its bytes are independently
+      // reverified at consume before deletion; metadata identity still seals this transfer.
+      if (record.proof.rebuild.kind !== 'npm-pristine-package-v1')
+        validateCleanupTypeContent(record, registration, record.path, commonDir);
       const r = { ...immutable(record), key, state: 'pending', attempts: 0, nextCheck: record.notBefore };
       save(file, r);
       i.objects[key] = pendingIndex(r);

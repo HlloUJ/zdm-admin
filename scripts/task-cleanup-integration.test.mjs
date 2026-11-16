@@ -1,11 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, readlinkSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { createdCleanupFixture, cleanupFixtureTemplate } from './test-support/cleanup-created-fixture.mjs';
 import { preserveAssets } from './task-completion.mjs';
 import { handoffPreservedReportCopies, recordCloseoutCleanupInventory } from './task-cleanup-handoff.mjs';
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
+import { dependencyAuditFixture } from './test-support/cleanup-npm-fixture.mjs';
+import { auditPrivateTaskDependencies, handoffAuditedDependencies } from './task-cleanup-npm.mjs';
+import { createTaskRegistry } from './task-registry.mjs';
+import { verifyPreservation } from './completion-cli.mjs';
 const unreferenced = async () => {};
 test('actual987 duplicate producer is accepted and consumed by actual683 queue only after closure; stable raw evidence survives', async (t) => {
   const f = createdCleanupFixture(t),
@@ -82,4 +86,50 @@ test('created fixture and external source carrier appear in total closeout inven
   assert.match(retained.reason, /unique|changed|Unexpected/);
   assert.equal(readFileSync(path.join(copy.source, 'unique.txt'), 'utf8'), 'unique value remains protected');
   assert.equal(raw.spaceReleased, false);
+});
+test('private package handoff precedes actual preservation; residual unique bytes and links remain retained in total inventory', async (t) => {
+  const f = dependencyAuditFixture(t),
+    task = f.context.task.id;
+  f.git(f.main, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+  createTaskRegistry(f.main).register({ id: task, worktree: f.root, owner: 'isolated-cleanup-owner' });
+  writeFileSync(path.join(f.root, 'node_modules/unique-patch.txt'), 'retain unknown private patch');
+  mkdirSync(path.join(f.root, 'node_modules/.bin'));
+  symlinkSync('../example/index.js', path.join(f.root, 'node_modules/.bin/example'));
+  const audit = auditPrivateTaskDependencies(f.parameters);
+  assert.equal(audit.entries.length, 1);
+  assert.ok(audit.protected.some((e) => e.relative === 'node_modules/unique-patch.txt'));
+  const dependencyHandoffs = await handoffAuditedDependencies({
+    ...f.parameters,
+    proof: f.proof,
+    assertUnreferenced: unreferenced,
+  });
+  assert.equal(dependencyHandoffs.handedOff.length, 1);
+  const preserved = preserveAssets(f.root, path.join(f.common, 'task-assets', task));
+  verifyPreservation(preserved.manifest, path.dirname(preserved.manifest));
+  const retained = path.join(f.common, 'task-assets', task, 'private-dependencies');
+  assert.equal(readFileSync(path.join(retained, 'unique-patch.txt'), 'utf8'), 'retain unknown private patch');
+  assert.equal(readlinkSync(path.join(retained, '.bin/example')), '../example/index.js');
+  assert.ok(!existsSync(path.join(retained, 'example')));
+  const result = recordCloseoutCleanupInventory({
+    ...f.parameters,
+    proof: f.proof,
+    preserved,
+    distHandoff: { state: 'retained' },
+    dependencyHandoffs,
+  });
+  const inventory = JSON.parse(readFileSync(result.manifest)),
+    pending = inventory.resources.find((r) => r.kind === 'npm-pristine-package-v1');
+  assert.equal(pending.disposition, 'pending-cleanup');
+  assert.equal(pending.spaceReleased, false);
+  assert.ok(inventory.dependencyArtifacts.protected.some((e) => e.relative === 'node_modules/unique-patch.txt'));
+  assert.equal(
+    inventory.resources.find((r) => r.type === 'private-dependencies' && !r.kind).disposition,
+    'protected-retention',
+  );
+  rmSync(f.root, { recursive: true });
+  assert.equal(
+    (await f.queue.run({ apply: true, verify: async () => ({ ready: true }), unreferenced })).processed[0].state,
+    'cleaned',
+  );
+  verifyPreservation(preserved.manifest, path.dirname(preserved.manifest));
 });

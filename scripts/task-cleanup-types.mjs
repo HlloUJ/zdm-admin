@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
+import { validateNpmAuditRegistration, verifyNpmPackageTree } from './task-cleanup-npm-proof.mjs';
 
 export const E2E_CLEANUP_DIRECTORY = '.task-runtime/e2e-app';
 export const CREATED_CLEANUP_DIRECTORY = '.task-runtime/cleanup-created';
@@ -162,7 +163,7 @@ function fixtureSources(record, registration, common) {
   assert.ok(bytes.length <= 1024 ** 2);
   return renderCleanupFixture(JSON.parse(bytes), recipe.seed);
 }
-export function validateCleanupTypeRegistration(record, registration, common) {
+export function validateCleanupTypeRegistration(record, registration, common, { phase = 'consume' } = {}) {
   assert.equal(registration.version, 1);
   assert.equal(registration.task, record.task);
   assert.equal(registration.worktree, record.proof.worktree);
@@ -226,7 +227,9 @@ export function validateCleanupTypeRegistration(record, registration, common) {
     cleanupGit(common, 'merge-base', '--is-ancestor', registration.recipe.sourceHead, record.proof.main);
     const inputs = sourceInputs(registration, common, registration.recipe.sourceHead, () => true);
     assert.ok(inputs.length > 0 && inputs.length < 100000);
-  } else if (kind === 'duplicate-preserved-v1') validatePreservedDuplicate(record, registration, common);
+  } else if (kind === 'npm-pristine-package-v1')
+    validateNpmAuditRegistration(record, registration, common, { readArchive: phase !== 'handoff' });
+  else if (kind === 'duplicate-preserved-v1') validatePreservedDuplicate(record, registration, common);
   else throw Error('No supported rebuild registration: ' + kind);
 }
 function treeFiles(directory) {
@@ -296,6 +299,10 @@ export function validateCleanupExpectedTree(expected, directory, { partial = fal
 }
 export function validateCleanupTypeContent(record, registration, directory, common, { partial = false } = {}) {
   const kind = record.proof.rebuild.kind;
+  if (kind === 'npm-pristine-package-v1') {
+    verifyNpmPackageTree(directory, validateNpmAuditRegistration(record, registration, common), { partial });
+    return;
+  }
   if (kind === 'vite-dist-v1') return;
   if (kind === 'e2e-test-build-v1') {
     if (!partial)

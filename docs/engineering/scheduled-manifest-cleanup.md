@@ -43,19 +43,20 @@
   "budgetMs": 120000,
   "maxLogicalBytes": 1073741824,
   "scheduler": { "historyLimit": 20, "maxSummaryBytes": 4096 },
+  "metadata": { "retentionMs": 2592000000, "maxDetails": 200, "compactLimit": 50 },
   "notification": { "destination": "01a1e39f-ef43-75e0-b948-e05f5fda634e" }
 }
 ```
 
-前三项预算已由总调度明确选择；scheduler 参数须作为部署配置明确记录。时间预算在对象边界检查，单个外部命令另有固定超时；不能把它解释为删除中途强杀。超预算对象保留，不能拆开后绕过总字节限制。
+上述参数已由总调度明确选定：每轮最多 10 个对象、120000 毫秒、1 GiB 逻辑字节；调度历史最多 20 条、每条摘要最多 4096 字节；每天 Asia/Shanghai 01:00、13:00；通知固定到上述真实 chat。文档记录不等于已写入真实 policy 或启用日程。时间预算在对象边界检查，单个外部命令另有固定超时；不能把它解释为删除中途强杀。超预算对象保留，不能拆开后绕过总字节限制。
 
-`metadata` 可选，只有显式加入后才压缩成功结果详情：
+`metadata` 的当前部署选择如下，须由已发布版本显式配置后才压缩成功结果详情：
 
 ```json
-{ "retentionMs": 123456789, "maxDetails": 200, "compactLimit": 50 }
+{ "retentionMs": 2592000000, "maxDetails": 200, "compactLimit": 50 }
 ```
 
-该数值只是字段格式示例，不是已确认期限。`retentionMs` 为非负整数毫秒，`maxDetails` 为非负整数，`compactLimit` 为 1–1000。超龄或超过详情容量的成功项，先持久化独立 `audit/<key前两位>/<key>.json` 紧凑回执，再删除冗长详情。回执保留任务ID、对象摘要、完成时间、结果、逻辑字节、未证明的物理释放 `null`、异常及首次失败引用；月度摘要不能代替逐项回执。紧凑审计不进入到期活跃查询索引。pending、异常、清单来源、构建证明、正式交付和首次失败证据不会被此到期规则删除。未配置 `metadata` 时保留详情；没有隐含 30 天默认。
+成功详细记录超过 30 天或超过 200 份上限，每轮最多压缩 50 份。程序仍要求显式 `retentionMs`（非负整数毫秒）、`maxDetails`（非负整数）、`compactLimit`（1–1000），不设置隐含 30 天默认。符合条件的成功项先持久化独立 `audit/<key前两位>/<key>.json` 紧凑回执，再删除冗长详情。回执保留任务ID、对象摘要、完成时间、结果、逻辑字节、未证明的物理释放 `null`、异常及首次失败引用；月度摘要不能代替逐项回执。紧凑审计不进入到期活跃查询索引。pending、error、异常、清单来源、必要构建证明、正式交付和首次失败证据不会被此到期规则删除。未配置 `metadata` 时保留详情。
 
 ## 稳定运行与计划生成
 
@@ -104,3 +105,19 @@ launchd 的日历任务会在睡眠唤醒后补触发；关机错过的时点不
 通知有独立持久 outbox 与活跃索引，保留到准确 ack；对应对象随后恢复并成功清理、关闭对象 pending、压缩成功详情，都不会吞掉未送或 unknown 通知。不同故障事件可以分别确认，旧事件回执只能确认对应事件，不能顺带确认新事件。
 
 本机 owner-only 文件不是独立防伪边界。具有同一用户写权限的人可改变记录，不宣称不可绕过。源码隔离测试与真实投递验收分开，正式启用仍须来源发布、显式 policy、987 真实清单、01:00/13:00 周期触发与原生通知读回证据。
+
+## 任务私有依赖：分包独立审计
+
+后续 683 版本新增 `npm-pristine-package-v1`，不混入已冻结的 987 候选。它明确是 `independent-archive-audit-v1` 审计证明，不是补造创建时凭证，不把 `npm ci` 退出 0 当作目录没有唯一内容的证明。
+
+`task-artifacts` 仍执行原有 `npm ci`，不修改生命周期脚本、参数或依赖运行行为。仅本次实际新安装并验证、写入准确私有 task-artifacts 后调用审计；正常复用不重复全目录审计。旧准确任务可以显式调用 `auditPrivateTaskDependencies({root,common,task})`。审计只读取该任务 `.task-runtime/npm-cache/_cacache/content-v2/sha512` 中按锁文件 integrity 精确定位的归档，不联网、不查共享 npm/Maven 缓存、不扫描历史安装。
+
+审计逐个处理 lock 中准确顶层或作用域包：要求实体私有 `node_modules`、task/worktree/lock 绑定、归档 SHA-512 完全一致、包内完整目录与文件集合及字节摘要相同。普通文件仅接受固定 npm 规范化 0644/0755 模式；未知模式、链接、硬链接、额外空目录、新增文件、缺失或修改内容均保留。带 `hasInstallScript`、嵌套或打包内含 node_modules 的包不纳入首期。`.bin`、安装索引、未知根成员、私有缓存、补丁及备份均保留，不放宽任何类型的全局链接规则。
+
+Python 归档检查器只读取、不解包或执行；压缩大小、解压容器、文件总量和成员数量均有界，拒绝越界路径、重复、链接、特殊模式及特殊文件。审计成功先将完整原归档以 owner-only、内容寻址方式保存在 `common/task-cleanup/dependency-archives/<task>/<sha512hex>.tgz`，再写不可覆盖证明。稳定索引为 `common/task-cleanup/npm-audits/<task>/index.json`；旧 Worktree 移除后，消费端仍能从准确 Git lock 与稳定原归档独立核验完整预期内容。
+
+`readDependencyCleanupInventory({root,common,task})` 只读登记，返回 `registered/artifacts/protected/summary`；不存在登记明确保护 node_modules。`handoffAuditedDependencies({root,common,task,proof,assertUnreferenced},{api})` 只按已有审计移交，重新核对原私有绑定、准确输入、稳定证明路径、归档存在性、封闭对象元数据身份和整个 node_modules 的活跃引用。证明成本放在独立审计，收尾不重复解包或逐字节读包；移交不授权删除。先保存 moving journal 后挪入稳定 staging，再发布到同一清理队列。消费时独立完整核验归档完整性及当前包字节后才允许 FD 删除；错误生产者即使封入额外唯一文件也不能获删除。其他类型的既有入队/消费保护不变。重复调用和发布中断接续原对象；缺失对象不记释放空间，失败原因进入只读清单。
+
+报告区分 `auditedPristinePackages`、`protectedLockPackages`、`protectedRecords`、审计逻辑字节和实际 staging 数量；`physicalBytes` 仍为 `null`。审计通过不等于已清理；正式关闭、准确交付及消费时引用证明继续必需。归档、原 cache 和所有 protected 内容必须先保全，未来总清单接线不能通过回收 Git 载体吞掉它们。本版本不执行真实依赖挪移或删除，不安装定时器，待正式发布后由总调度按准确任务小范围验证。
+
+683 隔离组合固定 987 源 `5926eed298b79dc925a1ac2b8f4ff0e49844e352` 后，正式收尾 `preserve` 阶段已接依赖移交，顺序为 `handoffAuditedDependencies`、原 `preserveAssets`、报告额外副本移交、统一总清单。残余私有依赖仍由原 `retainTaskDependencies` 完整保全，不将部分 pristine 包的可清理性套到整目录。总清单同时读取稳定 npm-audits 索引、准确移交结果和保护原因；已移交对象仍标记 `spaceReleased=false`。本组合不冒充已发布能力，不修改正在交付的 987 固定源。
