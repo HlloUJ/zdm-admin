@@ -620,8 +620,8 @@
       "dynamicImports": 1
     },
     "scripts/completion-session.mjs": {
-      "digest": "67130e10a1ea614d87c65c08b089b1d5d7de860b379764ce310c2a0f8f2a7234",
-      "imports": ["scripts/completion-process.mjs"],
+      "digest": "5e62d0a59d062739b7a37e19bdbe07e30aec2138196397a8cc77c0fbad42fef3",
+      "imports": ["scripts/completion-process.mjs", "scripts/task-delivery-status-sync.mjs"],
       "dynamicImports": 0
     },
     "scripts/completion-session.test.mjs": {
@@ -1565,6 +1565,29 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-codex-host.mjs": {
+      "digest": "44f087a2f2ff0fca09ced8193206bb3274426de5afa7735875c73044063c5a5b",
+      "imports": [
+        "scripts/task-delivery-status-sync.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-interruption-notice.mjs",
+        "scripts/task-monitor-registration.mjs",
+        "scripts/task-progress-outbox.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-codex-host.test.mjs": {
+      "digest": "96f7d34e411d335d75c8954a5aa895e43501d341059fe6d3dd5578940a0822ab",
+      "imports": [
+        "scripts/completion-session.mjs",
+        "scripts/task-codex-host.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-monitor-registration.mjs",
+        "scripts/task-progress-outbox.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/task-commit-ownership.mjs": {
       "digest": "7505dd878d4190042f94056481a868a455815a1bf5ad77807f4b1d74ffef6b60",
       "imports": ["scripts/task-registry.mjs"],
@@ -1696,6 +1719,29 @@
       "imports": ["scripts/task-delivery-queue.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-delivery-status-sync-cli.mjs": {
+      "digest": "65032fc90fb4870e6eeb6f32be94942c7b578bbce1a0e46513ca7751d12672d9",
+      "imports": [
+        "scripts/task-delivery-status-sync.mjs",
+        "scripts/task-progress-outbox.mjs",
+        "scripts/task-progress-replay.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-delivery-status-sync.mjs": {
+      "digest": "071635e47b46c8256f3e3e749dea57caa40c3070b8330c72c6193d60a7715ea5",
+      "imports": ["scripts/task-progress-host.mjs", "scripts/task-progress-outbox.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-delivery-status-sync.test.mjs": {
+      "digest": "c902aacbe9242e0d3187c3baf016690871aee880ea55d592f692ae4075a278b1",
+      "imports": [
+        "scripts/completion-session.mjs",
+        "scripts/task-delivery-status-sync.mjs",
+        "scripts/task-progress-outbox.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/task-dependencies.mjs": {
       "digest": "e771583db66522283935becd001598f9dd4dbb75b7cb8568e964403666125fbe",
       "imports": [],
@@ -1777,8 +1823,8 @@
       "dynamicImports": 0
     },
     "scripts/task-execution-order.mjs": {
-      "digest": "090113e2619bd274c1e633d57e7a9125f91025e07280524ede8630a401a1acfb",
-      "imports": ["scripts/task-registry.mjs"],
+      "digest": "47eb2e6116836b9cea1081d34717a35f051c7323a57eb5d2633037e4a3b04a13",
+      "imports": ["scripts/task-delivery-status-sync.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-execution-order.test.mjs": {
@@ -1823,7 +1869,7 @@
       "dynamicImports": 0
     },
     "scripts/task-monitor-registration.mjs": {
-      "digest": "ab43e20f6942dd95398f6dfc0f22bc78319f2fe0803e9c5a16ec964e55c47ae3",
+      "digest": "43fbc2a494532ba049ae0cab1a8a42bb6033c6912e6a7a8e77c69e31d5cda2a5",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1935,6 +1981,11 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-progress-host.mjs": {
+      "digest": "ca5caa61ca183959d72b756d6e19ba347fc829ac480a681ed198a6cbfa9cb603",
+      "imports": ["scripts/task-progress-outbox.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-progress-monitor.mjs": {
       "digest": "264a87b68334cb57c15a9d6a96239129b015556ce8b884bb0d4604b698ad5557",
       "imports": ["scripts/task-continuity.mjs"],
@@ -1943,6 +1994,21 @@
     "scripts/task-progress-monitor.test.mjs": {
       "digest": "5ee019a6c7f2169b780d081a9227783bccf47ac38a302e28d65130e4271ef192",
       "imports": ["scripts/task-monitor-registration.mjs", "scripts/task-progress-monitor.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-progress-outbox.mjs": {
+      "digest": "f67a61b0e859bff4d4b54faeff800d6c9c8398404b9562d1ac4921c5b82286fb",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-progress-replay.mjs": {
+      "digest": "bb28acfc8708c0385062d32a14d936ff33c54f87a8f0a0380f387db093396ab7",
+      "imports": ["scripts/task-progress-outbox.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-progress-replay.test.mjs": {
+      "digest": "24a76ac0ee01b3da7bdac46508061e2ad18dc48b45bd7e8feed15e8a75ed9b12",
+      "imports": ["scripts/task-delivery-status-sync-cli.mjs", "scripts/task-progress-outbox.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-registry-lock.test.mjs": {
@@ -2002,7 +2068,7 @@
       "dynamicImports": 0
     },
     "scripts/task-start.test.mjs": {
-      "digest": "3c9771705ef6f778141c60761efee4e26d531fdf372d4eac0fe7024757446865",
+      "digest": "a4559a5c8b512b52e47773712f40f71e4b4a654fbeaa74ac59a340d31254c7d2",
       "imports": [
         "scripts/task-execution-order-cli.mjs",
         "scripts/task-progress-collector.mjs",

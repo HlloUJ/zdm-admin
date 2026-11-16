@@ -3,6 +3,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { withTaskRegistryWriteLock } from './task-registry.mjs';
+import { captureQueueProgress } from './task-delivery-status-sync.mjs';
 
 export const EXECUTION_LANES = ['development', 'delivery'];
 const occupied = new Set(['running', 'blocked']);
@@ -59,9 +60,15 @@ export function createExecutionOrder(commonDir) {
   }
   function write(state) {
     validate(state);
+    const previous = existsSync(file) ? read() : null;
     const temporary = path.join(directory, randomUUID() + '.json');
     writeFileSync(temporary, JSON.stringify(state, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     renameSync(temporary, file);
+    try {
+      captureQueueProgress(commonDir, state, previous);
+    } catch (error) {
+      console.error('Progress capture failed; original queue retained: ' + error.message);
+    }
   }
   function initialize(request) {
     const source = event(request);
