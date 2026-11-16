@@ -354,3 +354,49 @@ test('unsupported live receipt capability retains outbox and cannot claim synchr
   );
   assert.equal(createProgressOutbox(dir).read().pending.length, 1);
 });
+
+test('collaboration monitoring binds real canonical assignment and never inherits parent chat liveness', async () => {
+  const monitor = { ...context(), executionSurface: 'collaboration-agent', worker: '/root/delivery_987' };
+  const task = {
+    id: 'native-task',
+    owner,
+    worktree: '/fixture/987',
+    stage: 'development',
+    monitoring: monitoringRegistration(owner, monitor, owner),
+  };
+  assert.equal(monitoringRegistration(owner, monitor, owner).executionSurface, 'collaboration-agent');
+  assert.throws(() => monitoringRegistration(owner, { ...monitor, worker: owner }, owner));
+  assert.throws(() => monitoringRegistration(owner, { ...monitor, rootThreadId: 'other' }, owner));
+  const host = {
+    paused: false,
+    now: 1000,
+    readThread: () => assert.fail('parent thread is not direct executor evidence'),
+  };
+  assert.equal((await observeCodexTask(task, host)).status, 'unknown');
+  const binding = { task: task.id, owner, worker: monitor.worker, worktree: task.worktree };
+  const snapshot = { canonicalTaskName: monitor.worker, status: 'running', observedAt: 900, binding };
+  assert.equal((await observeCodexTask(task, { ...host, readAgent: async () => snapshot })).status, 'running');
+  for (const changed of [
+    { binding: { ...binding, task: 'other' } },
+    { canonicalTaskName: '/root/cleanup_683' },
+    { observedAt: -100000 },
+    { observedAt: 1001 },
+    { status: 'idle' },
+    { status: 'done' },
+  ])
+    assert.equal(
+      (await observeCodexTask(task, { ...host, readAgent: async () => ({ ...snapshot, ...changed }) })).status,
+      'unknown',
+    );
+  const failed = await observeCodexTask(task, {
+    ...host,
+    readAgent: async () => ({ ...snapshot, status: 'error', failure: { id: 'actual-agent-error', finishedAt: 900 } }),
+  });
+  assert.equal(failed.status, 'blocked');
+  assert.equal(failed.failureEvent.id, 'actual-agent-error');
+  assert.equal(
+    (await observeCodexTask(task, { ...host, paused: true, readAgent: () => assert.fail('paused stays paused') }))
+      .status,
+    'paused',
+  );
+});

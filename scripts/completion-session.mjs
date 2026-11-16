@@ -1,3 +1,4 @@
+import { drainProgressHost, prepareProgressStage } from './task-progress-host.mjs';
 import { captureCompletionProgress } from './task-delivery-status-sync.mjs';
 import { completionDirectory, processScope } from './completion-process.mjs';
 import { createHash, randomUUID } from 'node:crypto';
@@ -148,6 +149,8 @@ export async function completionStage(state, name, key, run, { now = Date.now, s
   state.events.push(event);
   save(state);
   try {
+    await prepareProgressStage(state, event);
+    await drainProgressHost();
     const result = await processScope(state, event, save, run);
     event.result = result;
     event.status = 'success';

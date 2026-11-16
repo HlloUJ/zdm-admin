@@ -352,3 +352,21 @@ test('native missing intake refuses before worktree, branch, registry or artifac
   assert.equal(f.registry.readTask('unregistered-native'), null);
   assert.equal(f.git(f.root, 'branch', '--list', 'codex/unregistered-native'), '');
 });
+
+test('collaboration surface cannot bypass native board enrollment before creating its carrier', (t) => {
+  const f = fixture(t),
+    owner = '11111111-1111-4111-8111-111111111111';
+  process.env.CODEX_THREAD_ID = owner;
+  const opts = options('collaboration-new', f.parent);
+  opts.owner = owner;
+  opts.monitorContext = {
+    ...context('collaboration-new'),
+    executionSurface: 'collaboration-agent',
+    worker: '/root/delivery_987',
+    rootThreadId: owner,
+  };
+  assert.throws(() => startParallelTask(opts, { root: f.root }), /Board intake missing/);
+  assert.equal(existsSync(path.join(f.parent, 'collaboration-new')), false);
+  assert.equal(f.registry.readTask('collaboration-new'), null);
+  assert.equal(f.git(f.root, 'branch', '--list', 'codex/collaboration-new'), '');
+});

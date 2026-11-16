@@ -1,3 +1,4 @@
+import { assertStandardCoveragePlan, validateStandardCoverageEvidence } from './delivery-standard-coverage.mjs';
 import { requireBrowserBehaviors, browserBehaviorTitles, ciBrowserBehaviorNames } from './business-regression.mjs';
 import { validateDiagnosticComposition } from './ci-diagnostic-evidence.mjs';
 import {
@@ -14,10 +15,11 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifyChangedFiles } from './verification-impact.mjs';
+import { deliveryStandardPlan } from './delivery-standard.mjs';
 import { engineeringDomainProof, scriptTestFiles, SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import { backendReportState, validateBackendReports } from './backend-test-evidence.mjs';
 import { executionEnvironment, validateReusedMetadata, environmentProof } from './ci-equivalence.mjs';
-import { validateFrontendTestReport } from './frontend-test-evidence.mjs';
+import { validateFrontendTestReport, testIdentities } from './frontend-test-evidence.mjs';
 
 const readJson = (file) => JSON.parse(readFileSync(file, 'utf8'));
 const saveJson = (file, value) => {
@@ -66,36 +68,7 @@ export function verifyFrontendUnitEvidence(metadata) {
   }
 }
 
-export function testIdentities(report, executed = false) {
-  assert.ok(Array.isArray(report.suites), 'Playwright report is missing suites');
-  assert.equal(report.errors?.length ?? 0, 0, 'Playwright report contains global errors');
-  const ids = [];
-  function visit(suite) {
-    for (const spec of suite.specs ?? []) {
-      assert.ok(spec.id && Array.isArray(spec.tests) && spec.tests.length, 'Invalid Playwright spec');
-      for (const item of spec.tests) {
-        assert.ok(item.projectName, 'Playwright project identity is missing');
-        if (executed) {
-          assert.ok(item.results?.length, `Test has no execution result: ${spec.id}`);
-          assert.equal(item.expectedStatus ?? 'passed', 'passed', `Expected failure cannot pass: ${spec.id}`);
-          assert.equal(item.results?.length, 1, `Every execution must pass exactly once: ${spec.id}`);
-          assert.equal(item.results[0].retry ?? 0, 0, `Test retried: ${spec.id}`);
-          assert.equal(item.status, 'expected', `Test was skipped, flaky or unexpected: ${spec.id}`);
-          assert.ok(
-            item.results.every((result) => result.status === 'passed'),
-            `Every execution must pass without skipped, interrupted or failed attempts: ${spec.id}`,
-          );
-        }
-        ids.push(`${spec.id}:${item.projectName}:${item.repeatEachIndex ?? 0}`);
-      }
-    }
-    for (const child of suite.suites ?? []) visit(child);
-  }
-  report.suites.forEach(visit);
-  assert.ok(ids.length > 0, 'An empty test list cannot pass the coverage gate');
-  assert.equal(new Set(ids).size, ids.length, 'Duplicate tests inside a Playwright report');
-  return ids.sort();
-}
+export { testIdentities } from './frontend-test-evidence.mjs';
 
 export function verifyFrontendEvidence(needs, groups, { requiredBehaviors = [] } = {}) {
   const expectedJobs = ['frontend_static', 'frontend_e2e_1', 'frontend_e2e_2'];
@@ -184,6 +157,7 @@ export function changeScope(event, identity, git = gitRaw, engineeringProof = en
     problem = error.message;
     files = [];
   }
+  const classification = classifyChangedFiles(files, { engineeringProof });
   return {
     schemaVersion: 1,
     identity,
@@ -191,7 +165,13 @@ export function changeScope(event, identity, git = gitRaw, engineeringProof = en
     problem,
     files,
     engineeringProof,
-    classification: classifyChangedFiles(files, { engineeringProof }),
+    classification,
+    standard: deliveryStandardPlan({
+      files,
+      impact: classification,
+      candidate: identity.candidateSha,
+      base: identity.baseSha,
+    }),
   };
 }
 
@@ -211,6 +191,16 @@ export function verifyScope(scope, identity) {
     scope.classification,
     classifyChangedFiles(scope.files, { engineeringProof }),
     'Classification does not match the complete diff',
+  );
+  assert.deepEqual(
+    scope.standard,
+    deliveryStandardPlan({
+      files: scope.files,
+      impact: scope.classification,
+      candidate: identity.candidateSha,
+      base: identity.baseSha,
+    }),
+    'Unified standard plan does not match current inputs',
   );
 }
 
@@ -307,6 +297,7 @@ function main(args) {
     requireFirstAttempt(identity);
     const event = process.env.GITHUB_EVENT_PATH ? readJson(process.env.GITHUB_EVENT_PATH) : {};
     const scope = changeScope(event, identity);
+    assertStandardCoveragePlan(scope.standard);
     saveJson(path.join(directory, 'scope.json'), scope);
     if (process.env.GITHUB_OUTPUT) {
       for (const key of ['frontend', 'backend', 'engineering', 'docsOnly', 'full', 'runtime'])
@@ -345,6 +336,13 @@ function main(args) {
     if (scope.classification.engineering) {
       verifyEngineeringEvidence(scope, readJson(path.join(name, 'ci-engineering', 'metadata.json')), current);
     }
+    const packets = {
+      inputs: readJson(path.join(name, 'ci-validation-scope', 'delivery-input-contracts.json')),
+      formatting: domain === 'frontend' ? readJson(path.join(name, 'ci-formatting', 'metadata.json')) : null,
+      engineering: scope.classification.engineering
+        ? readJson(path.join(name, 'ci-engineering', 'metadata.json'))
+        : null,
+    };
     let result = { status: 'not-applicable', identity: scope.identity, reasons: scope.classification.reasons };
     if (applicable && domain === 'frontend') {
       const groups = ['ci-frontend-static', 'ci-frontend-e2e-1', 'ci-frontend-e2e-2'].map((artifact, index) => ({
@@ -353,13 +351,17 @@ function main(args) {
       }));
       groups.forEach((group) => verifyScope(scope, group.metadata));
       result = verifyFrontendEvidence(needs, groups, { requiredBehaviors: browserBehaviorTitles() });
+      packets.frontend = groups;
     } else if (applicable) {
       const metadata = readJson(path.join(name, 'ci-backend-full', 'metadata.json'));
       const reports = readJson(path.join(name, 'ci-backend-full', 'backend-tests.json'));
       verifyScope(scope, metadata);
       verifyBackendEvidence(metadata, reports, path.join(name, 'ci-backend-full'));
       result = { status: 'success', identity: metadata, reports };
+      packets.backend = metadata;
+      packets.backendReport = reports;
     }
+    result.standardCoverage = validateStandardCoverageEvidence(scope.standard, packets, { domain });
     saveJson(path.join(directory, `${domain}-aggregate.json`), result);
     console.log(
       `${domain} quality: ${result.status}${result.testCount ? `; ${result.testCount} tests` : ''}; ${scope.classification.reasons.join(' ')}`,

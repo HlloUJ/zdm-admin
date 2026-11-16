@@ -17,6 +17,7 @@ export const ENGINEERING_EXTRA_INPUTS = [
   'playwright.config.ts',
   'vite.e2e.config.mjs',
   'ci/e2e-app.json',
+  'ci/delivery-standard.json',
   'ci/e2e-shards.json',
   '.github/workflows/browser-image.yml',
   'ci/browser-image.lock.json',

@@ -2,10 +2,11 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 
 // Observability only: never authorizes reuse, changes selection, or converts a failed check to success.
-export function performanceSummary({ candidate, elapsedMs, exitCode, phases }) {
+export function performanceSummary({ candidate, elapsedMs, exitCode, phases, standard }) {
   return {
     version: 1,
     candidate,
+    ...(standard ? { standard: { id: standard.standard, digest: standard.digest, level: standard.level } } : {}),
     elapsedMs: Math.round(elapsedMs),
     exitCode,
     phases: phases.map((phase) => ({ ...phase, elapsedMs: Math.round(phase.elapsedMs) })),

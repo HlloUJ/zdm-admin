@@ -56,3 +56,34 @@ export function validateFrontendTestReport(report, { kind, runId } = {}) {
   }
   return { status: 'passed', tests: report.tests.length, files: report.files.length, suites: report.suites.length };
 }
+
+export function testIdentities(report, executed = false) {
+  assert.ok(Array.isArray(report.suites), 'Playwright report is missing suites');
+  assert.equal(report.errors?.length ?? 0, 0, 'Playwright report contains global errors');
+  const ids = [];
+  function visit(suite) {
+    for (const spec of suite.specs ?? []) {
+      assert.ok(spec.id && Array.isArray(spec.tests) && spec.tests.length, 'Invalid Playwright spec');
+      for (const item of spec.tests) {
+        assert.ok(item.projectName, 'Playwright project identity is missing');
+        if (executed) {
+          assert.ok(item.results?.length, `Test has no execution result: ${spec.id}`);
+          assert.equal(item.expectedStatus ?? 'passed', 'passed', `Expected failure cannot pass: ${spec.id}`);
+          assert.equal(item.results?.length, 1, `Every execution must pass exactly once: ${spec.id}`);
+          assert.equal(item.results[0].retry ?? 0, 0, `Test retried: ${spec.id}`);
+          assert.equal(item.status, 'expected', `Test was skipped, flaky or unexpected: ${spec.id}`);
+          assert.ok(
+            item.results.every((result) => result.status === 'passed'),
+            `Every execution must pass without skipped, interrupted or failed attempts: ${spec.id}`,
+          );
+        }
+        ids.push(`${spec.id}:${item.projectName}:${item.repeatEachIndex ?? 0}`);
+      }
+    }
+    for (const child of suite.suites ?? []) visit(child);
+  }
+  report.suites.forEach(visit);
+  assert.ok(ids.length > 0, 'An empty test list cannot pass the coverage gate');
+  assert.equal(new Set(ids).size, ids.length, 'Duplicate tests inside a Playwright report');
+  return ids.sort();
+}

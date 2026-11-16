@@ -8,6 +8,7 @@ export async function waitQuality({
   readJobs,
   wait,
   report = console.log,
+  onProgress,
   deadlineMs = 3600000,
   now = Date.now,
   progressIntervalMs = 60000,
@@ -21,6 +22,23 @@ export async function waitQuality({
   let interruptedAt = null;
   let previous;
   let transportFailures = 0;
+  const publish = async (run, jobs = null, terminalVerified = false) => {
+    if (!onProgress) return;
+    try {
+      await onProgress({
+        runId: String(runId),
+        headSha: expectedHead,
+        attempt: 1,
+        status: run.status,
+        conclusion: run.conclusion ?? null,
+        jobs,
+        terminalVerified,
+        observedAt: new Date(now()).toISOString(),
+      });
+    } catch {
+      report(`CI ${runId} progress capture unavailable; original CI verification remains required.`);
+    }
+  };
   while (now() - start < deadlineMs) {
     let run;
     try {
@@ -68,6 +86,7 @@ export async function waitQuality({
     if (run.status !== previous) {
       report(`CI ${runId}: ${run.status}`);
       previous = run.status;
+      await publish(run);
     }
     if (run.status === 'completed') {
       if (run.conclusion !== 'success')
@@ -112,6 +131,19 @@ export async function waitQuality({
           1,
           `Missing required ${name}`,
         );
+      await publish(
+        run,
+        jobs
+          .map((job) => ({
+            id: job.id ?? null,
+            name: job.name,
+            status: job.status,
+            conclusion: job.conclusion ?? null,
+            active: [],
+          }))
+          .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0)),
+        true,
+      );
       const completedJobs = jobs.map((job) => Date.parse(job.completed_at)).filter(Number.isFinite);
       return {
         gatesFinishedAt: completedJobs.length ? new Date(Math.max(...completedJobs)).toISOString() : undefined,
@@ -144,6 +176,7 @@ export async function waitQuality({
         if (key !== previousJobs) {
           report(`CI ${runId} jobs: ${key}`);
           previousJobs = key;
+          await publish(run, summary);
         }
       } catch {
         networkObservations.push({ kind: 'progress-unavailable', observedAt: now(), recovered: null });
@@ -181,7 +214,7 @@ export async function waitQuality({
   }
   throw new Error(`CI wait timed out; preserve run ${runId}, inspect status without rerunning checks`);
 }
-export async function waitRemoteQuality(root, runId, expectedHead) {
+export async function waitRemoteQuality(root, runId, expectedHead, { onProgress } = {}) {
   const gh = (args) => {
     const result = spawnSync('gh', args, { cwd: root, encoding: 'utf8', timeout: 30000 });
     assert.equal(result.status, 0, 'Cannot read remote CI status');
@@ -192,6 +225,7 @@ export async function waitRemoteQuality(root, runId, expectedHead) {
   return waitQuality({
     runId,
     expectedHead,
+    onProgress,
     readRun: () => api(''),
     readJobs: () => api('/jobs?filter=all&per_page=100').jobs,
     wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
