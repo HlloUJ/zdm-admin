@@ -39,7 +39,16 @@ export async function codexMonitoringContext({ taskId, owner, rootThreadId, requ
   return context;
 }
 
-export async function startCodexTask(input, { queue, readTask, readThread, start }) {
+export function developmentCapacity({ limit, activeDevelopment, activeDelivery, activeOther = 0 }) {
+  assert.ok(Number.isSafeInteger(limit) && limit > 0, 'Actual executor limit required');
+  for (const value of [activeDevelopment, activeDelivery, activeOther])
+    assert.ok(Number.isSafeInteger(value) && value >= 0);
+  assert.ok(activeDelivery <= 1, 'Delivery must remain serial');
+  assert.ok(activeDevelopment + activeDelivery + activeOther <= limit, 'Invalid executor capacity snapshot');
+  return { available: activeDevelopment < limit - activeOther - 1, reservedDelivery: 1 };
+}
+
+export async function startCodexTask(input, { queue, readTask, readThread, start, readCapacity }) {
   const context = await codexMonitoringContext(input, { readTask, readThread });
   const state = queue.read();
   assert.ok(state && !state.paused, 'Global pause remains in effect');
@@ -47,6 +56,18 @@ export async function startCodexTask(input, { queue, readTask, readThread, start
   assert.ok(ticket && ticket.status === 'queued', 'Only a queued new task may be dispatched; do not replay launch');
   assert.equal(ticket.owner, input.owner);
   assert.deepEqual(ticket.request, input.request, 'Original queued instruction required');
+  let capacity;
+  try {
+    capacity = readCapacity ? developmentCapacity(await readCapacity()) : null;
+  } catch {
+    return { status: 'queued', taskId: input.taskId, reason: 'execution-capacity-unverified' };
+  }
+  if ((state.limits?.development === null && !capacity) || capacity?.available === false)
+    return {
+      status: 'queued',
+      taskId: input.taskId,
+      reason: capacity ? 'execution-capacity-reserved-for-delivery' : 'execution-capacity-unverified',
+    };
   const admission = queue.claim({
     lane: 'development',
     task: input.taskId,

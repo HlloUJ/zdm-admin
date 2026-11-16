@@ -13,6 +13,7 @@ import {
   notifyCodexObservation,
   recordCodexProgress,
   syncCodexProgress,
+  developmentCapacity,
 } from './task-codex-host.mjs';
 
 const owner = '11111111-1111-4111-8111-111111111111';
@@ -35,6 +36,41 @@ const context = () => ({
   taskStableId: 'native-task',
   taskNumber: '337',
   taskName: 'isolated task',
+});
+test('dynamic development capacity always reserves one delivery slot', () => {
+  assert.equal(developmentCapacity({ limit: 6, activeDevelopment: 5, activeDelivery: 0 }).available, false);
+  assert.equal(developmentCapacity({ limit: 6, activeDevelopment: 5, activeDelivery: 1 }).available, false);
+  assert.equal(developmentCapacity({ limit: 6, activeDevelopment: 4, activeDelivery: 1 }).available, true);
+  assert.equal(
+    developmentCapacity({ limit: 4, activeDevelopment: 2, activeDelivery: 0, activeOther: 1 }).available,
+    false,
+  );
+  assert.throws(() => developmentCapacity({ limit: 4, activeDevelopment: 4, activeDelivery: 1 }));
+});
+test('executor capacity exhaustion or unknown capacity leaves unbounded development queued without claiming or launching', async (t) => {
+  const queue = createExecutionOrder(fixture(t));
+  queue.initialize(request(1));
+  queue.direct({ action: 'resume-all', request: request(2) });
+  queue.enqueue({ lane: 'development', task: 'native-task', owner, request: request(3) });
+  queue.direct({ action: 'set-limits', limits: { development: null, delivery: 1 }, request: request(4) });
+  const before = queue.read();
+  const host = {
+    queue,
+    readTask: async () => board(),
+    readThread: async () => source(),
+    start: () => assert.fail('capacity wait must not start'),
+  };
+  assert.equal((await startCodexTask(input(), host)).status, 'queued');
+  assert.equal(
+    (
+      await startCodexTask(input(), {
+        ...host,
+        readCapacity: async () => ({ limit: 4, activeDevelopment: 2, activeDelivery: 0, activeOther: 1 }),
+      })
+    ).status,
+    'queued',
+  );
+  assert.deepEqual(queue.read(), before);
 });
 function fixture(t) {
   const parent = path.join(process.cwd(), '.task-runtime/codex-host-tests');

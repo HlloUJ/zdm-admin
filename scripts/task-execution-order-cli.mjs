@@ -9,6 +9,7 @@ import { createExecutionOrder } from './task-execution-order.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 import { verifyCancellation } from './task-cancellation-proof.mjs';
 import { deliveryStatus } from './completion-status.mjs';
+import { assertDeliveredDependencies } from './task-context.mjs';
 
 const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
 export function verifyDevelopmentCompletion(task, evidence) {
@@ -53,6 +54,15 @@ export function executionOrderCommand(root, [command, json]) {
   }
   assert.ok(json, 'Explicit JSON command required; credentials are not user authorization');
   const input = JSON.parse(json);
+  const dependenciesReady = (ticket) => {
+    const task = registry.readTask(ticket.task);
+    if (!task || task.owner !== ticket.owner) return false;
+    try {
+      return assertDeliveredDependencies(root, task);
+    } catch {
+      return false;
+    }
+  };
   if (command === 'initialize') return queue.initialize(input);
   if (command === 'enqueue') return queue.enqueue(input);
   if (command === 'claim') {
@@ -63,10 +73,17 @@ export function executionOrderCommand(root, [command, json]) {
         ?.tickets.find((item) => item.lane === input.lane && item.task === input.task && item.owner === input.owner);
       verifyMonitoringInstruction(input.monitorContext, ticket);
     }
-    return queue.claim(input);
+    return queue.claim(input, dependenciesReady);
   }
   if (command === 'block') return queue.block(input);
-  if (command === 'direct') return queue.direct(input);
+  if (command === 'direct') {
+    if (input.action === 'resume-only' && input.lane === 'delivery') {
+      const task = registry.readTask(input.task);
+      assert.ok(task && task.owner === input.owner);
+      assertDeliveredDependencies(root, task);
+    }
+    return queue.direct(input);
+  }
   if (command === 'cancel-plan') {
     const target = queue.cancellationTarget(input);
     const proof = verifyCancellation(registry, target);

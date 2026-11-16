@@ -99,23 +99,11 @@ export function validateTaskBatch(root, batch) {
   assert.equal(task.branch, batch.branch, 'Task branch changed');
   return taskBatch(task, root);
 }
-export function planTaskDelivery(root, batch) {
-  batch = validateTaskBatch(root, batch);
+export function assertDeliveredDependencies(root, batch) {
   const registry = createTaskRegistry(root);
   const git = (...args) =>
-    execFileSync('git', ['--no-replace-objects', '-C', batch.worktree, ...args], { encoding: 'utf8' }).trim();
-  assert.equal(git('status', '--porcelain'), '', 'Task must be clean before delivery planning');
-  if (batch.frozen) {
-    assert.equal(
-      readAcceptance(batch.worktree, batch.id)?.commit,
-      batch.frozen.accepted,
-      'Original accepted source changed',
-    );
-    assertAcceptedSource(batch.worktree, batch.id, git('rev-parse', 'HEAD'));
-  }
-  const head = git('rev-parse', 'HEAD'),
-    originMain = git('rev-parse', 'origin/main');
-  assert.equal(head, batch.recordedHead, 'Checkpoint the exact current task head');
+    execFileSync('git', ['--no-replace-objects', '-C', root, ...args], { encoding: 'utf8' }).trim();
+  const originMain = git('rev-parse', 'origin/main');
   for (const dependencyId of batch.dependsOn) {
     const dependency = registry.readTask(dependencyId);
     assert.ok(
@@ -130,6 +118,25 @@ export function planTaskDelivery(root, batch) {
     );
     git('merge-base', '--is-ancestor', dependency.main.local, originMain);
   }
+  return true;
+}
+export function planTaskDelivery(root, batch) {
+  batch = validateTaskBatch(root, batch);
+  const git = (...args) =>
+    execFileSync('git', ['--no-replace-objects', '-C', batch.worktree, ...args], { encoding: 'utf8' }).trim();
+  assert.equal(git('status', '--porcelain'), '', 'Task must be clean before delivery planning');
+  if (batch.frozen) {
+    assert.equal(
+      readAcceptance(batch.worktree, batch.id)?.commit,
+      batch.frozen.accepted,
+      'Original accepted source changed',
+    );
+    assertAcceptedSource(batch.worktree, batch.id, git('rev-parse', 'HEAD'));
+  }
+  const head = git('rev-parse', 'HEAD'),
+    originMain = git('rev-parse', 'origin/main');
+  assert.equal(head, batch.recordedHead, 'Checkpoint the exact current task head');
+  assertDeliveredDependencies(root, batch);
   const commits = git('rev-list', '--reverse', batch.base + '..' + head, '--not', originMain)
     .split('\n')
     .filter(Boolean);
