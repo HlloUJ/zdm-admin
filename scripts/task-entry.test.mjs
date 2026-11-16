@@ -108,43 +108,44 @@ test('raw register cannot create a new task outside the enrolled start path', (t
   assert.equal(createTaskRegistry(f.main).readTask('a'), null);
 });
 
-test('canonical native start blocks missing intake before any child process is spawned', (t) => {
-  const f = fixture(t),
-    owner = '11111111-1111-4111-8111-111111111111';
-  writeFileSync(
-    path.join(f.main, 'scripts/task-start.mjs'),
-    "import {writeFileSync} from 'node:fs';writeFileSync('child-started','unsafe');",
-  );
-  f.git('add', '.');
-  f.git('commit', '-m', 'isolated start marker');
-  f.git('update-ref', 'refs/remotes/origin/main', 'HEAD');
-  const context = {
-    executionSurface: 'codex-thread',
-    taskNumber: '638',
-    taskName: 'isolated native',
-    taskStableId: 'native-new',
-    worker: owner,
-    rootThreadId: owner,
-    roomId: owner,
-    authorizationRef: 'fixture-execute',
-  };
-  const before = f.git('worktree', 'list', '--porcelain');
-  const result = spawnSync(
-    process.execPath,
-    [
-      path.join(f.main, 'scripts/task-entry.mjs'),
-      'start',
-      '--slug',
-      'native-new',
-      '--owner',
-      owner,
-      '--monitor-context',
-      JSON.stringify(context),
-    ],
-    { cwd: f.a, env: { ...process.env, CODEX_THREAD_ID: owner }, encoding: 'utf8' },
-  );
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /Board intake missing/);
-  assert.equal(f.git('worktree', 'list', '--porcelain'), before);
-  assert.throws(() => readFileSync(path.join(f.a, 'child-started')), { code: 'ENOENT' });
-});
+for (const surface of ['codex-thread', 'collaboration-agent'])
+  test(`canonical ${surface} start blocks missing intake before any child process is spawned`, (t) => {
+    const f = fixture(t),
+      owner = '11111111-1111-4111-8111-111111111111';
+    writeFileSync(
+      path.join(f.main, 'scripts/task-start.mjs'),
+      "import {writeFileSync} from 'node:fs';writeFileSync('child-started','unsafe');",
+    );
+    f.git('add', '.');
+    f.git('commit', '-m', 'isolated start marker');
+    f.git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    const context = {
+      executionSurface: surface,
+      taskNumber: '638',
+      taskName: 'isolated native',
+      taskStableId: 'native-new',
+      worker: surface === 'codex-thread' ? owner : '/root/delivery_987',
+      rootThreadId: owner,
+      roomId: owner,
+      authorizationRef: 'fixture-execute',
+    };
+    const before = f.git('worktree', 'list', '--porcelain');
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(f.main, 'scripts/task-entry.mjs'),
+        'start',
+        '--slug',
+        'native-new',
+        '--owner',
+        owner,
+        '--monitor-context',
+        JSON.stringify(context),
+      ],
+      { cwd: f.a, env: { ...process.env, CODEX_THREAD_ID: owner }, encoding: 'utf8' },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Board intake missing/);
+    assert.equal(f.git('worktree', 'list', '--porcelain'), before);
+    assert.throws(() => readFileSync(path.join(f.a, 'child-started')), { code: 'ENOENT' });
+  });

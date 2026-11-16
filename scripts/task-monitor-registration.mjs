@@ -21,6 +21,9 @@ export function monitoringRegistration(owner, context, runtimeOwner = process.en
   if (context.executionSurface === 'codex-thread') {
     assert.match(context.worker, /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
     assert.equal(context.worker, owner, 'Native thread must be the actual execution owner');
+  } else if (context.executionSurface === 'collaboration-agent') {
+    assert.match(context.worker, /^\/root\/[a-z0-9_]+(?:\/[a-z0-9_]+)*$/);
+    assert.equal(context.rootThreadId, owner, 'Collaboration executor belongs to the real coordinator thread');
   } else {
     assert.equal(context.executionSurface, undefined, 'Unknown execution surface');
     assert.match(context.worker, /^\/root\/[a-z0-9_/]+$/);

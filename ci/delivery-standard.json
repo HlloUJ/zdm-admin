@@ -1,0 +1,362 @@
+{
+  "version": 1,
+  "id": "zdm-delivery-standard-v1",
+  "source": "https://app.notion.com/p/41a572fed032818fbae3eb9c2874092b",
+  "levels": {
+    "R0": {
+      "minimum": ["diff", "format", "document-contract"]
+    },
+    "R1": {
+      "minimum": ["diff", "format", "static", "affected-interaction"]
+    },
+    "R2": {
+      "minimum": ["diff", "format", "static", "affected-unit", "business-flow", "boundary-and-failure"]
+    },
+    "R3": {
+      "minimum": [
+        "diff",
+        "format",
+        "static",
+        "affected-unit",
+        "business-flow",
+        "boundary-and-failure",
+        "shared-consumers",
+        "compatibility"
+      ]
+    },
+    "R4": {
+      "minimum": [
+        "diff",
+        "format",
+        "static",
+        "affected-unit",
+        "business-flow",
+        "boundary-and-failure",
+        "affected-domain-full",
+        "risk-specific"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "id": "execution-and-validation-control",
+      "level": "R4",
+      "pattern": "^(?:AGENTS\\.md$|\\.agents/|\\.codex/|scripts/|ci/|\\.github/|docs/(?:engineering/|task-completion\\.md$))",
+      "special": ["allow-and-deny", "evidence-invalidation", "safe-recovery"],
+      "engineering": true,
+      "domains": ["engineering"]
+    },
+    {
+      "id": "consumed-ui-rule",
+      "level": "R3",
+      "pattern": "^docs/ui/",
+      "domains": ["frontend"],
+      "special": ["consumer-closure", "document-contract"]
+    },
+    {
+      "id": "global-styles",
+      "level": "R3",
+      "pattern": "^src/styles/",
+      "domains": ["frontend"],
+      "special": ["consumer-closure", "affected-viewports"]
+    },
+    {
+      "id": "security-and-important-data",
+      "level": "R4",
+      "pattern": "(?:auth|security|permission|tenant|inventory|stock|price|payment|migration|delete|cleanup|reclaim)",
+      "special": ["permission-and-isolation", "data-consistency", "failure-and-recovery"]
+    },
+    {
+      "id": "shared-contract",
+      "level": "R3",
+      "pattern": "(?:^src/(?:components/|composables/|services/|router/)|(?:^|/)(?:shared|common|api|dto|contract)/|(?:Controller|Request|Response|Dto|DTO)\\.java$|^(?:package(?:-lock)?\\.json|vite|vitest|playwright|tsconfig|docker|compose))",
+      "special": ["consumer-closure", "contract-compatibility"]
+    },
+    {
+      "id": "local-style",
+      "level": "R1",
+      "pattern": "^src/.*\\.(?:css|scss|less)$",
+      "special": ["affected-viewports"]
+    },
+    {
+      "id": "local-runtime-source",
+      "level": "R2",
+      "pattern": "^(?!.*\\.(?:css|scss|less)$)(?:src/|backend/src/|tests/)",
+      "special": []
+    },
+    {
+      "id": "non-runtime-document",
+      "level": "R0",
+      "pattern": "(?:\\.md$|^docs/.*\\.(?:png|jpe?g|gif|webp|svg|pdf)$)",
+      "special": []
+    }
+  ],
+  "unknown": {
+    "level": "R4",
+    "minimum": ["complete-applicable-gates"],
+    "reason": "Unknown scope never grants a lower verification level"
+  },
+  "protected": [
+    "accepted-source",
+    "exact-candidate",
+    "required-ci-aggregates",
+    "first-failure",
+    "zero-skips-and-retries",
+    "runtime-handoff"
+  ],
+  "coverage": {
+    "version": 1,
+    "checks": {
+      "input-contracts": {
+        "stage": "scope",
+        "command": ["node", "scripts/delivery-input-contracts.mjs"],
+        "report": "delivery-input-contracts.json"
+      },
+      "formatting": {
+        "stage": "formatting",
+        "phase": "formatting",
+        "command": ["npm", "run", "format:check"]
+      },
+      "engineering-tests": {
+        "stage": "engineering",
+        "phase": "engineering-tests",
+        "command": ["npm", "run", "test:engineering"],
+        "report": "engineeringResults",
+        "reportKind": "engineering"
+      },
+      "engineering-static": {
+        "stage": "engineering",
+        "phase": "light-checks",
+        "command": ["node", "scripts/ci-light-checks.mjs"]
+      },
+      "frontend-static": {
+        "stage": "frontend",
+        "phase": "frontend-quality",
+        "command": ["npm", "run", "quality:static"]
+      },
+      "frontend-unit": {
+        "stage": "frontend",
+        "phase": "frontend-unit",
+        "command": ["npm", "run", "test:unit"],
+        "report": "frontendResults.unit",
+        "reportKind": "unit"
+      },
+      "frontend-tests": {
+        "stage": "frontend",
+        "phases": ["e2e-1", "e2e-2"],
+        "report": "complete-disjoint-playwright-shard-union",
+        "commands": {
+          "e2e-1": ["npm", "run", "test:e2e:ci", "--", "--shard=1/2", "--workers=1", "--reporter=list,json"],
+          "e2e-2": ["npm", "run", "test:e2e:ci", "--", "--shard=2/2", "--workers=1", "--reporter=list,json"]
+        }
+      },
+      "backend-tests": {
+        "stage": "backend",
+        "phase": "backend-quality",
+        "command": ["mvn", "-B", "test", "checkstyle:check", "spotbugs:check", "jacoco:report"],
+        "report": "backend-tests.json"
+      }
+    },
+    "requirements": {
+      "diff": {
+        "always": ["input-contracts"]
+      },
+      "format": {
+        "always": ["formatting"]
+      },
+      "document-contract": {
+        "documents": ["input-contracts"]
+      },
+      "static": {
+        "engineering": ["engineering-static"],
+        "frontend": ["frontend-static"],
+        "backend": ["backend-tests"]
+      },
+      "affected-unit": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-unit"],
+        "backend": ["backend-tests"]
+      },
+      "affected-interaction": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "business-flow": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "boundary-and-failure": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "shared-consumers": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "compatibility": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "affected-domain-full": {
+        "domains": true
+      },
+      "complete-applicable-gates": {
+        "domains": true
+      },
+      "risk-specific": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      }
+    },
+    "specialties": {
+      "allow-and-deny": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "evidence-invalidation": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "safe-recovery": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "consumer-closure": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "contract-compatibility": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "permission-and-isolation": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "data-consistency": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "failure-and-recovery": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "affected-viewports": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      },
+      "document-contract": {
+        "engineering": ["engineering-tests"],
+        "frontend": ["frontend-tests"],
+        "backend": ["backend-tests"]
+      }
+    },
+    "engineeringScenarios": {
+      "allow-and-deny": [
+        {
+          "file": "scripts/task-selected-resume.test.mjs",
+          "name": "foreign owner, user, room, duplicate target and delivery member cannot be selected"
+        }
+      ],
+      "evidence-invalidation": [
+        {
+          "file": "scripts/ci-quality-evidence.test.mjs",
+          "name": "evidence cannot be borrowed from another candidate or an incomplete run"
+        }
+      ],
+      "safe-recovery": [
+        {
+          "file": "scripts/completion-session.test.mjs",
+          "name": "reuse needs both matching candidate and an independent verifier, without rewriting original timing"
+        }
+      ],
+      "consumer-closure": [
+        {
+          "file": "scripts/runtime-file-scope.test.mjs",
+          "name": "installed preview service copies its complete native module dependency closure"
+        }
+      ],
+      "contract-compatibility": [
+        {
+          "file": "scripts/task-cleanup-handoff.test.mjs",
+          "name": "CI or retained checkout without task registration builds without Git identity or cleanup imports"
+        }
+      ],
+      "permission-and-isolation": [
+        {
+          "file": "scripts/task-selected-resume.test.mjs",
+          "name": "foreign owner, user, room, duplicate target and delivery member cannot be selected"
+        }
+      ],
+      "data-consistency": [
+        {
+          "file": "scripts/task-cleanup-handoff.test.mjs",
+          "name": "unchanged output is durably moved to exact stable carrier and immutable handoff replays"
+        }
+      ],
+      "failure-and-recovery": [
+        {
+          "file": "scripts/task-cleanup-handoff.test.mjs",
+          "name": "queue failure preserves stable object and intent; resume completes exact original handoff"
+        }
+      ],
+      "risk-specific": [
+        {
+          "file": "scripts/task-selected-resume.test.mjs",
+          "name": "foreign owner, user, room, duplicate target and delivery member cannot be selected"
+        },
+        {
+          "file": "scripts/ci-quality-evidence.test.mjs",
+          "name": "evidence cannot be borrowed from another candidate or an incomplete run"
+        },
+        {
+          "file": "scripts/completion-session.test.mjs",
+          "name": "reuse needs both matching candidate and an independent verifier, without rewriting original timing"
+        }
+      ],
+      "business-flow": [
+        {
+          "file": "scripts/completion-session.test.mjs",
+          "name": "happy post-CI closure orders evidence, handoff, preservation, cleanup and registry exactly once"
+        }
+      ],
+      "boundary-and-failure": [
+        {
+          "file": "scripts/task-selected-resume.test.mjs",
+          "name": "foreign owner, user, room, duplicate target and delivery member cannot be selected"
+        },
+        {
+          "file": "scripts/task-cleanup-handoff.test.mjs",
+          "name": "queue failure preserves stable object and intent; resume completes exact original handoff"
+        }
+      ],
+      "shared-consumers": [
+        {
+          "file": "scripts/runtime-file-scope.test.mjs",
+          "name": "installed preview service copies its complete native module dependency closure"
+        }
+      ],
+      "compatibility": [
+        {
+          "file": "scripts/task-cleanup-handoff.test.mjs",
+          "name": "CI or retained checkout without task registration builds without Git identity or cleanup imports"
+        }
+      ]
+    }
+  }
+}

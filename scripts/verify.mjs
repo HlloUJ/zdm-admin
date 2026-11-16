@@ -1,3 +1,5 @@
+import { assertStandardCoveragePlan } from './delivery-standard-coverage.mjs';
+import { deliveryStandardPlan, effectiveDeliveryPlan } from './delivery-standard.mjs';
 import { observeCurrentTiming } from './batch-timing-runtime.mjs';
 import { observeTaskTiming } from './task-timing.mjs';
 import { randomUUID } from 'node:crypto';
@@ -18,7 +20,7 @@ import {
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, readFileSync, lstatSync } from 'node:fs';
 import { createVerificationReporter, runVerificationTask } from './verification-runner.mjs';
 import { captureSource } from './verification-evidence.mjs';
 import { createValidationPlan } from './check-changed-plan.mjs';
@@ -73,6 +75,18 @@ export function createVerificationPlan({
   });
   const browserEnv = browser ? { ...qualityEnv, PLAYWRIGHT_CHANNEL: browser } : qualityEnv;
   const plan = {
+    inputContracts: {
+      root,
+      name: 'delivery input contracts',
+      command: process.execPath,
+      args: [
+        path.join(path.dirname(fileURLToPath(import.meta.url)), 'delivery-input-contracts.mjs'),
+        '--files-json',
+        JSON.stringify(files),
+      ],
+      env: qualityEnv,
+      reuse: false,
+    },
     earlyChecks: earlyReadinessTasks(root, files, qualityEnv),
     preflight: task('format check', 'format:check', { reuse: false }),
     contractPreflight:
@@ -110,6 +124,13 @@ export function createVerificationPlan({
     affected,
     impact,
     plannedCandidate,
+    standard: deliveryStandardPlan({
+      root,
+      files,
+      impact,
+      candidate: plannedCandidate?.digest ?? null,
+      base: plannedCandidate?.baseline ?? null,
+    }),
   };
   const complete = () => {
     // A light check moved to the front must not execute again in readiness.
@@ -120,6 +141,7 @@ export function createVerificationPlan({
   if (affected && ciCapability?.verified === false) {
     plan.affected = false;
     plan.ciFallback = true;
+    plan.ciCapability = ciCapability;
     plan.contractPreflight = task('CI reuse contract preflight', 'test:ci-reuse', { reuse: false });
     return complete();
   }
@@ -195,9 +217,33 @@ export async function executeVerification(
   plan,
   { run = runVerificationTask, force = false, report = console.log, capture = captureSource } = {},
 ) {
+  if (plan.standard) assertStandardCoveragePlan(plan.standard);
   const started = performance.now();
   const phases = [];
   const before = capture(plan.preflight.root);
+  const standard = plan.standard
+    ? effectiveDeliveryPlan(plan, {
+        candidate: before.digest,
+        base: before.baseline,
+        environment: { platform: process.platform, arch: process.arch, node: process.version },
+      })
+    : null;
+  // A plan is evidence of selection, never evidence that a listed check passed.
+  if (standard) {
+    const directory = path.join(plan.preflight.root, '.task-verification/plans');
+    for (const item of [path.dirname(directory), directory]) {
+      if (existsSync(item)) {
+        if (lstatSync(item).isSymbolicLink() || !lstatSync(item).isDirectory())
+          throw new Error('Unsafe plan directory');
+      } else mkdirSync(item, { mode: 0o700 });
+    }
+    const file = path.join(directory, standard.digest + '.json');
+    const content = JSON.stringify(standard, null, 2) + '\n';
+    if (existsSync(file)) {
+      if (lstatSync(file).isSymbolicLink() || readFileSync(file, 'utf8') !== content)
+        throw new Error('Stored validation plan differs');
+    } else writeFileSync(file, content, { flag: 'wx', mode: 0o600 });
+  }
   // One UUID per executor, never inherited from a previous run or sent to CI.
   const localDiagnostics =
     plan.contractPreflight &&
@@ -227,6 +273,7 @@ export async function executeVerification(
           elapsedMs: performance.now() - started,
           exitCode: code,
           phases,
+          standard,
         }),
       );
       report(`Performance report: ${file}`);
@@ -263,6 +310,7 @@ export async function executeVerification(
     });
     return result;
   };
+  if (plan.inputContracts && (await execute(plan.inputContracts)).exitCode !== 0) return finish(1);
   if ((await execute(plan.preflight)).exitCode !== 0) return finish(1);
   for (const task of plan.earlyChecks ?? []) if ((await execute(task)).exitCode !== 0) return finish(1);
   if (

@@ -98,7 +98,7 @@ test('affected verification keeps one engineering pipeline and retains source gu
     root: f.root,
     affected: true,
     files: ['scripts/helper.mjs'],
-    impact: { full: false, engineering: true, frontend: false, backend: false },
+    impact: { full: false, engineering: true, frontend: false, backend: false, runtime: false },
   });
   assert.equal(plan.engineering.length, 1);
   assert.ok(plan.engineering[0].args.includes('test:engineering'));
@@ -120,4 +120,20 @@ test('review guard rejects stale inputs without refreshing them, then accepts ex
   assert.equal(readFileSync(path.join(f.root, 'scripts/test-domain-manifest.json'), 'utf8'), before);
   f.seal();
   assert.equal(run().status, 0);
+});
+
+test('allowed nested delivery repair tests remain in the full engineering inventory', (t) => {
+  const f = fixture(t);
+  const moved = [
+    'task-cleanup-npm.test.mjs',
+    'task-completion-placement-order.test.mjs',
+    'task-progress-invalid-supersession.test.mjs',
+  ];
+  for (const name of moved) f.write('scripts/delivery-repairs/' + name, '// isolated inventory fixture');
+  f.write('scripts/delivery-repairs/test-support/fixture.mjs', 'export const fixture=true;');
+  for (const domain of ['all', 'engineering']) {
+    const files = scriptTestFiles(f.root, domain);
+    for (const name of moved) assert.ok(files.includes('scripts/delivery-repairs/' + name));
+    assert.ok(!files.includes('scripts/delivery-repairs/test-support/fixture.mjs'));
+  }
 });

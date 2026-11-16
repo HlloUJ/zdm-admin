@@ -18,6 +18,11 @@ export function verifyDevelopmentCompletion(task, evidence) {
   assert.equal(evidence.owner, task.owner);
   assert.equal(evidence.head, git(task.worktree, 'rev-parse', 'HEAD'));
   assert.equal(git(task.worktree, 'status', '--porcelain'), '', 'Uncommitted development cannot release a slot');
+  return verifyDevelopmentReports(task, evidence);
+}
+function verifyDevelopmentReports(task, evidence) {
+  assert.equal(evidence?.task, task.id);
+  assert.equal(evidence.owner, task.owner);
   assert.ok(
     Array.isArray(evidence.reports) && evidence.reports.length > 0,
     'Exact development verification reports required',
@@ -46,6 +51,33 @@ export function verifyDevelopmentCompletion(task, evidence) {
   }
   return true;
 }
+// Placement may reuse an exact tree after a recorded Git-history replay, never a changed candidate.
+// Queue completion above keeps its original strict HEAD contract.
+export function verifyDevelopmentPlacementEvidence(task, evidence) {
+  const head = git(task.worktree, 'rev-parse', 'HEAD');
+  assert.equal(git(task.worktree, 'status', '--porcelain'), '', 'Uncommitted candidate is not ready');
+  assert.match(evidence?.head ?? '', /^[a-f0-9]{40}$/);
+  const tree = git(task.worktree, 'rev-parse', head + '^{tree}'),
+    sourceTree = git(task.worktree, 'rev-parse', evidence.head + '^{tree}');
+  assert.equal(sourceTree, tree, 'Development evidence belongs to changed source');
+  verifyDevelopmentReports(task, evidence);
+  const assessment = evidence.assessment;
+  assert.equal(assessment?.task, task.id);
+  assert.equal(assessment.owner, task.owner);
+  assert.equal(assessment.head, head);
+  assert.equal(assessment.noKnownDefects, true, 'Current ordinary development assessment required');
+  assert.ok(Number.isFinite(Date.parse(assessment.observedAt)));
+  return {
+    task: task.id,
+    owner: task.owner,
+    candidate: head,
+    sourceHead: evidence.head,
+    tree,
+    evidenceDigest: createHash('sha256').update(JSON.stringify(evidence)).digest('hex'),
+    assessment,
+    verified: true,
+  };
+}
 export function executionOrderCommand(root, [command, json]) {
   const registry = createTaskRegistry(root);
   const queue = createExecutionOrder(registry.commonDir);
@@ -69,7 +101,7 @@ export function executionOrderCommand(root, [command, json]) {
   if (command === 'claim') {
     if (input.lane === 'development' && !registry.readTask(input.task)) {
       requireStartMonitoring(input.owner, input.task, input.monitorContext);
-      if (input.monitorContext?.executionSurface === 'codex-thread')
+      if (['codex-thread', 'collaboration-agent'].includes(input.monitorContext?.executionSurface))
         createBoardIntake(registry.commonDir).require(input.monitorContext, input.task, input.owner);
       const ticket = queue
         .read()
@@ -80,9 +112,34 @@ export function executionOrderCommand(root, [command, json]) {
   }
   if (command === 'block') return queue.block(input);
   if (command === 'direct') {
+    if (input.action === 'resume-selected') {
+      assert.ok(Array.isArray(input.members) && input.members.length > 0, 'Exact selected tasks required');
+      for (const member of input.members) {
+        assert.equal(member.lane, 'development');
+        const current = queue
+          .read()
+          ?.tickets.find((t) => t.task === member.task && t.lane === member.lane && t.owner === member.owner);
+        requireStartMonitoring(member.owner, member.task, member.monitorContext);
+        if (['codex-thread', 'collaboration-agent'].includes(member.monitorContext?.executionSurface))
+          createBoardIntake(registry.commonDir).require(member.monitorContext, member.task, member.owner);
+        verifyMonitoringInstruction(member.monitorContext, current);
+        const registered = registry.readTask(member.task);
+        if (registered) {
+          assert.equal(registered.owner, member.owner);
+          if (member.kind !== undefined) assert.equal(registered.kind, member.kind, 'Registered task kind differs');
+          for (const key of ['taskStableId', 'taskNumber', 'rootThreadId', 'roomId', 'authorizationRef', 'worker'])
+            assert.equal(
+              registered.monitoring?.[key],
+              member.monitorContext[key],
+              'Registered monitoring differs: ' + key,
+            );
+        }
+      }
+    }
+
     if (input.action === 'resume-only' && input.lane === 'development' && !registry.readTask(input.task)) {
       requireStartMonitoring(input.owner, input.task, input.monitorContext);
-      if (input.monitorContext?.executionSurface === 'codex-thread')
+      if (['codex-thread', 'collaboration-agent'].includes(input.monitorContext?.executionSurface))
         createBoardIntake(registry.commonDir).require(input.monitorContext, input.task, input.owner);
       verifyMonitoringInstruction(
         input.monitorContext,
@@ -102,6 +159,21 @@ export function executionOrderCommand(root, [command, json]) {
     assert.deepEqual(queue.cancellationTarget(input), target, 'Cancellation target changed during plan');
     return { dryRun: true, cancelled: false, futureAuthorization: false, proof };
   }
+  if (command === 'promote-delivery') {
+    const registered = registry.readTask(input.task);
+    assert.ok(registered && registered.owner === input.owner, 'Exact registered engineering task required');
+    return queue.promoteDelivery(
+      input,
+      (development, authorization) => {
+        const fresh = registry.readTask(input.task);
+        for (const key of ['id', 'kind', 'owner', 'worktree', 'branch', 'revision'])
+          assert.equal(fresh?.[key], registered[key], 'Registered engineering task changed');
+        assert.equal(registered.kind, authorization.kind, 'Task is not the authorized engineering kind');
+        return verifyDevelopmentCompletion(registered, development.completion.evidence);
+      },
+      dependenciesReady,
+    );
+  }
   if (command === 'cancel') {
     return queue.cancel(input, (ticket) => verifyCancellation(registry, ticket));
   }
@@ -117,7 +189,9 @@ export function executionOrderCommand(root, [command, json]) {
       return true;
     });
   }
-  throw new Error('execution-order <status|initialize|enqueue|claim|block|direct|complete|cancel|cancel-plan> [json]');
+  throw new Error(
+    'execution-order <status|initialize|enqueue|claim|block|direct|complete|promote-delivery|cancel|cancel-plan> [json]',
+  );
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
