@@ -7,9 +7,9 @@ const impact = { frontend: true, backend: true, engineering: true, full: true, r
 test('versioned classification applies high-risk and shared rules before local file extension', () => {
   for (const [file, level] of [
     ['README.md', 'R0'],
-    ['src/pages/example/view.css', 'R1'],
+    ['src/pages/finished-stock/store/index.css', 'R1'],
     ['src/pages/example/index.vue', 'R2'],
-    ['src/components/common/theme.css', 'R3'],
+    ['src/styles/index.css', 'R3'],
     ['src/services/client.ts', 'R3'],
     ['src/pages/stock/view.css', 'R4'],
     ['scripts/verify.mjs', 'R4'],
@@ -99,7 +99,7 @@ test('missing or malformed standard cannot authorize a document-only plan', asyn
     path.join(root, 'scripts/delivery-standard.mjs'),
     readFileSync(new URL('./delivery-standard.mjs', import.meta.url)),
   );
-  for (const name of ['delivery-standard-coverage.mjs', 'frontend-test-evidence.mjs'])
+  for (const name of ['delivery-standard-coverage.mjs', 'frontend-test-evidence.mjs', 'stylesheet-scope.mjs'])
     writeFileSync(path.join(root, 'scripts', name), readFileSync(new URL('./' + name, import.meta.url)));
   writeFileSync(path.join(root, 'ci/delivery-standard.json'), '{broken');
   const invalid = await import(new URL('file://' + path.join(root, 'scripts/delivery-standard.mjs')));
@@ -124,4 +124,17 @@ test('runtime-consumed UI rules and sensitive documents cannot pass as ordinary 
   assert.equal(sensitive.full, true);
   assert.equal(sensitive.frontend, true);
   assert.equal(sensitive.backend, true);
+});
+
+test('known full gates do not fabricate unknown scope, while explicit transitive uncertainty is preserved', () => {
+  const known = deliveryStandardPlan({ files: ['src/services/client.ts'], impact });
+  assert.equal(known.unknownScope, false);
+  const unknown = deliveryStandardPlan({
+    files: ['src/pages/example/index.vue'],
+    impact: { ...impact, scopeUncertainty: [{ code: 'transitive-impact-unproven', reason: 'Unreviewed consumer' }] },
+  });
+  assert.equal(unknown.unknownScope, true);
+  assert.equal(unknown.level, 'R4');
+  assert.ok(unknown.minimum.includes('complete-applicable-gates'));
+  assert.equal(unknown.scopeUncertainty[0].reason, 'Unreviewed consumer');
 });

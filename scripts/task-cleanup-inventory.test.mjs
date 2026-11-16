@@ -48,7 +48,11 @@ test('total inventory classifies dependencies, tests, evidence and unknown owned
   assert.equal(result.spaceReleased, false);
   assert.equal(result.implementationComplete, false);
   assert.ok(result.gaps.some((g) => g.type === 'temporary-source-copy'));
-  assert.ok(result.gaps.some((g) => g.type === 'expired-duplicate-report'));
+  assert.equal(result.typeCoverage.find((c) => c.type === 'expired-duplicate-report').state, 'automatic-handoff');
+  assert.ok(
+    !result.resources.some((r) => r.type === 'expired-duplicate-report' && r.disposition === 'pending-cleanup'),
+    'A supported type alone never admits an object',
+  );
   assert.equal(result.resources.find((r) => r.type === 'private-dependencies').disposition, 'protected-retention');
   assert.equal(
     result.resources.find((r) => r.type === 'private-dependencies').preserved.location.path,

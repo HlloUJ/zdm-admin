@@ -1,4 +1,8 @@
-import { handoffBuiltDist, recordCloseoutCleanupInventory } from './task-cleanup-handoff.mjs';
+import {
+  handoffBuiltDist,
+  handoffPreservedReportCopies,
+  recordCloseoutCleanupInventory,
+} from './task-cleanup-handoff.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
@@ -557,6 +561,35 @@ async function completionCommandLocked(
                 })
               : { state: 'retained', reason: 'Legacy task outputs remain protected' };
           const preservedAssets = preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id));
+          const reportHandoffs =
+            batch.taskRegistryVersion === 2
+              ? await handoffPreservedReportCopies({
+                  root: batch.worktree,
+                  common,
+                  task: batch.id,
+                  proof: {
+                    worktree: batch.worktree,
+                    head: batch.recordedHead,
+                    accepted: readAcceptance(anchor, batch.id).commit,
+                    main: expectedMain,
+                  },
+                  preserved: preservedAssets,
+                  assertUnreferenced: async () => {
+                    const task = createTaskRegistry(anchor).readTask(batch.id);
+                    const references = await runtimeReferences(task);
+                    assert.equal(references.owned.length, 0, 'Task frontend still references reports');
+                    assert.equal(references.backendPorts.length, 0, 'Task backend still references reports');
+                    if (previewControl.assertCleanupSafe)
+                      await previewControl.assertCleanupSafe({
+                        anchor,
+                        task: batch.worktree,
+                        preview,
+                        common,
+                        main: expectedMain,
+                      });
+                  },
+                })
+              : [];
           const cleanupInventory = recordCloseoutCleanupInventory({
             root: batch.worktree,
             common,
@@ -569,8 +602,9 @@ async function completionCommandLocked(
             },
             preserved: preservedAssets,
             distHandoff: cleanupHandoff,
+            reportHandoffs,
           });
-          return { ...preservedAssets, cleanupHandoff, cleanupInventory };
+          return { ...preservedAssets, cleanupHandoff, reportHandoffs, cleanupInventory };
         },
       },
       cleanup: {

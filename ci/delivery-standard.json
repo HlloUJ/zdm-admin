@@ -54,6 +54,13 @@
       "special": ["consumer-closure", "document-contract"]
     },
     {
+      "id": "global-styles",
+      "level": "R3",
+      "pattern": "^src/styles/",
+      "domains": ["frontend"],
+      "special": ["consumer-closure", "affected-viewports"]
+    },
+    {
       "id": "security-and-important-data",
       "level": "R4",
       "pattern": "(?:auth|security|permission|tenant|inventory|stock|price|payment|migration|delete|cleanup|reclaim)",
@@ -114,7 +121,8 @@
         "stage": "engineering",
         "phase": "engineering-tests",
         "command": ["npm", "run", "test:engineering"],
-        "report": "engineeringResults"
+        "report": "engineeringResults",
+        "reportKind": "engineering"
       },
       "engineering-static": {
         "stage": "engineering",
@@ -130,7 +138,8 @@
         "stage": "frontend",
         "phase": "frontend-unit",
         "command": ["npm", "run", "test:unit"],
-        "report": "frontendResults.unit"
+        "report": "frontendResults.unit",
+        "reportKind": "unit"
       },
       "frontend-tests": {
         "stage": "frontend",

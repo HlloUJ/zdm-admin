@@ -1,0 +1,13 @@
+# 正式交付的实时回执宿主
+
+普通completion CLI继续耐久记录outbox，无宿主时不增加网络工作。十分钟周期监测作为兜底，阶段进展通过现有417接口实时传送。
+
+使用准确已发布main入口；首次控制面自升级只能按任务完成文档的已审查准确候选例外，不把候选称为已发布。宿主在同一个Node进程调用`runCompletionWithProgress({root,args,call})`，保留原completionCommand的授权、冻结、门禁、最终main互斥和交接流程。root必须是本任务准确registry目录，宿主只能访问其task-progress目录及同任务417操作。
+
+需要私有凭证输入时运行该版本的`node scripts/task-completion-progress-cli.mjs`，等待hidden提示后通过私有PTY写一行JSON：task（永久任务ID，可选）、root、args、url、token。token不得进argv、环境变量、普通日志或文件；CLI既不打印输入也不输出服务端敏感正文。目标URL固定为现有任务看板417服务。凭证仅在宿主内存，结束即退出，无新服务或定时器。CLI的cwd和控制源码必须位于稳定main锚点或准确审查载体，不能位于待移除任务目录；root仍明确指向准确任务。启动时捕获commonDir/registry，任务源码移除后从稳定闭合证据完成流转和投递。
+
+阶段开始保存事实后，真实注入宿主在进入同步长命令前执行一次有界drain；默认每次5秒，可由宿主在1至30000毫秒内明确配置。超时/失败保留outbox；保护性hold不绕过，原交付异常继续上抛。底层请求传递AbortSignal，未知写入结果下次先读回，不能盲重发。一次flush有界32条，不机械重试。
+
+输出分别给出completion原结果、真实确认数量、pending和rejectedNotDelivered。stdout不是投递证明；pending不冒充送达，隔离拒绝不冒充ack。已存在手动更新屏障按过期回执契约处理。
+
+正式流转由源证明触发：deliver真实prepare阶段在授权票据、任务冻结、accepted-source准确一致后，补begin_delivery事实；不把领取准入当实际开工。命令后读取正式deliveryStatus，只有合并、main CI、运行交接、清理和关闭及正式回执齐全，才按sourceReceiptDigest生成一次delivery_complete。已done看板只记录当前状态确认，不补新receipt。失败或仅合并不推完成，普通checkpoint不推待验收。业务开发仍按已有明确开发完成入口处理。

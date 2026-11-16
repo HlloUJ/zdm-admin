@@ -39,9 +39,9 @@ export const CLEANUP_TYPE_COVERAGE = Object.freeze([
   },
   {
     type: 'expired-duplicate-report',
-    state: 'gap',
-    reason:
-      'Content-addressed preservation avoids identical blob copies; expiry/reference-safe retirement is not implemented',
+    state: 'automatic-handoff',
+    scope:
+      'Only complete extra test-results/playwright-report/coverage copies with immutable preservation proof; necessary raw blobs and first failures retained',
   },
   {
     type: 'necessary-evidence',
@@ -80,6 +80,7 @@ export function buildCloseoutCleanupInventory({
   entries,
   artifacts = null,
   distHandoff,
+  reportHandoffs = [],
   externalDependencyTarget = null,
 }) {
   assert.match(task, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -184,6 +185,17 @@ export function buildCloseoutCleanupInventory({
       reason: distHandoff?.reason ?? 'No valid creation registration; original preservation applies',
       evidence: preserved.manifest,
     });
+  for (const handoff of reportHandoffs) {
+    assert.ok(['test-results', 'playwright-report', 'coverage'].includes(handoff.relative));
+    assert.equal(handoff.state, 'handed-off');
+    resources.push({
+      type: 'expired-duplicate-report',
+      disposition: 'pending-cleanup',
+      reason: 'Whole extra copy matches durable preservation; retain necessary stable originals',
+      ...handoff,
+      spaceReleased: false,
+    });
+  }
   const gaps = CLEANUP_TYPE_COVERAGE.filter((c) => c.state === 'gap').map((c) => ({ type: c.type, reason: c.reason }));
   if (!artifacts)
     gaps.push({

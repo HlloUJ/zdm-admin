@@ -146,7 +146,7 @@ export function validateStandardCoverageEvidence(plan, packets, { domain = null 
       metadata = packets.engineering;
       const producer = phase(metadata, definition.phase, definition.command);
       if (id === 'engineering-tests')
-        validateFrontendTestReport(metadata.engineeringResults, { kind: 'scripts', runId: producer.runId });
+        validateFrontendTestReport(metadata.engineeringResults, { kind: definition.reportKind, runId: producer.runId });
     } else if (id === 'frontend-tests') {
       assert.ok(packets.frontend?.length === 3, 'Missing original frontend shard proof');
       for (let i = 1; i <= 2; i++) phase(packets.frontend[i].metadata, 'e2e-' + i, definition.commands['e2e-' + i]);
@@ -162,7 +162,10 @@ export function validateStandardCoverageEvidence(plan, packets, { domain = null 
       metadata = packets.frontend?.[0]?.metadata;
       const producer = phase(metadata, definition.phase, definition.command);
       if (id === 'frontend-unit')
-        validateFrontendTestReport(metadata.frontendResults.unit, { kind: 'unit', runId: producer.runId });
+        validateFrontendTestReport(metadata.frontendResults.unit, {
+          kind: definition.reportKind,
+          runId: producer.runId,
+        });
     } else if (id === 'backend-tests') {
       metadata = packets.backend;
       phase(metadata, definition.phase, definition.command);

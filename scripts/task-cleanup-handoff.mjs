@@ -13,6 +13,7 @@ import {
   closeSync,
   fsyncSync,
   readlinkSync,
+  readdirSync,
 } from 'node:fs';
 import path from 'node:path';
 import { captureSource } from './verification-evidence.mjs';
@@ -179,7 +180,15 @@ export async function handoffBuiltDist(
 
 // The whole closeout manifest records protected and unsupported types too. This
 // is not a deletion permit and does not claim the entire cleanup rollout is done.
-export function recordCloseoutCleanupInventory({ root, common, task, proof, preserved, distHandoff }) {
+export function recordCloseoutCleanupInventory({
+  root,
+  common,
+  task,
+  proof,
+  preserved,
+  distHandoff,
+  reportHandoffs = [],
+}) {
   const expected = path.join(common, 'task-assets', task);
   assert.equal(path.dirname(preserved.manifest), expected, 'Foreign asset preservation manifest');
   canonical(preserved.manifest);
@@ -201,6 +210,7 @@ export function recordCloseoutCleanupInventory({ root, common, task, proof, pres
     entries: JSON.parse(bytes),
     artifacts,
     distHandoff,
+    reportHandoffs,
     externalDependencyTarget,
   });
   const content = JSON.stringify(inventory) + '\n';
@@ -215,4 +225,127 @@ export function recordCloseoutCleanupInventory({ root, common, task, proof, pres
     implementationComplete: inventory.implementationComplete,
     spaceReleased: false,
   };
+}
+
+// Only extra copies whose whole file closure is already preserved can be handed off.
+// Necessary stable blobs, first failures and .task-verification control state stay retained.
+export async function handoffPreservedReportCopies(
+  { root, common, task, proof, preserved, assertUnreferenced },
+  { api } = {},
+) {
+  root = canonical(path.resolve(root));
+  common = canonical(path.resolve(common));
+  assert.match(task, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  assert.equal(proof.worktree, root);
+  for (const field of ['head', 'accepted', 'main']) assert.match(proof[field] ?? '', /^[a-f0-9]{40}$/);
+  assert.equal(path.dirname(preserved.manifest), path.join(common, 'task-assets', task));
+  canonical(preserved.manifest);
+  const raw = readFileSync(preserved.manifest),
+    digest = sha(raw);
+  assert.equal(path.basename(preserved.manifest), 'assets-' + digest + '.json');
+  const original = JSON.parse(raw);
+  assert.ok(Array.isArray(original));
+  api ??= await loadConsumer();
+  const queue = api.createCleanupQueue(common),
+    results = [];
+  for (const relative of ['test-results', 'playwright-report', 'coverage']) {
+    const source = path.join(root, relative),
+      intent = path.join(root, '.task-runtime', 'cleanup-preserved-' + relative + '.json');
+    let record;
+    if (existsSync(intent)) {
+      record = JSON.parse(readFileSync(canonical(intent), 'utf8'));
+      assert.equal(record.task, task);
+      for (const field of ['worktree', 'head', 'accepted', 'main'])
+        assert.equal(record.proof[field], proof[field], 'Interrupted report handoff identity changed');
+    } else {
+      if (!existsSync(source)) continue;
+      canonical(source);
+      const identity = api.cleanupIdentity(source),
+        files = [];
+      const expected = original.filter((entry) => entry.file.startsWith(relative + '/'));
+      assert.ok(expected.length, 'Report directory has no complete preservation proof');
+      assert.equal(new Set(expected.map((entry) => entry.file)).size, expected.length);
+      const walk = (directory) => {
+        for (const entry of readdirSync(path.join(root, directory), { withFileTypes: true })) {
+          const name = directory + '/' + entry.name,
+            file = path.join(root, name),
+            stat = lstatSync(file);
+          assert.ok(
+            (!stat.isSymbolicLink() && stat.nlink === 1) || stat.isDirectory(),
+            'Linked report copy remains protected',
+          );
+          if (stat.isDirectory()) walk(name);
+          else {
+            assert.ok(stat.isFile(), 'Special report copy remains protected');
+            const archived = expected.find((item) => item.file === name);
+            assert.ok(archived && archived.kind === 'generated-output', 'Unpreserved report member');
+            const bytes = readFileSync(file),
+              blob = path.join(common, 'task-assets', task, 'blobs', archived.digest);
+            canonical(blob);
+            assert.ok(lstatSync(blob).isFile() && !lstatSync(blob).isSymbolicLink());
+            assert.equal(bytes.length, archived.bytes);
+            assert.equal(sha(bytes), archived.digest);
+            assert.equal(sha(readFileSync(blob)), archived.digest, 'Preserved report changed');
+            files.push({ relative: name, blob, mode: stat.mode, sha256: archived.digest });
+          }
+        }
+      };
+      walk(relative);
+      files.sort((a, b) => (a.relative < b.relative ? -1 : a.relative > b.relative ? 1 : 0));
+      assert.deepEqual(
+        files.map((item) => item.relative),
+        expected.map((item) => item.file).sort(),
+        'Incomplete report preservation closure',
+      );
+      assert.deepEqual(api.cleanupIdentity(source), identity, 'Report changed during preservation proof');
+      await assertUnreferenced();
+      assert.deepEqual(api.cleanupIdentity(source), identity, 'Report changed during reference proof');
+      const registration = {
+        version: 1,
+        task,
+        worktree: root,
+        relative,
+        identity,
+        sourceDigest: digest,
+        producer: 'preserved-report-duplicate-v1',
+        preservation: { manifest: preserved.manifest, digest, files },
+      };
+      const content = JSON.stringify(registration) + '\n',
+        base = directory(path.join(common, 'task-cleanup')),
+        stable = path.join(directory(path.join(base, 'proofs', task)), sha(content) + '.json');
+      immutable(stable, content);
+      const candidate = {
+        version: 1,
+        task,
+        identity,
+        producer: 'task-completion-handoff-v1',
+        proof: { ...proof, rebuild: { kind: 'duplicate-preserved-v1', record: stable, digest: sha(content) } },
+        disposition: 'preserved-duplicate',
+        notBefore: new Date().toISOString(),
+      };
+      const carrier = path.join(base, 'staging', task, api.cleanupObjectId(candidate));
+      record = { ...candidate, carrier, path: path.join(carrier, 'content') };
+      immutable(intent, JSON.stringify(record) + '\n');
+    }
+    directory(record.carrier);
+    immutable(path.join(record.carrier, 'manifest.json'), JSON.stringify(record) + '\n');
+    assert.ok(!(existsSync(source) && existsSync(record.path)), 'Ambiguous report handoff; keep both');
+    if (existsSync(source)) {
+      assert.deepEqual(api.cleanupIdentity(source), record.identity);
+      await assertUnreferenced();
+      assert.deepEqual(api.cleanupIdentity(source), record.identity);
+      renameSync(source, record.path);
+    }
+    assert.deepEqual(api.cleanupIdentity(record.path), record.identity);
+    const accepted = queue.handoff(record);
+    results.push({
+      relative,
+      state: 'handed-off',
+      manifest: path.join(record.carrier, 'manifest.json'),
+      object: accepted.key,
+      cleanupPending: true,
+      spaceReleased: false,
+    });
+  }
+  return results;
 }

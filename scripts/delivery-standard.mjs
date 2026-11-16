@@ -1,3 +1,4 @@
+import { stylesheetScope } from './stylesheet-scope.mjs';
 import { compileStandardCoverage } from './delivery-standard-coverage.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -48,10 +49,16 @@ const normalized = (file) =>
   typeof file === 'string' && file && !/^(?:\/|[A-Za-z]:)|(?:^|[/\\])\.\.(?:[/\\]|$)/.test(file)
     ? file.replaceAll('\\', '/').replace(/^\.\//, '')
     : null;
-export function deliveryStandardRule(file) {
+export function deliveryStandardRule(file, { root = process.cwd() } = {}) {
   const name = normalized(file);
   if (!name) return { ...standard.unknown, id: 'unknown', file };
-  const matches = standard.rules.filter((rule) => new RegExp(rule.pattern, 'i').test(name));
+  const style = /\.(?:css|scss|less)$/.test(name) ? stylesheetScope(root, name) : null;
+  if (style && !style.proven) return { ...standard.unknown, id: 'unknown', file: name, scopeEvidence: style };
+  const matches = standard.rules.filter(
+    (rule) => new RegExp(rule.pattern, 'i').test(name) && !(style?.proven && rule.id === 'security-and-important-data'),
+  );
+  if (style?.shared)
+    matches.push({ id: 'proven-shared-stylesheet', level: 'R3', special: ['consumer-closure', 'affected-viewports'] });
   if (!matches.length) return { ...standard.unknown, id: 'unknown', file: name };
   // Highest risk wins, rather than the first convenient path classification.
   return {
@@ -59,6 +66,7 @@ export function deliveryStandardRule(file) {
       (a, b) => rank(b.level) - rank(a.level) || standard.rules.indexOf(a) - standard.rules.indexOf(b),
     )[0],
     file: name,
+    ...(style ? { scopeEvidence: style } : {}),
     engineering: matches.some((rule) => rule.engineering === true),
     domains: [...new Set(matches.flatMap((rule) => rule.domains ?? []))].sort(),
     matched: matches.map((rule) => rule.id).sort(),
@@ -66,24 +74,45 @@ export function deliveryStandardRule(file) {
     special: [...new Set(matches.flatMap((rule) => rule.special ?? []))].sort(),
   };
 }
-export function deliveryStandardPlan({ files, impact, candidate = null, base = null, environment = null }) {
+export function deliveryStandardPlan({
+  files,
+  impact,
+  candidate = null,
+  base = null,
+  environment = null,
+  root = process.cwd(),
+}) {
   assert.equal(standard.version, 1);
   assert.ok(
     impact && ['frontend', 'backend', 'engineering', 'full', 'runtime'].every((k) => typeof impact[k] === 'boolean'),
     'Actual conservative impact required',
   );
   const paths = Array.isArray(files) && files.length ? [...new Set(files)].sort() : ['<unknown>'];
-  const rules = paths.map(deliveryStandardRule);
-  const level = rules.reduce((a, r) => (rank(r.level) > rank(a) ? r.level : a), 'R0');
-  const unknown = rules.some((r) => r.id === 'unknown');
+  const rules = paths.map((file) => deliveryStandardRule(file, { root }));
+  const uncertainty = [
+    ...(impact.scopeUncertainty ?? []),
+    ...rules
+      .filter((r) => r.id === 'unknown')
+      .map((r) => ({
+        file: r.file,
+        code: r.scopeEvidence ? 'stylesheet-consumers-unproven' : 'unknown-path',
+        reason: r.scopeEvidence?.reason ?? 'No proven path classification',
+      })),
+  ];
+  const unknown = uncertainty.length > 0;
+  const pathLevel = rules.reduce((a, r) => (rank(r.level) > rank(a) ? r.level : a), 'R0');
+  const level = unknown && rank(standard.unknown.level) > rank(pathLevel) ? standard.unknown.level : pathLevel;
   const minimum = [
     ...new Set([
       ...rules.flatMap((rule) => rule.minimum ?? standard.levels[rule.level].minimum),
+      ...standard.levels[level].minimum,
       ...(unknown ? standard.unknown.minimum : []),
     ]),
   ].sort();
   const specialties = [...new Set(rules.flatMap((r) => r.special ?? []))].sort();
-  const domains = ['frontend', 'backend', 'engineering'].filter((k) => !deliveryStandardAvailable || impact[k]);
+  const domains = ['frontend', 'backend', 'engineering'].filter(
+    (k) => unknown || !deliveryStandardAvailable || impact[k],
+  );
   const gates = [
     ...(impact.docsOnly ? ['format'] : []),
     ...domains.map((d) => d + '-quality'),
@@ -98,8 +127,15 @@ export function deliveryStandardPlan({ files, impact, candidate = null, base = n
     environment,
     level,
     unknownScope: unknown,
+    scopeUncertainty: uncertainty,
     files: paths,
-    rules: rules.map((r) => ({ file: r.file, rule: r.id, level: r.level, matched: r.matched ?? [] })),
+    rules: rules.map((r) => ({
+      file: r.file,
+      rule: r.id,
+      level: r.level,
+      matched: r.matched ?? [],
+      ...(r.scopeEvidence ? { scopeEvidence: r.scopeEvidence } : {}),
+    })),
     minimum,
     specialties,
     domains,

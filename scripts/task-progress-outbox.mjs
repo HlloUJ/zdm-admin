@@ -1,9 +1,29 @@
+import {
+  STALE_PROTOCOL,
+  validateProgressHistory,
+  validateClosedSupersession,
+  validateRecordedClientStale,
+} from './task-progress-supersession.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  unlinkSync,
+  writeFileSync,
+  openSync,
+  fsyncSync,
+  closeSync,
+} from 'node:fs';
 import path from 'node:path';
 
+const approvedRejections = new WeakSet();
+const byteHash = (value) => createHash('sha256').update(value).digest('hex');
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+export const progressSourceIdentity = (task, sourceKey) => hash([task, sourceKey]);
 function safe(file) {
   for (let cursor = file; ; cursor = path.dirname(cursor)) {
     if (existsSync(cursor)) assert.ok(!lstatSync(cursor).isSymbolicLink(), 'Linked progress store refused');
@@ -41,12 +61,23 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
     assert.match(task, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.ok(typeof sourceKey === 'string' && sourceKey.length > 0);
     assert.ok(Buffer.byteLength(JSON.stringify(payload)) <= 16384, 'Receipt too large');
-    const receipt_id = hash([task, sourceKey]);
+    const receipt_id = progressSourceIdentity(task, sourceKey);
     const payloadHash = hash(payload);
     return change((state) => {
-      const existing = [...state.pending, ...state.acknowledged].find((r) => r.receipt_id === receipt_id);
+      const existing = [...state.pending, ...state.acknowledged, ...(state.rejected ?? [])].find(
+        (r) => r.receipt_id === receipt_id,
+      );
       if (existing) {
         assert.equal(existing.payload_hash, payloadHash, 'Receipt identity reused with changed facts');
+        if (
+          ['rejected-not-delivered', 'superseded-without-submission', 'client-reported-stale-not-delivered'].includes(
+            existing.state,
+          )
+        ) {
+          const bytes = readFileSync(existing.audit);
+          assert.equal(byteHash(bytes), existing.auditDigest);
+          return { ...JSON.parse(bytes).entry, state: existing.state };
+        }
         return structuredClone(existing);
       }
       assert.ok(
@@ -89,7 +120,7 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
       return entry;
     });
   }
-  function fail(receiptId, code) {
+  function fail(receiptId, code, rejection = null) {
     assert.ok(typeof code === 'string' && /^[a-z0-9_-]{1,80}$/.test(code));
     return change((state) => {
       const entry = state.pending.find((item) => item.receipt_id === receiptId);
@@ -105,10 +136,152 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
           'forbidden',
         ].includes(code),
       };
+      if (rejection) entry.failure.rejection = structuredClone(rejection);
       return structuredClone(entry);
     });
   }
-  return { read, enqueue, prepare, acknowledge, fail };
+  function quarantineTerminal(receiptId, proof, { afterAudit = () => {} } = {}) {
+    assert.ok(approvedRejections.has(proof), 'Authenticated owner rejection/readback required');
+    return change((state) => {
+      const prior = (state.rejected ?? []).find((item) => item.receipt_id === receiptId);
+      if (prior) return structuredClone(prior);
+      const index = state.pending.findIndex((item) => item.receipt_id === receiptId);
+      assert.ok(index >= 0, 'Unknown pending stale receipt');
+      const entry = state.pending[index];
+      const superseded = proof.kind === 'superseded-without-submission',
+        recorded = proof.kind === 'recorded-client-stale';
+      const validate = superseded
+        ? validateClosedSupersession
+        : recorded
+          ? validateRecordedClientStale
+          : validateStaleProof;
+      validate(entry, proof);
+      if (recorded) assert.equal(proof.clientEvidence.outboxDirectory, directory);
+      const auditDirectory = path.join(directory, 'rejected');
+      safe(auditDirectory);
+      mkdirSync(auditDirectory, { recursive: true, mode: 0o700 });
+      const auditFile = path.join(auditDirectory, receiptId + '.json');
+      safe(auditFile);
+      const original = readFileSync(file);
+      const audit = {
+        version: 1,
+        status: superseded
+          ? 'superseded-without-submission'
+          : recorded
+            ? 'client-reported-stale-not-delivered'
+            : 'rejected-not-delivered',
+        entry: structuredClone(entry),
+        entryDigest: hash(entry),
+        originalOutbox: { bytes: original.toString('base64'), sha256: byteHash(original) },
+        rejection: proof.rejection,
+        readback: proof.readback,
+        ...(superseded ? { kind: proof.kind, closedSource: proof.closedSource } : {}),
+        ...(recorded ? { kind: proof.kind, clientEvidence: proof.clientEvidence } : {}),
+        ...(proof.historyEvidence ? { historyEvidence: proof.historyEvidence } : {}),
+      };
+      if (existsSync(auditFile)) {
+        const retained = JSON.parse(readFileSync(auditFile, 'utf8'));
+        assert.equal(retained.entryDigest, hash(entry), 'Existing rejection audit differs');
+        assert.deepEqual(retained.entry, entry);
+        validate(entry, retained);
+        assert.equal(byteHash(Buffer.from(retained.originalOutbox.bytes, 'base64')), retained.originalOutbox.sha256);
+      } else {
+        const fd = openSync(auditFile, 'wx', 0o600);
+        try {
+          writeFileSync(fd, JSON.stringify(audit) + '\n');
+          fsyncSync(fd);
+        } finally {
+          closeSync(fd);
+        }
+        const parent = openSync(auditDirectory, 'r');
+        try {
+          fsyncSync(parent);
+        } finally {
+          closeSync(parent);
+        }
+      }
+      afterAudit(auditFile);
+      const result = {
+        receipt_id: entry.receipt_id,
+        payload_hash: entry.payload_hash,
+        state: superseded
+          ? 'superseded-without-submission'
+          : recorded
+            ? 'client-reported-stale-not-delivered'
+            : 'rejected-not-delivered',
+        task_id: entry.receipt.task_id,
+        sequence: entry.receipt.sequence,
+        audit: auditFile,
+        auditDigest: byteHash(readFileSync(auditFile)),
+      };
+      (state.rejected ??= []).push(result);
+      state.pending.splice(index, 1);
+      return structuredClone(result);
+    });
+  }
+  return {
+    read,
+    enqueue,
+    prepare,
+    acknowledge,
+    fail,
+    quarantineStale: (id, proof, options) => {
+      assert.notEqual(proof.kind, 'superseded-without-submission');
+      return quarantineTerminal(id, proof, options);
+    },
+    quarantineRecordedStale: (id, proof, options) => {
+      assert.equal(proof.kind, 'recorded-client-stale');
+      return quarantineTerminal(id, proof, options);
+    },
+    quarantineSuperseded: (id, proof, options) => {
+      assert.equal(proof.kind, 'superseded-without-submission');
+      return quarantineTerminal(id, proof, options);
+    },
+  };
+}
+
+function validateStaleProof(entry, proof) {
+  assert.equal(entry.failure?.code, 'stale_receipt');
+  assert.equal(entry.failure.retryable, false);
+  assert.ok(Number.isSafeInteger(entry.revision) && entry.revision > 0);
+  const rejection = proof.rejection;
+  assert.equal(rejection.operation, 'apply_task_progress_receipt');
+  assert.deepEqual(rejection.args, { id: entry.receipt.task_id, revision: entry.revision, receipt: entry.receipt });
+  assert.equal(rejection.result.code, 'stale_receipt');
+  if (rejection.result.retryable === undefined) validateProgressHistory(entry, proof.historyEvidence);
+  else assert.equal(rejection.result.retryable, false);
+  assert.ok(
+    typeof rejection.source === 'string' && rejection.source.length > 0,
+    'Original authenticated operation reference required',
+  );
+  const seen = proof.readback;
+  assert.equal(seen.task_id, entry.receipt.task_id);
+  assert.equal(seen.task?.id, entry.receipt.task_id);
+  assert.equal(seen.receipt_id, entry.receipt_id);
+  assert.equal(seen.status, 'not_found');
+  assert.equal(seen.receipt, null);
+  assert.ok(Number.isSafeInteger(seen.revision) && seen.revision >= entry.revision);
+  assert.equal(seen.task.revision, seen.revision);
+}
+// Historical recovery needs the original owner tool trace, not a bare caller-provided failure code.
+export async function recoverStaleReceipt(outbox, adapter, receiptId, { rejectionRef, afterAudit } = {}) {
+  const entry = outbox.read().pending.find((item) => item.receipt_id === receiptId);
+  const prior = (outbox.read().rejected ?? []).find((item) => item.receipt_id === receiptId);
+  if (prior) return prior;
+  assert.ok(entry, 'Unknown pending stale receipt');
+  assert.equal(typeof adapter.readRejection, 'function', 'Original authenticated rejection adapter unavailable');
+  const proof = {
+    rejection: await adapter.readRejection(rejectionRef, entry),
+    readback: await adapter.read(entry.receipt.task_id, receiptId),
+  };
+  if (proof.rejection.result.retryable === undefined) {
+    assert.equal(typeof adapter.history, 'function');
+    proof.historyEvidence = await adapter.history(entry.receipt.task_id, receiptId);
+    proof.readback = proof.historyEvidence.current;
+  }
+  validateStaleProof(entry, proof);
+  approvedRejections.add(proof);
+  return outbox.quarantineStale(receiptId, proof, { afterAudit });
 }
 
 // A single bounded flush via the already authenticated owner host. Read before any send, including retries.
@@ -135,6 +308,7 @@ export async function flushProgress(outbox, adapter, { limit = 32 } = {}) {
           outbox.fail(
             receipt.receipt_id,
             /^[a-z0-9_-]{1,80}$/.test(error.code ?? '') ? error.code : 'write_result_unknown',
+            error.authenticatedRejection ?? null,
           );
           /* uncertain write: read back, never resend here */
         }
@@ -144,6 +318,14 @@ export async function flushProgress(outbox, adapter, { limit = 32 } = {}) {
         outbox.acknowledge(receipt.receipt_id, seen);
         results.push({ receipt_id: receipt.receipt_id, status: 'confirmed' });
       } else {
+        const failed = outbox.read().pending.find((item) => item.receipt_id === receipt.receipt_id);
+        if (failed?.failure?.rejection && adapter.readRejection) {
+          const result = await recoverStaleReceipt(outbox, adapter, receipt.receipt_id, {
+            rejectionRef: failed.failure.rejection.source,
+          });
+          results.push({ receipt_id: receipt.receipt_id, status: result.state });
+          continue;
+        }
         results.push({ receipt_id: receipt.receipt_id, status: 'pending' });
         break; // preserve source order; no later task receipt can overtake this one
       }
@@ -160,10 +342,11 @@ export async function flushProgress(outbox, adapter, { limit = 32 } = {}) {
 }
 
 // `call` is supplied ONLY by the authenticated owner host, never from credentials in this repo.
-export function authenticatedBoardAdapter(call) {
-  return {
-    async read(task, receiptId) {
-      const result = await call('get_task_progress_receipt', { id: task, receipt_id: receiptId });
+export function authenticatedBoardAdapter(call, { readRejectedOperation } = {}) {
+  const observed = new Map();
+  const adapter = {
+    async read(task, receiptId, options) {
+      const result = await call('get_task_progress_receipt', { id: task, receipt_id: receiptId }, options);
       assert.equal(result.task.id, task);
       assert.equal(result.receipt_id, receiptId);
       return {
@@ -176,6 +359,124 @@ export function authenticatedBoardAdapter(call) {
         task: result.task,
       };
     },
-    apply: (envelope) => call('apply_task_progress_receipt', envelope),
+    async readRejection(ref, entry) {
+      const rejection = observed.get(ref) ?? (readRejectedOperation ? await readRejectedOperation(ref) : null);
+      assert.ok(rejection, 'Original authenticated rejection unavailable');
+      assert.deepEqual(rejection.args, { id: entry.receipt.task_id, revision: entry.revision, receipt: entry.receipt });
+      return structuredClone(rejection);
+    },
+    async history(task, receiptId, options) {
+      const before = await adapter.read(task, receiptId, options);
+      const events = await call('task_history', { id: task }, options);
+      const current = await adapter.read(task, receiptId, options);
+      assert.equal(before.revision, current.revision, 'Task changed during history observation');
+      return { contract: STALE_PROTOCOL, operation: 'task_history', task, events, current };
+    },
+    async apply(envelope, options) {
+      try {
+        return await call('apply_task_progress_receipt', envelope, options);
+      } catch (error) {
+        // Only authenticated call adapters attach the exact server result; arbitrary code alone never qualifies.
+        if (
+          error.boardResponse?.code === 'stale_receipt' &&
+          [undefined, false].includes(error.boardResponse.retryable)
+        ) {
+          const rejection = {
+            source: error.operationRef ?? 'owner-call:' + randomUUID(),
+            operation: 'apply_task_progress_receipt',
+            args: structuredClone(envelope),
+            result: structuredClone(error.boardResponse),
+          };
+          observed.set(rejection.source, rejection);
+          error.authenticatedRejection = rejection;
+        }
+        throw error;
+      }
+    },
   };
+  return adapter;
+}
+
+// A fresh authoritative source observation can prove the board already matches.
+// This never acknowledges, rewrites, retries or removes a historical receipt.
+export async function confirmCurrentBoardProjection({ directory, task, receiptId, observeCurrent }, adapter) {
+  assert.equal(typeof observeCurrent, 'function');
+  const source = await observeCurrent();
+  assert.equal(source.task, task);
+  assert.ok(Array.isArray(source.evidence_refs) && source.evidence_refs.length);
+  assert.ok(Number.isFinite(Date.parse(source.observed_at)));
+  const seen = await adapter.read(task, receiptId);
+  assert.equal(seen.task_id, task);
+  assert.equal(seen.receipt_id, receiptId);
+  assert.equal(seen.task?.id, task);
+  assert.ok(Number.isSafeInteger(seen.revision) && seen.revision > 0);
+  assert.equal(seen.task.revision, seen.revision);
+  const fields = ['board_column', 'status', 'current_work', 'next_step'];
+  assert.deepEqual(Object.keys(source.expected).sort(), fields.sort(), 'Exact projection required');
+  for (const field of fields) {
+    assert.equal(typeof source.expected[field], 'string');
+    assert.equal(seen.task[field], source.expected[field], 'Current board differs from observed source');
+  }
+  const proof = { version: 1, status: 'current-state-confirmed-no-write', task, source, readback: seen };
+  const store = path.join(directory, 'confirmations');
+  safe(store);
+  mkdirSync(store, { recursive: true, mode: 0o700 });
+  const file = path.join(store, hash(proof) + '.json'),
+    content = JSON.stringify(proof) + '\n';
+  safe(file);
+  if (existsSync(file)) assert.equal(readFileSync(file, 'utf8'), content);
+  else writeFileSync(file, content, { flag: 'wx', mode: 0o600 });
+  return { status: proof.status, evidence: file, historicalReceiptDelivered: false };
+}
+
+export async function supersedeUnsubmittedReceipt(outbox, adapter, receiptId, { readClosedSource, afterAudit } = {}) {
+  const entry = outbox.read().pending.find((item) => item.receipt_id === receiptId);
+  const prior = (outbox.read().rejected ?? []).find((item) => item.receipt_id === receiptId);
+  if (prior) return prior;
+  assert.ok(entry, 'Unknown unsubmitted receipt');
+  assert.equal(typeof readClosedSource, 'function');
+  const closedSource = await readClosedSource();
+  const historyEvidence = await adapter.history(entry.receipt.task_id, receiptId);
+  const proof = {
+    kind: 'superseded-without-submission',
+    closedSource,
+    historyEvidence,
+    readback: historyEvidence.current,
+  };
+  validateClosedSupersession(entry, proof);
+  approvedRejections.add(proof);
+  return outbox.quarantineSuperseded(receiptId, proof, { afterAudit });
+}
+
+// Legacy published client retained the terminal code but not the full HTTP body.
+// Preserve that lower evidence strength; fresh authenticated history independently proves supersession.
+export async function recoverRecordedClientStale(outbox, adapter, receiptId, { clientEvidenceFile, afterAudit } = {}) {
+  const state = outbox.read(),
+    prior = (state.rejected ?? []).find((item) => item.receipt_id === receiptId);
+  if (prior) return prior;
+  const entry = state.pending.find((item) => item.receipt_id === receiptId);
+  assert.ok(entry);
+  safe(clientEvidenceFile);
+  const bytes = readFileSync(clientEvidenceFile),
+    report = JSON.parse(bytes);
+  const matched = report.outboxes?.find((box) => box.receipts?.some((receipt) => receipt.receipt_id === receiptId));
+  assert.ok(matched);
+  const historyEvidence = await adapter.history(entry.receipt.task_id, receiptId);
+  const proof = {
+    kind: 'recorded-client-stale',
+    clientEvidence: {
+      contract: 'published-progress-outbox-terminal-v1',
+      file: clientEvidenceFile,
+      bytes: bytes.toString('base64'),
+      digest: byteHash(bytes),
+      report,
+      outboxDirectory: matched.directory,
+      originalProviderResponse: 'not-retained',
+    },
+    historyEvidence,
+    readback: historyEvidence.current,
+  };
+  validateRecordedClientStale(entry, proof);
+  approvedRejections.add(proof);
+  return outbox.quarantineRecordedStale(receiptId, proof, { afterAudit });
 }

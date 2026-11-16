@@ -125,6 +125,7 @@ export function createVerificationPlan({
     impact,
     plannedCandidate,
     standard: deliveryStandardPlan({
+      root,
       files,
       impact,
       candidate: plannedCandidate?.digest ?? null,

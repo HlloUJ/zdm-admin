@@ -50,7 +50,7 @@ function engineering(plan) {
     ]),
     engineeringResults: {
       schemaVersion: 1,
-      kind: 'scripts',
+      kind: 'engineering',
       runId: 'run',
       complete: true,
       files,
@@ -134,7 +134,7 @@ test('R0 documents require real diff, format and changed-document proof rather t
   }
 });
 test('R1 interaction obligations require the complete first-pass disjoint automation evidence', () => {
-  const plan = planFor(['src/pages/example/style.css'], { ...impact, frontend: true, docsOnly: false }),
+  const plan = planFor(['src/pages/finished-stock/store/index.css'], { ...impact, frontend: true, docsOnly: false }),
     proof = { ...packets(plan), frontend: frontend() };
   assert.equal(validateStandardCoverageEvidence(plan, proof).state, 'satisfied');
   for (const mutate of [
@@ -181,4 +181,30 @@ test('domain aggregates prove only their part and complete coverage still requir
   delete changed.backend;
   assert.throws(() => validateStandardCoverageEvidence(plan, changed));
   assert.throws(() => validateStandardCoverageEvidence(plan, proof, { domain: 'other' }));
+});
+
+test('the real existing engineering producer kind agrees with the standard report contract', async (t) => {
+  const { mkdtempSync, mkdirSync, writeFileSync, readFileSync, realpathSync, rmSync } = await import('node:fs');
+  const { tmpdir, homedir } = await import('node:os');
+  const path = await import('node:path');
+  const { runScriptTests } = await import('./run-script-tests.mjs');
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'actual-engineering-contract-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(path.join(root, 'scripts'));
+  writeFileSync(
+    path.join(root, 'scripts/producer.test.mjs'),
+    "import test from 'node:test';test('a real collected schema fixture',()=>{});\n",
+  );
+  const result = runScriptTests('--engineering', [], {
+    root,
+    env: { PATH: process.env.PATH, HOME: homedir(), ENGINEERING_RUN_ID: 'producer-kind' },
+  });
+  assert.equal(result, 0);
+  const report = JSON.parse(
+    readFileSync(path.join(root, '.task-verification/script-tests/producer-kind/engineering-results.json'), 'utf8'),
+  );
+  const standard = readDeliveryStandard(new URL('../ci/delivery-standard.json', import.meta.url)).value;
+  assert.equal(report.kind, standard.coverage.checks['engineering-tests'].reportKind);
+  assert.equal(report.tests.length, 1);
+  assert.equal(report.complete, true);
 });
