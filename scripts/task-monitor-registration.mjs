@@ -18,13 +18,20 @@ export function monitoringRegistration(owner, context, runtimeOwner = process.en
   const fields = ['taskNumber', 'taskName', 'taskStableId', 'worker', 'rootThreadId', 'roomId', 'authorizationRef'];
   for (const key of fields)
     assert.ok(typeof context[key] === 'string' && context[key].trim(), `Missing monitoring ${key}`);
-  assert.match(context.worker, /^\/root\/[a-z0-9_/]+$/);
+  if (context.executionSurface === 'codex-thread') {
+    assert.match(context.worker, /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
+    assert.equal(context.worker, owner, 'Native thread must be the actual execution owner');
+  } else {
+    assert.equal(context.executionSurface, undefined, 'Unknown execution surface');
+    assert.match(context.worker, /^\/root\/[a-z0-9_/]+$/);
+  }
   // This stores provenance, not a fabricated platform liveness check.
   return {
     ...base,
     state: 'registered',
     platformWorkerVerified: false,
     ...Object.fromEntries(fields.map((key) => [key, context[key]])),
+    ...(context.executionSurface ? { executionSurface: context.executionSurface } : {}),
   };
 }
 
@@ -72,6 +79,7 @@ export function verifyStartMonitoringReadback(registry, task, context) {
       'rootThreadId',
       'roomId',
       'authorizationRef',
+      'executionSurface',
     ])
       assert.equal(saved.monitoring?.[key], context[key], 'Monitoring readback differs: ' + key);
     assert.equal(saved.monitoring.state, 'registered');

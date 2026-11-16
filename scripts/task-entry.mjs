@@ -60,7 +60,9 @@ export function publishedTaskEntry(root, args) {
       ? ['--check', '--worktree', target, ...rest]
       : command === 'temporary'
         ? ['--worktree', target, '--temporary', ...rest]
-        : rest;
+        : command === 'registry' && rest[0] === 'register'
+          ? [...rest, '--worktree', target]
+          : rest;
   return { script, cwd: target, args: forwarded, published, source: main };
 }
 export function main(root = process.cwd(), args = process.argv.slice(2)) {
