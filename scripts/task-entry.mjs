@@ -64,7 +64,11 @@ export function publishedTaskEntry(root, args) {
     const slug = option('--slug'),
       raw = option('--monitor-context');
     const context = raw === undefined ? undefined : JSON.parse(raw);
-    if (slug && !targetRegistry.readTask(slug) && context?.executionSurface === 'codex-thread')
+    if (
+      slug &&
+      !targetRegistry.readTask(slug) &&
+      ['codex-thread', 'collaboration-agent'].includes(context?.executionSurface)
+    )
       createBoardIntake(targetRegistry.commonDir).require(
         context,
         slug,

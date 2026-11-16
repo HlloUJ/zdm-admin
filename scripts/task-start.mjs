@@ -88,7 +88,7 @@ export function startParallelTask(
     typeof owner === 'string' && owner.trim(),
     'Explicit task owner required when execution identity is unavailable',
   );
-  if (options.monitorContext?.executionSurface === 'codex-thread')
+  if (['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface))
     createBoardIntake(registry.commonDir).require(options.monitorContext, options.slug, owner);
   // The explicit root-thread receipt/claim precedes worktree creation or restoration.
   const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;

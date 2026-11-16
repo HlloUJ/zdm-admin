@@ -69,6 +69,7 @@ test('repeat exact restore does not rotate admissions; a changed source target o
   queue.direct(direction);
   const after = queue.read();
   assert.deepEqual(after.tickets, before.tickets);
+  assert.equal(after.revision, before.revision);
   assert.deepEqual(after.scopedAdmissions, before.scopedAdmissions);
   assert.throws(() => queue.direct({ ...direction, members: direction.members.slice(0, 1) }));
   assert.throws(() => queue.direct({ ...direction, capacity: { ...direction.capacity, limit: 8 } }));
