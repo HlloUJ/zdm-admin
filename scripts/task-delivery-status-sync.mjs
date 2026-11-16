@@ -1,8 +1,10 @@
+import { createHash } from 'node:crypto';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { executionPausedFor } from './task-execution-scope.mjs';
 import { notifyProgressHost } from './task-progress-host.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { createProgressOutbox } from './task-progress-outbox.mjs';
+import { createProgressOutbox, progressSourceIdentity } from './task-progress-outbox.mjs';
 
 // This bridge emits facts, never a board status, current_work patch or movement decision.
 export function validateProgressReceipt(payload) {
@@ -80,4 +82,79 @@ export function captureQueueProgress(commonDir, state, previous) {
       },
     );
   }
+}
+
+// Uses the waiter's existing authoritative readRun/readJobs results; no new GitHub call/poller.
+export function captureCiProgress(common, task, progress) {
+  assert.match(task, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  assert.match(progress.runId, /^\d+$/);
+  assert.match(progress.headSha, /^[a-f0-9]{40}$/);
+  assert.equal(progress.attempt, 1);
+  assert.equal(typeof progress.terminalVerified, 'boolean');
+  if (progress.terminalVerified) {
+    assert.equal(progress.status, 'completed');
+    assert.equal(progress.conclusion, 'success');
+  }
+  assert.ok(Number.isFinite(Date.parse(progress.observedAt)));
+  assert.equal(typeof progress.status, 'string');
+  const factual = {
+    task,
+    runId: progress.runId,
+    headSha: progress.headSha,
+    attempt: 1,
+    status: progress.status,
+    conclusion: progress.conclusion,
+    jobs: progress.jobs,
+    terminalVerified: progress.terminalVerified,
+  };
+  const digest = createHash('sha256').update(JSON.stringify(factual)).digest('hex'),
+    sourceKey = 'ci-progress:' + digest,
+    directory = path.join(common, 'task-progress', task),
+    box = createProgressOutbox(directory),
+    id = progressSourceIdentity(task, sourceKey);
+  const prior = [...box.read().pending, ...box.read().acknowledged, ...(box.read().rejected ?? [])].find(
+    (entry) => entry.receipt_id === id,
+  );
+  if (prior) return prior;
+  const store = path.join(common, 'task-delivery', task, 'ci-progress');
+  for (let current = store; ; current = path.dirname(current)) {
+    if (existsSync(current)) assert.ok(!lstatSync(current).isSymbolicLink());
+    if (current === path.dirname(current)) break;
+  }
+  mkdirSync(store, { recursive: true, mode: 0o700 });
+  const file = path.join(store, progress.runId + '-' + digest + '.json'),
+    content = JSON.stringify({ ...factual, observedAt: progress.observedAt }) + '\n';
+  let observedAt = progress.observedAt;
+  if (existsSync(file)) {
+    const old = JSON.parse(readFileSync(file));
+    observedAt = old.observedAt;
+    delete old.observedAt;
+    assert.deepEqual(old, factual);
+  } else writeFileSync(file, content, { flag: 'wx', mode: 0o600 });
+  const failed =
+    (progress.conclusion && progress.conclusion !== 'success') ||
+    progress.jobs?.some((job) => ['failure', 'cancelled', 'timed_out'].includes(job.conclusion));
+  const event = failed ? 'blocked' : progress.terminalVerified ? 'completed' : 'started';
+  const labels = progress.jobs?.map(
+    (job) =>
+      job.name + ':' + (job.conclusion ?? job.status) + (job.active?.length ? '(' + job.active.join(',') + ')' : ''),
+  );
+  const label = labels?.length
+    ? 'CI ' + progress.runId + ' | ' + labels.join('；')
+    : 'CI ' +
+      progress.runId +
+      '：' +
+      progress.status +
+      (progress.status === 'completed' && !progress.terminalVerified ? '，必需汇总待核验' : '');
+  return recordToolProgress(directory, task, sourceKey, {
+    observed_at: observedAt,
+    action: { id: 'ci:' + progress.runId + ':' + digest, label },
+    event,
+    evidence_refs: [file, 'ci:' + progress.runId + ':' + progress.headSha + ':attempt1'],
+    next: {
+      kind: progress.terminalVerified ? 'wait' : 'action',
+      label: failed ? '保留原失败并诊断' : progress.terminalVerified ? '接续正式交付阶段' : '等待同一CI运行的必需检查',
+    },
+    ...(failed ? { reason: '准确CI运行报告失败；未重跑或改写' } : {}),
+  });
 }

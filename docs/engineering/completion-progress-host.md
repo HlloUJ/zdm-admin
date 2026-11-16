@@ -11,3 +11,5 @@
 输出分别给出completion原结果、真实确认数量、pending和rejectedNotDelivered。stdout不是投递证明；pending不冒充送达，隔离拒绝不冒充ack。已存在手动更新屏障按过期回执契约处理。
 
 正式流转由源证明触发：deliver真实prepare阶段在授权票据、任务冻结、accepted-source准确一致后，补begin_delivery事实；不把领取准入当实际开工。命令后读取正式deliveryStatus，只有合并、main CI、运行交接、清理和关闭及正式回执齐全，才按sourceReceiptDigest生成一次delivery_complete。已done看板只记录当前状态确认，不补新receipt。失败或仅合并不推完成，普通checkpoint不推待验收。业务开发仍按已有明确开发完成入口处理。
+
+同一wait-quality等待器把既有readRun状态变化、既有readJobs的job/活动step变化及最终必需汇总结果交给onProgress。completion wait将结构化观察绑定准确task/run/head/attempt并存入稳定ci-progress证据后入队，宿主立即drain；不新增API或轮询，不解析stdout。相同job摘要不重复写，尚未核验汇总的run success不标完成，失败/未知仍保留原门禁与失败。CI步骤完成事实不带整任务delivery_complete。

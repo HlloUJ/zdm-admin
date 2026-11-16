@@ -1,3 +1,5 @@
+import { captureCiProgress } from './task-delivery-status-sync.mjs';
+import { drainProgressHost } from './task-progress-host.mjs';
 import {
   handoffBuiltDist,
   handoffPreservedReportCopies,
@@ -392,7 +394,19 @@ async function completionCommandLocked(
       ).result;
     }
     const result = (
-      await completionStage(state, 'ci', `${head}:${runId}`, () => waitQuality(root, runId, head), { save })
+      await completionStage(
+        state,
+        'ci',
+        `${head}:${runId}`,
+        () =>
+          waitQuality(root, runId, head, {
+            onProgress: async (progress) => {
+              captureCiProgress(common, batch.id, progress);
+              await drainProgressHost();
+            },
+          }),
+        { save },
+      )
     ).result;
     return {
       runId: result.runId,
