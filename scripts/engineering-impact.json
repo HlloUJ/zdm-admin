@@ -121,6 +121,18 @@
     }
   },
   "consumers": {
+    "ci/delivery-standard.json": {
+      "imports": [
+        "scripts/ci-light-checks.mjs",
+        "scripts/ci-quality-evidence.test.mjs",
+        "scripts/completion-session.test.mjs",
+        "scripts/delivery-input-contracts.mjs",
+        "scripts/runtime-file-scope.test.mjs",
+        "scripts/task-cleanup-handoff.test.mjs",
+        "scripts/task-selected-resume.test.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "playwright.config.ts": {
       "imports": ["scripts/e2e-app.mjs"],
       "dynamicImports": 0
@@ -350,6 +362,7 @@
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/ci-equivalence.mjs",
         "scripts/ci-light-checks.mjs",
+        "scripts/delivery-standard-coverage.mjs",
         "scripts/delivery-standard.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/run-script-tests.mjs",
@@ -383,7 +396,12 @@
       "dynamicImports": 0
     },
     "scripts/completion-ci-evidence.mjs": {
-      "imports": ["scripts/ci-equivalence.mjs", "scripts/ci-quality-evidence.mjs", "scripts/verification-evidence.mjs"],
+      "imports": [
+        "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs",
+        "scripts/delivery-standard-coverage.mjs",
+        "scripts/verification-evidence.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
@@ -546,6 +564,14 @@
       "imports": ["scripts/completion-session.mjs", "scripts/completion-status.mjs"],
       "dynamicImports": 0
     },
+    "scripts/delivery-input-contracts.mjs": {
+      "imports": ["scripts/delivery-standard.mjs", "scripts/verification-impact.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-input-contracts.test.mjs": {
+      "imports": ["scripts/delivery-input-contracts.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-launcher.mjs": {
       "imports": [
         "scripts/backend-runtime.mjs",
@@ -568,6 +594,16 @@
         "scripts/dev-task.mjs",
         "scripts/dev-task.test.mjs",
         "scripts/sync-integration.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-standard-coverage.test.mjs": {
+      "imports": [
+        "scripts/ci-light-checks.mjs",
+        "scripts/delivery-standard-coverage.mjs",
+        "scripts/delivery-standard.mjs",
+        "scripts/task-cleanup-handoff.mjs",
+        "scripts/tool.mjs"
       ],
       "dynamicImports": 0
     },
@@ -940,11 +976,19 @@
       "dynamicImports": 0
     },
     "scripts/task-cleanup-handoff.mjs": {
-      "imports": ["scripts/task-cleanup-queue.mjs", "scripts/verification-evidence.mjs"],
+      "imports": [
+        "scripts/task-cleanup-inventory.mjs",
+        "scripts/task-cleanup-queue.mjs",
+        "scripts/verification-evidence.mjs"
+      ],
       "dynamicImports": 1
     },
     "scripts/task-cleanup-handoff.test.mjs": {
       "imports": ["scripts/build-task-app.mjs", "scripts/task-cleanup-handoff.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-inventory.test.mjs": {
+      "imports": ["scripts/task-cleanup-handoff.mjs", "scripts/task-cleanup-inventory.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-completion.mjs": {
@@ -1312,6 +1356,7 @@
         "scripts/batch-timing-runtime.mjs",
         "scripts/business-regression.mjs",
         "scripts/check-changed-plan.mjs",
+        "scripts/delivery-standard-coverage.mjs",
         "scripts/delivery-standard.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/task-timing.mjs",
@@ -1335,7 +1380,8 @@
   "externalReaders": {
     ".codex/zdm-project-workflow.yaml": "3d90822c39e214906c99eb2dffc6d0185c3094deb1ddbe4c669e8243b7a77030",
     ".github/workflows/accepted-source.yml": "a72dec1a289814e35617311e87b8c25e2865afe00bb4d38e437fdc7abca2a64e",
-    ".github/workflows/quality.yml": "744fecb594f4d1e5f4e8fc8772739689b1b408d77dbdfd28d27184dffa9ca136",
+    ".github/workflows/quality.yml": "ad81abb9fba29c3fa9c2c877bc39660130ad4e04a4128ca61b6318bcd758196c",
+    "ci/delivery-standard.json": "99acd25bb101152109fbbc265f0e0e87c6b91dfa14129741a83f6d666b80affe",
     "package.json": "fe434bc8aab39e90209c3d28bef8ad6e7857f98bb99b62d097079b3ac3359b45",
     "playwright.config.ts": "8dba517383128d692e5f05ec7563fe158371cecb51973c77e4d9a79db4f71a6a",
     "tsconfig.json": "657f4c35d37230d953338a69eb9529db710bb89fa49cd0ee4d21dac062a9b196",
@@ -1377,14 +1423,14 @@
     "scripts/ci-diagnostic-evidence.mjs": "208cb10771ff4e73302737129c46eb33840044785ba4e177d2f52c85dd90fceb",
     "scripts/ci-diagnostic-evidence.test.mjs": "766d0e56bb29bdfb2075a2320640adae1a7c4729f8bb6f2468d426b72280602e",
     "scripts/ci-equivalence-environment.mjs": "65483d5d50f79c9499517d67c69dcd23da47fc1c6f981ebcfea7cf08d1e1e889",
-    "scripts/ci-equivalence.mjs": "da51a51841e27ca45bb1eeed9e04e1a1560622a440d7f47a848d78afaec0bd51",
-    "scripts/ci-equivalence.test.mjs": "d26ab708c554f33ddecc71d8d5bba00e3c0f458b38eeea120ab83a7a8facfaa1",
+    "scripts/ci-equivalence.mjs": "79ff54768bb2811981c66ebdfc5a624fa42d40d86e9de7c679722bd775ade69c",
+    "scripts/ci-equivalence.test.mjs": "6417e1ae3fc85c87c7f9d4e111d6999ef43cbb46b85e0b1e24cb5fac18e017c0",
     "scripts/ci-light-checks.mjs": "ac1843722e30995eb764615bb37329b663b4941e40eeb9ea184c4b6f1f68f4ec",
-    "scripts/ci-quality-evidence.mjs": "b7e2b0c75c882724aaf24ab68558ae99198a8f78ebb17ff8c453df7a179787f8",
+    "scripts/ci-quality-evidence.mjs": "8429c9b7023bd4f39194f2004d22601a38fdc4be39ac93d99a098ac9fbb55e29",
     "scripts/ci-quality-evidence.test.mjs": "6714db8d69a86a1363fb860120755e300e564ba7c61accd9493c4fa05081b73f",
     "scripts/ci-report-contract.mjs": "faff33c1ff3accf8a04d99a7e3b8380a23450a2141dd59b8d5d1509282c229b7",
     "scripts/ci-report-contract.test.mjs": "e107480e8e5223f939ff0751748051ff966406f1cf81f39ac5091d30f657ad75",
-    "scripts/completion-ci-evidence.mjs": "b1e12aa217bbc0d3b0364521907570545a5f3cb6fb14114b85807935b1ab880f",
+    "scripts/completion-ci-evidence.mjs": "5d10ec9b5398126d51d16ef597936aa92a145f8bfc49bf0c3feda7552a979007",
     "scripts/completion-fixed-preview.mjs": "441646896c199f0cb5f3a6a61ec24bb43af4e9e795aa4dcba3b3f20ff66a54af",
     "scripts/completion-fixed-preview.test.mjs": "731d824aa05520c318fea04bc08435595c3aec20149fe9dc2fd46b7ca6db90cd",
     "scripts/completion-parallel.test.mjs": "d0cb503c29c5ca0a9c809f0ecd3b827b076fae8b42f46186bde2ebaec10f2495",
@@ -1396,13 +1442,15 @@
     "scripts/completion-session.mjs": "5e62d0a59d062739b7a37e19bdbe07e30aec2138196397a8cc77c0fbad42fef3",
     "scripts/completion-status.mjs": "45f74fb596abd3fe95b42db14c90115917011d0c383d41c0d199af0a0edac9d1",
     "scripts/completion-status.test.mjs": "553b4239b04159544044d3daff18a6fb7e7cf5a6da31f4b580feeb64ed1b6e2c",
+    "scripts/delivery-input-contracts.mjs": "0ae278cd0ae03f80307e40ae2adfd9bef7d9de9263a197406428c6f39a3ce612",
+    "scripts/delivery-input-contracts.test.mjs": "1296936dd4efd1089163cfdd849cc41f8812d592f9305c3b78d52c6fc3552782",
     "scripts/delivery-launcher.mjs": "bd1efa19e95d0492ee14193866de46b9664b0ca8e5bf24ca747c80249effff13",
     "scripts/delivery-launcher.test.mjs": "0ccdee6132682d8b53991df63ce19821a342ca19d42dc056e905605accdbc712",
     "scripts/delivery-migration-safety.mjs": "6924cbaf12c054dee7db3c4a7d9b90177cbe7e9969675af98d7005876c12c999",
     "scripts/delivery-repairs/batch-timing-io.mjs": "c4a3225f7a412a7b3ed890366af56b3feba3e62e3588e160bb139bcc40d05ab6",
     "scripts/delivery-repairs/batch-timing-publication.test.mjs": "c1e0417c85f53a4433fbcfdc6608221b568f1b80031c38ca7a45081bb13bbb69",
-    "scripts/delivery-standard.mjs": "95ab854cf3b791ad1611d04f1062d8c60d51278871f8a6bd6ffb473dfadb7235",
-    "scripts/delivery-standard.test.mjs": "2108a04187ceb4f611cc91dbb26d7fb3e1df75a49b00656b76e28d696618da13",
+    "scripts/delivery-standard.mjs": "fb3cde79a55d7c1049ee43736fbeeeb30959a937b52efab45789cd99e680fa29",
+    "scripts/delivery-standard.test.mjs": "01c56c10c5a2b4116f605defcf5fd546c25dcc2c027c6ee6048174cdb1becb6e",
     "scripts/dev-all.mjs": "b49b19cc1672700483f9faabbc226a8a67a3f6a9df7a25bfa321d1b39b74613a",
     "scripts/dev-task.mjs": "2bfe7a96a472b64c45d9065a2ef0b7b7c1bccccfa69654b44b73aad0f25329c4",
     "scripts/dev-task.test.mjs": "1c3f842be31edc0c93734b07b4549bdf7420370c013a48b4972c2a932fa2e250",
@@ -1470,8 +1518,9 @@
     "scripts/task-cancellation-proof.test.mjs": "6c0f43d1503228bff4718225342e76ef6499b32e1628686092eb328f60554b81",
     "scripts/task-candidate-runtime.mjs": "b28661afd82e5c976872e2e257cfcfbc97dff9cf73227f5f961bcaea75634da5",
     "scripts/task-candidate-runtime.test.mjs": "ef33f4d292935e6e455b30e4ac7aeafd9247bcff958924de21bf1ed5bc1cfb8d",
-    "scripts/task-cleanup-handoff.mjs": "974a78b9c1d0b8d04cb7fb86991072d9782d1c51b1049d5d463956c19a0f5834",
-    "scripts/task-cleanup-handoff.test.mjs": "70c994410583324a91efb113018fa85b006767526764ed9adbf0187d85458b9b",
+    "scripts/task-cleanup-handoff.mjs": "0b8ae2af286348f459cd1521218cb9e2dc1f99df0488bc790d6682dea7968f5e",
+    "scripts/task-cleanup-handoff.test.mjs": "35ce5482b05d68f7466d54c13f6c4a6a7c1d80da12b2ebad29e97e6a7c7b50b7",
+    "scripts/task-cleanup-inventory.test.mjs": "990c0a6dd6f3dab63a476fc05c75d9082728ee4c0d7ee8ad420ce0c9d74d6476",
     "scripts/task-codex-cycle-cli.mjs": "edf3ef3b94c6b17bbf31eec899de38b68902d2653b3523d13484771d4b2756c9",
     "scripts/task-codex-cycle.test.mjs": "c2230ee41c3abe7d70c3f2d65d2c5dcc4e8d43c88f725ed72d06d3ccedb4ecf5",
     "scripts/task-codex-host.mjs": "4f39ddfd5389cb6cab67b6ccf9dc35948d049d9638d3177306c184dd3c8760fd",
@@ -1548,7 +1597,7 @@
     "scripts/verification-process-lifecycle.test.mjs": "ac8aa5e888423c1e37613fe4ae9ddfd074e8baf7fc0c95ba1a5047feb07f878c",
     "scripts/verification-runner.mjs": "ba33bb78da9b7ba176f2444cbae811cc998061ca929297661c0e87119994144f",
     "scripts/verification-scope.test.mjs": "ba48064c072e1217e39896476dadc88267cb4bb4c577ceefc10f67c145599956",
-    "scripts/verify.mjs": "93298061385d297a9a0f0cfcf9f1b5dff92352803758c3ef38b9770caf8a5534",
+    "scripts/verify.mjs": "6b319461779c97913174cd98ca3c81a0cc623ba699e15cecc5bf110409a566ec",
     "scripts/vite-watch.test.mjs": "47686cdc91b7c81af6c665e8c8bee45e0a9d09e484cb7ee783c81070c862bffc",
     "scripts/vitest-evidence-reporter.mjs": "1bfd049f64888dd3224b23de9a870caff9234728bde7723941f8b753f495741f"
   }

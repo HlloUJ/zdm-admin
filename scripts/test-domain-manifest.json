@@ -18,7 +18,7 @@
       "dynamicImports": 1
     },
     ".github/workflows/quality.yml": {
-      "digest": "744fecb594f4d1e5f4e8fc8772739689b1b408d77dbdfd28d27184dffa9ca136",
+      "digest": "ad81abb9fba29c3fa9c2c877bc39660130ad4e04a4128ca61b6318bcd758196c",
       "imports": [],
       "dynamicImports": 0
     },
@@ -38,8 +38,16 @@
       "dynamicImports": 0
     },
     "ci/delivery-standard.json": {
-      "digest": "3e5b9b5d4463ff1aefbd22f5659e447a9e1472f4f093ac0384bea31b987e7f10",
-      "imports": [],
+      "digest": "99acd25bb101152109fbbc265f0e0e87c6b91dfa14129741a83f6d666b80affe",
+      "imports": [
+        "scripts/ci-light-checks.mjs",
+        "scripts/ci-quality-evidence.test.mjs",
+        "scripts/completion-session.test.mjs",
+        "scripts/delivery-input-contracts.mjs",
+        "scripts/runtime-file-scope.test.mjs",
+        "scripts/task-cleanup-handoff.test.mjs",
+        "scripts/task-selected-resume.test.mjs"
+      ],
       "dynamicImports": 0
     },
     "ci/e2e-app.json": {
@@ -393,7 +401,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.mjs": {
-      "digest": "da51a51841e27ca45bb1eeed9e04e1a1560622a440d7f47a848d78afaec0bd51",
+      "digest": "79ff54768bb2811981c66ebdfc5a624fa42d40d86e9de7c679722bd775ade69c",
       "imports": [
         "scripts/ci-backend-equivalence.mjs",
         "scripts/ci-browser-image.mjs",
@@ -404,7 +412,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-equivalence.test.mjs": {
-      "digest": "d26ab708c554f33ddecc71d8d5bba00e3c0f458b38eeea120ab83a7a8facfaa1",
+      "digest": "6417e1ae3fc85c87c7f9d4e111d6999ef43cbb46b85e0b1e24cb5fac18e017c0",
       "imports": [
         "scripts/ci-equivalence-environment.mjs",
         "scripts/ci-equivalence.mjs",
@@ -423,7 +431,7 @@
       "dynamicImports": 0
     },
     "scripts/ci-quality-evidence.mjs": {
-      "digest": "b7e2b0c75c882724aaf24ab68558ae99198a8f78ebb17ff8c453df7a179787f8",
+      "digest": "8429c9b7023bd4f39194f2004d22601a38fdc4be39ac93d99a098ac9fbb55e29",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/business-regression.mjs",
@@ -431,6 +439,7 @@
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/ci-equivalence.mjs",
         "scripts/ci-light-checks.mjs",
+        "scripts/delivery-standard-coverage.mjs",
         "scripts/delivery-standard.mjs",
         "scripts/frontend-test-evidence.mjs",
         "scripts/run-script-tests.mjs",
@@ -467,12 +476,17 @@
       "dynamicImports": 0
     },
     "scripts/completion-ci-evidence.mjs": {
-      "digest": "b1e12aa217bbc0d3b0364521907570545a5f3cb6fb14114b85807935b1ab880f",
-      "imports": ["scripts/ci-equivalence.mjs", "scripts/ci-quality-evidence.mjs", "scripts/verification-evidence.mjs"],
+      "digest": "5d10ec9b5398126d51d16ef597936aa92a145f8bfc49bf0c3feda7552a979007",
+      "imports": [
+        "scripts/ci-equivalence.mjs",
+        "scripts/ci-quality-evidence.mjs",
+        "scripts/delivery-standard-coverage.mjs",
+        "scripts/verification-evidence.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "8758ef11c2a385bf1d4ea0c06ab5fc0a21db0c1d9a6b883d2d99c8450f4e3b76",
+      "digest": "216a945e8277176e9ba855d4740765afb803e6d3e1fa99261438f993c51a02de",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -666,6 +680,16 @@
       "imports": ["src/components/foundation/actions/button-functions.json"],
       "dynamicImports": 0
     },
+    "scripts/delivery-input-contracts.mjs": {
+      "digest": "0ae278cd0ae03f80307e40ae2adfd9bef7d9de9263a197406428c6f39a3ce612",
+      "imports": ["scripts/delivery-standard.mjs", "scripts/verification-impact.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-input-contracts.test.mjs": {
+      "digest": "1296936dd4efd1089163cfdd849cc41f8812d592f9305c3b78d52c6fc3552782",
+      "imports": ["scripts/delivery-input-contracts.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-launcher.mjs": {
       "digest": "bd1efa19e95d0492ee14193866de46b9664b0ca8e5bf24ca747c80249effff13",
       "imports": [
@@ -743,13 +767,29 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/delivery-standard-coverage.mjs": {
+      "digest": "eb4d1986edbb7a86a0bba4acbc7b94fcbfc60f9f91fc1c2f1f6dfbdfaafa7f2e",
+      "imports": ["scripts/frontend-test-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-standard-coverage.test.mjs": {
+      "digest": "47b41ef7f1fc15e554500b3901a36a465c7c127772329ad8fe987a5d65414b36",
+      "imports": [
+        "scripts/ci-light-checks.mjs",
+        "scripts/delivery-standard-coverage.mjs",
+        "scripts/delivery-standard.mjs",
+        "scripts/task-cleanup-handoff.mjs",
+        "scripts/tool.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/delivery-standard.mjs": {
-      "digest": "95ab854cf3b791ad1611d04f1062d8c60d51278871f8a6bd6ffb473dfadb7235",
-      "imports": [],
+      "digest": "fb3cde79a55d7c1049ee43736fbeeeb30959a937b52efab45789cd99e680fa29",
+      "imports": ["scripts/delivery-standard-coverage.mjs"],
       "dynamicImports": 0
     },
     "scripts/delivery-standard.test.mjs": {
-      "digest": "2108a04187ceb4f611cc91dbb26d7fb3e1df75a49b00656b76e28d696618da13",
+      "digest": "01c56c10c5a2b4116f605defcf5fd546c25dcc2c027c6ee6048174cdb1becb6e",
       "imports": ["scripts/delivery-standard.mjs", "scripts/verification-impact.mjs", "scripts/verify.mjs"],
       "dynamicImports": 4
     },
@@ -847,7 +887,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "351cb52871eecd52b5a20aa7b93113758b58113e7a4130a5aae4d84a5bd9bd24",
+      "digest": "a18c009f8c286d4261005ede113ed4a2c521e2019e57de0b6ec7cc2a5f586451",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -921,11 +961,15 @@
         "scripts/completion-status.test.mjs",
         "scripts/consumer.mjs",
         "scripts/consumer.test.mjs",
+        "scripts/delivery-input-contracts.mjs",
+        "scripts/delivery-input-contracts.test.mjs",
         "scripts/delivery-launcher.mjs",
         "scripts/delivery-launcher.test.mjs",
         "scripts/delivery-migration-safety.mjs",
         "scripts/delivery-repairs/batch-timing-io.mjs",
         "scripts/delivery-repairs/batch-timing-publication.test.mjs",
+        "scripts/delivery-standard-coverage.mjs",
+        "scripts/delivery-standard-coverage.test.mjs",
         "scripts/delivery-standard.mjs",
         "scripts/delivery-standard.test.mjs",
         "scripts/dev-all.mjs",
@@ -1025,6 +1069,8 @@
         "scripts/task-candidate-runtime.test.mjs",
         "scripts/task-cleanup-handoff.mjs",
         "scripts/task-cleanup-handoff.test.mjs",
+        "scripts/task-cleanup-inventory.mjs",
+        "scripts/task-cleanup-inventory.test.mjs",
         "scripts/task-cleanup-queue.mjs",
         "scripts/task-codex-cycle-cli.mjs",
         "scripts/task-codex-cycle.test.mjs",
@@ -1098,6 +1144,7 @@
         "scripts/test-support/engineering-scope-fixture.mjs",
         "scripts/test-support/task-data-environment.mjs",
         "scripts/test-support/wait-quality.mjs",
+        "scripts/tool.mjs",
         "scripts/ui-template-policy.test.mjs",
         "scripts/unknown.mjs",
         "scripts/unrelated.test.mjs",
@@ -1171,7 +1218,7 @@
       "dynamicImports": 0
     },
     "scripts/frontend-test-evidence.mjs": {
-      "digest": "61b9df2bac67f43b8450d670b3229e1c45116c628925ad4d5bdf008807c5f4c1",
+      "digest": "2376ac62b085d8a738f786d4ef20aad3b2430153e97f48b717a9193dc01417b5",
       "imports": [],
       "dynamicImports": 0
     },
@@ -1721,13 +1768,27 @@
       "dynamicImports": 0
     },
     "scripts/task-cleanup-handoff.mjs": {
-      "digest": "974a78b9c1d0b8d04cb7fb86991072d9782d1c51b1049d5d463956c19a0f5834",
-      "imports": ["scripts/task-cleanup-queue.mjs", "scripts/verification-evidence.mjs"],
+      "digest": "0b8ae2af286348f459cd1521218cb9e2dc1f99df0488bc790d6682dea7968f5e",
+      "imports": [
+        "scripts/task-cleanup-inventory.mjs",
+        "scripts/task-cleanup-queue.mjs",
+        "scripts/verification-evidence.mjs"
+      ],
       "dynamicImports": 1
     },
     "scripts/task-cleanup-handoff.test.mjs": {
-      "digest": "70c994410583324a91efb113018fa85b006767526764ed9adbf0187d85458b9b",
+      "digest": "35ce5482b05d68f7466d54c13f6c4a6a7c1d80da12b2ebad29e97e6a7c7b50b7",
       "imports": ["scripts/build-task-app.mjs", "scripts/task-cleanup-handoff.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-inventory.mjs": {
+      "digest": "2e1cc4001cf99c86ec1cff3eddf401f286fa5a12173d4f6f88f5aee600901c84",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-inventory.test.mjs": {
+      "digest": "990c0a6dd6f3dab63a476fc05c75d9082728ee4c0d7ee8ad420ce0c9d74d6476",
+      "imports": ["scripts/task-cleanup-handoff.mjs", "scripts/task-cleanup-inventory.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-codex-cycle-cli.mjs": {
@@ -2499,12 +2560,13 @@
       "dynamicImports": 0
     },
     "scripts/verify.mjs": {
-      "digest": "93298061385d297a9a0f0cfcf9f1b5dff92352803758c3ef38b9770caf8a5534",
+      "digest": "6b319461779c97913174cd98ca3c81a0cc623ba699e15cecc5bf110409a566ec",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/batch-timing-runtime.mjs",
         "scripts/business-regression.mjs",
         "scripts/check-changed-plan.mjs",
+        "scripts/delivery-standard-coverage.mjs",
         "scripts/delivery-standard.mjs",
         "scripts/script-test-plan.mjs",
         "scripts/task-timing.mjs",

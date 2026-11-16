@@ -1,3 +1,4 @@
+import { compileStandardCoverage } from './delivery-standard-coverage.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -111,6 +112,7 @@ export function deliveryStandardPlan({ files, impact, candidate = null, base = n
     },
     protected: standard.protected,
   };
+  plan.coverage = compileStandardCoverage(standard, plan);
   return { ...plan, digest: hash(plan) };
 }
 
@@ -118,7 +120,16 @@ export function deliveryStandardPlan({ files, impact, candidate = null, base = n
 export function effectiveDeliveryPlan(plan, { candidate, base, environment } = {}) {
   const source = plan.standard;
   const execution = Object.fromEntries(
-    ['earlyChecks', 'preflight', 'contractPreflight', 'frontend', 'backend', 'engineering', 'runtime'].map((stage) => [
+    [
+      'inputContracts',
+      'earlyChecks',
+      'preflight',
+      'contractPreflight',
+      'frontend',
+      'backend',
+      'engineering',
+      'runtime',
+    ].map((stage) => [
       stage,
       [plan[stage]]
         .flat()

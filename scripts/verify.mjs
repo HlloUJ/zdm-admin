@@ -1,3 +1,4 @@
+import { assertStandardCoveragePlan } from './delivery-standard-coverage.mjs';
 import { deliveryStandardPlan, effectiveDeliveryPlan } from './delivery-standard.mjs';
 import { observeCurrentTiming } from './batch-timing-runtime.mjs';
 import { observeTaskTiming } from './task-timing.mjs';
@@ -74,6 +75,18 @@ export function createVerificationPlan({
   });
   const browserEnv = browser ? { ...qualityEnv, PLAYWRIGHT_CHANNEL: browser } : qualityEnv;
   const plan = {
+    inputContracts: {
+      root,
+      name: 'delivery input contracts',
+      command: process.execPath,
+      args: [
+        path.join(path.dirname(fileURLToPath(import.meta.url)), 'delivery-input-contracts.mjs'),
+        '--files-json',
+        JSON.stringify(files),
+      ],
+      env: qualityEnv,
+      reuse: false,
+    },
     earlyChecks: earlyReadinessTasks(root, files, qualityEnv),
     preflight: task('format check', 'format:check', { reuse: false }),
     contractPreflight:
@@ -203,6 +216,7 @@ export async function executeVerification(
   plan,
   { run = runVerificationTask, force = false, report = console.log, capture = captureSource } = {},
 ) {
+  if (plan.standard) assertStandardCoveragePlan(plan.standard);
   const started = performance.now();
   const phases = [];
   const before = capture(plan.preflight.root);
@@ -295,6 +309,7 @@ export async function executeVerification(
     });
     return result;
   };
+  if (plan.inputContracts && (await execute(plan.inputContracts)).exitCode !== 0) return finish(1);
   if ((await execute(plan.preflight)).exitCode !== 0) return finish(1);
   for (const task of plan.earlyChecks ?? []) if ((await execute(task)).exitCode !== 0) return finish(1);
   if (

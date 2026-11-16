@@ -7,6 +7,7 @@ import {
 // Main may reuse only an exact, successful same-repository PR merge candidate.
 // Every uncertainty is a miss: the unchanged normal CI commands then run.
 import assert from 'node:assert/strict';
+import { isDeepStrictEqual } from 'node:util';
 import { spawnSync } from 'node:child_process';
 import { cpSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -17,6 +18,21 @@ import { SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import { environmentProof, environmentObservation, validateEnvironmentProof } from './ci-equivalence-environment.mjs';
 export { executionEnvironment, environmentProof } from './ci-equivalence-environment.mjs';
 
+// Diagnostic paths only, never environment values or credentials. This does not
+// change deep equality or the original fallback decision.
+export function equivalenceDifferencePaths(actual, expected, limit = 64) {
+  const paths = [];
+  function visit(a, b, p) {
+    if (isDeepStrictEqual(a, b)) return;
+    if (paths.length >= limit) return;
+    if (a && b && typeof a === 'object' && typeof b === 'object' && Array.isArray(a) === Array.isArray(b)) {
+      for (const key of [...new Set([...Object.keys(a), ...Object.keys(b)])].sort())
+        visit(a[key], b[key], p + '/' + key);
+    } else paths.push(p || '/');
+  }
+  visit(actual, expected, '');
+  return paths;
+}
 export const STATIC_PHASE_COMMANDS = {
   'npm-ci': ['npm', 'ci'],
   'browser-image': ['node', 'scripts/ci-browser-image.mjs', 'verify'],
@@ -102,7 +118,16 @@ export function validateProvenance({ current, original, run, pull, commit, repos
     commit.parents.map((entry) => entry.sha),
     parents,
   );
-  assert.deepEqual(original.environmentProof, proof, 'Installed dependencies, runtime or execution environment differ');
+  try {
+    assert.deepEqual(
+      original.environmentProof,
+      proof,
+      'Installed dependencies, runtime or execution environment differ',
+    );
+  } catch (error) {
+    error.equivalenceMismatchPaths = equivalenceDifferencePaths(original.environmentProof, proof);
+    throw error;
+  }
   assert.equal(original.reusedFrom, undefined, 'Chained evidence is prohibited');
   assert.ok(original.phases?.length && original.phases.every((phase) => phase.exitCode === 0), 'Failed source phases');
   return true;
@@ -157,6 +182,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
   let reused = false;
   const job = env.GITHUB_JOB;
   let proof = null;
+  let stage = 'environment-proof';
   try {
     assert.notEqual(env.CI_EQUIVALENCE_DISABLED, 'true', 'Operator disabled equivalence reuse');
     if (job === 'backend_full') recordBackendPreparation(directory, env, dependencies.backendRuntime);
@@ -181,10 +207,12 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
     const parents = dependencies.parents ? dependencies.parents() : readCommitParents();
     assert.equal(parents.length, 2);
     const api = dependencies.api ?? ((suffix) => JSON.parse(command('gh', ['api', `repos/${repository}/${suffix}`])));
+    stage = 'source-pull-request';
     const pulls = api(`commits/${current.candidateSha}/pulls`);
     const pull = pulls.find((item) => item.merged_at && item.merge_commit_sha === current.candidateSha);
     assert.ok(pull, 'No exact merged PR');
     const fullPull = api(`pulls/${pull.number}`);
+    stage = 'source-workflow';
     const runs = api(
       `actions/workflows/quality.yml/runs?event=pull_request&head_sha=${parents[1]}&per_page=20`,
     ).workflow_runs;
@@ -210,6 +238,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
     );
     const staging = dependencies.staging ?? path.join(os.tmpdir(), `zdm-ci-${env.GITHUB_RUN_ID}-${job}`);
     mkdirSync(staging, { recursive: true });
+    stage = 'source-artifact';
     (dependencies.download ?? ((args) => command('gh', args)))([
       'run',
       'download',
@@ -221,6 +250,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
       '--dir',
       staging,
     ]);
+    stage = 'provenance-and-environment';
     const original = json(path.join(staging, 'metadata.json'));
     assert.equal(original.job, job);
     if (job === 'backend_full') {
@@ -266,6 +296,7 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
       environmentObservation: current.environmentObservation,
       preparationObservation: current.preparationObservation,
       reusedFrom: provenance,
+      reuseDecision: { version: 1, state: 'valid-reuse', stage: 'complete', sourceRun: String(run.id) },
     };
     validateReusedMetadata(replay);
     cpSync(staging, directory, { recursive: true });
@@ -275,6 +306,24 @@ export async function tryReuse(directory, env = process.env, dependencies = {}) 
   } catch (error) {
     if (job === 'backend_full') proof = null;
     console.log(`CI equivalence miss: ${error.message}; run normal checks.`);
+    try {
+      const file = path.join(directory, 'metadata.json'),
+        metadata = json(file);
+      metadata.reuseDecision = {
+        version: 1,
+        state: 'miss',
+        stage,
+        reason: error.equivalenceMismatchPaths?.length
+          ? 'environment-input-mismatch'
+          : error.code === 'ERR_ASSERTION'
+            ? 'contract-not-proven'
+            : 'evidence-unavailable',
+        mismatchPaths: error.equivalenceMismatchPaths ?? [],
+      };
+      writeFileSync(file, JSON.stringify(metadata, null, 2) + '\n');
+    } catch {
+      console.log('CI reuse diagnostic persistence unavailable; original normal fallback remains required.');
+    }
   }
   if (!reused && proof) {
     const file = path.join(directory, 'metadata.json');

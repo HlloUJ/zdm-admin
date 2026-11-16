@@ -1,4 +1,4 @@
-import { handoffBuiltDist } from './task-cleanup-handoff.mjs';
+import { handoffBuiltDist, recordCloseoutCleanupInventory } from './task-cleanup-handoff.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
@@ -556,7 +556,21 @@ async function completionCommandLocked(
                   },
                 })
               : { state: 'retained', reason: 'Legacy task outputs remain protected' };
-          return { ...preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id)), cleanupHandoff };
+          const preservedAssets = preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id));
+          const cleanupInventory = recordCloseoutCleanupInventory({
+            root: batch.worktree,
+            common,
+            task: batch.id,
+            proof: {
+              worktree: batch.worktree,
+              head: batch.recordedHead,
+              accepted: readAcceptance(anchor, batch.id).commit,
+              main: expectedMain,
+            },
+            preserved: preservedAssets,
+            distHandoff: cleanupHandoff,
+          });
+          return { ...preservedAssets, cleanupHandoff, cleanupInventory };
         },
       },
       cleanup: {

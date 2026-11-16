@@ -99,6 +99,8 @@ test('missing or malformed standard cannot authorize a document-only plan', asyn
     path.join(root, 'scripts/delivery-standard.mjs'),
     readFileSync(new URL('./delivery-standard.mjs', import.meta.url)),
   );
+  for (const name of ['delivery-standard-coverage.mjs', 'frontend-test-evidence.mjs'])
+    writeFileSync(path.join(root, 'scripts', name), readFileSync(new URL('./' + name, import.meta.url)));
   writeFileSync(path.join(root, 'ci/delivery-standard.json'), '{broken');
   const invalid = await import(new URL('file://' + path.join(root, 'scripts/delivery-standard.mjs')));
   assert.equal(invalid.deliveryStandardAvailable, false);

@@ -30,7 +30,7 @@ function fixture(t) {
     proof = { worktree: root, head: 'a'.repeat(40), accepted: 'b'.repeat(40), main: 'c'.repeat(40) };
   writeFileSync(
     path.join(root, '.task-runtime/task-artifacts.json'),
-    JSON.stringify({ ready: true, task, worktree: root }),
+    JSON.stringify({ version: 1, ready: true, task, worktree: root }),
   );
   let source = 'd'.repeat(64),
     fail = false,

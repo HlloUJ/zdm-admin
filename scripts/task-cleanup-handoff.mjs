@@ -1,3 +1,4 @@
+import { buildCloseoutCleanupInventory } from './task-cleanup-inventory.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -11,6 +12,7 @@ import {
   openSync,
   closeSync,
   fsyncSync,
+  readlinkSync,
 } from 'node:fs';
 import path from 'node:path';
 import { captureSource } from './verification-evidence.mjs';
@@ -59,6 +61,7 @@ export async function registerBuiltDist(root, sourceDigest, { api, capture = cap
   if (!existsSync(artifact)) return { state: 'retained', reason: 'No task-owned artifact registration' };
   canonical(artifact);
   const task = JSON.parse(readFileSync(artifact, 'utf8'));
+  assert.equal(task.version, 1, 'Unknown task-owned artifact registration');
   assert.equal(task.ready, true);
   assert.equal(task.worktree, root);
   assert.match(task.task, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -171,5 +174,45 @@ export async function handoffBuiltDist(
     manifest: path.join(record.carrier, 'manifest.json'),
     object: accepted.key,
     cleanupPending: true,
+  };
+}
+
+// The whole closeout manifest records protected and unsupported types too. This
+// is not a deletion permit and does not claim the entire cleanup rollout is done.
+export function recordCloseoutCleanupInventory({ root, common, task, proof, preserved, distHandoff }) {
+  const expected = path.join(common, 'task-assets', task);
+  assert.equal(path.dirname(preserved.manifest), expected, 'Foreign asset preservation manifest');
+  canonical(preserved.manifest);
+  const bytes = readFileSync(preserved.manifest),
+    digest = sha(bytes);
+  assert.equal(path.basename(preserved.manifest), 'assets-' + digest + '.json', 'Preservation manifest changed');
+  const artifactsFile = path.join(root, '.task-runtime/task-artifacts.json');
+  const artifacts = existsSync(artifactsFile) ? JSON.parse(readFileSync(canonical(artifactsFile), 'utf8')) : null;
+  const modules = path.join(root, 'node_modules');
+  const externalDependencyTarget =
+    existsSync(modules) && lstatSync(modules).isSymbolicLink() ? path.resolve(root, readlinkSync(modules)) : null;
+  const inventory = buildCloseoutCleanupInventory({
+    root,
+    common,
+    task,
+    proof,
+    preserved,
+    manifestDigest: digest,
+    entries: JSON.parse(bytes),
+    artifacts,
+    distHandoff,
+    externalDependencyTarget,
+  });
+  const content = JSON.stringify(inventory) + '\n';
+  const store = directory(path.join(common, 'task-cleanup', 'handoffs', task));
+  const file = path.join(store, proof.main + '-' + sha(content) + '.json');
+  immutable(file, content);
+  return {
+    state: 'inventory-handed-off',
+    manifest: file,
+    resources: inventory.resources.length,
+    gaps: inventory.gaps,
+    implementationComplete: inventory.implementationComplete,
+    spaceReleased: false,
   };
 }
