@@ -373,3 +373,25 @@ test('explicit reorder cannot release blocked slots, change owner, or affect the
   assert.equal(queue.read().tickets[0].owner, 'owner-1');
   assert.throws(() => claim(queue, 2, 'delivery'), /FIFO/);
 });
+
+test('one exact instruction can pause others then resume only its named task, preserving monitoring binding', (t) => {
+  const { queue } = fixture(t);
+  const request = event(100);
+  queue.direct({ action: 'pause-all', request });
+  queue.enqueue({ lane: 'development', task: 'repair', owner: 'owner-1', request });
+  const monitorContext = { taskStableId: 'repair', authorizationRef: request.messageId };
+  const direction = {
+    action: 'resume-only',
+    lane: 'development',
+    task: 'repair',
+    owner: 'owner-1',
+    request,
+    monitorContext,
+  };
+  const after = queue.direct(direction);
+  assert.equal(after.paused, true);
+  assert.deepEqual(after.tickets[0].monitorContext, monitorContext);
+  assert.deepEqual(queue.direct(direction), after);
+  assert.throws(() => queue.direct({ ...direction, monitorContext: { taskStableId: 'wrong' } }));
+  assert.throws(() => queue.direct({ action: 'resume-all', request }));
+});

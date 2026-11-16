@@ -1,3 +1,4 @@
+import { createBoardIntake } from './task-board-intake.mjs';
 import { collectTaskProgress } from './task-progress-collector.mjs';
 import { executionOrderCommand } from './task-execution-order-cli.mjs';
 import assert from 'node:assert/strict';
@@ -60,13 +61,37 @@ const options = (slug, parent) => ({
   taskParent: parent,
   resume: false,
 });
-test('native top-level thread creates real isolated worktree, persists exact monitoring and remains observable', (t) => {
+test('native top-level thread creates real isolated worktree, persists exact monitoring and remains observable', async (t) => {
   const f = fixture(t);
   const owner = '11111111-1111-4111-8111-111111111111';
   process.env.CODEX_THREAD_ID = owner;
   const opts = options('native-task', f.parent);
   opts.owner = owner;
   opts.monitorContext = { ...context('native-task'), executionSurface: 'codex-thread', worker: owner };
+  opts.monitorContext.rootThreadId = owner;
+  opts.monitorContext.roomId = owner;
+  await createBoardIntake(f.registry.commonDir).accept(
+    {
+      taskId: 'native-task',
+      title: opts.monitorContext.taskName,
+      owner,
+      rootThreadId: owner,
+      request: { roomId: owner, messageId: opts.monitorContext.authorizationRef },
+    },
+    {
+      readThread: async () => ({
+        thread: { id: owner },
+        turns: [{ items: [{ type: 'userMessage', id: opts.monitorContext.authorizationRef }] }],
+      }),
+      readTask: async () => ({
+        id: 'native-task',
+        title: opts.monitorContext.taskName,
+        task_number: opts.monitorContext.taskNumber,
+        status: 'active',
+        revision: 1,
+      }),
+    },
+  );
   const result = startParallelTask(opts, { root: f.root });
   assert.equal(result.task.monitoring.executionSurface, 'codex-thread');
   assert.equal(result.task.monitoring.worker, owner);
@@ -313,4 +338,17 @@ test('existing registered carrier preserves its explicit different board stable 
   assert.equal(resumed.resumed, true);
   assert.equal(resumed.task.worktree, result.task.worktree);
   assert.equal(resumed.task.monitoring.taskStableId, 'original-board-task');
+});
+
+test('native missing intake refuses before worktree, branch, registry or artifacts exist', (t) => {
+  const f = fixture(t),
+    owner = '11111111-1111-4111-8111-111111111111';
+  process.env.CODEX_THREAD_ID = owner;
+  const opts = options('unregistered-native', f.parent);
+  opts.owner = owner;
+  opts.monitorContext = { ...context('unregistered-native'), executionSurface: 'codex-thread', worker: owner };
+  assert.throws(() => startParallelTask(opts, { root: f.root }), /Board intake missing/);
+  assert.equal(existsSync(path.join(f.parent, 'unregistered-native')), false);
+  assert.equal(f.registry.readTask('unregistered-native'), null);
+  assert.equal(f.git(f.root, 'branch', '--list', 'codex/unregistered-native'), '');
 });
