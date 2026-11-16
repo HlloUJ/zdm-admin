@@ -56,13 +56,22 @@ export function captureCompletionProgress(directory, state, previous) {
   }
 }
 export function captureQueueProgress(commonDir, state, previous) {
+  const pausedFor = (s, t) =>
+    s?.paused === true &&
+    !(
+      s.scopedAdmission?.lane === t.lane &&
+      s.scopedAdmission?.task === t.task &&
+      s.scopedAdmission?.owner === t.owner &&
+      s.scopedAdmission?.admission === t.admission
+    );
   for (const ticket of state.tickets) {
     if (['completed', 'cancelled'].includes(ticket.status)) continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
     // Admission is NOT proof of actual action start. No synthetic started event on claim.
-    const changed = !before || before.status !== ticket.status || state.paused !== previous.paused;
-    if (!changed || (!['queued', 'blocked'].includes(ticket.status) && !state.paused)) continue;
-    const event = state.paused ? 'paused' : ticket.status;
+    const paused = pausedFor(state, ticket);
+    const changed = !before || before.status !== ticket.status || paused !== pausedFor(previous, before);
+    if (!changed || (!['queued', 'blocked'].includes(ticket.status) && !paused)) continue;
+    const event = paused ? 'paused' : ticket.status;
     bestEffortProgress(
       path.join(commonDir, 'task-progress', ticket.task),
       ticket.task,
@@ -72,7 +81,7 @@ export function captureQueueProgress(commonDir, state, previous) {
         action: { id: `queue:${ticket.lane}`, label: ticket.lane },
         event,
         evidence_refs: [`execution-order:${state.revision}:${ticket.lane}:${ticket.task}`],
-        next: { kind: 'wait', label: state.paused ? '等待恢复指令' : '等待执行' },
+        next: { kind: 'wait', label: paused ? '等待恢复指令' : '等待执行' },
         ...(ticket.reason ? { reason: ticket.reason } : {}),
       },
     );

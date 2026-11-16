@@ -167,6 +167,18 @@ test('dependency-aware delivery keeps original order, waits without a slot, and 
     before.tickets.map((t) => t.order),
   );
 });
+test('scoped admission is not reported as paused or started; a new pause records its revocation', (t) => {
+  const { root, queue } = fixture(t);
+  enqueue(queue, 1, 'delivery');
+  queue.direct({ action: 'pause-all', request: event(90) });
+  const file = path.join(root, 'task-progress/task-1/outbox.json');
+  const before = JSON.parse(readFileSync(file));
+  queue.direct({ action: 'resume-only', lane: 'delivery', task: 'task-1', owner: 'owner-1', request: event(100) });
+  assert.deepEqual(JSON.parse(readFileSync(file)), before);
+  queue.direct({ action: 'pause-all', request: event(101) });
+  assert.equal(JSON.parse(readFileSync(file)).pending.at(-1).receipt.event, 'paused');
+  assert.equal(JSON.parse(readFileSync(file)).pending.length, before.pending.length + 1);
+});
 test('two independent FIFO lanes admit three each, never a fourth', (t) => {
   const { queue } = fixture(t);
   for (const lane of ['development', 'delivery']) {
