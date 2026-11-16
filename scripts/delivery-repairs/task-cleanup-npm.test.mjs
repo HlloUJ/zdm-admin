@@ -12,7 +12,7 @@ import {
   handoffAuditedDependencies,
   readDependencyCleanupInventory,
 } from './task-cleanup-npm.mjs';
-import { npmArchiveFiles, npmDigest, verifyNpmPackageTree } from './task-cleanup-npm-proof.mjs';
+import { npmArchiveFiles, npmDigest, verifyNpmPackageTree, npmIntegrityHex } from './task-cleanup-npm-proof.mjs';
 import { cleanupIdentity } from '../task-cleanup-queue.mjs';
 const safe = { apply: true, verify: async () => ({ ready: true }), unreferenced: async () => {} };
 const handoff = (f, extra = {}) =>
@@ -73,6 +73,25 @@ test('missing private archive, lock mismatch, install scripts and nested package
   const changed = fixture(t);
   writeFileSync(path.join(changed.root, 'package-lock.json'), '{}');
   assert.throws(() => auditPrivateTaskDependencies(changed.parameters), /binding changed/);
+});
+test('actual installed package with missing lock integrity keeps original bytes and reports the explicit immutable-proof gap', (t) => {
+  const f = fixture(t),
+    lockFile = path.join(f.root, 'package-lock.json'),
+    lock = JSON.parse(readFileSync(lockFile));
+  delete lock.packages['node_modules/example'].integrity;
+  writeFileSync(lockFile, JSON.stringify(lock));
+  const artifact = JSON.parse(readFileSync(f.artifact));
+  artifact.lockDigest = npmDigest(readFileSync(lockFile));
+  writeFileSync(f.artifact, JSON.stringify(artifact));
+  const result = auditPrivateTaskDependencies(f.parameters),
+    retained = result.protected.find((e) => e.relative === 'node_modules/example');
+  assert.equal(result.entries.length, 0);
+  assert.match(retained.reason, /锁未记录不可变SHA-512证明，保留原内容/);
+  assert.doesNotMatch(retained.reason, /TypeError|must be of type string/);
+  assert.equal(readFileSync(path.join(f.source, 'index.js'), 'utf8'), 'export default 1;');
+  assert.deepEqual(readFileSync(f.cache), f.bytes);
+  for (const value of [undefined, null, 42, ''])
+    assert.throws(() => npmIntegrityHex(value), /锁未记录不可变SHA-512证明，保留原内容/);
 });
 test('real tar parser rejects traversal, duplicate and linked archive members without extracting', () => {
   for (const files of [

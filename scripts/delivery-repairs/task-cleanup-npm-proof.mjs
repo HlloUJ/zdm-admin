@@ -25,7 +25,9 @@ export function npmPackagePath(relative) {
   return relative;
 }
 export function npmIntegrityHex(integrity) {
-  assert.match(integrity, /^sha512-[A-Za-z0-9+/]{86}==$/);
+  const reason = '锁未记录不可变SHA-512证明，保留原内容';
+  assert.ok(typeof integrity === 'string' && integrity.length > 0, reason);
+  assert.match(integrity, /^sha512-[A-Za-z0-9+/]{86}==$/, reason);
   const bytes = Buffer.from(integrity.slice(7), 'base64');
   assert.equal(bytes.length, 64);
   assert.equal(bytes.toString('base64'), integrity.slice(7));
