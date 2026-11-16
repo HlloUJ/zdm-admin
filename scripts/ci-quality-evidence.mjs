@@ -14,6 +14,7 @@ import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } fr
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { classifyChangedFiles } from './verification-impact.mjs';
+import { deliveryStandardPlan } from './delivery-standard.mjs';
 import { engineeringDomainProof, scriptTestFiles, SOURCE_GUARD_TESTS } from './script-test-plan.mjs';
 import { backendReportState, validateBackendReports } from './backend-test-evidence.mjs';
 import { executionEnvironment, validateReusedMetadata, environmentProof } from './ci-equivalence.mjs';
@@ -184,6 +185,7 @@ export function changeScope(event, identity, git = gitRaw, engineeringProof = en
     problem = error.message;
     files = [];
   }
+  const classification = classifyChangedFiles(files, { engineeringProof });
   return {
     schemaVersion: 1,
     identity,
@@ -191,7 +193,13 @@ export function changeScope(event, identity, git = gitRaw, engineeringProof = en
     problem,
     files,
     engineeringProof,
-    classification: classifyChangedFiles(files, { engineeringProof }),
+    classification,
+    standard: deliveryStandardPlan({
+      files,
+      impact: classification,
+      candidate: identity.candidateSha,
+      base: identity.baseSha,
+    }),
   };
 }
 
@@ -211,6 +219,16 @@ export function verifyScope(scope, identity) {
     scope.classification,
     classifyChangedFiles(scope.files, { engineeringProof }),
     'Classification does not match the complete diff',
+  );
+  assert.deepEqual(
+    scope.standard,
+    deliveryStandardPlan({
+      files: scope.files,
+      impact: scope.classification,
+      candidate: identity.candidateSha,
+      base: identity.baseSha,
+    }),
+    'Unified standard plan does not match current inputs',
   );
 }
 

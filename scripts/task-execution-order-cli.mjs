@@ -69,7 +69,7 @@ export function executionOrderCommand(root, [command, json]) {
   if (command === 'claim') {
     if (input.lane === 'development' && !registry.readTask(input.task)) {
       requireStartMonitoring(input.owner, input.task, input.monitorContext);
-      if (input.monitorContext?.executionSurface === 'codex-thread')
+      if (['codex-thread', 'collaboration-agent'].includes(input.monitorContext?.executionSurface))
         createBoardIntake(registry.commonDir).require(input.monitorContext, input.task, input.owner);
       const ticket = queue
         .read()
@@ -80,9 +80,33 @@ export function executionOrderCommand(root, [command, json]) {
   }
   if (command === 'block') return queue.block(input);
   if (command === 'direct') {
+    if (input.action === 'resume-selected') {
+      assert.ok(Array.isArray(input.members) && input.members.length > 0, 'Exact selected tasks required');
+      for (const member of input.members) {
+        assert.equal(member.lane, 'development');
+        const current = queue
+          .read()
+          ?.tickets.find((t) => t.task === member.task && t.lane === member.lane && t.owner === member.owner);
+        requireStartMonitoring(member.owner, member.task, member.monitorContext);
+        if (['codex-thread', 'collaboration-agent'].includes(member.monitorContext?.executionSurface))
+          createBoardIntake(registry.commonDir).require(member.monitorContext, member.task, member.owner);
+        verifyMonitoringInstruction(member.monitorContext, current);
+        const registered = registry.readTask(member.task);
+        if (registered) {
+          assert.equal(registered.owner, member.owner);
+          for (const key of ['taskStableId', 'taskNumber', 'rootThreadId', 'roomId', 'authorizationRef', 'worker'])
+            assert.equal(
+              registered.monitoring?.[key],
+              member.monitorContext[key],
+              'Registered monitoring differs: ' + key,
+            );
+        }
+      }
+    }
+
     if (input.action === 'resume-only' && input.lane === 'development' && !registry.readTask(input.task)) {
       requireStartMonitoring(input.owner, input.task, input.monitorContext);
-      if (input.monitorContext?.executionSurface === 'codex-thread')
+      if (['codex-thread', 'collaboration-agent'].includes(input.monitorContext?.executionSurface))
         createBoardIntake(registry.commonDir).require(input.monitorContext, input.task, input.owner);
       verifyMonitoringInstruction(
         input.monitorContext,

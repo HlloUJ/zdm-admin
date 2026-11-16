@@ -1,0 +1,11 @@
+# 过期回执的隔离与接续契约
+
+问题：旧离线事实先于用户手动更新，看板正确拒绝 `stale_receipt`；本地有序outbox为防重放而保留首条，但后续新事实也被阻塞。拒绝不是投递成功，不能改旧observed_at、刷新旧revision、删除历史或伪造ack。
+
+当前Site回执规则要求sequence单调递增、observed_at不逆序及manualBarrier新鲜度，**不要求 last+1 连续**。必须依据准确部署版本及原失败证据诊断，不能因假设要求改Site。
+
+恢复动作应由原owner认证宿主明确调用，先读取准确receipt_id及当前任务，确认原receipt仍为not_found、内容与原文一致，原持久失败确为stale_receipt。只将这一个被证明不可投递的事实标为“已隔离、未投递”，持久化原文、原revision、拒绝、当前读回revision和恢复依据；它不进入acknowledged，也不声称看板收到。revision_conflict、未知拒绝或未知结果不套用该路径。
+
+后续旧事实逐项按原身份读回/判断；不能把整段pending按年龄批量丢弃，也不能借接续自动恢复任务或跨卡片。新事实必须来自当前准确阶段证据，重新生成其真实观察时间和独立receipt_id，使用当前revision走既有Site的CAS/顺序屏障；用户手动状态仍优先。确认应用及准确内容读回后，才能记录投递成功。
+
+当前源代码只具备永久拒绝后的needs-review保护，尚未接入上述显式隔离动作。本契约是待实现接口说明，不授权操作现有outbox、修改Site或重放暂停任务；不能报告过期队列已经恢复。

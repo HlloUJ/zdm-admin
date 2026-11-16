@@ -1,3 +1,4 @@
+import { executionPausedFor } from './task-execution-scope.mjs';
 import { notifyProgressHost } from './task-progress-host.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -56,14 +57,7 @@ export function captureCompletionProgress(directory, state, previous) {
   }
 }
 export function captureQueueProgress(commonDir, state, previous) {
-  const pausedFor = (s, t) =>
-    s?.paused === true &&
-    !(
-      s.scopedAdmission?.lane === t.lane &&
-      s.scopedAdmission?.task === t.task &&
-      s.scopedAdmission?.owner === t.owner &&
-      s.scopedAdmission?.admission === t.admission
-    );
+  const pausedFor = executionPausedFor;
   for (const ticket of state.tickets) {
     if (['completed', 'cancelled'].includes(ticket.status)) continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);

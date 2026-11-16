@@ -18,21 +18,27 @@ export function deliveryCiCapability(
     return result.stdout;
   },
 ) {
+  let stage = 'repository-identity';
   try {
     const repository = JSON.parse(execute('gh', ['repo', 'view', '--json', 'nameWithOwner'])).nameWithOwner;
     assert.match(repository, /^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/);
+    stage = 'main-protection';
     const protection = JSON.parse(execute('gh', ['api', `repos/${repository}/branches/main/protection`]));
     assert.equal(protection.enforce_admins?.enabled, true);
     assert.equal(protection.required_status_checks?.strict, true);
     for (const context of ['Frontend quality', 'Backend quality'])
       assert.ok(protection.required_status_checks.contexts.includes(context));
+    stage = 'quality-workflow';
     const workflow = JSON.parse(execute('gh', ['api', `repos/${repository}/actions/workflows/quality.yml`]));
     assert.equal(workflow.state, 'active');
     assert.equal(workflow.path, '.github/workflows/quality.yml');
     return { verified: true, repository, workflow: workflow.id, checkedAt: new Date().toISOString() };
-  } catch {
+  } catch (error) {
     return {
       verified: false,
+      stage,
+      // Do not persist gh output, URLs or error messages: they may contain credentials.
+      failure: error?.code === 'ERR_ASSERTION' ? 'contract-not-proven' : 'query-unavailable-or-invalid',
       reason: 'CI availability or required protection could not be proven; full local fallback required',
     };
   }

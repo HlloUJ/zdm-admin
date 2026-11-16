@@ -1,3 +1,4 @@
+import { hasScopedAdmission, scopedAdmissions } from './task-execution-scope.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
@@ -50,9 +51,14 @@ function validate(state) {
         (state.paused ? retainedLimit(state, lane) : laneLimit(state, lane)),
       'Capacity invariant violated',
     );
-  if (state.scopedAdmission) {
-    const scoped = state.scopedAdmission;
+  const scopes = scopedAdmissions(state);
+  if (state.scopedAdmissions !== undefined) assert.ok(Array.isArray(state.scopedAdmissions));
+  const scopedKeys = new Set();
+  for (const scoped of scopes) {
     assert.equal(state.paused, true, 'Scoped admission requires the global pause');
+    const key = scoped.lane + ':' + scoped.task;
+    assert.ok(!scopedKeys.has(key), 'Duplicate scoped task');
+    scopedKeys.add(key);
     const current = state.tickets.find((t) => t.lane === scoped.lane && t.task === scoped.task);
     assert.ok(current && current.status === 'running' && current.owner === scoped.owner);
     assert.ok(text(scoped.admission) && current.admission === scoped.admission);
@@ -60,23 +66,38 @@ function validate(state) {
     assert.ok(
       state.events.some(
         (e) =>
-          e.action === 'resume-only' &&
-          e.lane === scoped.lane &&
-          e.task === scoped.task &&
-          e.owner === scoped.owner &&
-          e.admission === scoped.admission &&
-          JSON.stringify(e.request) === JSON.stringify(scoped.request),
+          JSON.stringify(e.request) === JSON.stringify(scoped.request) &&
+          ((e.action === 'resume-only' &&
+            e.lane === scoped.lane &&
+            e.task === scoped.task &&
+            e.owner === scoped.owner &&
+            e.admission === scoped.admission) ||
+            (e.action === 'resume-selected' &&
+              e.members?.some(
+                (m) =>
+                  m.lane === scoped.lane &&
+                  m.task === scoped.task &&
+                  m.owner === scoped.owner &&
+                  m.admission === scoped.admission,
+              ))),
       ),
       'Scoped admission lacks its exact user direction',
     );
   }
+  assert.ok(scopes.filter((s) => s.lane === 'delivery').length <= 1, 'Delivery must remain serial');
   return state;
 }
-const scopedFor = (state, current) =>
-  state.scopedAdmission?.lane === current.lane &&
-  state.scopedAdmission?.task === current.task &&
-  state.scopedAdmission?.owner === current.owner &&
-  state.scopedAdmission?.admission === current.admission;
+const scopedFor = hasScopedAdmission;
+function removeScope(state, current) {
+  if (state.scopedAdmission?.lane === current.lane && state.scopedAdmission?.task === current.task)
+    delete state.scopedAdmission;
+  if (state.scopedAdmissions) {
+    state.scopedAdmissions = state.scopedAdmissions.filter(
+      (s) => !(s.lane === current.lane && s.task === current.task),
+    );
+    if (!state.scopedAdmissions.length) delete state.scopedAdmissions;
+  }
+}
 function safe(file) {
   for (let cursor = file; ; cursor = path.dirname(cursor)) {
     if (existsSync(cursor)) assert.ok(!lstatSync(cursor).isSymbolicLink(), 'Linked execution-order state refused');
@@ -219,16 +240,30 @@ export function createExecutionOrder(commonDir) {
       const current = ticket(state, lane, task, owner);
       assert.ok(occupied.has(current.status), 'Only an occupied slot can block');
       current.status = 'blocked';
-      if (scopedFor(state, current)) delete state.scopedAdmission;
+      if (scopedFor(state, current)) removeScope(state, current);
       current.reason = reason;
       state.events.push({ action: 'block', lane, task, reason });
       return structuredClone(current);
     });
   }
-  function direct({ action, request, lane, task, owner, tasks, limits, dependenciesFirst, monitorContext }) {
+  function direct({
+    action,
+    request,
+    lane,
+    task,
+    owner,
+    tasks,
+    limits,
+    dependenciesFirst,
+    monitorContext,
+    members,
+    capacity,
+  }) {
     const source = event(request);
     assert.ok(
-      ['pause-all', 'resume-all', 'resume-task', 'resume-only', 'set-limits', 'reorder'].includes(action),
+      ['pause-all', 'resume-all', 'resume-task', 'resume-only', 'resume-selected', 'set-limits', 'reorder'].includes(
+        action,
+      ),
       'Only explicit supported user directions',
     );
     return update((state) => {
@@ -245,12 +280,28 @@ export function createExecutionOrder(commonDir) {
         ...(['resume-task', 'resume-only'].includes(action) ? { lane, task, owner } : {}),
         ...(action === 'resume-only' && monitorContext !== undefined ? { monitorContext } : {}),
         ...(action === 'reorder' ? { lane, tasks } : {}),
+        ...(action === 'resume-selected'
+          ? {
+              members: members?.map((member) => {
+                const result = { ...member };
+                delete result.admission;
+                return result;
+              }),
+              capacity,
+            }
+          : {}),
         ...(action === 'set-limits' ? { limits } : {}),
         ...(action === 'set-limits' && dependenciesFirst !== undefined ? { dependenciesFirst } : {}),
       };
       if (prior) {
         const direction = { ...prior };
         delete direction.admission;
+        if (direction.members)
+          direction.members = direction.members.map((member) => {
+            const result = { ...member };
+            delete result.admission;
+            return result;
+          });
         assert.deepEqual(direction, command, 'User event already used for a different action');
         return structuredClone(state);
       }
@@ -262,6 +313,7 @@ export function createExecutionOrder(commonDir) {
       );
       if (action === 'pause-all' || action === 'resume-all') {
         state.paused = action === 'pause-all';
+        delete state.scopedAdmissions;
         delete state.scopedAdmission; // A new pause revokes the exception; resume-all is explicit.
       }
       if (action === 'set-limits') {
@@ -279,9 +331,82 @@ export function createExecutionOrder(commonDir) {
           state.dependenciesFirst = dependenciesFirst;
         }
       }
+      if (action === 'resume-selected') {
+        assert.equal(state.paused, true, 'Use ordinary FIFO when not globally paused');
+        assert.ok(Array.isArray(members) && members.length > 0, 'Exact selected development tasks required');
+        assert.equal(
+          new Set(members.map((m) => m.lane + ':' + m.task)).size,
+          members.length,
+          'Duplicate selected task',
+        );
+        assert.ok(
+          capacity && Number.isSafeInteger(capacity.limit) && capacity.limit > 0,
+          'Actual executor capacity required',
+        );
+        for (const key of ['activeDevelopment', 'activeDelivery', 'activeOther'])
+          assert.ok(Number.isSafeInteger(capacity[key]) && capacity[key] >= 0);
+        assert.ok(capacity.activeDelivery <= 1, 'Delivery must remain serial');
+        assert.ok(
+          capacity.activeDevelopment + capacity.activeDelivery + capacity.activeOther <= capacity.limit,
+          'Invalid capacity snapshot',
+        );
+        const existingScopes = [
+          ...(state.scopedAdmission ? [state.scopedAdmission] : []),
+          ...(state.scopedAdmissions ?? []),
+        ];
+        assert.ok(
+          capacity.activeDevelopment >= existingScopes.filter((s) => s.lane === 'development').length,
+          'Capacity omits current development',
+        );
+        assert.ok(
+          capacity.activeDelivery >= existingScopes.filter((s) => s.lane === 'delivery').length,
+          'Capacity omits current delivery',
+        );
+        const targets = members.map((m) => {
+          assert.equal(
+            m.lane,
+            'development',
+            'Selected restore only admits development; final delivery remains serial',
+          );
+          const current = ticket(state, m.lane, m.task, m.owner);
+          assert.ok(['queued', 'running', 'blocked'].includes(current.status), 'Terminal task cannot resume');
+          assert.equal(current.request.roomId, source.roomId, 'Original user conversation required');
+          assert.equal(current.request.authorId, source.authorId, 'Original user required');
+          assert.ok(current.request.sequence <= source.sequence, 'Stale selected direction refused');
+          return { current, m };
+        });
+        const additions = targets.filter(({ current }) => !scopedFor(state, current));
+        assert.ok(
+          capacity.activeDevelopment + additions.length <= capacity.limit - capacity.activeOther - 1,
+          'Reserve one executor slot for delivery',
+        );
+        assert.ok(
+          existingScopes.filter((s) => s.lane === 'development').length + additions.length <=
+            laneLimit(state, 'development'),
+          'Development lane capacity exceeded',
+        );
+        state.scopedAdmissions ??= [];
+        command.members = [];
+        for (const { current, m } of targets) {
+          if (!scopedFor(state, current)) {
+            current.status = 'running';
+            current.admission = randomUUID();
+            delete current.reason;
+            if (m.monitorContext !== undefined) current.monitorContext = structuredClone(m.monitorContext);
+            state.scopedAdmissions.push({
+              lane: current.lane,
+              task: current.task,
+              owner: current.owner,
+              admission: current.admission,
+              request: source,
+            });
+          }
+          command.members.push({ ...m, admission: current.admission });
+        }
+      }
       if (action === 'resume-only') {
         assert.equal(state.paused, true, 'Use ordinary FIFO when not globally paused');
-        assert.ok(!state.scopedAdmission, 'Another scoped direction remains active');
+        assert.ok(!state.scopedAdmission && !state.scopedAdmissions?.length, 'Another scoped direction remains active');
         const current = ticket(state, lane, task, owner);
         assert.ok(['queued', 'blocked'].includes(current.status), 'Only queued or blocked tasks can resume alone');
         assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
@@ -398,7 +523,7 @@ export function createExecutionOrder(commonDir) {
       assert.equal(current.admission, admission);
       assert.equal(verify(structuredClone(current), evidence), true, 'Stage completion evidence not proven');
       current.status = 'completed';
-      if (scopedFor(state, current)) delete state.scopedAdmission;
+      if (scopedFor(state, current)) removeScope(state, current);
       current.completion = { digest: digest(evidence), evidence: structuredClone(evidence) };
       state.events.push({ action: 'complete', lane, task, evidenceDigest: current.completion.digest });
       return structuredClone(current); // never launches queued work

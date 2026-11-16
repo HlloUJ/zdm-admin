@@ -1,3 +1,4 @@
+import { executionPausedFor } from './task-execution-scope.mjs';
 import { createBoardIntake } from './task-board-intake.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
@@ -64,9 +65,10 @@ export async function startCodexTask(input, { queue, readTask, readThread, start
   assert.ok(queue.commonDir, 'Persistent intake store required before queue dispatch');
   createBoardIntake(queue.commonDir).require(context, input.taskId, input.owner);
   const state = queue.read();
-  assert.ok(state && !state.paused, 'Global pause remains in effect');
+  assert.ok(state, 'Execution policy required');
   const ticket = state.tickets.find((t) => t.lane === 'development' && t.task === input.taskId);
-  assert.ok(ticket && ticket.status === 'queued', 'Only a queued new task may be dispatched; do not replay launch');
+  assert.ok(ticket && !executionPausedFor(state, ticket), 'Global pause remains in effect');
+  assert.ok(ticket.status === 'queued', 'Only a queued new task may be dispatched; do not replay launch');
   assert.equal(ticket.owner, input.owner);
   assert.deepEqual(ticket.request, input.request, 'Original queued instruction required');
   let capacity;
@@ -101,12 +103,69 @@ export async function startCodexTask(input, { queue, readTask, readThread, start
   return result; // Admission alone is never emitted as a started receipt.
 }
 
-export async function observeCodexTask(task, { readThread, paused, now = Date.now() }) {
+export async function observeCodexTask(task, { readThread, readAgent, paused, now = Date.now() }) {
   const base = { task: task.id, observedAt: now, automaticResumptionEnabled: false };
   if (task.stage === 'closed') return { ...base, status: 'closed' };
   if (paused === true) return { ...base, status: 'paused' };
   if (paused !== false) return { ...base, status: 'unknown', reason: 'Current pause state not verified' };
   const m = task.monitoring;
+  if (m.executionSurface === 'collaboration-agent') {
+    if (typeof readAgent !== 'function')
+      return {
+        ...base,
+        status: 'unknown',
+        reason:
+          'Direct collaboration executor observation adapter unavailable; parent chat activity is not task liveness',
+      };
+    try {
+      assert.equal(m.state, 'registered');
+      assert.equal(m.rootThreadId, task.owner);
+      const agent = await readAgent(m.worker);
+      assert.equal(agent.canonicalTaskName, m.worker, 'Wrong collaboration executor');
+      // A direct inventory alone cannot prove the task assignment of a reused agent.
+      // The owner host must bind it to its recorded dispatch, never to the latest parent cwd.
+      assert.deepEqual(
+        agent.binding,
+        { task: task.id, owner: task.owner, worker: m.worker, worktree: task.worktree },
+        'Unverified executor assignment',
+      );
+      assert.ok(
+        Number.isFinite(agent.observedAt) && agent.observedAt <= now && now - agent.observedAt <= 60_000,
+        'Stale executor observation',
+      );
+      const observed = {
+        ...base,
+        executor: { kind: 'collaboration-agent', canonical: m.worker },
+        executorStatus: agent.status,
+      };
+      if (agent.status === 'running')
+        return { ...observed, status: 'running', reason: 'Direct assigned collaboration executor is running' };
+      if (
+        agent.status === 'error' &&
+        agent.failure?.id &&
+        Number.isFinite(agent.failure.finishedAt) &&
+        agent.failure.finishedAt <= now
+      )
+        return {
+          ...observed,
+          status: 'blocked',
+          reason: 'Assigned executor ended with an explicit failure',
+          failureEvent: {
+            id: agent.failure.id,
+            name: 'collaboration-agent',
+            status: 'failure',
+            finishedAt: agent.failure.finishedAt,
+          },
+        };
+      return {
+        ...observed,
+        status: 'unknown',
+        reason: 'Executor ended or is idle; verify actual task stage without inferring completion',
+      };
+    } catch (error) {
+      return { ...base, status: 'unknown', reason: `Collaboration observation unavailable: ${error.message}` };
+    }
+  }
   assert.equal(m.executionSurface, 'codex-thread');
   assert.equal(m.state, 'registered');
   assert.equal(m.worker, task.owner);
@@ -145,7 +204,7 @@ export async function observeCodexTask(task, { readThread, paused, now = Date.no
   }
 }
 
-export async function inspectCodexTasks(root, { taskIds, readThread, now = Date.now() }) {
+export async function inspectCodexTasks(root, { taskIds, readThread, readAgent, now = Date.now() }) {
   assert.ok(Array.isArray(taskIds) && taskIds.length > 0, 'Explicit task allowlist required; no global scan');
   assert.equal(new Set(taskIds).size, taskIds.length);
   const registry = createTaskRegistry(root);
@@ -155,12 +214,12 @@ export async function inspectCodexTasks(root, { taskIds, readThread, now = Date.
     const task = registry.readTask(id);
     assert.ok(task, 'Exact registered task required');
     const ticket = queue?.tickets.find((t) => t.task === id && t.lane === 'development');
-    const paused = queue?.paused === true || task.monitoring?.paused === true;
+    const paused = executionPausedFor(queue, ticket) || task.monitoring?.paused === true;
     if (ticket?.status === 'queued') {
       results.push({ task: id, status: paused ? 'paused' : 'queued', automaticResumptionEnabled: false });
       continue;
     }
-    results.push(await observeCodexTask(task, { readThread, paused, now }));
+    results.push(await observeCodexTask(task, { readThread, readAgent, paused, now }));
   }
   return results;
 }
@@ -171,7 +230,7 @@ export async function notifyCodexObservation(
   { directory, paused, readThread, sendMessage, readMessage, now = Date.now() },
 ) {
   const m = task.monitoring;
-  assert.equal(m.executionSurface, 'codex-thread');
+  assert.ok(['codex-thread', 'collaboration-agent'].includes(m.executionSurface));
   assert.equal(m.rootThreadId, process.env.CODEX_THREAD_ID, 'Original coordinator must send');
   const observedAt = observation.observedAt;
   if (!Number.isFinite(observedAt) || observedAt > now || now - observedAt > 60_000)

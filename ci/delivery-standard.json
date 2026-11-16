@@ -1,0 +1,81 @@
+{
+  "version": 1,
+  "id": "zdm-delivery-standard-v1",
+  "source": "https://app.notion.com/p/41a572fed032818fbae3eb9c2874092b",
+  "levels": {
+    "R0": { "minimum": ["diff", "format", "document-contract"] },
+    "R1": { "minimum": ["diff", "format", "static", "affected-interaction"] },
+    "R2": { "minimum": ["diff", "format", "static", "affected-unit", "business-flow", "boundary-and-failure"] },
+    "R3": {
+      "minimum": [
+        "diff",
+        "format",
+        "static",
+        "affected-unit",
+        "business-flow",
+        "boundary-and-failure",
+        "shared-consumers",
+        "compatibility"
+      ]
+    },
+    "R4": {
+      "minimum": [
+        "diff",
+        "format",
+        "static",
+        "affected-unit",
+        "business-flow",
+        "boundary-and-failure",
+        "affected-domain-full",
+        "risk-specific"
+      ]
+    }
+  },
+  "rules": [
+    {
+      "id": "execution-and-validation-control",
+      "level": "R4",
+      "pattern": "^(?:AGENTS\\.md$|\\.agents/|\\.codex/|scripts/|ci/|\\.github/|docs/(?:engineering/|task-completion\\.md$))",
+      "special": ["allow-and-deny", "evidence-invalidation", "safe-recovery"],
+      "engineering": true
+    },
+    {
+      "id": "security-and-important-data",
+      "level": "R4",
+      "pattern": "(?:auth|security|permission|tenant|inventory|stock|price|payment|migration|delete|cleanup|reclaim)",
+      "special": ["permission-and-isolation", "data-consistency", "failure-and-recovery"]
+    },
+    {
+      "id": "shared-contract",
+      "level": "R3",
+      "pattern": "(?:^src/(?:components/|composables/|services/|router/)|(?:^|/)(?:shared|common|api|dto|contract)/|(?:Controller|Request|Response|Dto|DTO)\\.java$|^(?:package(?:-lock)?\\.json|vite|vitest|playwright|tsconfig|docker|compose))",
+      "special": ["consumer-closure", "contract-compatibility"]
+    },
+    { "id": "local-style", "level": "R1", "pattern": "\\.(?:css|scss|less)$", "special": ["affected-viewports"] },
+    {
+      "id": "local-runtime-source",
+      "level": "R2",
+      "pattern": "^(?!.*\\.(?:css|scss|less)$)(?:src/|backend/src/|tests/)",
+      "special": []
+    },
+    {
+      "id": "non-runtime-document",
+      "level": "R0",
+      "pattern": "(?:\\.md$|^docs/.*\\.(?:png|jpe?g|gif|webp|svg|pdf)$)",
+      "special": []
+    }
+  ],
+  "unknown": {
+    "level": "R4",
+    "minimum": ["complete-applicable-gates"],
+    "reason": "Unknown scope never grants a lower verification level"
+  },
+  "protected": [
+    "accepted-source",
+    "exact-candidate",
+    "required-ci-aggregates",
+    "first-failure",
+    "zero-skips-and-retries",
+    "runtime-handoff"
+  ]
+}

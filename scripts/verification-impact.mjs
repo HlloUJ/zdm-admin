@@ -1,3 +1,4 @@
+import { deliveryStandardRule, deliveryStandardAvailable } from './delivery-standard.mjs';
 import { businessImpact } from './business-regression.mjs';
 import { isRuntimeFile } from './runtime-file-scope.mjs';
 import { engineeringOnlyProof } from './engineering-impact.mjs';
@@ -24,12 +25,17 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
     reasons: [],
   };
   const engineeringScope = engineeringOnlyProof(root, files);
-  let docs = false;
+  let docs = false,
+    controlDocument = false;
   const full = (reason, runtime) => {
     result.frontend = result.backend = result.engineering = result.full = true;
     result.runtime ||= runtime;
     result.reasons.push(reason);
   };
+  if (!deliveryStandardAvailable) {
+    full('Unified standard unavailable; complete fallback required.', false);
+    return result;
+  }
   if (!Array.isArray(files) || files.length === 0) {
     full('无法证明有效变更范围，执行前后端完整门禁。', false);
     return result;
@@ -43,6 +49,11 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
     const file = original.replaceAll('\\', '/').replace(/^\.\//, '');
     if (DOC.test(file)) {
       docs = true;
+      if (deliveryStandardRule(file).engineering) {
+        controlDocument = true;
+        result.engineering = true;
+        result.reasons.push('Execution/validation standard document: ' + file);
+      }
       continue;
     }
     const runtime = isRuntimeFile(file);
@@ -83,7 +94,7 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
       full(`依赖、CI、验证工具或未知路径：${file}；未据此推断重挂运行环境。`, false);
     }
   }
-  result.docsOnly = docs && !result.frontend && !result.backend && !engineeringScope.proven;
+  result.docsOnly = docs && !controlDocument && !result.frontend && !result.backend && !engineeringScope.proven;
   if (result.docsOnly) result.reasons.push('仅文档及明确的文档资产；执行格式检查。');
   return result;
 }

@@ -1,3 +1,4 @@
+import { handoffBuiltDist } from './task-cleanup-handoff.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
@@ -526,9 +527,36 @@ async function completionCommandLocked(
               common,
               main: expectedMain,
             });
-          return existsSync(batch.worktree)
-            ? preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id))
-            : preserved.result;
+          if (!existsSync(batch.worktree)) return preserved.result;
+          const cleanupHandoff =
+            batch.taskRegistryVersion === 2
+              ? await handoffBuiltDist({
+                  root: batch.worktree,
+                  common,
+                  task: batch.id,
+                  proof: {
+                    worktree: batch.worktree,
+                    head: batch.recordedHead,
+                    accepted: readAcceptance(anchor, batch.id).commit,
+                    main: expectedMain,
+                  },
+                  assertUnreferenced: async () => {
+                    const task = createTaskRegistry(anchor).readTask(batch.id);
+                    const references = await runtimeReferences(task);
+                    assert.equal(references.owned.length, 0, 'Task frontend still references generated output');
+                    assert.equal(references.backendPorts.length, 0, 'Task backend still references generated output');
+                    if (previewControl.assertCleanupSafe)
+                      await previewControl.assertCleanupSafe({
+                        anchor,
+                        task: batch.worktree,
+                        preview,
+                        common,
+                        main: expectedMain,
+                      });
+                  },
+                })
+              : { state: 'retained', reason: 'Legacy task outputs remain protected' };
+          return { ...preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id)), cleanupHandoff };
         },
       },
       cleanup: {
