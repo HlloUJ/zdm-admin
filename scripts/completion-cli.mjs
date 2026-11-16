@@ -1,5 +1,5 @@
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
-import { handoffAuditedDependencies } from './task-cleanup-npm.mjs';
+import { handoffAuditedDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
 import { assertCleanupUnreferenced } from './task-cleanup-cli.mjs';
 import { captureCiProgress } from './task-delivery-status-sync.mjs';
 import { drainProgressHost } from './task-progress-host.mjs';

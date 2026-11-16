@@ -6,8 +6,8 @@ import { createdCleanupFixture, cleanupFixtureTemplate } from './test-support/cl
 import { preserveAssets } from './task-completion.mjs';
 import { handoffPreservedReportCopies, recordCloseoutCleanupInventory } from './task-cleanup-handoff.mjs';
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
-import { dependencyAuditFixture } from './test-support/cleanup-npm-fixture.mjs';
-import { auditPrivateTaskDependencies, handoffAuditedDependencies } from './task-cleanup-npm.mjs';
+import { dependencyAuditFixture } from './delivery-repairs/test-support/cleanup-npm-fixture.mjs';
+import { auditPrivateTaskDependencies, handoffAuditedDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 import { verifyPreservation } from './completion-cli.mjs';
 const unreferenced = async () => {};

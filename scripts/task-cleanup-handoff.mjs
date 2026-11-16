@@ -1,5 +1,5 @@
 import { readCreatedArtifactInventory } from './task-cleanup-created-artifacts.mjs';
-import { readDependencyCleanupInventory } from './task-cleanup-npm.mjs';
+import { readDependencyCleanupInventory } from './delivery-repairs/task-cleanup-npm.mjs';
 import { buildCloseoutCleanupInventory } from './task-cleanup-inventory.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';

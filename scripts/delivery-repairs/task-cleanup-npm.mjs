@@ -17,7 +17,7 @@ import {
   closeSync,
 } from 'node:fs';
 import path from 'node:path';
-import { cleanupIdentity, cleanupObjectId, createCleanupQueue, safePath } from './task-cleanup-queue.mjs';
+import { cleanupIdentity, cleanupObjectId, createCleanupQueue, safePath } from '../task-cleanup-queue.mjs';
 import {
   npmDigest,
   npmPackagePath,

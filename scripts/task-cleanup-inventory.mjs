@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
-import { npmPackagePath } from './task-cleanup-npm-proof.mjs';
+import { npmPackagePath } from './delivery-repairs/task-cleanup-npm-proof.mjs';
 
 const knownDirectories = [
   '.task-runtime/cache',

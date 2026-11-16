@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { lstatSync, readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { validateNpmAuditRegistration, verifyNpmPackageTree } from './task-cleanup-npm-proof.mjs';
+import { validateNpmAuditRegistration, verifyNpmPackageTree } from './delivery-repairs/task-cleanup-npm-proof.mjs';
 
 export const E2E_CLEANUP_DIRECTORY = '.task-runtime/e2e-app';
 export const CREATED_CLEANUP_DIRECTORY = '.task-runtime/cleanup-created';

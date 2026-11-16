@@ -7,11 +7,11 @@ import path from 'node:path';
 import { tmpdir } from 'node:os';
 const contractBytes = readFileSync(new URL('./test-support/task-placement-417-v35.js.txt', import.meta.url));
 const { requirePlacementRecord } = await import('data:text/javascript;base64,' + contractBytes.toString('base64'));
-import { ensureDeliveryPlacement, beginDeliveryFact } from './task-completion-placement.mjs';
-import { createProgressHost } from './task-progress-host.mjs';
-import { createProgressOutbox, authenticatedBoardAdapter } from './task-progress-outbox.mjs';
-import { completionStage, openCompletion, saveCompletion } from './completion-session.mjs';
-import { verifyDevelopmentPlacementEvidence, verifyDevelopmentCompletion } from './task-execution-order-cli.mjs';
+import { ensureDeliveryPlacement, beginDeliveryFact } from '../task-completion-placement.mjs';
+import { createProgressHost } from '../task-progress-host.mjs';
+import { createProgressOutbox, authenticatedBoardAdapter } from '../task-progress-outbox.mjs';
+import { completionStage, openCompletion, saveCompletion } from '../completion-session.mjs';
+import { verifyDevelopmentPlacementEvidence, verifyDevelopmentCompletion } from '../task-execution-order-cli.mjs';
 const sha = (bytes) => createHash('sha256').update(bytes).digest('hex');
 function fixture(t) {
   const common = realpathSync(mkdtempSync(path.join(tmpdir(), 'real-placement-order-')));

@@ -212,9 +212,11 @@ test('many Chinese CI jobs and long steps fit actual417 wire label bound while c
   const { captureCiProgress } = await import('./task-delivery-status-sync.mjs');
   const { readFileSync } = await import('node:fs');
   const { createHash } = await import('node:crypto');
-  const bytes = readFileSync(new URL('./test-support/task-progress-receipt-417-v35.js.txt', import.meta.url));
+  const bytes = readFileSync(
+    new URL('./delivery-repairs/test-support/task-progress-receipt-417-v35.js.txt', import.meta.url),
+  );
   const manifest = JSON.parse(
-    readFileSync(new URL('./test-support/task-progress-receipt-417-v35-source.json', import.meta.url)),
+    readFileSync(new URL('./delivery-repairs/test-support/task-progress-receipt-417-v35-source.json', import.meta.url)),
   );
   assert.equal(createHash('sha256').update(bytes).digest('hex'), manifest.sha256);
   const { progressReceipt } = await import('data:text/javascript;base64,' + bytes.toString('base64'));

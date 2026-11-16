@@ -13,7 +13,7 @@ import {
   readDependencyCleanupInventory,
 } from './task-cleanup-npm.mjs';
 import { npmArchiveFiles, npmDigest, verifyNpmPackageTree } from './task-cleanup-npm-proof.mjs';
-import { cleanupIdentity } from './task-cleanup-queue.mjs';
+import { cleanupIdentity } from '../task-cleanup-queue.mjs';
 const safe = { apply: true, verify: async () => ({ ready: true }), unreferenced: async () => {} };
 const handoff = (f, extra = {}) =>
   handoffAuditedDependencies({ ...f.parameters, proof: f.proof, assertUnreferenced: async () => {}, ...extra });

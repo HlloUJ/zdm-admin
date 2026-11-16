@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import path from 'node:path';
-import { createdCleanupFixture } from './cleanup-created-fixture.mjs';
+import { createdCleanupFixture } from '../../test-support/cleanup-created-fixture.mjs';
 import { npmDigest } from '../task-cleanup-npm-proof.mjs';
 export function dependencyArchive(
   files = [

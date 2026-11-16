@@ -67,6 +67,8 @@ test('real cleanup runtime cold-imports its full module closure after original s
   const head = f.git('rev-parse', 'HEAD');
   f.git('update-ref', 'refs/remotes/origin/main', head);
   const runtime = publishCleanupRuntime(f.root, { expectedHead: head });
+  for (const file of ['task-cleanup-npm.mjs', 'task-cleanup-npm-proof.mjs', 'task-cleanup-npm-archive.py'])
+    assert.ok(runtime.manifest.files['scripts/delivery-repairs/' + file], 'Nested runtime helper omitted: ' + file);
   rmSync(path.join(f.root, 'scripts'), { recursive: true });
   const url = pathToFileURL(path.join(runtime.directory, 'scripts/task-cleanup-scheduled-cli.mjs')).href;
   const result = execFileSync(
@@ -74,9 +76,13 @@ test('real cleanup runtime cold-imports its full module closure after original s
     [
       '--input-type=module',
       '-e',
-      `const m=await import(${JSON.stringify(url)}); console.log(typeof m.runScheduledCleanup)`,
+      `const m=await import(${JSON.stringify(url)}); console.log(typeof m.runScheduledCleanup);
+const {createHash}=await import('node:crypto');
+const {dependencyArchive}=await import(${JSON.stringify(pathToFileURL(path.join(runtime.directory, 'scripts/delivery-repairs/test-support/cleanup-npm-fixture.mjs')).href)});
+const {npmArchiveFiles}=await import(${JSON.stringify(pathToFileURL(path.join(runtime.directory, 'scripts/delivery-repairs/task-cleanup-npm-proof.mjs')).href)});
+const bytes=dependencyArchive();const files=npmArchiveFiles(bytes,'sha512-'+createHash('sha512').update(bytes).digest('base64'));console.log(Object.keys(files).sort().join(','));`,
     ],
     { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] },
   );
-  assert.equal(result.trim(), 'function');
+  assert.equal(result.trim(), 'function\nindex.js,package.json');
 });

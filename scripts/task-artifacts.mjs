@@ -4,7 +4,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, realpathSync, mkdirSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { validateTaskDependencies } from './task-dependencies.mjs';
-import { auditInstalledTaskDependencies } from './task-cleanup-npm.mjs';
+import { auditInstalledTaskDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
 const dependencyFields = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
 function directory(root, relative) {
   let current = root;

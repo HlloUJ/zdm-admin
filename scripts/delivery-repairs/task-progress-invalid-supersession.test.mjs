@@ -8,7 +8,7 @@ import {
   authenticatedBoardAdapter,
   recoverTerminalInvalidWithSupersession,
   flushProgress,
-} from './task-progress-outbox.mjs';
+} from '../task-progress-outbox.mjs';
 function fixture(t) {
   const base = realpathSync(mkdtempSync(path.join(tmpdir(), 'invalid-supersession-'))),
     directory = path.join(base, '.git', 'task-progress', 'fixture');
