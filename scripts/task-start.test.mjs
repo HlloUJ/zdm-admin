@@ -60,6 +60,21 @@ const options = (slug, parent) => ({
   taskParent: parent,
   resume: false,
 });
+test('native top-level thread creates real isolated worktree, persists exact monitoring and remains observable', (t) => {
+  const f = fixture(t);
+  const owner = '11111111-1111-4111-8111-111111111111';
+  process.env.CODEX_THREAD_ID = owner;
+  const opts = options('native-task', f.parent);
+  opts.owner = owner;
+  opts.monitorContext = { ...context('native-task'), executionSurface: 'codex-thread', worker: owner };
+  const result = startParallelTask(opts, { root: f.root });
+  assert.equal(result.task.monitoring.executionSurface, 'codex-thread');
+  assert.equal(result.task.monitoring.worker, owner);
+  assert.equal(f.registry.resolve({ id: 'native-task' }).monitoring.executionSurface, 'codex-thread');
+  assert.equal(collectTaskProgress(f.root)[0].monitoring.executionSurface, 'codex-thread');
+  assert.equal(result.previewSwitched, false);
+  assert.equal(f.git(result.task.worktree, 'branch', '--show-current'), 'codex/native-task');
+});
 test('two task starts create independent worktrees without switching preview or blocking unfinished A', (t) => {
   const f = fixture(t),
     settings = path.join(f.root, '.git/preview-fixture.json');
