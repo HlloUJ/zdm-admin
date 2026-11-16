@@ -79,8 +79,14 @@ export async function observeCodexTask(task, { readThread, paused, now = Date.no
   try {
     const snapshot = await readThread(m.worker);
     assert.equal(snapshot.thread.id, task.owner, 'Wrong platform thread');
-    if (snapshot.thread.cwd && task.worktree)
-      assert.equal(path.resolve(snapshot.thread.cwd), path.resolve(task.worktree), 'Thread worktree changed');
+    if (snapshot.thread.cwd && task.worktree && path.resolve(snapshot.thread.cwd) !== path.resolve(task.worktree)) {
+      // Native chats can stay attached to the main anchor while each tool uses its exact task cwd.
+      // Only the newest command in the latest platform turn can establish that binding.
+      const commands = snapshot.turns?.[0]?.items?.filter((item) => item.type === 'commandExecution') ?? [];
+      const latest = commands.at(-1);
+      assert.ok(latest?.cwd, 'Thread worktree changed; no actual task command binding');
+      assert.equal(path.resolve(latest.cwd), path.resolve(task.worktree), 'Thread worktree changed');
+    }
     const turn = snapshot.turns?.[0];
     const status = snapshot.thread.status;
     if (['active', 'running'].includes(typeof status === 'string' ? status : status?.type))

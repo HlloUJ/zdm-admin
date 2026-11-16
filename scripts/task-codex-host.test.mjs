@@ -164,6 +164,33 @@ test('native observation distinguishes active, paused, unavailable, idle and exp
   );
   assert.equal((await observe(async () => ({ thread: { id: 'wrong', status: 'idle' } }))).status, 'unknown');
 });
+test('a main-attached native chat requires its latest real command to bind the exact task worktree', async () => {
+  const task = {
+    id: 'native-task',
+    owner,
+    worktree: '/fixture/task',
+    monitoring: { ...context(), state: 'registered' },
+  };
+  const read = (items) => async () => ({
+    thread: { id: owner, cwd: '/fixture/main', status: 'active' },
+    turns: [{ items }],
+  });
+  const command = (cwd) => ({ type: 'commandExecution', cwd });
+  assert.equal(
+    (await observeCodexTask(task, { paused: false, readThread: read([command('/fixture/task')]) })).status,
+    'running',
+  );
+  assert.equal(
+    (
+      await observeCodexTask(task, {
+        paused: false,
+        readThread: read([command('/fixture/task'), command('/fixture/other-task')]),
+      })
+    ).status,
+    'unknown',
+  );
+  assert.equal((await observeCodexTask(task, { paused: false, readThread: read([]) })).status, 'unknown');
+});
 test('notice delivery is read back and deduplicated; unknown delivery is never resent', async (t) => {
   const dir = fixture(t),
     task = { id: 'native-task', monitoring: { ...context(), owner, mode: 'confirmed-interruption-notice-only' } };

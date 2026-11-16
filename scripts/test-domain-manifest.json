@@ -1566,7 +1566,7 @@
       "dynamicImports": 0
     },
     "scripts/task-codex-host.mjs": {
-      "digest": "44f087a2f2ff0fca09ced8193206bb3274426de5afa7735875c73044063c5a5b",
+      "digest": "defa5ccd53cde492da250cc9ed442bc79f2cdd51c391cd6abe3073cc8f169023",
       "imports": [
         "scripts/task-delivery-status-sync.mjs",
         "scripts/task-execution-order.mjs",
@@ -1578,7 +1578,7 @@
       "dynamicImports": 0
     },
     "scripts/task-codex-host.test.mjs": {
-      "digest": "96f7d34e411d335d75c8954a5aa895e43501d341059fe6d3dd5578940a0822ab",
+      "digest": "a8c53c91dfbd1889e087f6d645c07d14772ddca5bf53cf3350220998ea19601d",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/task-codex-host.mjs",
