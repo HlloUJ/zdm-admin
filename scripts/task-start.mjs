@@ -1,3 +1,4 @@
+import { createBoardIntake } from './task-board-intake.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import {
   requireStartMonitoring,
@@ -87,6 +88,8 @@ export function startParallelTask(
     typeof owner === 'string' && owner.trim(),
     'Explicit task owner required when execution identity is unavailable',
   );
+  if (options.monitorContext?.executionSurface === 'codex-thread')
+    createBoardIntake(registry.commonDir).require(options.monitorContext, options.slug, owner);
   // The explicit root-thread receipt/claim precedes worktree creation or restoration.
   const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;
   const admission = createExecutionOrder(registry.commonDir).assertAdmission({

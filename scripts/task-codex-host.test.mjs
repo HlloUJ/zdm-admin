@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, mkdirSync, rmSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, readFileSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { monitoringRegistration } from './task-monitor-registration.mjs';
@@ -83,6 +83,23 @@ function fixture(t) {
     if (previous === undefined) delete process.env.CODEX_THREAD_ID;
     else process.env.CODEX_THREAD_ID = previous;
   });
+  mkdirSync(path.join(directory, 'task-board-intake'), { recursive: true });
+  writeFileSync(
+    path.join(directory, 'task-board-intake/native-task.json'),
+    JSON.stringify({
+      version: 1,
+      state: 'accepted',
+      taskId: 'native-task',
+      owner,
+      rootThreadId: owner,
+      messageId: request(3).messageId,
+      number: '337',
+      title: 'isolated task',
+      revision: 1,
+      card: 'active',
+      observedAt: Date.now(),
+    }),
+  );
   return directory;
 }
 test('native monitoring uses real owner UUID without weakening legacy worker checks', () => {
