@@ -887,7 +887,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "a18c009f8c286d4261005ede113ed4a2c521e2019e57de0b6ec7cc2a5f586451",
+      "digest": "171fe11a7ec29f39580f58a4f6223a327d420877313b661791c734b2602fc020",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -1067,11 +1067,23 @@
         "scripts/task-cancellation-proof.test.mjs",
         "scripts/task-candidate-runtime.mjs",
         "scripts/task-candidate-runtime.test.mjs",
+        "scripts/task-cleanup-cli.mjs",
+        "scripts/task-cleanup-cli.test.mjs",
+        "scripts/task-cleanup-delete.test.mjs",
         "scripts/task-cleanup-handoff.mjs",
         "scripts/task-cleanup-handoff.test.mjs",
         "scripts/task-cleanup-inventory.mjs",
         "scripts/task-cleanup-inventory.test.mjs",
+        "scripts/task-cleanup-notification.mjs",
+        "scripts/task-cleanup-notification.test.mjs",
         "scripts/task-cleanup-queue.mjs",
+        "scripts/task-cleanup-queue.test.mjs",
+        "scripts/task-cleanup-runtime.mjs",
+        "scripts/task-cleanup-runtime.test.mjs",
+        "scripts/task-cleanup-schedule.mjs",
+        "scripts/task-cleanup-schedule.test.mjs",
+        "scripts/task-cleanup-scheduled-cli.mjs",
+        "scripts/task-cleanup-scheduled-cli.test.mjs",
         "scripts/task-codex-cycle-cli.mjs",
         "scripts/task-codex-cycle.test.mjs",
         "scripts/task-codex-host.mjs",
@@ -1767,6 +1779,31 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-cleanup-cli.mjs": {
+      "digest": "ae6f2f7bae97d3fa9c508b6a288d34576a8b5d380915e457bd7e1c1465467aa3",
+      "imports": [
+        "scripts/completion-status.mjs",
+        "scripts/task-cleanup-notification.mjs",
+        "scripts/task-cleanup-queue.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-cli.test.mjs": {
+      "digest": "6bfb81c056ffdfa78498431e52ca072d43f6ffd651ed8f3ef3b9f907ca43273c",
+      "imports": ["scripts/task-cleanup-cli.mjs", "scripts/task-cleanup-queue.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-delete.py": {
+      "digest": "ac201cbc39fe32d68718f08932a21d37038d1ad5ae9f49aa94bdc84771f960fb",
+      "imports": [],
+      "dynamicImports": 17
+    },
+    "scripts/task-cleanup-delete.test.mjs": {
+      "digest": "439c4e4cafb7cdcdd95deccc08277ccd287f62aa41e9b36921c83b6cb7cfb3c9",
+      "imports": [],
+      "dynamicImports": 0
+    },
     "scripts/task-cleanup-handoff.mjs": {
       "digest": "0b8ae2af286348f459cd1521218cb9e2dc1f99df0488bc790d6682dea7968f5e",
       "imports": [
@@ -1789,6 +1826,62 @@
     "scripts/task-cleanup-inventory.test.mjs": {
       "digest": "990c0a6dd6f3dab63a476fc05c75d9082728ee4c0d7ee8ad420ce0c9d74d6476",
       "imports": ["scripts/task-cleanup-handoff.mjs", "scripts/task-cleanup-inventory.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-notification.mjs": {
+      "digest": "dfa8ad3c82b4332d8563be94679bfec9139f8c2a0fd20a7bda79e4bf52dca196",
+      "imports": ["scripts/task-cleanup-queue.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-notification.test.mjs": {
+      "digest": "1ce0620381ce6e0207e1c98313dfd3ec5ce10063e8393ee86c040c0c45ae0b7b",
+      "imports": ["scripts/task-cleanup-notification.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-queue.mjs": {
+      "digest": "d539bb77ca2ab3ed699b3b3c22482d534ff6975aceff90985f9cde74e94febaa",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-queue.test.mjs": {
+      "digest": "a3a700dfa6905cafd8234008283415f42e256baf08424996a98eab05fb0d48fb",
+      "imports": ["scripts/task-cleanup-notification.mjs", "scripts/task-cleanup-queue.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-runtime.mjs": {
+      "digest": "a21e3e65e789b224d0afb0cb12468bf023ed08b824eceedcae1cdaaa338b21fc",
+      "imports": ["scripts/task-cleanup-queue.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-runtime.test.mjs": {
+      "digest": "8ec594ecbb394256abdd75daae4179ab57f6d0cd5ae74cf2a84ff0e1f557c91d",
+      "imports": ["scripts/task-cleanup-runtime.mjs", "scripts/task-cleanup-scheduled-cli.mjs"],
+      "dynamicImports": 1
+    },
+    "scripts/task-cleanup-schedule.mjs": {
+      "digest": "a2d21db570be762e39384d2bcaccc1a0c2f6874e2740babab8477145e813ed87",
+      "imports": ["scripts/task-cleanup-scheduled-cli.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-schedule.test.mjs": {
+      "digest": "1c569e3df314949a5ddece160dc36da599a3553c1c90365e6d29d298be179a0f",
+      "imports": ["scripts/task-cleanup-schedule.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-scheduled-cli.mjs": {
+      "digest": "8c974a8b73c1dce1ce0fb03047e52c494a10c0a6a6603000961710cbbc5f08cb",
+      "imports": [
+        "scripts/task-cleanup-cli.mjs",
+        "scripts/task-cleanup-notification.mjs",
+        "scripts/task-cleanup-queue.mjs",
+        "scripts/task-cleanup-runtime.mjs",
+        "scripts/task-cleanup-schedule.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-scheduled-cli.test.mjs": {
+      "digest": "b007d8e9d87dddfe1cea40684577eb2d1f384810d3d4994bfd0d23f66d3a892c",
+      "imports": ["scripts/task-cleanup-scheduled-cli.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-codex-cycle-cli.mjs": {
