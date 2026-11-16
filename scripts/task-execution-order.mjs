@@ -13,6 +13,32 @@ const id = (v) => typeof v === 'string' && /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(v);
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const laneLimit = (state, lane) => (state.limits?.[lane] === null ? Infinity : (state.limits?.[lane] ?? state.limit));
 const retainedLimit = (state, lane) => (state.limits?.[lane] === null ? Infinity : state.limit);
+const engineeringKind = (kind) => ['infrastructure', 'maintenance'].includes(kind);
+const lastPauseSequence = (state) =>
+  Math.max(0, ...state.events.filter((e) => e.action === 'pause-all').map((e) => e.request.sequence));
+function recoveryAuthorization(state, development) {
+  const a = development.recoveryAuthorization;
+  assert.ok(a && engineeringKind(a.kind), 'Explicit engineering lifecycle authorization required');
+  event(a.request);
+  assert.equal(development.executionKind, a.kind, 'Engineering kind changed');
+  assert.ok(
+    state.events.some(
+      (e) =>
+        e.action === 'resume-selected' &&
+        JSON.stringify(e.request) === JSON.stringify(a.request) &&
+        e.members?.some(
+          (m) =>
+            m.task === development.task &&
+            m.owner === development.owner &&
+            m.lane === 'development' &&
+            m.kind === a.kind &&
+            m.admission === a.developmentAdmission,
+        ),
+    ),
+    'Recovery authorization has no exact selected instruction',
+  );
+  return a;
+}
 function event(value) {
   assert.ok(
     value && text(value.messageId) && text(value.roomId) && text(value.authorId),
@@ -44,6 +70,42 @@ function validate(state) {
     const key = `${ticket.lane}:${ticket.task}`;
     assert.ok(!keys.has(key), 'Duplicate task lane');
     keys.add(key);
+    if (ticket.recoveryAuthorization) recoveryAuthorization(state, ticket);
+    if (ticket.derivedAuthorization) {
+      assert.equal(ticket.lane, 'delivery');
+      const development = state.tickets.find(
+        (t) => t.lane === 'development' && t.task === ticket.task && t.owner === ticket.owner,
+      );
+      assert.equal(development?.status, 'completed', 'Derived delivery lacks completed development');
+      const authorization = recoveryAuthorization(state, development);
+      assert.deepEqual(ticket.derivedAuthorization, {
+        ...authorization,
+        developmentEvidenceDigest: development.completion.digest,
+      });
+      assert.ok(
+        state.events.some(
+          (e) =>
+            e.action === 'promote-delivery' &&
+            e.task === ticket.task &&
+            e.owner === ticket.owner &&
+            e.admission === ticket.deliveryOriginAdmission &&
+            e.developmentEvidenceDigest === development.completion.digest,
+        ),
+        'Derived delivery lacks its exact phase transition',
+      );
+      assert.ok(
+        ticket.admission === ticket.deliveryOriginAdmission ||
+          state.events.some(
+            (e) =>
+              ['resume-only', 'resume-task'].includes(e.action) &&
+              e.lane === 'delivery' &&
+              e.task === ticket.task &&
+              e.owner === ticket.owner &&
+              e.admission === ticket.admission,
+          ),
+        'Derived admission changed without an explicit resume',
+      );
+    }
   }
   for (const lane of EXECUTION_LANES)
     assert.ok(
@@ -72,6 +134,11 @@ function validate(state) {
             e.task === scoped.task &&
             e.owner === scoped.owner &&
             e.admission === scoped.admission) ||
+            (e.action === 'promote-delivery' &&
+              scoped.lane === 'delivery' &&
+              e.task === scoped.task &&
+              e.owner === scoped.owner &&
+              e.admission === scoped.admission) ||
             (e.action === 'resume-selected' &&
               e.members?.some(
                 (m) =>
@@ -369,6 +436,11 @@ export function createExecutionOrder(commonDir) {
             'Selected restore only admits development; final delivery remains serial',
           );
           const current = ticket(state, m.lane, m.task, m.owner);
+          if (m.kind !== undefined) {
+            assert.ok(['business', 'infrastructure', 'maintenance'].includes(m.kind), 'Unknown task kind');
+            if (current.executionKind !== undefined)
+              assert.equal(current.executionKind, m.kind, 'Task kind cannot be retagged');
+          }
           assert.ok(['queued', 'running', 'blocked'].includes(current.status), 'Terminal task cannot resume');
           assert.equal(current.request.roomId, source.roomId, 'Original user conversation required');
           assert.equal(current.request.authorId, source.authorId, 'Original user required');
@@ -401,12 +473,20 @@ export function createExecutionOrder(commonDir) {
               request: source,
             });
           }
+          if (m.kind !== undefined) current.executionKind = m.kind;
+          if (engineeringKind(m.kind))
+            current.recoveryAuthorization = { request: source, kind: m.kind, developmentAdmission: current.admission };
           command.members.push({ ...m, admission: current.admission });
         }
       }
       if (action === 'resume-only') {
         assert.equal(state.paused, true, 'Use ordinary FIFO when not globally paused');
-        assert.ok(!state.scopedAdmission && !state.scopedAdmissions?.length, 'Another scoped direction remains active');
+        assert.ok(
+          lane === 'delivery'
+            ? !scopedAdmissions(state).some((s) => s.lane === 'delivery')
+            : !scopedAdmissions(state).length,
+          'Another scoped direction remains active',
+        );
         const current = ticket(state, lane, task, owner);
         assert.ok(['queued', 'blocked'].includes(current.status), 'Only queued or blocked tasks can resume alone');
         assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
@@ -432,6 +512,10 @@ export function createExecutionOrder(commonDir) {
         current.admission = randomUUID();
         delete current.reason;
         command.admission = current.admission;
+        if (state.scopedAdmission) {
+          state.scopedAdmissions ??= [];
+          state.scopedAdmissions.push(state.scopedAdmission);
+        }
         state.scopedAdmission = { lane, task, owner, admission: current.admission, request: source };
       }
       if (action === 'resume-task') {
@@ -441,6 +525,7 @@ export function createExecutionOrder(commonDir) {
         current.status = 'running';
         current.admission = randomUUID();
         delete current.reason;
+        command.admission = current.admission;
       }
       if (action === 'reorder') {
         assert.ok(EXECUTION_LANES.includes(lane), 'Exact lane required');
@@ -529,6 +614,106 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(current); // never launches queued work
     });
   }
+  // A phase transition references the original real user authorization. It is
+  // deliberately not a new user direction, a refreshed timestamp or a replay.
+  function promoteDelivery({ task, owner, developmentEvidenceDigest }, verify, dependenciesReady) {
+    assert.equal(typeof verify, 'function', 'Independent development/registry verification required');
+    assert.equal(typeof dependenciesReady, 'function', 'Trusted dependency reader required');
+    return update((state) => {
+      assert.equal(state.paused, true, 'Unpaused tasks use the ordinary FIFO entry');
+      const development = ticket(state, 'development', task, owner);
+      assert.equal(development.status, 'completed', 'Development must be verified complete first');
+      const authorization = recoveryAuthorization(state, development);
+      assert.ok(
+        authorization.request.sequence > lastPauseSequence(state),
+        'A later pause revoked lifecycle authorization',
+      );
+      assert.equal(
+        development.completion.digest,
+        developmentEvidenceDigest,
+        'Exact development completion proof required',
+      );
+      const old = state.tickets.find((t) => t.lane === 'delivery' && t.task === task);
+      const derived = { ...authorization, developmentEvidenceDigest };
+      if (old?.derivedAuthorization) {
+        assert.equal(old.owner, owner);
+        assert.deepEqual(old.derivedAuthorization, derived);
+        return structuredClone(old); // Never rotate/revive a running, blocked or terminal admission.
+      }
+      assert.ok(!old, 'An existing delivery instruction cannot be adopted or overwritten');
+      const held = state.tickets
+        .filter((t) => t.lane === 'delivery' && occupied.has(t.status))
+        .some(
+          (t) =>
+            scopedFor(state, t) ||
+            t.derivedAuthorization?.request.sequence > lastPauseSequence(state) ||
+            state.events.some(
+              (e) =>
+                e.action === 'resume-only' &&
+                e.lane === 'delivery' &&
+                e.task === t.task &&
+                e.admission === t.admission &&
+                e.request.sequence >= lastPauseSequence(state),
+            ),
+        );
+      assert.equal(held, false, 'Current delivery retains its serial slot');
+      assert.equal(dependenciesReady({ lane: 'delivery', task, owner }), true, 'Task dependencies are not delivered');
+      const earlier = state.tickets.filter(
+        (t) =>
+          t.lane === 'development' &&
+          t.status === 'completed' &&
+          t.recoveryAuthorization &&
+          t.order < development.order &&
+          t.recoveryAuthorization.request.sequence > lastPauseSequence(state) &&
+          !state.tickets.some((d) => d.lane === 'delivery' && d.task === t.task && d.status === 'completed'),
+      );
+      assert.ok(
+        !earlier.some(
+          (t) => !state.dependenciesFirst || dependenciesReady({ lane: 'delivery', task: t.task, owner: t.owner }),
+        ),
+        'Earlier eligible engineering task retains delivery order',
+      );
+      assert.equal(
+        verify(structuredClone(development), structuredClone(authorization)),
+        true,
+        'Development/registered engineering identity not proven',
+      );
+      const current = {
+        lane: 'delivery',
+        task,
+        owner,
+        request: structuredClone(authorization.request),
+        order: development.order,
+        status: 'running',
+        admission: randomUUID(),
+        derivedAuthorization: structuredClone(derived),
+      };
+      current.deliveryOriginAdmission = current.admission;
+      state.tickets.push(current);
+      if (state.scopedAdmission) {
+        state.scopedAdmissions ??= [];
+        state.scopedAdmissions.push(state.scopedAdmission);
+      }
+      state.scopedAdmission = {
+        lane: 'delivery',
+        task,
+        owner,
+        admission: current.admission,
+        request: structuredClone(authorization.request),
+      };
+      state.events.push({
+        action: 'promote-delivery',
+        task,
+        owner,
+        kind: authorization.kind,
+        request: structuredClone(authorization.request),
+        admission: current.admission,
+        developmentAdmission: authorization.developmentAdmission,
+        developmentEvidenceDigest,
+      });
+      return structuredClone(current);
+    });
+  }
   return {
     commonDir,
     read,
@@ -539,6 +724,7 @@ export function createExecutionOrder(commonDir) {
     block,
     direct,
     complete,
+    promoteDelivery,
     cancel,
     cancellationTarget,
   };

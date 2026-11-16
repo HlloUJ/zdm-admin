@@ -38,3 +38,7 @@
 全局暂停时，`resume-selected` 仅恢复明确成员的开发准入，保留既有交付单例、其他票据状态及原收件顺序。准入要求真实原生用户请求身份、原owner/room、登记与监测上下文，以及一致的实际容量快照，始终预留一个交付位。未知容量、遗漏正在交付的占位、重复成员、跨owner、交付成员均拒绝。不得用本候选手改真实队列或把未发布能力称为已发布。
 
 同一个原生聊天下的 collaboration 子执行者必须以真实canonical身份观察。父聊天活跃或最新一个command.cwd不能证明每个子执行者活跃；缺少canonical执行者观测适配时应为unknown，不能编造native threadId、套用Dot路径或自动释放/恢复。候选提供显式 `collaboration-agent` 登记和注入式 `readAgent` 接口；直接观测必须同时绑定canonical、准确task/owner/worktree及新鲜宿主快照。实时宿主尚未接线时保持unknown，不宣称已完成平台观察部署或独立权限隔离。
+
+工程类型成员在明确恢复时同时绑定原恢复消息、永久任务ID、owner和工程kind。开发完成后，`execution-order promote-delivery` 读取准确registry并复核原开发报告、干净HEAD及其completion摘要，再用原授权引用创建派生交付准入；它不伪造另一条用户消息、不更新时间、不把原source重放成任意动作。新的pause会撤销尚未派生的资格，业务任务及缺证明任务拒绝。
+
+派生仍须依赖准入和既定顺序，交付单独持位；已有交付或受阻持位不会被抢占，其他开发例外保留。重复派生只读回原票据，不旋转admission、不恢复blocked、不再次执行验证；最终main队列与共享资源互斥继续由原执行器承担。当前bootstrap载体仍须经已发布受理入口安排，不提供泛化adopt或直接import registry的绕过路径。

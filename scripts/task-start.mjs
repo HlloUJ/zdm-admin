@@ -98,6 +98,8 @@ export function startParallelTask(
     owner,
     admission: process.env.ZDM_EXECUTION_ADMISSION,
   });
+  if (admission.ticket?.executionKind !== undefined)
+    assert.equal(options.kind, admission.ticket.executionKind, 'Start kind differs from the authorized task');
   if (!options.slug) {
     const task = registry.resolve({ worktree: root });
     assert.equal(task.owner, owner, 'Another owner controls this task');

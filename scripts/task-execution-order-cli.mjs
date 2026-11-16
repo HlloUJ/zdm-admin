@@ -94,6 +94,7 @@ export function executionOrderCommand(root, [command, json]) {
         const registered = registry.readTask(member.task);
         if (registered) {
           assert.equal(registered.owner, member.owner);
+          if (member.kind !== undefined) assert.equal(registered.kind, member.kind, 'Registered task kind differs');
           for (const key of ['taskStableId', 'taskNumber', 'rootThreadId', 'roomId', 'authorizationRef', 'worker'])
             assert.equal(
               registered.monitoring?.[key],
@@ -126,6 +127,21 @@ export function executionOrderCommand(root, [command, json]) {
     assert.deepEqual(queue.cancellationTarget(input), target, 'Cancellation target changed during plan');
     return { dryRun: true, cancelled: false, futureAuthorization: false, proof };
   }
+  if (command === 'promote-delivery') {
+    const registered = registry.readTask(input.task);
+    assert.ok(registered && registered.owner === input.owner, 'Exact registered engineering task required');
+    return queue.promoteDelivery(
+      input,
+      (development, authorization) => {
+        const fresh = registry.readTask(input.task);
+        for (const key of ['id', 'kind', 'owner', 'worktree', 'branch', 'revision'])
+          assert.equal(fresh?.[key], registered[key], 'Registered engineering task changed');
+        assert.equal(registered.kind, authorization.kind, 'Task is not the authorized engineering kind');
+        return verifyDevelopmentCompletion(registered, development.completion.evidence);
+      },
+      dependenciesReady,
+    );
+  }
   if (command === 'cancel') {
     return queue.cancel(input, (ticket) => verifyCancellation(registry, ticket));
   }
@@ -141,7 +157,9 @@ export function executionOrderCommand(root, [command, json]) {
       return true;
     });
   }
-  throw new Error('execution-order <status|initialize|enqueue|claim|block|direct|complete|cancel|cancel-plan> [json]');
+  throw new Error(
+    'execution-order <status|initialize|enqueue|claim|block|direct|complete|promote-delivery|cancel|cancel-plan> [json]',
+  );
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {

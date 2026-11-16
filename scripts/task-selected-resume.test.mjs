@@ -132,3 +132,205 @@ test('corrupted selected admission cannot become a paused-state bypass', (t) => 
   writeFileSync(path.join(root, 'task-registry/execution-order/state.json'), JSON.stringify(state));
   assert.throws(() => queue.read());
 });
+
+function completedSelectedDevelopment(t) {
+  const f = fixture(t);
+  f.direction.members = f.members.map((m) => ({ ...m, kind: 'infrastructure' }));
+  f.queue.direct(f.direction);
+  const finish = (lane, task) => {
+    const current = f.queue.read().tickets.find((t) => t.lane === lane && t.task === task);
+    return f.queue.complete({ ...admission(current), evidence: { task, head: 'fixture-verified' } }, () => true);
+  };
+  const development = finish('development', 'task-1');
+  return {
+    ...f,
+    finish,
+    input: { task: 'task-1', owner: 'owner-1', developmentEvidenceDigest: development.completion.digest },
+  };
+}
+test('engineering phase admission derives from exact restore and completed development while preserving serial delivery', (t) => {
+  const f = completedSelectedDevelopment(t),
+    before = f.queue.read();
+  assert.throws(
+    () =>
+      f.queue.promoteDelivery(
+        f.input,
+        () => assert.fail('638 retains slot'),
+        () => true,
+      ),
+    /serial slot/,
+  );
+  assert.deepEqual(f.queue.read(), before);
+  f.finish('delivery', 'delivery');
+  const unselected = f.queue.read().tickets.filter((t) => ['task-2', 'task-3', 'task-5'].includes(t.task));
+  const result = f.queue.promoteDelivery(
+    f.input,
+    (development, authorization) => {
+      assert.equal(development.task, 'task-1');
+      assert.deepEqual(authorization.request, f.direction.request);
+      assert.equal(authorization.kind, 'infrastructure');
+      return true;
+    },
+    () => true,
+  );
+  assert.equal(result.lane, 'delivery');
+  assert.equal(result.status, 'running');
+  assert.equal(f.queue.assertAdmission(admission(result)).active, true);
+  const state = f.queue.read();
+  assert.equal(state.paused, true);
+  assert.deepEqual(
+    state.tickets.filter((t) => ['task-2', 'task-3', 'task-5'].includes(t.task)),
+    unselected,
+  );
+  assert.deepEqual(state.events.at(-1).request, f.direction.request);
+  assert.equal(state.events.at(-1).action, 'promote-delivery');
+  const again = f.queue.promoteDelivery(
+    f.input,
+    () => assert.fail('no repeat verification or phase start'),
+    () => assert.fail('no repeat dependency action'),
+  );
+  assert.deepEqual(again, result);
+  assert.deepEqual(f.queue.read(), state);
+});
+test('phase derivation rejects missing evidence, dependencies, wrong owner and later pause without inventing a user event', (t) => {
+  const f = completedSelectedDevelopment(t);
+  f.finish('delivery', 'delivery');
+  const before = f.queue.read();
+  for (const [input, verify, dependencies] of [
+    [{ ...f.input, developmentEvidenceDigest: 'changed' }, () => true, () => true],
+    [{ ...f.input, owner: 'other' }, () => true, () => true],
+    [f.input, () => false, () => true],
+    [f.input, () => true, () => false],
+  ]) {
+    assert.throws(() => f.queue.promoteDelivery(input, verify, dependencies));
+    assert.deepEqual(f.queue.read(), before);
+  }
+  f.queue.direct({ action: 'pause-all', request: source(102) });
+  const paused = f.queue.read();
+  assert.throws(
+    () =>
+      f.queue.promoteDelivery(
+        f.input,
+        () => true,
+        () => true,
+      ),
+    /later pause/,
+  );
+  assert.deepEqual(f.queue.read(), paused);
+});
+test('blocked derived delivery holds its serial slot and replay cannot revive it or launch a successor', (t) => {
+  const f = completedSelectedDevelopment(t);
+  f.finish('delivery', 'delivery');
+  const first = f.queue.promoteDelivery(
+    f.input,
+    () => true,
+    () => true,
+  );
+  f.queue.block({ lane: 'delivery', task: first.task, owner: first.owner, reason: 'actual failure' });
+  const second = f.finish('development', 'task-4');
+  const before = f.queue.read();
+  assert.equal(
+    f.queue.promoteDelivery(
+      f.input,
+      () => assert.fail('blocked replay does not execute'),
+      () => true,
+    ).status,
+    'blocked',
+  );
+  assert.throws(
+    () =>
+      f.queue.promoteDelivery(
+        { task: 'task-4', owner: 'owner-4', developmentEvidenceDigest: second.completion.digest },
+        () => true,
+        () => true,
+      ),
+    /serial slot/,
+  );
+  assert.deepEqual(f.queue.read(), before);
+});
+test('eligible engineering deliveries retain receipt order, with only proven dependency ordering allowed', (t) => {
+  const f = completedSelectedDevelopment(t);
+  f.finish('delivery', 'delivery');
+  const second = f.finish('development', 'task-4');
+  const input = { task: 'task-4', owner: 'owner-4', developmentEvidenceDigest: second.completion.digest };
+  assert.throws(
+    () =>
+      f.queue.promoteDelivery(
+        input,
+        () => true,
+        () => true,
+      ),
+    /Earlier eligible/,
+  );
+  f.queue.direct({
+    action: 'set-limits',
+    request: source(102),
+    limits: { development: null, delivery: 1 },
+    dependenciesFirst: true,
+  });
+  assert.equal(
+    f.queue.promoteDelivery(
+      input,
+      () => true,
+      (t) => t.task !== 'task-1',
+    ).task,
+    'task-4',
+  );
+});
+test('business or untyped development never inherits engineering self-delivery authority', (t) => {
+  const f = fixture(t);
+  f.queue.direct(f.direction);
+  const current = f.queue.read().tickets.find((t) => t.task === 'task-1');
+  const completed = f.queue.complete({ ...admission(current), evidence: { verified: true } }, () => true);
+  assert.throws(
+    () =>
+      f.queue.promoteDelivery(
+        { task: 'task-1', owner: 'owner-1', developmentEvidenceDigest: completed.completion.digest },
+        () => true,
+        () => true,
+      ),
+    /engineering lifecycle/,
+  );
+});
+test('explicit delivery resume preserves selected developer scopes instead of consuming their reservations', (t) => {
+  const f = fixture(t);
+  f.queue.direct(f.direction);
+  const previous = f.queue.read(),
+    delivery = previous.tickets.find((t) => t.task === 'delivery');
+  f.queue.complete({ ...admission(delivery), evidence: { verified: true } }, () => true);
+  f.queue.enqueue({ lane: 'delivery', task: 'next-delivery', owner: 'next-owner', request: source(102) });
+  f.queue.direct({
+    action: 'resume-only',
+    lane: 'delivery',
+    task: 'next-delivery',
+    owner: 'next-owner',
+    request: source(103),
+  });
+  const state = f.queue.read();
+  assert.deepEqual(state.scopedAdmissions, previous.scopedAdmissions);
+  assert.equal(state.scopedAdmission.task, 'next-delivery');
+  for (const task of ['task-1', 'task-4'])
+    assert.equal(f.queue.assertAdmission(admission(state.tickets.find((t) => t.task === task))).active, true);
+});
+
+test('an explicit new delivery resume preserves derived authorization and records its new admission', (t) => {
+  const f = completedSelectedDevelopment(t);
+  f.finish('delivery', 'delivery');
+  const original = f.queue.promoteDelivery(
+    f.input,
+    () => true,
+    () => true,
+  );
+  f.queue.block({ lane: 'delivery', task: original.task, owner: original.owner, reason: 'known interruption' });
+  f.queue.direct({
+    action: 'resume-only',
+    lane: 'delivery',
+    task: original.task,
+    owner: original.owner,
+    request: source(102),
+  });
+  const resumed = f.queue.read().tickets.find((t) => t.lane === 'delivery' && t.task === original.task);
+  assert.notEqual(resumed.admission, original.admission);
+  assert.deepEqual(resumed.derivedAuthorization, original.derivedAuthorization);
+  assert.equal(f.queue.assertAdmission(admission(resumed)).active, true);
+});

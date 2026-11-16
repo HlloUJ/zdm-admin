@@ -847,7 +847,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "f40e1ed42c496f4fb67bd0fd7928ca24de4eb0e0abb47b51f25458990f82086e",
+      "digest": "351cb52871eecd52b5a20aa7b93113758b58113e7a4130a5aae4d84a5bd9bd24",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -1999,7 +1999,7 @@
       "dynamicImports": 0
     },
     "scripts/task-execution-order-cli.mjs": {
-      "digest": "02a76e0772aebae727e8d334e7e1c85cf3a7d1006157e25ae19c073fc42b14f2",
+      "digest": "c93ca9bb0b93ab5f604dd48cd2e4c316aa660af9678798c02bdf661e83e35c71",
       "imports": [
         "scripts/completion-status.mjs",
         "scripts/task-board-intake.mjs",
@@ -2012,7 +2012,7 @@
       "dynamicImports": 3
     },
     "scripts/task-execution-order.mjs": {
-      "digest": "431d32005a58988c33d88db973d267cc9cffbb5f2d886bd703c42491f5d05cb3",
+      "digest": "9ab5c9f8e84425acd80bb9e884a51e10b19502c9396683fdbf74ea195989d2a5",
       "imports": [
         "scripts/task-delivery-status-sync.mjs",
         "scripts/task-execution-scope.mjs",
@@ -2254,12 +2254,12 @@
       "dynamicImports": 0
     },
     "scripts/task-selected-resume.test.mjs": {
-      "digest": "7b470c65a0a212c328aeb7393fd051ffc9cd42715ef85a56e779e5d21f96bd20",
+      "digest": "8bb488583ee7aa050c0617cb3a6498d59f7b2701745b9900f2e1abb3acaef6be",
       "imports": ["scripts/task-execution-order.mjs", "scripts/task-execution-scope.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-start.mjs": {
-      "digest": "79426a7a90e8d54a3f5daf1c136948f74bca1758164b9344ab4b653319bce515",
+      "digest": "dc141f7b00f55388ed91089d9030894d25d5ff53a4a0c4f63306c5e0ca53b46d",
       "imports": [
         "scripts/batch-timing-store.mjs",
         "scripts/resource-lease.mjs",
