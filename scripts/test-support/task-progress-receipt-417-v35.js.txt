@@ -1,0 +1,22 @@
+// Owner-authenticated development-tool facts. References are audit pointers,
+// not a replacement for the existing placement gate or external verification.
+const text=(v,max=500)=>{if(typeof v!=='string'||!v.trim()||v.length>max)throw new Error('Invalid receipt text');return v.trim()};
+function keys(o,allowed){if(!o||typeof o!=='object'||Array.isArray(o)||Object.keys(o).some(k=>!allowed.includes(k)))throw new Error('Unsupported receipt field')}
+export function canonical(value){if(Array.isArray(value))return '['+value.map(canonical).join(',')+']';if(value&&typeof value==='object')return '{'+Object.keys(value).sort().map(k=>JSON.stringify(k)+':'+canonical(value[k])).join(',')+'}';return JSON.stringify(value)}
+export function progressReceipt(raw){
+ keys(raw,['version','task_id','stage_fact','receipt_id','sequence','action','event','observed_at','evidence_refs','next','reason']);
+ if(raw.version!==1||!Number.isSafeInteger(raw.sequence)||raw.sequence<1)throw new Error('Invalid receipt version or sequence');
+ if(raw.stage_fact!==undefined){keys(raw.stage_fact,['kind','conditions','references','delivery_kind']);if(!['development_ready','begin_delivery','delivery_complete'].includes(raw.stage_fact.kind))throw new Error('Unsupported stage fact');}
+ text(raw.task_id,100); text(raw.receipt_id,200);keys(raw.action,['id','label']);text(raw.action.id,200);text(raw.action.label);
+ if(!['queued','started','completed','blocked','paused'].includes(raw.event))throw new Error('Invalid receipt event');
+ if(typeof raw.observed_at!=='string'||!/^\d{4}-\d\d-\d\dT/.test(raw.observed_at)||!Number.isFinite(Date.parse(raw.observed_at)))throw new Error('Invalid observation time');
+ if(!Array.isArray(raw.evidence_refs)||!raw.evidence_refs.length||raw.evidence_refs.length>30)throw new Error('Receipt evidence required');
+ raw.evidence_refs.forEach(v=>text(v,2000));keys(raw.next,['kind','label']);
+ if(!['action','wait','none'].includes(raw.next.kind))throw new Error('Invalid next action kind');if(raw.next.label!==undefined)text(raw.next.label);
+ if(raw.next.kind==='action'&&!raw.next.label)throw new Error('Next action label required');
+ if(raw.event==='blocked')text(raw.reason,1000);else if(raw.reason!==undefined)text(raw.reason,1000);
+ const current_work=raw.event==='queued'?`等待执行：${raw.action.label}`:raw.event==='paused'?`已暂停：${raw.action.label}${raw.reason?'。原因：'+raw.reason:''}`:raw.event==='started'?`进行中：${raw.action.label}`:raw.event==='completed'?`已完成：${raw.action.label}`:`受阻：${raw.action.label}。原因：${raw.reason}`;
+ const next_step=(raw.next.kind==='action'?'接下来：':raw.next.kind==='wait'?'等待：':'')+(raw.next.label??(raw.next.kind==='wait'?'下一步确认':'暂无下一步'));
+ return {current_work,next_step};
+}
+export const receiptSchema={type:'object',properties:{version:{const:1},task_id:{type:'string'},stage_fact:{type:'object'},receipt_id:{type:'string'},sequence:{type:'integer',minimum:1},action:{type:'object',properties:{id:{type:'string'},label:{type:'string'}},required:['id','label'],additionalProperties:false},event:{enum:['queued','started','completed','blocked','paused']},observed_at:{type:'string'},evidence_refs:{type:'array',items:{type:'string'},minItems:1},next:{type:'object',properties:{kind:{enum:['action','wait','none']},label:{type:'string'}},required:['kind'],additionalProperties:false},reason:{type:'string'}},required:['version','task_id','receipt_id','sequence','action','event','observed_at','evidence_refs','next'],additionalProperties:false};

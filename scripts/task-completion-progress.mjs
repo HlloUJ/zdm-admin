@@ -1,11 +1,17 @@
-import { recordBeginPlacement, recordCompletePlacement } from './task-completion-placement.mjs';
+import { verifyDevelopmentPlacementEvidence } from './task-execution-order-cli.mjs';
+import { ensureDeliveryPlacement, recordCompletePlacement } from './task-completion-placement.mjs';
 import { readAcceptance } from './accepted-source.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createProgressHost } from './task-progress-host.mjs';
-import { authenticatedBoardAdapter, createProgressOutbox, recoverStaleReceipt } from './task-progress-outbox.mjs';
+import {
+  authenticatedBoardAdapter,
+  createProgressOutbox,
+  recoverStaleReceipt,
+  recoverTerminalInvalidWithSupersession,
+} from './task-progress-outbox.mjs';
 import { completionCommand } from './completion-cli.mjs';
 import { preserveAssets, checkCompletionRuntime } from './task-completion.mjs';
 
@@ -22,6 +28,8 @@ export async function runCompletionWithProgress(
     staleRejections = [],
     hostOptions = {},
     completionOptions = {},
+    developmentEvidence = null,
+    invalidSupersessions = [],
   },
   { command = completionCommand, registry = createTaskRegistry(anchor ?? root), readClosedSource = null } = {},
 ) {
@@ -45,11 +53,32 @@ export async function runCompletionWithProgress(
   assert.ok(Array.isArray(staleRejections) && staleRejections.length <= 128);
   for (const rejected of staleRejections)
     await recoverStaleReceipt(box, adapter, rejected.receiptId, { rejectionRef: rejected.ref });
+  const readDevelopmentSource = async () => {
+    const current = registry.readTask(task.id),
+      order = createExecutionOrder(registry.commonDir);
+    const recorded = order
+      .read()
+      ?.tickets.find(
+        (ticket) =>
+          ticket.task === task.id &&
+          ticket.lane === 'development' &&
+          ticket.owner === task.owner &&
+          ticket.status === 'completed',
+      )?.completion?.evidence;
+    return verifyDevelopmentPlacementEvidence(current, developmentEvidence ?? recorded);
+  };
+  assert.ok(Array.isArray(invalidSupersessions) && invalidSupersessions.length <= 128);
+  for (const item of invalidSupersessions)
+    await recoverTerminalInvalidWithSupersession(box, adapter, item.receiptId, {
+      clientEvidenceFile: item.clientEvidenceFile,
+      evidenceBase: item.evidenceBase,
+      readRepairSource: readDevelopmentSource,
+    });
   const placements = [];
   const host = createProgressHost(adapter, {
     ...hostOptions,
     directory,
-    beforeStage: async ({ state, event }) => {
+    beforeStage: async ({ state, event, transport }) => {
       if (args[0] !== 'deliver' || event.name !== 'prepare') return;
       try {
         assert.equal(state.batch, task.id);
@@ -63,10 +92,24 @@ export async function runCompletionWithProgress(
         });
         assert.equal(admitted.active, true);
         const acceptance = readAcceptance(root, task.id);
-        recordBeginPlacement(directory, task.id, { task: current, ticket: admitted.ticket, acceptance, event });
-        placements.push({ kind: 'begin_delivery', state: 'queued', event: event.id });
+        const result = await ensureDeliveryPlacement(
+          {
+            directory,
+            task: current,
+            ticket: admitted.ticket,
+            acceptance,
+            event,
+            readDevelopmentSource,
+            drain: () => host.drain(),
+          },
+          transport,
+        );
+        placements.push({ kind: 'begin_delivery', ...result, event: event.id });
       } catch (error) {
         placements.push({ kind: 'begin_delivery', state: 'needs-attention', reason: error.message });
+        throw Object.assign(new Error('Required board placement not confirmed: ' + error.message, { cause: error }), {
+          code: 'PROGRESS_PLACEMENT_BLOCKED',
+        });
       }
     },
   });

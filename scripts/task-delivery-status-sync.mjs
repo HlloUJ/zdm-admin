@@ -84,6 +84,18 @@ export function captureQueueProgress(commonDir, state, previous) {
   }
 }
 
+// 417 measures JS string length (UTF-16 code units). Keep code points intact.
+function boundedCiLabel(value) {
+  if (value.length <= 500) return value;
+  const suffix = '……（完整进展见CI记录）',
+    budget = 500 - suffix.length;
+  let prefix = '';
+  for (const character of value) {
+    if (prefix.length + character.length > budget) break;
+    prefix += character;
+  }
+  return prefix + suffix;
+}
 // Uses the waiter's existing authoritative readRun/readJobs results; no new GitHub call/poller.
 export function captureCiProgress(common, task, progress) {
   assert.match(task, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -148,7 +160,7 @@ export function captureCiProgress(common, task, progress) {
       (progress.status === 'completed' && !progress.terminalVerified ? '，必需汇总待核验' : '');
   return recordToolProgress(directory, task, sourceKey, {
     observed_at: observedAt,
-    action: { id: 'ci:' + progress.runId + ':' + digest, label },
+    action: { id: 'ci:' + progress.runId + ':' + digest, label: boundedCiLabel(label) },
     event,
     evidence_refs: [file, 'ci:' + progress.runId + ':' + progress.headSha + ':attempt1'],
     next: {

@@ -208,3 +208,37 @@ test('structured CI observations keep task/run/head/attempt identity, deduplicat
   assert.throws(() => captureCiProgress(common, 'fixture-task', { ...fact, terminalVerified: true }));
   assert.equal(createProgressOutbox(path.join(common, 'task-progress', 'fixture-task')).read().pending.length, 2);
 });
+test('many Chinese CI jobs and long steps fit actual417 wire label bound while complete source proof stays intact', async (t) => {
+  const { captureCiProgress } = await import('./task-delivery-status-sync.mjs');
+  const { readFileSync } = await import('node:fs');
+  const { createHash } = await import('node:crypto');
+  const bytes = readFileSync(new URL('./test-support/task-progress-receipt-417-v35.js.txt', import.meta.url));
+  const manifest = JSON.parse(
+    readFileSync(new URL('./test-support/task-progress-receipt-417-v35-source.json', import.meta.url)),
+  );
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), manifest.sha256);
+  const { progressReceipt } = await import('data:text/javascript;base64,' + bytes.toString('base64'));
+  const common = fixture(t),
+    jobs = Array.from({ length: 9 }, (_, i) => ({
+      name: '前端与后端检查' + i,
+      status: 'in_progress',
+      conclusion: null,
+      active: ['执行中文步骤与真实用例验证'.repeat(40) + '🧪'],
+    }));
+  const fact = {
+    runId: '42',
+    headSha: 'a'.repeat(40),
+    attempt: 1,
+    status: 'in_progress',
+    conclusion: null,
+    jobs,
+    terminalVerified: false,
+    observedAt: new Date().toISOString(),
+  };
+  const result = captureCiProgress(common, 'fixture-task', fact);
+  assert.ok(result.receipt.action.label.length <= 500);
+  assert.match(result.receipt.action.label, /完整进展见CI记录/);
+  assert.doesNotThrow(() => progressReceipt(result.receipt));
+  assert.deepEqual(JSON.parse(readFileSync(result.receipt.evidence_refs[0])).jobs, jobs);
+  assert.equal(captureCiProgress(common, 'fixture-task', fact).receipt_id, result.receipt_id);
+});

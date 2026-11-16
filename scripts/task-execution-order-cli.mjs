@@ -18,6 +18,11 @@ export function verifyDevelopmentCompletion(task, evidence) {
   assert.equal(evidence.owner, task.owner);
   assert.equal(evidence.head, git(task.worktree, 'rev-parse', 'HEAD'));
   assert.equal(git(task.worktree, 'status', '--porcelain'), '', 'Uncommitted development cannot release a slot');
+  return verifyDevelopmentReports(task, evidence);
+}
+function verifyDevelopmentReports(task, evidence) {
+  assert.equal(evidence?.task, task.id);
+  assert.equal(evidence.owner, task.owner);
   assert.ok(
     Array.isArray(evidence.reports) && evidence.reports.length > 0,
     'Exact development verification reports required',
@@ -45,6 +50,33 @@ export function verifyDevelopmentCompletion(task, evidence) {
     }
   }
   return true;
+}
+// Placement may reuse an exact tree after a recorded Git-history replay, never a changed candidate.
+// Queue completion above keeps its original strict HEAD contract.
+export function verifyDevelopmentPlacementEvidence(task, evidence) {
+  const head = git(task.worktree, 'rev-parse', 'HEAD');
+  assert.equal(git(task.worktree, 'status', '--porcelain'), '', 'Uncommitted candidate is not ready');
+  assert.match(evidence?.head ?? '', /^[a-f0-9]{40}$/);
+  const tree = git(task.worktree, 'rev-parse', head + '^{tree}'),
+    sourceTree = git(task.worktree, 'rev-parse', evidence.head + '^{tree}');
+  assert.equal(sourceTree, tree, 'Development evidence belongs to changed source');
+  verifyDevelopmentReports(task, evidence);
+  const assessment = evidence.assessment;
+  assert.equal(assessment?.task, task.id);
+  assert.equal(assessment.owner, task.owner);
+  assert.equal(assessment.head, head);
+  assert.equal(assessment.noKnownDefects, true, 'Current ordinary development assessment required');
+  assert.ok(Number.isFinite(Date.parse(assessment.observedAt)));
+  return {
+    task: task.id,
+    owner: task.owner,
+    candidate: head,
+    sourceHead: evidence.head,
+    tree,
+    evidenceDigest: createHash('sha256').update(JSON.stringify(evidence)).digest('hex'),
+    assessment,
+    verified: true,
+  };
 }
 export function executionOrderCommand(root, [command, json]) {
   const registry = createTaskRegistry(root);

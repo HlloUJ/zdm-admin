@@ -7,7 +7,7 @@ import {
 } from './task-progress-outbox.mjs';
 import { recordToolProgress } from './task-delivery-status-sync.mjs';
 
-export function beginDeliveryFact({ task, ticket, acceptance, event }) {
+export function beginDeliveryFact({ task, ticket, acceptance, event, observedAt }) {
   assert.equal(ticket.lane, 'delivery');
   assert.equal(ticket.task, task.id);
   assert.equal(ticket.owner, task.owner);
@@ -19,7 +19,7 @@ export function beginDeliveryFact({ task, ticket, acceptance, event }) {
   assert.equal(event.name, 'prepare');
   assert.equal(event.status, 'running');
   return {
-    observed_at: new Date(event.startedAt).toISOString(),
+    observed_at: observedAt ?? new Date(event.startedAt).toISOString(),
     action: { id: 'delivery:' + event.id, label: '正式交付' },
     event: 'started',
     evidence_refs: ['accepted-source:' + acceptance.commit, 'execution-order:' + ticket.request.messageId],
@@ -102,5 +102,113 @@ export async function recordCompletePlacement({ directory, task, readClosedSourc
     receipt_id: record.receipt_id,
     sourceReceiptDigest: source.sourceReceiptDigest,
     evidence: path.join(directory, 'outbox.json'),
+  };
+}
+
+export function developmentReadyFact({ task, source, observedAt, event }) {
+  assert.equal(source.verified, true);
+  assert.equal(source.task, task.id);
+  assert.equal(source.owner, task.owner);
+  assert.equal(source.assessment.noKnownDefects, true);
+  assert.match(source.candidate, /^[a-f0-9]{40}$/);
+  assert.match(source.evidenceDigest, /^[a-f0-9]{64}$/);
+  assert.ok(Number.isFinite(Date.parse(observedAt)));
+  return {
+    observed_at: observedAt,
+    action: { id: 'development-ready:' + event.id, label: '开发完成并验证' },
+    event: 'completed',
+    evidence_refs: [
+      'development-evidence:' + source.evidenceDigest,
+      'candidate:' + source.candidate,
+      'verified-source:' + source.sourceHead,
+    ],
+    next: { kind: 'action', label: '接续已获授权的正式交付' },
+    stage_fact: {
+      kind: 'development_ready',
+      conditions: { development_complete: true, verification_passed: true, no_known_defects: true },
+      references: { candidate: source.candidate, verification: 'development-evidence:' + source.evidenceDigest },
+    },
+  };
+}
+function placementEntry(box, task, key) {
+  const id = progressSourceIdentity(task, key);
+  return [...box.read().pending, ...box.read().acknowledged, ...(box.read().rejected ?? [])].find(
+    (entry) => entry.receipt_id === id,
+  );
+}
+async function confirmedPlacement(box, adapter, task, entry, column) {
+  const confirmed = box.read().acknowledged.find((record) => record.receipt_id === entry.receipt_id);
+  assert.ok(confirmed, 'Placement receipt remains undelivered');
+  const read = await adapter.read(task, entry.receipt_id, { signal: AbortSignal.timeout(5000) });
+  assert.ok(['applied', 'duplicate'].includes(read.status));
+  assert.deepEqual(read.receipt, entry.receipt);
+  assert.equal(read.task.id, task);
+  assert.equal(read.task.board_column, column);
+  assert.equal(read.task.status, column);
+  return read;
+}
+// A real next-card transition is confirmed before the next fact is created.
+// No manufactured review, old timestamp refresh, annotation clearing or source execution on failure.
+export async function ensureDeliveryPlacement(
+  { directory, task, ticket, acceptance, event, readDevelopmentSource, drain, now = Date.now },
+  adapter,
+) {
+  const source = await readDevelopmentSource();
+  assert.equal(source.verified, true);
+  assert.equal(source.task, task.id);
+  assert.equal(source.owner, task.owner);
+  assert.equal(source.assessment.noKnownDefects, true);
+  beginDeliveryFact({ task, ticket, acceptance, event }); // Validate delivery eligibility before any transport.
+  const box = createProgressOutbox(directory);
+  const probe = progressSourceIdentity(task.id, 'placement-observe:' + event.id);
+  let seen = await adapter.read(task.id, probe, { signal: AbortSignal.timeout(5000) });
+  assert.equal(seen.task?.id, task.id);
+  assert.ok(!seen.task.deleted_at);
+  assert.ok(
+    ['active', 'review', 'merging'].includes(seen.task.status),
+    'Paused/blocked/done task cannot be moved by delivery host',
+  );
+  await drain();
+  assert.equal(box.read().pending.length, 0, 'Earlier unresolved receipt blocks placement');
+  seen = await adapter.read(task.id, probe, { signal: AbortSignal.timeout(5000) });
+  assert.equal(seen.task?.id, task.id);
+  assert.ok(!seen.task.deleted_at);
+  assert.ok(
+    ['active', 'review', 'merging'].includes(seen.task.status),
+    'Paused/blocked/done task cannot be moved by delivery host',
+  );
+  if (seen.task.board_column === 'merging')
+    return { state: 'current-merging-confirmed-no-write', revision: seen.task.revision };
+  if (seen.task.board_column === 'active') {
+    const key = 'placement:development-ready:' + event.id + ':' + source.evidenceDigest;
+    const entry =
+      placementEntry(box, task.id, key) ??
+      recordToolProgress(
+        directory,
+        task.id,
+        key,
+        developmentReadyFact({ task, source, event, observedAt: new Date(now()).toISOString() }),
+      );
+    await drain();
+    seen = await confirmedPlacement(box, adapter, task.id, entry, 'review');
+  }
+  assert.equal(seen.task.board_column, 'review', 'Cannot skip the development review card');
+  assert.equal(seen.task.status, 'review');
+  const key = 'placement:begin:' + event.id;
+  const entry =
+    placementEntry(box, task.id, key) ??
+    recordToolProgress(
+      directory,
+      task.id,
+      key,
+      beginDeliveryFact({ task, ticket, acceptance, event, observedAt: new Date(now()).toISOString() }),
+    );
+  await drain();
+  const read = await confirmedPlacement(box, adapter, task.id, entry, 'merging');
+  return {
+    state: 'confirmed',
+    receipt_id: entry.receipt_id,
+    revision: read.revision,
+    developmentEvidence: source.evidenceDigest,
   };
 }

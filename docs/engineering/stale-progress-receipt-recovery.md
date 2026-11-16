@@ -21,3 +21,11 @@
 638等已经正式完成的任务不再补新receipt。`readClosedDeliveryProgressSource(anchor,task)`只读取已有正式来源，不重跑CI/下载/交接。宿主再用`confirmCurrentBoardProjection`比较真实当前源与看板status/column/current_work/next_step，保存`current-state-confirmed-no-write`；不写看板、不声称历史receipt送达。
 
 真实历史outbox仅由总协调在新main发布后按准确owner权限操作；隔离测试通过不代表生产638已恢复。
+
+## 已证实的 invalid 流转缺口
+
+`recoverTerminalInvalidWithSupersession` 仅处理原begin_delivery在原revision仍active而跳过review的这一类已确认缺口。必须有完整原客户端观察文件（准确entry、原failure invalid_receipt:false、源outbox、真实观察时间；原HTTP未保留时如实标注），当前已验证的修复就绪证据，以及认证的同revision完整history、manualBarrier和从未应用证明。权限/冲突/网络、其他invalid形状、无屏障或已应用均不套用。
+
+原entry、payload、revision、observed_at、sequence及原失败完整保留，先持久审计再退出pending，状态固定为terminal-invalid-with-supersession；不改称stale，不记ack，也不把旧包刷新后重发。审计先写后中断可重入。普通flush不自动隔离invalid。宿主可显式传invalidSupersessions，每项绑定原receipt和clientEvidenceFile；修复源码发布及根明确恢复前不操作真实队列。
+
+根清除action注记回原active后，后续未prepare/无failure的旧尾部仍保留原身份。既有flush首次实际发送，若服务确实拒绝stale才按真实code/history路径审计；不能直接把它们当已拒绝或送达。新的ready/begin只来自当前源的重新真实观察，并按卡片顺序逐次确认。

@@ -93,3 +93,43 @@ export function validateRecordedClientStale(entry, proof) {
   validateProgressHistory(entry, proof.historyEvidence);
   assert.deepEqual(proof.readback, proof.historyEvidence.current);
 }
+
+// One explicit repair case. Invalid is not stale and is never acknowledged or retried as the old packet.
+export function validateTerminalInvalidSupersession(entry, proof) {
+  assert.equal(proof.kind, 'terminal-invalid-with-supersession');
+  assert.equal(entry.failure?.code, 'invalid_receipt');
+  assert.equal(entry.failure.retryable, false);
+  assert.ok(Number.isSafeInteger(entry.revision) && entry.revision > 0);
+  assert.equal(entry.receipt.stage_fact?.kind, 'begin_delivery');
+  assert.equal(entry.receipt.event, 'started');
+  const client = proof.clientEvidence,
+    bytes = Buffer.from(client.bytes, 'base64');
+  assert.equal(createHash('sha256').update(bytes).digest('hex'), client.digest);
+  assert.deepEqual(JSON.parse(bytes), client.report);
+  assert.equal(client.report.task, entry.receipt.task_id);
+  assert.equal(client.report.sourceKind, 'recorded-client-terminal-invalid');
+  assert.equal(client.report.originalProviderResponse, 'not-retained');
+  assert.deepEqual(client.report.entry, entry, 'Original invalid packet/client failure changed');
+  assert.ok(Date.parse(client.report.observedAt) >= Date.parse(entry.receipt.observed_at));
+  validateProgressHistory(entry, proof.historyEvidence);
+  assert.deepEqual(proof.readback, proof.historyEvidence.current);
+  assert.ok(proof.readback.revision >= entry.revision);
+  const original = proof.historyEvidence.events
+    .map((event) => (typeof event.snapshot === 'string' ? JSON.parse(event.snapshot) : event.snapshot))
+    .find((snapshot) => snapshot.revision === entry.revision);
+  assert.equal(
+    original?.card_stage ?? original?.status,
+    'active',
+    'Only the proved missing-review transition may be superseded',
+  );
+  const repair = proof.repairSource;
+  assert.equal(repair?.verified, true);
+  assert.equal(repair.task, entry.receipt.task_id);
+  assert.match(repair.candidate ?? '', /^[a-f0-9]{40}$/);
+  assert.match(repair.evidenceDigest ?? '', /^[a-f0-9]{64}$/);
+  assert.equal(repair.assessment?.noKnownDefects, true);
+  assert.equal(repair.assessment.task, repair.task);
+  assert.equal(repair.assessment.owner, repair.owner);
+  assert.equal(repair.assessment.head, repair.candidate);
+  assert.ok(Number.isFinite(Date.parse(repair.assessment.observedAt)));
+}

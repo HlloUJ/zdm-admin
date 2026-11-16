@@ -14,9 +14,11 @@ export function createProgressHost(
   let protectedTurns = 0,
     scheduled = null,
     flushing = null,
-    generation = 0;
+    generation = 0,
+    preparing = 0,
+    stageFailed = false;
   function start() {
-    if (flushing || protectedTurns || !pending.size) return flushing;
+    if (flushing || protectedTurns || stageFailed || !pending.size) return flushing;
     const launchedGeneration = generation,
       directories = [...pending];
     pending.clear();
@@ -65,7 +67,7 @@ export function createProgressHost(
     return flushing;
   }
   function kick() {
-    if (scheduled || flushing || protectedTurns || !pending.size) return;
+    if (scheduled || flushing || protectedTurns || preparing || stageFailed || !pending.size) return;
     scheduled = setImmediate(() => {
       scheduled = null;
       start();
@@ -73,7 +75,36 @@ export function createProgressHost(
   }
   const runner = {
     run: (work) => context.run(runner, work),
-    beforeStage: beforeStage,
+    async beforeStage(input) {
+      if (!beforeStage) return;
+      if (protectedTurns) throw Error('progress-transport-deferred');
+      preparing++;
+      if (scheduled) {
+        clearImmediate(scheduled);
+        scheduled = null;
+      }
+      try {
+        await flushing;
+        const transport = Object.fromEntries(
+          Object.keys(adapter)
+            .filter((name) => typeof adapter[name] === 'function')
+            .map((name) => [
+              name,
+              (...args) => {
+                if (protectedTurns || stageFailed) throw Error('progress-transport-deferred');
+                return adapter[name](...args);
+              },
+            ]),
+        );
+        return await beforeStage({ ...input, transport });
+      } catch (error) {
+        stageFailed = true;
+        throw error;
+      } finally {
+        preparing--;
+        if (!stageFailed) kick();
+      }
+    },
     notify(target) {
       assert.ok(
         !directory || path.resolve(target) === path.resolve(directory),
@@ -97,6 +128,7 @@ export function createProgressHost(
     },
     async drain() {
       if (protectedTurns) return { state: 'deferred-protected' };
+      if (stageFailed) return { state: 'deferred-stage-failure' };
       if (scheduled) {
         clearImmediate(scheduled);
         scheduled = null;

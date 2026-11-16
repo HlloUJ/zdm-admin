@@ -3,6 +3,7 @@ import {
   validateProgressHistory,
   validateClosedSupersession,
   validateRecordedClientStale,
+  validateTerminalInvalidSupersession,
 } from './task-progress-supersession.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
@@ -70,9 +71,12 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
       if (existing) {
         assert.equal(existing.payload_hash, payloadHash, 'Receipt identity reused with changed facts');
         if (
-          ['rejected-not-delivered', 'superseded-without-submission', 'client-reported-stale-not-delivered'].includes(
-            existing.state,
-          )
+          [
+            'rejected-not-delivered',
+            'superseded-without-submission',
+            'client-reported-stale-not-delivered',
+            'terminal-invalid-with-supersession',
+          ].includes(existing.state)
         ) {
           const bytes = readFileSync(existing.audit);
           assert.equal(byteHash(bytes), existing.auditDigest);
@@ -149,14 +153,17 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
       assert.ok(index >= 0, 'Unknown pending stale receipt');
       const entry = state.pending[index];
       const superseded = proof.kind === 'superseded-without-submission',
-        recorded = proof.kind === 'recorded-client-stale';
-      const validate = superseded
-        ? validateClosedSupersession
-        : recorded
-          ? validateRecordedClientStale
-          : validateStaleProof;
+        recorded = proof.kind === 'recorded-client-stale',
+        invalid = proof.kind === 'terminal-invalid-with-supersession';
+      const validate = invalid
+        ? validateTerminalInvalidSupersession
+        : superseded
+          ? validateClosedSupersession
+          : recorded
+            ? validateRecordedClientStale
+            : validateStaleProof;
       validate(entry, proof);
-      if (recorded) assert.equal(proof.clientEvidence.outboxDirectory, directory);
+      if (recorded || invalid) assert.equal(proof.clientEvidence.outboxDirectory, directory);
       const auditDirectory = path.join(directory, 'rejected');
       safe(auditDirectory);
       mkdirSync(auditDirectory, { recursive: true, mode: 0o700 });
@@ -167,16 +174,19 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
         version: 1,
         status: superseded
           ? 'superseded-without-submission'
-          : recorded
-            ? 'client-reported-stale-not-delivered'
-            : 'rejected-not-delivered',
+          : invalid
+            ? 'terminal-invalid-with-supersession'
+            : recorded
+              ? 'client-reported-stale-not-delivered'
+              : 'rejected-not-delivered',
         entry: structuredClone(entry),
         entryDigest: hash(entry),
         originalOutbox: { bytes: original.toString('base64'), sha256: byteHash(original) },
         rejection: proof.rejection,
         readback: proof.readback,
         ...(superseded ? { kind: proof.kind, closedSource: proof.closedSource } : {}),
-        ...(recorded ? { kind: proof.kind, clientEvidence: proof.clientEvidence } : {}),
+        ...(recorded || invalid ? { kind: proof.kind, clientEvidence: proof.clientEvidence } : {}),
+        ...(invalid ? { repairSource: proof.repairSource } : {}),
         ...(proof.historyEvidence ? { historyEvidence: proof.historyEvidence } : {}),
       };
       if (existsSync(auditFile)) {
@@ -206,9 +216,11 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
         payload_hash: entry.payload_hash,
         state: superseded
           ? 'superseded-without-submission'
-          : recorded
-            ? 'client-reported-stale-not-delivered'
-            : 'rejected-not-delivered',
+          : invalid
+            ? 'terminal-invalid-with-supersession'
+            : recorded
+              ? 'client-reported-stale-not-delivered'
+              : 'rejected-not-delivered',
         task_id: entry.receipt.task_id,
         sequence: entry.receipt.sequence,
         audit: auditFile,
@@ -220,6 +232,7 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
     });
   }
   return {
+    directory,
     read,
     enqueue,
     prepare,
@@ -231,6 +244,10 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
     },
     quarantineRecordedStale: (id, proof, options) => {
       assert.equal(proof.kind, 'recorded-client-stale');
+      return quarantineTerminal(id, proof, options);
+    },
+    quarantineInvalid: (id, proof, options) => {
+      assert.equal(proof.kind, 'terminal-invalid-with-supersession');
       return quarantineTerminal(id, proof, options);
     },
     quarantineSuperseded: (id, proof, options) => {
@@ -479,4 +496,48 @@ export async function recoverRecordedClientStale(outbox, adapter, receiptId, { c
   validateRecordedClientStale(entry, proof);
   approvedRejections.add(proof);
   return outbox.quarantineRecordedStale(receiptId, proof, { afterAudit });
+}
+
+export async function recoverTerminalInvalidWithSupersession(
+  outbox,
+  adapter,
+  receiptId,
+  { clientEvidenceFile, evidenceBase, readRepairSource, afterAudit } = {},
+) {
+  const state = outbox.read(),
+    prior = (state.rejected ?? []).find((item) => item.receipt_id === receiptId);
+  if (prior) {
+    assert.equal(prior.state, 'terminal-invalid-with-supersession');
+    return prior;
+  }
+  const entry = state.pending.find((item) => item.receipt_id === receiptId);
+  assert.ok(entry, 'Unknown invalid receipt');
+  assert.equal(typeof readRepairSource, 'function', 'Verified current repair source required');
+  safe(clientEvidenceFile);
+  const bytes = readFileSync(clientEvidenceFile),
+    report = JSON.parse(bytes);
+  const source = path.resolve(
+    evidenceBase ?? path.dirname(path.dirname(path.dirname(outbox.directory))),
+    report.sourceFile,
+  );
+  assert.equal(source, path.join(outbox.directory, 'outbox.json'), 'Client observation is for another outbox');
+  const repairSource = await readRepairSource(),
+    historyEvidence = await adapter.history(entry.receipt.task_id, receiptId);
+  const proof = {
+    kind: 'terminal-invalid-with-supersession',
+    clientEvidence: {
+      file: clientEvidenceFile,
+      bytes: bytes.toString('base64'),
+      digest: byteHash(bytes),
+      report,
+      outboxDirectory: outbox.directory,
+      sourceFile: source,
+    },
+    repairSource,
+    historyEvidence,
+    readback: historyEvidence.current,
+  };
+  validateTerminalInvalidSupersession(entry, proof);
+  approvedRejections.add(proof);
+  return outbox.quarantineInvalid(receiptId, proof, { afterAudit });
 }

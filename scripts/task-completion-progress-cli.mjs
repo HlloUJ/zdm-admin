@@ -34,6 +34,8 @@ process.stdin.on('data', async (chunk) => {
       taskId: input.task,
       anchor: process.cwd(),
       args: input.args,
+      developmentEvidence: input.developmentEvidence ?? null,
+      invalidSupersessions: input.invalidSupersessions ?? [],
       call,
     });
     console.log(JSON.stringify(result));
