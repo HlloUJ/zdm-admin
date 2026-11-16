@@ -1565,6 +1565,21 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-codex-cycle-cli.mjs": {
+      "digest": "edf3ef3b94c6b17bbf31eec899de38b68902d2653b3523d13484771d4b2756c9",
+      "imports": ["scripts/task-codex-cycle.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-codex-cycle.mjs": {
+      "digest": "18b91a5f89828ee8d16e93268c7417c48b6d23d55416dddf76503c4295365866",
+      "imports": ["scripts/task-progress-outbox.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-codex-cycle.test.mjs": {
+      "digest": "c2230ee41c3abe7d70c3f2d65d2c5dcc4e8d43c88f725ed72d06d3ccedb4ecf5",
+      "imports": ["scripts/task-codex-cycle.mjs", "scripts/task-progress-outbox.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/task-codex-host.mjs": {
       "digest": "defa5ccd53cde492da250cc9ed442bc79f2cdd51c391cd6abe3073cc8f169023",
       "imports": [
