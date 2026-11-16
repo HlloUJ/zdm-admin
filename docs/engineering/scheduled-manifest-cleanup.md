@@ -2,6 +2,8 @@
 
 本页描述 683 的源码候选。源码检查点不代表已安装、已周期运行或通知已送达。原暂停任务不由此恢复。清理只消费 987 的已登记稳定移交对象，不扫描历史目录推断残留。
 
+683 的真实 13:00 周期与通知验证可能跨多小时。源码交付可以按[任务完成入口](../task-completion.md)由可信宿主显式使用 `deferSettle`：准确 main CI、final-handoff 完成后正常返回外部验收等待，释放本次临界租约但保留交付票据和 Git 载体，`formalDeliveryComplete=false`。真实周期和原生通知读回证明齐全后，宿主只调用原 `settle` 接续；不为等周期占住 main/集成临界资源，不将等待记成失败或提前宣告 683 完成。默认交付路径不使用该选项。
+
 ## 683 必要准入升级
 
 本候选精准复用 987 检查点 `67090457bafe7e5b01005196f7d59459efaabfd3` 的控制面桥接：明确选择恢复、协作执行者身份、工程任务开发完成后的串行交付准入。它保留 638 已发布的看板受理保护，不把执行者父聊天活跃当子任务仍运行，不重放历史“任务完成”授权，也不解除未被用户选择的暂停任务。
@@ -62,11 +64,21 @@
 
 `publishCleanupRuntime(mainRoot, {expectedHead})` 是显式部署函数，只接受干净 main 且 HEAD 与 origin/main 跟踪引用相等；它不宣称实时查询远端。root 在正式主线交付与来源核验后调用。函数从准确 Git 对象复制全部受跟踪 scripts（包括 Python 子进程辅助文件），写入 owner-only 的 `task-cleanup/runtime/<main-sha>/`。每次执行前核对输入摘要和 Node 身份，任务 Worktree 移除不影响运行。历史 runtime 版本保护保留，不在此入口猜测删除。
 
-`cleanupLaunchAgentPlan({root,node,commonDir,runtimeDirectory})` 只生成 plist，不安装。它直接调用稳定 runtime 的 `task-cleanup-scheduled-cli.mjs`，每天北京时间 01:00、13:00；宿主时区必须是 Asia/Shanghai。`RunAtLoad` 用于登录/重载后仅补最近时点；同一时点已领取不重跑，跨越多个时点也不逐轮回放。并发和失主锁保留，不以超时抢占。
+`cleanupLaunchAgentPlan({root,node,commonDir,runtimeDirectory})` 只生成 plist，不安装。它直接调用稳定 runtime 的 `task-cleanup-scheduled-cli.mjs`，每天北京时间 01:00、13:00；宿主时区必须是 Asia/Shanghai。`RunAtLoad` 用于登录/重载后仅补最近时点；同一时点已完成不重跑，跨越多个时点也不逐轮回放。仅准确证明中断执行者及删除组全部结束后，允许接续同一未完成时点；并发、失主身份不明或旧锁保留，不以超时抢占。
 
 launchd 的日历任务会在睡眠唤醒后补触发；关机错过的时点不能依赖日历任务自动补跑，因此另有启动时最近时点核验。参考 [Apple 定时任务文档](https://developer.apple.com/library/archive/documentation/MacOSX/Conceptual/BPSystemStartup/Chapters/ScheduledJobs.html)。
 
 不创建每轮聊天。无追加增长的 stdout/stderr 文件；调度写定长数量的结构化最近记录，并保留首次失败。JS 已启动时的预检错误覆盖写入 `scheduler-startup-error.json`。若 Node 或进程根本无法启动，必须由现有外部监测读取 launchd 的 LastExitStatus；进程自身无法证明这一情况。尚未接通外部观察前不能宣称不存在静默停机。
+
+### 真实进程中断与准确接续
+
+683 后续候选的 `task-cleanup-lock.mjs` 仅处理 `scheduler.lock`、`run.lock`，复用 `verification-process-identity` 的 PID、PGID、启动时间观察，以及既有 `completion-process` 的独占进程组和子执行 journal。v2 owner 绑定本机、准确清理目录、锁类型、源码身份、随机 token 和完整删除子执行登记。Python FD 删除通过该既有 supervisor 启动；不能因父 Node 退出就假设 Python 也退出。
+
+恢复不发送信号，也不按锁龄接管。原 PID 仍存在（包括 PID 复用）、观察权限未知、任一已登记组仍活着、子执行仍是未确认 launch、源码身份改变或 legacy 缺少完整证明，均明确拒绝并保留。恢复外层 scheduler 前先核对内层 run 锁；全部组必须已不存在，才能将原 owner/journal 保全到 `lock-history/<lock-name>/<original-token>` 后重新取得锁。恢复过程本身的未明 transition 同样保留，不能擅自清其 guard。
+
+调度 `running` 状态记录原锁 token；同一时点只有命中该 token 和源码的结束证明才可接续。原 `scheduler-state.interrupted.json` 与首次 `interrupted` 事实保留，已完成时点不重放。新接续仍受显式每轮预算约束，既有对象结果、封闭删除清单及部分删除 journal 继续决定剩余工作；新增唯一文件仍阻断删除。已启动过删除组的正常锁也保留过程证明；这些必要 `lock-history` 证据不进入到期对象查询或成功详情压缩。
+
+源码隔离用例真实发送 SIGTERM 给本轮创建的 Node 和 Python：父进程结束而 Python 仍活时，两把锁均拒绝恢复；子组结束后，同一时点只删除已封闭清单中的剩余内容，并准确记录剩余逻辑字节。该验证不是生产清理或真实日程启用。
 
 ## 固定通知宿主接口
 
@@ -110,9 +122,13 @@ launchd 的日历任务会在睡眠唤醒后补触发；关机错过的时点不
 
 后续 683 版本新增 `npm-pristine-package-v1`，不混入已冻结的 987 候选。它明确是 `independent-archive-audit-v1` 审计证明，不是补造创建时凭证，不把 `npm ci` 退出 0 当作目录没有唯一内容的证明。
 
+NPM 审计/移交的规范入口为 `scripts/delivery-repairs/task-cleanup-npm.mjs`，证明校验及只读归档辅助同置于该目录。此轮仅隔离预组合固定候选 `2d706462a4d4df58d38976ad2f07821ed018ab69`，尚未以它替代正式发布的 main。
+
 `task-artifacts` 仍执行原有 `npm ci`，不修改生命周期脚本、参数或依赖运行行为。仅本次实际新安装并验证、写入准确私有 task-artifacts 后调用审计；正常复用不重复全目录审计。旧准确任务可以显式调用 `auditPrivateTaskDependencies({root,common,task})`。审计只读取该任务 `.task-runtime/npm-cache/_cacache/content-v2/sha512` 中按锁文件 integrity 精确定位的归档，不联网、不查共享 npm/Maven 缓存、不扫描历史安装。
 
 审计逐个处理 lock 中准确顶层或作用域包：要求实体私有 `node_modules`、task/worktree/lock 绑定、归档 SHA-512 完全一致、包内完整目录与文件集合及字节摘要相同。普通文件仅接受固定 npm 规范化 0644/0755 模式；未知模式、链接、硬链接、额外空目录、新增文件、缺失或修改内容均保留。带 `hasInstallScript`、嵌套或打包内含 node_modules 的包不纳入首期。`.bin`、安装索引、未知根成员、私有缓存、补丁及备份均保留，不放宽任何类型的全局链接规则。
+
+缺少字符串 integrity 时，保护原因明确为“锁未记录不可变SHA-512证明，保留原内容”。实际安装存在不替代不可变证明；总调度只读核实的 225 条缺 integrity 路径中，224 条实际存在、1 条缺失，均不补造证明或联网猜测。提示明确化不扩大可清理范围，也不调整数量、时间、字节或通知预算。
 
 Python 归档检查器只读取、不解包或执行；压缩大小、解压容器、文件总量和成员数量均有界，拒绝越界路径、重复、链接、特殊模式及特殊文件。审计成功先将完整原归档以 owner-only、内容寻址方式保存在 `common/task-cleanup/dependency-archives/<task>/<sha512hex>.tgz`，再写不可覆盖证明。稳定索引为 `common/task-cleanup/npm-audits/<task>/index.json`；旧 Worktree 移除后，消费端仍能从准确 Git lock 与稳定原归档独立核验完整预期内容。
 

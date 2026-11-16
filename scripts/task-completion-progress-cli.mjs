@@ -19,6 +19,10 @@ process.stdin.on('data', async (chunk) => {
     const input = JSON.parse(raw);
     raw = '';
     assert.ok(Array.isArray(input.args) && input.args.every((arg) => typeof arg === 'string'));
+    assert.ok(
+      input.deferSettle === undefined || typeof input.deferSettle === 'boolean',
+      'deferSettle must be explicit boolean',
+    );
     const inside = (parent, child) => {
       const relative = path.relative(path.resolve(parent), path.resolve(child));
       return (
@@ -36,6 +40,7 @@ process.stdin.on('data', async (chunk) => {
       args: input.args,
       developmentEvidence: input.developmentEvidence ?? null,
       invalidSupersessions: input.invalidSupersessions ?? [],
+      completionOptions: { deferSettle: input.deferSettle ?? false },
       call,
     });
     console.log(JSON.stringify(result));
