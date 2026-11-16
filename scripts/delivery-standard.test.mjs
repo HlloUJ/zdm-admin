@@ -111,3 +111,15 @@ test('missing or malformed standard cannot authorize a document-only plan', asyn
   assert.deepEqual(fallback.domains, ['frontend', 'backend', 'engineering']);
   assert.ok(fallback.minimum.includes('complete-applicable-gates'));
 });
+
+test('runtime-consumed UI rules and sensitive documents cannot pass as ordinary prose', () => {
+  assert.equal(deliveryStandardRule('docs/ui/standard.md').level, 'R3');
+  const ui = classifyChangedFiles(['docs/ui/standard.md'], { engineeringProof: { proven: true } });
+  assert.equal(ui.docsOnly, false);
+  assert.equal(ui.frontend, true);
+  const sensitive = classifyChangedFiles(['docs/permission-policy.md'], { engineeringProof: { proven: true } });
+  assert.equal(sensitive.docsOnly, false);
+  assert.equal(sensitive.full, true);
+  assert.equal(sensitive.frontend, true);
+  assert.equal(sensitive.backend, true);
+});

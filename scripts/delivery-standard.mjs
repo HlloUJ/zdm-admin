@@ -9,10 +9,17 @@ export function readDeliveryStandard(file) {
     for (const level of ['R0', 'R1', 'R2', 'R3', 'R4'])
       assert.ok(Array.isArray(value.levels[level].minimum) && value.levels[level].minimum.length);
     assert.equal(value.unknown.level, 'R4');
+    assert.ok(Array.isArray(value.unknown.minimum) && value.unknown.minimum.length);
     assert.ok(value.rules.length && value.protected.length);
     for (const rule of value.rules) {
       assert.ok(value.levels[rule.level]);
       assert.ok(rule.id);
+      assert.equal(typeof rule.pattern, 'string');
+      assert.ok(
+        !rule.domains ||
+          (Array.isArray(rule.domains) &&
+            rule.domains.every((domain) => ['frontend', 'backend', 'engineering'].includes(domain))),
+      );
       new RegExp(rule.pattern, 'i');
     }
     return { available: true, value };
@@ -51,6 +58,8 @@ export function deliveryStandardRule(file) {
       (a, b) => rank(b.level) - rank(a.level) || standard.rules.indexOf(a) - standard.rules.indexOf(b),
     )[0],
     file: name,
+    engineering: matches.some((rule) => rule.engineering === true),
+    domains: [...new Set(matches.flatMap((rule) => rule.domains ?? []))].sort(),
     matched: matches.map((rule) => rule.id).sort(),
     minimum: [...new Set(matches.flatMap((rule) => standard.levels[rule.level].minimum))].sort(),
     special: [...new Set(matches.flatMap((rule) => rule.special ?? []))].sort(),

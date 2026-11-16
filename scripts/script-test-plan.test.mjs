@@ -98,7 +98,7 @@ test('affected verification keeps one engineering pipeline and retains source gu
     root: f.root,
     affected: true,
     files: ['scripts/helper.mjs'],
-    impact: { full: false, engineering: true, frontend: false, backend: false },
+    impact: { full: false, engineering: true, frontend: false, backend: false, runtime: false },
   });
   assert.equal(plan.engineering.length, 1);
   assert.ok(plan.engineering[0].args.includes('test:engineering'));

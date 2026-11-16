@@ -3,9 +3,15 @@
   "id": "zdm-delivery-standard-v1",
   "source": "https://app.notion.com/p/41a572fed032818fbae3eb9c2874092b",
   "levels": {
-    "R0": { "minimum": ["diff", "format", "document-contract"] },
-    "R1": { "minimum": ["diff", "format", "static", "affected-interaction"] },
-    "R2": { "minimum": ["diff", "format", "static", "affected-unit", "business-flow", "boundary-and-failure"] },
+    "R0": {
+      "minimum": ["diff", "format", "document-contract"]
+    },
+    "R1": {
+      "minimum": ["diff", "format", "static", "affected-interaction"]
+    },
+    "R2": {
+      "minimum": ["diff", "format", "static", "affected-unit", "business-flow", "boundary-and-failure"]
+    },
     "R3": {
       "minimum": [
         "diff",
@@ -37,7 +43,15 @@
       "level": "R4",
       "pattern": "^(?:AGENTS\\.md$|\\.agents/|\\.codex/|scripts/|ci/|\\.github/|docs/(?:engineering/|task-completion\\.md$))",
       "special": ["allow-and-deny", "evidence-invalidation", "safe-recovery"],
-      "engineering": true
+      "engineering": true,
+      "domains": ["engineering"]
+    },
+    {
+      "id": "consumed-ui-rule",
+      "level": "R3",
+      "pattern": "^docs/ui/",
+      "domains": ["frontend"],
+      "special": ["consumer-closure", "document-contract"]
     },
     {
       "id": "security-and-important-data",
@@ -51,7 +65,12 @@
       "pattern": "(?:^src/(?:components/|composables/|services/|router/)|(?:^|/)(?:shared|common|api|dto|contract)/|(?:Controller|Request|Response|Dto|DTO)\\.java$|^(?:package(?:-lock)?\\.json|vite|vitest|playwright|tsconfig|docker|compose))",
       "special": ["consumer-closure", "contract-compatibility"]
     },
-    { "id": "local-style", "level": "R1", "pattern": "\\.(?:css|scss|less)$", "special": ["affected-viewports"] },
+    {
+      "id": "local-style",
+      "level": "R1",
+      "pattern": "\\.(?:css|scss|less)$",
+      "special": ["affected-viewports"]
+    },
     {
       "id": "local-runtime-source",
       "level": "R2",

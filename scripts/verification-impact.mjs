@@ -49,10 +49,14 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
     const file = original.replaceAll('\\', '/').replace(/^\.\//, '');
     if (DOC.test(file)) {
       docs = true;
-      if (deliveryStandardRule(file).engineering) {
+      const rule = deliveryStandardRule(file);
+      if (rule.level !== 'R0') {
         controlDocument = true;
-        result.engineering = true;
-        result.reasons.push('Execution/validation standard document: ' + file);
+        if (rule.id === 'security-and-important-data' || !rule.domains?.length)
+          full('Rule document with sensitive or unknown consumers: ' + file, false);
+        else for (const domain of rule.domains) result[domain] = true;
+        result.engineering ||= rule.engineering === true;
+        result.reasons.push('Consumed rule document: ' + file);
       }
       continue;
     }
