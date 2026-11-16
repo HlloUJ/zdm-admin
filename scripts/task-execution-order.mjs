@@ -130,10 +130,13 @@ export function createExecutionOrder(commonDir) {
     assert.ok(read(), 'Execution-order policy not activated');
     return withTaskRegistryWriteLock(directory, () => {
       const state = read();
+      const before = JSON.stringify(state);
       const result = action(state);
-      state.revision++;
-      write(state);
-      return result;
+      if (JSON.stringify(state) !== before) {
+        state.revision++;
+        write(state);
+      }
+      return result?.tickets && result.version === state.version ? structuredClone(state) : result;
     });
   }
   function ticket(state, lane, task, owner) {
@@ -222,18 +225,25 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(current);
     });
   }
-  function direct({ action, request, lane, task, owner, tasks, limits, dependenciesFirst }) {
+  function direct({ action, request, lane, task, owner, tasks, limits, dependenciesFirst, monitorContext }) {
     const source = event(request);
     assert.ok(
       ['pause-all', 'resume-all', 'resume-task', 'resume-only', 'set-limits', 'reorder'].includes(action),
       'Only explicit supported user directions',
     );
     return update((state) => {
-      const prior = state.events.find((e) => e.request?.messageId === source.messageId);
+      const sameSource = state.events.filter((e) => e.request?.messageId === source.messageId);
+      const continuation =
+        action === 'resume-only' &&
+        sameSource.length === 1 &&
+        sameSource[0].action === 'pause-all' &&
+        JSON.stringify(sameSource[0].request) === JSON.stringify(source);
+      const prior = sameSource.find((e) => e.action === action) ?? (continuation ? null : sameSource[0]);
       const command = {
         action,
         request: source,
         ...(['resume-task', 'resume-only'].includes(action) ? { lane, task, owner } : {}),
+        ...(action === 'resume-only' && monitorContext !== undefined ? { monitorContext } : {}),
         ...(action === 'reorder' ? { lane, tasks } : {}),
         ...(action === 'set-limits' ? { limits } : {}),
         ...(action === 'set-limits' && dependenciesFirst !== undefined ? { dependenciesFirst } : {}),
@@ -245,7 +255,9 @@ export function createExecutionOrder(commonDir) {
         return structuredClone(state);
       }
       assert.ok(
-        state.events.filter((e) => e.request).every((e) => e.request.sequence < source.sequence),
+        state.events
+          .filter((e) => e.request)
+          .every((e) => e.request.sequence < source.sequence || (continuation && e === sameSource[0])),
         'Stale user direction refused',
       );
       if (action === 'pause-all' || action === 'resume-all') {
@@ -289,6 +301,8 @@ export function createExecutionOrder(commonDir) {
         );
         // Other historical slots remain held but administratively paused. Exactly
         // one task can execute in this mode; global resume still checks the new limits.
+        if (lane === 'development' && monitorContext !== undefined)
+          current.monitorContext = structuredClone(monitorContext);
         current.status = 'running';
         current.admission = randomUUID();
         delete current.reason;
@@ -390,5 +404,17 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(current); // never launches queued work
     });
   }
-  return { read, initialize, enqueue, claim, assertAdmission, block, direct, complete, cancel, cancellationTarget };
+  return {
+    commonDir,
+    read,
+    initialize,
+    enqueue,
+    claim,
+    assertAdmission,
+    block,
+    direct,
+    complete,
+    cancel,
+    cancellationTarget,
+  };
 }

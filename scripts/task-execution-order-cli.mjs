@@ -1,3 +1,4 @@
+import { createBoardIntake } from './task-board-intake.mjs';
 import { requireStartMonitoring, verifyMonitoringInstruction } from './task-monitor-registration.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -68,6 +69,8 @@ export function executionOrderCommand(root, [command, json]) {
   if (command === 'claim') {
     if (input.lane === 'development' && !registry.readTask(input.task)) {
       requireStartMonitoring(input.owner, input.task, input.monitorContext);
+      if (input.monitorContext?.executionSurface === 'codex-thread')
+        createBoardIntake(registry.commonDir).require(input.monitorContext, input.task, input.owner);
       const ticket = queue
         .read()
         ?.tickets.find((item) => item.lane === input.lane && item.task === input.task && item.owner === input.owner);
@@ -77,6 +80,15 @@ export function executionOrderCommand(root, [command, json]) {
   }
   if (command === 'block') return queue.block(input);
   if (command === 'direct') {
+    if (input.action === 'resume-only' && input.lane === 'development' && !registry.readTask(input.task)) {
+      requireStartMonitoring(input.owner, input.task, input.monitorContext);
+      if (input.monitorContext?.executionSurface === 'codex-thread')
+        createBoardIntake(registry.commonDir).require(input.monitorContext, input.task, input.owner);
+      verifyMonitoringInstruction(
+        input.monitorContext,
+        queue.read()?.tickets.find((t) => t.task === input.task && t.lane === input.lane),
+      );
+    }
     if (input.action === 'resume-only' && input.lane === 'delivery') {
       const task = registry.readTask(input.task);
       assert.ok(task && task.owner === input.owner);

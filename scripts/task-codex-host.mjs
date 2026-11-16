@@ -1,3 +1,4 @@
+import { createBoardIntake } from './task-board-intake.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -48,8 +49,20 @@ export function developmentCapacity({ limit, activeDevelopment, activeDelivery, 
   return { available: activeDevelopment < limit - activeOther - 1, reservedDelivery: 1 };
 }
 
+// Coordinator intake is mandatory before preflight, queue work or task dispatch.
+export async function receiveCodexTask(input, host) {
+  assert.ok(host.intake, 'Persistent board intake adapter required');
+  await host.intake.accept(input, host);
+  const context = await codexMonitoringContext(input, host);
+  host.intake.require(context, input.taskId, input.owner);
+  if (host.preflight) await host.preflight(input);
+  return startCodexTask(input, host);
+}
+
 export async function startCodexTask(input, { queue, readTask, readThread, start, readCapacity }) {
   const context = await codexMonitoringContext(input, { readTask, readThread });
+  assert.ok(queue.commonDir, 'Persistent intake store required before queue dispatch');
+  createBoardIntake(queue.commonDir).require(context, input.taskId, input.owner);
   const state = queue.read();
   assert.ok(state && !state.paused, 'Global pause remains in effect');
   const ticket = state.tickets.find((t) => t.lane === 'development' && t.task === input.taskId);
