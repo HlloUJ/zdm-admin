@@ -47,7 +47,8 @@ test('total inventory classifies dependencies, tests, evidence and unknown owned
     result = buildCloseoutCleanupInventory(input(f));
   assert.equal(result.spaceReleased, false);
   assert.equal(result.implementationComplete, false);
-  assert.ok(result.gaps.some((g) => g.type === 'temporary-source-copy'));
+  assert.equal(result.typeCoverage.find((c) => c.type === 'temporary-source-copy').state, 'automatic-handoff');
+  assert.ok(result.gaps.some((g) => g.type === 'unclassified-owned-output'));
   assert.equal(result.typeCoverage.find((c) => c.type === 'expired-duplicate-report').state, 'automatic-handoff');
   assert.ok(
     !result.resources.some((r) => r.type === 'expired-duplicate-report' && r.disposition === 'pending-cleanup'),

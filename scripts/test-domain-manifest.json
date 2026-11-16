@@ -486,7 +486,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "8b866a173a7c396b9dad82ba360b4478ec4f0aac9af20a74e6164f8416fe0558",
+      "digest": "3dbb936b94229571c4713f18722992430c81dcfed120f5ea1c4ca70388f125fc",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -504,6 +504,8 @@
         "scripts/resource-lease.mjs",
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
+        "scripts/task-cleanup-cli.mjs",
+        "scripts/task-cleanup-created-artifacts.mjs",
         "scripts/task-cleanup-handoff.mjs",
         "scripts/task-completion.mjs",
         "scripts/task-context.mjs",
@@ -895,7 +897,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "537395331de3c5dfeb424f30299b0f3264264d6238ad556f6b400103862ce200",
+      "digest": "310336cd880ce2f068f1dc9c40f92a4a43b30efbdf6a0b7e59ac50ce2b0b591d",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -1088,6 +1090,7 @@
         "scripts/task-cleanup-duplicate.test.mjs",
         "scripts/task-cleanup-handoff.mjs",
         "scripts/task-cleanup-handoff.test.mjs",
+        "scripts/task-cleanup-integration.test.mjs",
         "scripts/task-cleanup-inventory.mjs",
         "scripts/task-cleanup-inventory.test.mjs",
         "scripts/task-cleanup-notification.mjs",
@@ -1837,7 +1840,7 @@
       "dynamicImports": 0
     },
     "scripts/task-cleanup-created-artifacts.mjs": {
-      "digest": "039cedaab5c6bd4d29e7805ee341f341b275fe172a900a6533979cda285c400d",
+      "digest": "0da9baf4b39a3cbf6192b30c36a6e41e0d8122d2e7d1bb1f5fa7a3e3435da57e",
       "imports": ["scripts/task-cleanup-queue.mjs", "scripts/task-cleanup-types.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
@@ -1878,8 +1881,9 @@
       "dynamicImports": 0
     },
     "scripts/task-cleanup-handoff.mjs": {
-      "digest": "c88c48edfe8a9a04c40fed43363fb405f95fb6e105fc657e2f953c4f5e98c0cd",
+      "digest": "8d0651795f81ee2bad979122b2e79527816a757e4831d06b738afb756c3e6fa6",
       "imports": [
+        "scripts/task-cleanup-created-artifacts.mjs",
         "scripts/task-cleanup-inventory.mjs",
         "scripts/task-cleanup-queue.mjs",
         "scripts/verification-evidence.mjs"
@@ -1891,13 +1895,23 @@
       "imports": ["scripts/build-task-app.mjs", "scripts/task-cleanup-handoff.mjs"],
       "dynamicImports": 0
     },
+    "scripts/task-cleanup-integration.test.mjs": {
+      "digest": "2abdcef980fdc6c5d6aacb4a1022b59b4d97f6cec427d4fd1e379b7044705448",
+      "imports": [
+        "scripts/task-cleanup-created-artifacts.mjs",
+        "scripts/task-cleanup-handoff.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/cleanup-created-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/task-cleanup-inventory.mjs": {
-      "digest": "1565654990c1573604d62508fe666a8b3ad877b946956b031be684984c99fe22",
+      "digest": "5ce918b2660cbcd2dc7f3a314023848aaa42186d7939bfb236bc5b97f0245a8d",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/task-cleanup-inventory.test.mjs": {
-      "digest": "3ab5e6b919fd64cb7fa0e5780fa88a404792f232d7e99485ca3e9943dff1a23b",
+      "digest": "6ac671cfc30fb58eed3670505f94d1957f431ce52e27be4497b83b0ff5453f2c",
       "imports": ["scripts/task-cleanup-handoff.mjs", "scripts/task-cleanup-inventory.mjs"],
       "dynamicImports": 0
     },

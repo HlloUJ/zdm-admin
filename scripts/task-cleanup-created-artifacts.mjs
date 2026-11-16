@@ -423,10 +423,18 @@ export function createCleanupArtifactProducer(root, { context, queueApi, recover
           }
           if (existsSync(source)) {
             assert.ok(!existsSync(record.path), 'Ambiguous artifact source and staging');
-            assert.deepEqual(cleanupIdentity(source), registration.identity);
+            assert.deepEqual(
+              cleanupIdentity(source),
+              registration.identity,
+              'Created artifact identity changed; retain original',
+            );
             validateCleanupTypeContent(record, registration, source, common);
             await assertUnreferenced({ ...record, path: source });
-            assert.deepEqual(cleanupIdentity(source), registration.identity);
+            assert.deepEqual(
+              cleanupIdentity(source),
+              registration.identity,
+              'Created artifact identity changed; retain original',
+            );
             save(record.proof.rebuild.record, registration, true);
             safePath(carrier);
             mkdirSync(carrier, { recursive: true, mode: 0o700 });

@@ -29,13 +29,15 @@ export const CLEANUP_TYPE_COVERAGE = Object.freeze([
   },
   {
     type: 'test-output-and-fixtures',
-    state: 'gap',
-    reason: 'No creation-time reclaim proof/consumer type; preserve original output and failures',
+    state: 'automatic-handoff',
+    scope:
+      'Only exact creation-proved E2E builds and Git-template fixtures; existing unregistered outputs/failures remain protected',
   },
   {
     type: 'temporary-source-copy',
-    state: 'gap',
-    reason: 'External source capsules need creation registration; do not scan unknown temporary directories',
+    state: 'automatic-handoff',
+    scope:
+      'Only creator-registered exact Git source copies in stable created-sources carrier; no historical temporary-directory scan',
   },
   {
     type: 'expired-duplicate-report',
@@ -81,6 +83,8 @@ export function buildCloseoutCleanupInventory({
   artifacts = null,
   distHandoff,
   reportHandoffs = [],
+  createdArtifacts = { registered: false, artifacts: [] },
+  createdHandoffs = { registered: false, handedOff: [], protected: [] },
   externalDependencyTarget = null,
 }) {
   assert.match(task, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
@@ -196,7 +200,32 @@ export function buildCloseoutCleanupInventory({
       spaceReleased: false,
     });
   }
+  for (const artifact of createdArtifacts.artifacts) {
+    assert.ok(['e2e-test-build-v1', 'generated-fixture-v1', 'git-source-copy-v1'].includes(artifact.kind));
+    const handedOff = createdHandoffs.handedOff.find((item) => item.id === artifact.id);
+    const protectedRecord = createdHandoffs.protected.find(
+      (item) => item.kind === artifact.kind && item.source === artifact.source,
+    );
+    resources.push({
+      type: artifact.kind === 'git-source-copy-v1' ? 'temporary-source-copy' : 'test-output-and-fixtures',
+      kind: artifact.kind,
+      sourceLocations: [artifact.source],
+      disposition: handedOff ? 'pending-cleanup' : 'protected-retention',
+      reason: handedOff
+        ? 'Creation-proved exact object accepted by the stable queue'
+        : (protectedRecord?.reason ?? artifact.reason ?? 'Creator registration retained; no completed handoff'),
+      evidence: artifact.registration ?? createdArtifacts.index,
+      creationIndex: createdArtifacts.index,
+      ...(handedOff ? { manifest: handedOff.manifest, object: handedOff.object ?? handedOff.key } : {}),
+      spaceReleased: false,
+    });
+  }
   const gaps = CLEANUP_TYPE_COVERAGE.filter((c) => c.state === 'gap').map((c) => ({ type: c.type, reason: c.reason }));
+  for (const resource of resources.filter((item) => item.disposition === 'needs-review'))
+    gaps.push({
+      type: resource.type,
+      reason: 'Known preserved resource requires classification; no deletion permission',
+    });
   if (!artifacts)
     gaps.push({
       type: 'creation-registration',
@@ -211,6 +240,11 @@ export function buildCloseoutCleanupInventory({
     sourceRegistration: artifacts ? 'registered' : 'missing',
     preservation: { manifest: preserved.manifest, manifestDigest },
     registered,
+    createdArtifacts: {
+      index: createdArtifacts.index ?? null,
+      registered: createdArtifacts.registered,
+      resources: createdArtifacts.artifacts.length,
+    },
     resources,
     typeCoverage: CLEANUP_TYPE_COVERAGE,
     gaps,

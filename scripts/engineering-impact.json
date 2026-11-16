@@ -19,6 +19,8 @@
         "scripts/resource-lease.mjs",
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
+        "scripts/task-cleanup-cli.mjs",
+        "scripts/task-cleanup-created-artifacts.mjs",
         "scripts/task-cleanup-handoff.mjs",
         "scripts/task-completion.mjs",
         "scripts/task-context.mjs",
@@ -424,6 +426,8 @@
         "scripts/resource-lease.mjs",
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
+        "scripts/task-cleanup-cli.mjs",
+        "scripts/task-cleanup-created-artifacts.mjs",
         "scripts/task-cleanup-handoff.mjs",
         "scripts/task-completion.mjs",
         "scripts/task-context.mjs",
@@ -1023,6 +1027,7 @@
     },
     "scripts/task-cleanup-handoff.mjs": {
       "imports": [
+        "scripts/task-cleanup-created-artifacts.mjs",
         "scripts/task-cleanup-inventory.mjs",
         "scripts/task-cleanup-queue.mjs",
         "scripts/verification-evidence.mjs"
@@ -1031,6 +1036,15 @@
     },
     "scripts/task-cleanup-handoff.test.mjs": {
       "imports": ["scripts/build-task-app.mjs", "scripts/task-cleanup-handoff.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/task-cleanup-integration.test.mjs": {
+      "imports": [
+        "scripts/task-cleanup-created-artifacts.mjs",
+        "scripts/task-cleanup-handoff.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/test-support/cleanup-created-fixture.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-cleanup-inventory.test.mjs": {
@@ -1620,14 +1634,15 @@
     "scripts/task-candidate-runtime.test.mjs": "ef33f4d292935e6e455b30e4ac7aeafd9247bcff958924de21bf1ed5bc1cfb8d",
     "scripts/task-cleanup-cli.mjs": "ae6f2f7bae97d3fa9c508b6a288d34576a8b5d380915e457bd7e1c1465467aa3",
     "scripts/task-cleanup-cli.test.mjs": "6bfb81c056ffdfa78498431e52ca072d43f6ffd651ed8f3ef3b9f907ca43273c",
-    "scripts/task-cleanup-created-artifacts.mjs": "039cedaab5c6bd4d29e7805ee341f341b275fe172a900a6533979cda285c400d",
+    "scripts/task-cleanup-created-artifacts.mjs": "0da9baf4b39a3cbf6192b30c36a6e41e0d8122d2e7d1bb1f5fa7a3e3435da57e",
     "scripts/task-cleanup-created-artifacts.test.mjs": "0ecd00c0f2f5df78187090bac046450fc526f2dfdaa03eef19038dc5885fea8c",
     "scripts/task-cleanup-delete.test.mjs": "439c4e4cafb7cdcdd95deccc08277ccd287f62aa41e9b36921c83b6cb7cfb3c9",
     "scripts/task-cleanup-duplicate-producer.test.mjs": "f9687e81439ebbe59b2afda5aceae26eb30edae5503291a00d3a71844bcb063d",
     "scripts/task-cleanup-duplicate.test.mjs": "a0214299c81b3e55a3c6c5280181c0eecea72f1e1111c4e5274a49915998d39c",
-    "scripts/task-cleanup-handoff.mjs": "c88c48edfe8a9a04c40fed43363fb405f95fb6e105fc657e2f953c4f5e98c0cd",
+    "scripts/task-cleanup-handoff.mjs": "8d0651795f81ee2bad979122b2e79527816a757e4831d06b738afb756c3e6fa6",
     "scripts/task-cleanup-handoff.test.mjs": "35ce5482b05d68f7466d54c13f6c4a6a7c1d80da12b2ebad29e97e6a7c7b50b7",
-    "scripts/task-cleanup-inventory.test.mjs": "3ab5e6b919fd64cb7fa0e5780fa88a404792f232d7e99485ca3e9943dff1a23b",
+    "scripts/task-cleanup-integration.test.mjs": "2abdcef980fdc6c5d6aacb4a1022b59b4d97f6cec427d4fd1e379b7044705448",
+    "scripts/task-cleanup-inventory.test.mjs": "6ac671cfc30fb58eed3670505f94d1957f431ce52e27be4497b83b0ff5453f2c",
     "scripts/task-cleanup-notification.mjs": "dfa8ad3c82b4332d8563be94679bfec9139f8c2a0fd20a7bda79e4bf52dca196",
     "scripts/task-cleanup-notification.test.mjs": "1ce0620381ce6e0207e1c98313dfd3ec5ce10063e8393ee86c040c0c45ae0b7b",
     "scripts/task-cleanup-queue.mjs": "54d5093feea3d8b6f04612a200fd05909ab24fb228230d57ae66304fec7a9ae7",
