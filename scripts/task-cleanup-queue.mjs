@@ -1,6 +1,5 @@
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
-import { spawnSync } from 'node:child_process';
 import {
   existsSync,
   lstatSync,
@@ -8,7 +7,6 @@ import {
   readFileSync,
   readdirSync,
   renameSync,
-  rmdirSync,
   unlinkSync,
   writeFileSync,
   fsyncSync,
@@ -18,11 +16,16 @@ import {
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { validateCleanupTypeRegistration, validateCleanupTypeContent } from './task-cleanup-types.mjs';
+import { acquireCleanupLock } from './task-cleanup-lock.mjs';
+import { runCompletionProcess } from './completion-process.mjs';
 
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 const HEX = /^[a-f0-9]{64}$/;
 const UUID = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+const LOCK_SOURCE = createHash('sha256')
+  .update(readFileSync(fileURLToPath(import.meta.url)))
+  .digest('hex');
 const immutable = (r) => ({
   version: r.version,
   task: r.task,
@@ -89,12 +92,16 @@ function snapshot(directory) {
 // ctime cannot be restored through ordinary utimes; the producer separately proves rebuildability.
 export const cleanupIdentity = (directory) => snapshot(directory).identity;
 function removeSealed(directory, entries) {
-  const result = spawnSync('python3', ['-I', fileURLToPath(new URL('./task-cleanup-delete.py', import.meta.url))], {
-    input: JSON.stringify({ path: directory, entries }),
-    encoding: 'utf8',
-    timeout: 60000,
-    maxBuffer: 1024 * 1024,
-  });
+  const result = runCompletionProcess(
+    'python3',
+    ['-I', fileURLToPath(new URL('./task-cleanup-delete.py', import.meta.url))],
+    {
+      input: JSON.stringify({ path: directory, entries }),
+      encoding: 'utf8',
+      timeout: 60000,
+      maxBuffer: 1024 * 1024,
+    },
+  );
   assert.ok(
     !result.error && result.status === 0,
     result.stderr?.trim() || 'Descriptor deletion interrupted; retain journal',
@@ -149,15 +156,8 @@ export function createCleanupQueue(commonDir) {
     return i;
   }
   function lock() {
-    const p = path.join(base, 'run.lock');
-    mkdirSync(p, { mode: 0o700 });
-    const owner = { pid: process.pid, token: randomUUID() };
-    save(path.join(p, 'owner.json'), owner);
-    return () => {
-      assert.deepEqual(read(path.join(p, 'owner.json')), owner, 'Cleanup lock owner changed; retain');
-      unlinkSync(path.join(p, 'owner.json'));
-      rmdirSync(p);
-    };
+    const lease = acquireCleanupLock(base, 'run.lock', { source: LOCK_SOURCE });
+    return Object.assign(() => lease.release(), { scope: lease.scope });
   }
   function validate(r, phase = 'consume') {
     assert.equal(r.version, 1);
@@ -352,7 +352,7 @@ export function createCleanupQueue(commonDir) {
               if (apply) {
                 const entries = read(path.join(folders.inventories, key + '.json'));
                 assert.equal(hash(entries), r.inventoryDigest, 'Deletion inventory changed');
-                const deleted = await remove(quarantine, entries);
+                const deleted = await release.scope(() => remove(quarantine, entries));
                 assert.ok(!existsSync(quarantine), 'Deletion did not finish');
                 deletedLogicalBytes = deleted.deletedLogicalBytes;
               }
