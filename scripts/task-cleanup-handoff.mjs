@@ -271,7 +271,13 @@ export async function handoffPreservedReportCopies(
       const identity = api.cleanupIdentity(source),
         files = [];
       const expected = original.filter((entry) => entry.file.startsWith(relative + '/'));
-      assert.ok(expected.length, 'Report directory has no complete preservation proof');
+      if (!expected.length) {
+        // Nothing is transferred or deleted. Identity rejects links/special objects;
+        // only a genuinely empty directory may lack a file-preservation proof.
+        assert.equal(readdirSync(source).length, 0, 'Report directory has no complete preservation proof');
+        assert.deepEqual(api.cleanupIdentity(source), identity, 'Empty report directory changed');
+        continue;
+      }
       assert.equal(new Set(expected.map((entry) => entry.file)).size, expected.length);
       const walk = (directory) => {
         for (const entry of readdirSync(path.join(root, directory), { withFileTypes: true })) {
