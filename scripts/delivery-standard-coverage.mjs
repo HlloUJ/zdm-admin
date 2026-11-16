@@ -62,6 +62,8 @@ export function compileStandardCoverage(standard, plan) {
         gaps.push({ kind, id, check, reason: 'Unknown concrete check producer' });
       else if (
         producer.stage !== producerStages[check] ||
+        (check === 'engineering-tests' && producer.reportKind !== 'engineering') ||
+        (check === 'frontend-unit' && producer.reportKind !== 'unit') ||
         (check === 'frontend-tests'
           ? ['e2e-1', 'e2e-2'].some((p) => !Array.isArray(producer.commands?.[p]) || !producer.commands[p].length)
           : !Array.isArray(producer.command) || !producer.command.length)

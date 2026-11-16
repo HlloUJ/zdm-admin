@@ -105,6 +105,7 @@ test('unmapped requirements, check producers and risk scenarios are explicit fai
   for (const mutate of [
     (s) => delete s.coverage.requirements['risk-specific'],
     (s) => delete s.coverage.checks['engineering-tests'],
+    (s) => delete s.coverage.checks['engineering-tests'].reportKind,
     (s) => delete s.coverage.engineeringScenarios['risk-specific'],
   ]) {
     const config = structuredClone(standard);
