@@ -17,6 +17,7 @@ import {
 } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateCleanupTypeRegistration, validateCleanupTypeContent } from './task-cleanup-types.mjs';
 
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -161,7 +162,7 @@ export function createCleanupQueue(commonDir) {
   function validate(r) {
     assert.equal(r.version, 1);
     assert.match(r.task, ID);
-    assert.equal(r.disposition, 'rebuildable');
+    assert.ok(['rebuildable', 'preserved-duplicate'].includes(r.disposition), 'Unknown artifact disposition');
     assert.equal(r.producer, 'task-completion-handoff-v1', 'Unknown cleanup producer');
     for (const name of ['head', 'accepted', 'main'])
       assert.match(r.proof?.[name] ?? '', /^[a-f0-9]{40}$/, 'Missing delivery identity ' + name);
@@ -176,25 +177,17 @@ export function createCleanupQueue(commonDir) {
     safePath(r.carrier);
     assert.deepEqual(immutable(read(path.join(r.carrier, 'manifest.json'))), immutable(r), 'Producer manifest differs');
     const rebuild = r.proof.rebuild;
-    assert.equal(rebuild?.kind, 'vite-dist-v1', 'No supported rebuild registration');
+    assert.ok(typeof rebuild?.kind === 'string', 'No supported rebuild registration');
     assert.match(rebuild.digest, HEX);
     assert.equal(rebuild.record, path.join(base, 'proofs', r.task, rebuild.digest + '.json'), 'Foreign rebuild proof');
     const registration = read(rebuild.record),
       bytes = readFileSync(rebuild.record);
     assert.equal(createHash('sha256').update(bytes).digest('hex'), rebuild.digest, 'Rebuild proof bytes changed');
-    assert.equal(registration.version, 1);
-    assert.equal(registration.task, r.task);
-    assert.equal(registration.worktree, r.proof.worktree);
-    assert.equal(registration.relative, 'dist');
-    assert.deepEqual(registration.identity, r.identity);
-    assert.match(registration.sourceDigest, HEX);
-    assert.equal(registration.producer, 'vite-build-success-v1');
-    assert.deepEqual(registration.command, ['npm', 'run', 'build:app']);
-    assert.equal(registration.exitCode, 0);
-    return object;
+    validateCleanupTypeRegistration(r, registration, commonDir);
+    return { key: object, registration };
   }
   function handoff(record) {
-    const key = validate(record),
+    const { key, registration } = validate(record),
       release = lock();
     try {
       const i = index(),
@@ -216,6 +209,7 @@ export function createCleanupQueue(commonDir) {
         return old;
       }
       assert.deepEqual(cleanupIdentity(record.path), record.identity, 'Handoff object changed');
+      validateCleanupTypeContent(record, registration, record.path, commonDir);
       const r = { ...immutable(record), key, state: 'pending', attempts: 0, nextCheck: record.notBefore };
       save(file, r);
       i.objects[key] = pendingIndex(r);
@@ -277,7 +271,9 @@ export function createCleanupQueue(commonDir) {
           trusted = false;
         try {
           r = read(file);
-          assert.equal(validate(r), key);
+          const validated = validate(r),
+            registration = validated.registration;
+          assert.equal(validated.key, key);
           assert.equal(r.key, key);
           assert.ok(['pending', 'moving', 'quarantined', 'deleting'].includes(r.state));
           trusted = true;
@@ -311,6 +307,7 @@ export function createCleanupQueue(commonDir) {
             if (!existsSync(r.path)) absent = true;
             else {
               assert.deepEqual(cleanupIdentity(r.path), r.identity, 'Object changed since handoff');
+              validateCleanupTypeContent(r, registration, r.path, commonDir);
               await unreferenced(r);
               assert.deepEqual(cleanupIdentity(r.path), r.identity, 'Object changed during reference check');
               if (apply) {
@@ -326,6 +323,7 @@ export function createCleanupQueue(commonDir) {
             assert.ok(!(existsSync(r.path) && existsSync(quarantine)), 'Ambiguous interrupted move');
             if (existsSync(r.path)) {
               assert.deepEqual(cleanupIdentity(r.path), r.identity);
+              validateCleanupTypeContent(r, registration, r.path, commonDir);
               await unreferenced(r);
               if (apply) renameSync(r.path, quarantine);
             } else assert.ok(existsSync(quarantine), 'Interrupted move lost both objects');
@@ -338,6 +336,7 @@ export function createCleanupQueue(commonDir) {
             assert.ok(!existsSync(r.path), 'Original content path reused; retain both objects');
             if (existsSync(quarantine)) {
               await unreferenced({ ...r, path: quarantine });
+              validateCleanupTypeContent(r, registration, quarantine, commonDir, { partial: r.state === 'deleting' });
               if (r.state === 'quarantined') {
                 const sealed = snapshot(quarantine);
                 assert.deepEqual(sealed.identity, r.identity, 'Quarantined object changed');

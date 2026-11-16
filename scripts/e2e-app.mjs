@@ -5,6 +5,7 @@ import { mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { hashPaths } from './verification-evidence.mjs';
+import { beginE2eCleanupCreation } from './task-cleanup-created-artifacts.mjs';
 export const APP_DIRECTORY = '.task-runtime/e2e-app';
 export const APP_PROOF = '.task-runtime/e2e-app-proof.json';
 const hash = (value) => createHash('sha256').update(value).digest('hex');
@@ -67,24 +68,34 @@ export function readApplicationProof(root = process.cwd()) {
   assert.equal(proof.policy, hash(readFileSync(path.join(root, 'ci/e2e-app.json'))));
   return proof;
 }
-export function prepareApplication(root = process.cwd()) {
+export function prepareApplication(
+  root = process.cwd(),
+  { execute = spawnSync, beginCleanup = beginE2eCleanupCreation } = {},
+) {
   readApplicationManifest(root);
   const source = applicationSource(root);
-  const result = spawnSync(
-    process.execPath,
-    [path.join(root, 'node_modules/vite/bin/vite.js'), 'build', '--config', 'vite.e2e.config.mjs'],
-    { cwd: root, stdio: 'inherit' },
-  );
-  assert.equal(result.status, 0, 'E2E application build failed');
-  assert.equal(applicationSource(root), source, 'Source changed during application build');
-  const proof = {
-    version: 1,
-    source,
-    artifact: hashPaths(root, [APP_DIRECTORY]),
-    policy: hash(readFileSync(path.join(root, 'ci/e2e-app.json'))),
-  };
-  writeFileSync(path.join(root, APP_PROOF), JSON.stringify(proof, null, 2) + '\n');
-  return proof;
+  const creation = beginCleanup(root);
+  try {
+    const result = execute(
+      process.execPath,
+      [path.join(root, 'node_modules/vite/bin/vite.js'), 'build', '--config', 'vite.e2e.config.mjs'],
+      { cwd: root, stdio: 'inherit' },
+    );
+    assert.equal(result.status, 0, 'E2E application build failed');
+    assert.equal(applicationSource(root), source, 'Source changed during application build');
+    const proof = {
+      version: 1,
+      source,
+      artifact: hashPaths(root, [APP_DIRECTORY]),
+      policy: hash(readFileSync(path.join(root, 'ci/e2e-app.json'))),
+    };
+    writeFileSync(path.join(root, APP_PROOF), JSON.stringify(proof, null, 2) + '\n');
+    creation.complete(proof);
+    return proof;
+  } catch (error) {
+    creation.fail(error.message);
+    throw error;
+  }
 }
 function port(value, fallback) {
   const n = Number(value ?? fallback);

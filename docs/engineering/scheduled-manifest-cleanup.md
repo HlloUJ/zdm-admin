@@ -10,7 +10,23 @@
 
 ## 清单与删除边界
 
-`task-cleanup-queue.mjs` 导出 `cleanupIdentity`、`cleanupObjectId` 和 `createCleanupQueue`。生产者固定为 `task-completion-handoff-v1`；当前仅支持有成功 Vite 构建登记证明的 `dist`。含符号链接的依赖目录、数据库、媒体、备份及共享资产不在当前删除范围。
+`task-cleanup-queue.mjs` 导出 `cleanupIdentity`、`cleanupObjectId` 和 `createCleanupQueue`。移交生产者固定为 `task-completion-handoff-v1`；消费者按以下独立证明类型核验，不凭目录名或年龄推断可删：
+
+| 类型                     | 创建或保全证明                                                   | 独立核验                                                                                                        |
+| ------------------------ | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| `vite-dist-v1`           | 成功 Vite 构建登记                                               | 准确 `dist` 身份及原有构建登记                                                                                  |
+| `e2e-test-build-v1`      | 现有 `prepareApplication` 成功钩子登记 `.task-runtime/e2e-app`   | 构建前后源码不变、准确 Git 输入集合、原 v1 构建产物和策略摘要；不改变 HTML 入口、分片或原证明契约               |
+| `generated-fixture-v1`   | 显式创建器按 Git 中固定 JSON 模板及 32 位十六进制 seed 生成      | 仅字面量替换，完整期望文件和目录集合；不执行任务文本，额外唯一文件也拒绝                                        |
+| `git-source-copy-v1`     | 显式创建器从准确 Git 对象复制普通受跟踪文件                      | 完整树、逐文件 blob 和模式一致，来源是已交付候选及 main 的祖先；链接、子模块及超限对象保护保留                  |
+| `duplicate-preserved-v1` | `preserveAssets` 已将完整报告闭包保存到稳定 manifest 和内容 blob | 只支持 `test-results`、`playwright-report`、`coverage` 的额外原副本；完整成员、字节、模式及稳定原始证据逐项一致 |
+
+前四类使用 `disposition=rebuildable`；报告额外副本使用独立的 `preserved-duplicate`。必要稳定 blob、保全 manifest、首次失败及 `.task-verification` 不由此删除。含符号链接的依赖目录、私有依赖、共享缓存、数据库、媒体、备份及无法证明的报告继续保护；不扫描旧 Worktree 或系统临时目录。
+
+`task-cleanup-created-artifacts.mjs` 提供显式创建器 `createCleanupArtifactProducer`、移交接口 `handoffCreatedArtifacts({root,common,task,proof,assertUnreferenced}, {api})` 和只读 `readCreatedArtifactInventory({root,common,task})`。索引固定在 `common/task-cleanup/created/<task>/index.json`；外部源码容器固定在 `common/task-cleanup/created-sources/<task>/<uuid>/content`，由创建时记录精确绑定，不根据已移除的 Worktree 猜路径。只读清单返回真实登记状态和 `existence=not-probed`，不将缺失对象当作已释放空间。移交返回 `registered`、`handedOff`、`protected`，供 987 汇入统一收尾清单。
+
+仅存在准确任务私有 `task-artifacts` 和登记绑定时，现有 E2E 创建钩子才登记；未知 Vite 环境、源码变化及失败构建保护保留。夹具和源码副本只接显式新适配，不全库替换 `mkdtemp`；外部源码创建器上限为 128 MiB，超限拒绝而不截断。创建、挪移和发布保存稳定 journal，队列发布中断后按同一对象接续，不创建第二份副本。
+
+收尾顺序为完整证据保全、稳定 staging 移交、最后 Git 载体回收。原载体先消失不能补造清理成功。报告保全原 manifest 为 JSON 数组，消费者只选择准确前缀且要求全部为 `generated-output`；额外副本的文件模式由创建证明记录，原保全 manifest 无须新增模式字段。
 
 稳定路径为 `git-common-dir/task-cleanup/staging/<task>/<object-id>/content`。同目录 `manifest.json` 和 `proof.rebuild.record` 是只写一次的审计来源，消费后继续保留；不能随删除目标一起移除。consumer 独立核验正式关闭、原候选/验收/main、证明原始字节、准确对象身份、打开文件和本机 Docker 引用。无法证明时保留对象。
 
