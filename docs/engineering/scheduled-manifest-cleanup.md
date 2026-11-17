@@ -114,6 +114,10 @@ launchd 的日历任务会在睡眠唤醒后补触发；关机错过的时点不
 
 发送适配也可通过 `flushCleanupNotifications` 显式注入 `readThread/sendMessage/readMessage`。这与现有 Codex host 的接口边界一致；原始返回值须规范化为此处字段。成功读回先落盘，再 ack；落盘后 ack 中断可接续而不重发。同一未变故障不每周期制造新事件。失败和未知送达保持 pending，既有首次失败不被覆盖。
 
+原生 `read_thread` 的 commentary 消息若只比预期正文多一个末尾 LF，可显式使用 `ack-native-commentary <observation.json>` 确认既有 sending/unknown 通知；该入口不发送、不重新领取。输入为 `{ "key": "<exact key>", "id": "<exact notification id>", "eventId": "<exact event id>", "observation": <原始完整读取对象> }`。observation 保留 `provider: "codex-native-read_thread"`、`threadId`、`turnId`、`message: { id, phase: "commentary", text }` 和实际 `observedAt`，不能改写原始全文。
+
+版本化回执 provider 为 `codex-native-commentary-lf-v1`，保留原始 observation、完整 text、预期正文与原始正文的 SHA-256 以及 version 1 适配标记。仅接受严格的 `原预期正文 + "\n"`；双换行、CRLF、空格、额外正文、事件或目标差异全部拒绝，时间仍不得早于原 claim。确认前再次核验所有字段与摘要，成功后保留原领取时间与首次错误。原 generic `codex-fixed-channel-readback` 仍要求全文逐字相等，不采用 trim、模糊匹配或自动识别 LF。本机结构校验不等于独立防伪：可信宿主必须保全真实原生读取结果和实际 messageId，不能用自行编造的 JSON 代替投递证据。
+
 通知有独立持久 outbox 与活跃索引，保留到准确 ack；对应对象随后恢复并成功清理、关闭对象 pending、压缩成功详情，都不会吞掉未送或 unknown 通知。不同故障事件可以分别确认，旧事件回执只能确认对应事件，不能顺带确认新事件。
 
 本机 owner-only 文件不是独立防伪边界。具有同一用户写权限的人可改变记录，不宣称不可绕过。源码隔离测试与真实投递验收分开，正式启用仍须来源发布、显式 policy、987 真实清单、01:00/13:00 周期触发与原生通知读回证据。

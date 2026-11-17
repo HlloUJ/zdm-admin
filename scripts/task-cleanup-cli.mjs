@@ -11,6 +11,7 @@ import {
   cleanupNoticeState,
   claimCleanupNotice,
   acknowledgeCleanupNotice,
+  nativeCommentaryCleanupEnvelope,
 } from './task-cleanup-notification.mjs';
 
 export function loadCleanupPolicy(commonDir) {
@@ -158,7 +159,7 @@ export async function cleanupCommand(
       delivery: 'unverified',
     };
   }
-  if (['claim-notification', 'ack-notification'].includes(args[0])) {
+  if (['claim-notification', 'ack-notification', 'ack-native-commentary'].includes(args[0])) {
     assert.equal(args.length, 2);
     safePath(path.resolve(args[1]));
     const envelope = JSON.parse(readFileSync(args[1], 'utf8'));
@@ -171,7 +172,14 @@ export async function cleanupCommand(
     assert.ok(destination, 'Fixed notification destination not configured');
     return args[0] === 'claim-notification'
       ? claimCleanupNotice(queue, event, destination)
-      : acknowledgeCleanupNotice(queue, event, envelope, destination);
+      : acknowledgeCleanupNotice(
+          queue,
+          event,
+          args[0] === 'ack-native-commentary'
+            ? nativeCommentaryCleanupEnvelope(event, envelope.observation, destination)
+            : envelope,
+          destination,
+        );
   }
   if (args[0] === 'handoff') {
     assert.equal(args.length, 2);
@@ -182,7 +190,7 @@ export async function cleanupCommand(
   }
   assert.ok(
     args.length === 1 && ['plan', 'run'].includes(args[0]),
-    'cleanup <plan|run|pending-notifications|handoff exact-manifest.json|claim-notification event.json|ack-notification receipt.json>',
+    'cleanup <plan|run|pending-notifications|handoff exact-manifest.json|claim-notification event.json|ack-notification receipt.json|ack-native-commentary observation.json>',
   );
   const policy = args[0] === 'run' ? loadCleanupPolicy(registry.commonDir) : {};
   return queue.run({ ...policy, apply: args[0] === 'run', verify, unreferenced });
