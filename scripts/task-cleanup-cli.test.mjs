@@ -24,78 +24,107 @@ test('apply requires explicit bounded production policy and cannot enable an una
   writeFileSync(file, JSON.stringify({ ...policy, limit: 101 }));
   assert.throws(() => loadCleanupPolicy(root));
 });
-test('host CLI claims one notification and requires exact fixed-room readback before ack', async (t) => {
-  const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'cleanup-host-cli-')));
-  t.after(() => rmSync(root, { recursive: true, force: true }));
-  const commonDir = path.join(root, 'common'),
-    base = path.join(commonDir, 'task-cleanup');
-  mkdirSync(base, { recursive: true, mode: 0o700 });
-  writeFileSync(
-    path.join(base, 'policy.json'),
-    JSON.stringify({
-      version: 1,
-      limit: 2,
-      budgetMs: 10000,
-      maxLogicalBytes: 1000,
-      notification: { destination: 'fixed-room' },
-    }),
-    { mode: 0o600 },
+for (const native of [false, true])
+  test(
+    'host CLI confirms one existing notification with exact fixed-room ' +
+      (native ? 'native LF' : 'generic') +
+      ' readback',
+    async (t) => {
+      const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'cleanup-host-cli-')));
+      t.after(() => rmSync(root, { recursive: true, force: true }));
+      const commonDir = path.join(root, 'common'),
+        base = path.join(commonDir, 'task-cleanup');
+      mkdirSync(base, { recursive: true, mode: 0o700 });
+      writeFileSync(
+        path.join(base, 'policy.json'),
+        JSON.stringify({
+          version: 1,
+          limit: 2,
+          budgetMs: 10000,
+          maxLogicalBytes: 1000,
+          notification: { destination: 'fixed-room' },
+        }),
+        { mode: 0o600 },
+      );
+      const event = {
+        key: 'a'.repeat(64),
+        id: 'exact-event',
+        task: 'other-artifact-owner',
+        reason: 'retained live reference',
+      };
+      let acknowledged = false;
+      const queue = {
+        base,
+        pendingNotifications: () => (acknowledged ? [] : [event]),
+        acknowledgeNotification: () => {
+          acknowledged = true;
+          return { acknowledged: true };
+        },
+        run: () => {
+          throw Error('must not execute cleanup');
+        },
+      };
+      const deps = { queue, registry: { commonDir } };
+      const pending = (await cleanupCommand(root, ['pending-notifications'], deps)).notifications[0];
+      assert.equal(pending.delivery.status, 'unclaimed');
+      assert.equal(pending.task, 'other-artifact-owner');
+      const envelope = {
+        key: event.key,
+        id: event.id,
+        eventId: pending.eventId,
+        receipt: {
+          provider: 'codex-fixed-channel-readback',
+          destination: 'fixed-room',
+          messageId: 'message-1',
+          deliveredAt: new Date().toISOString(),
+        },
+        readback: { roomId: 'fixed-room', messageId: 'message-1', text: pending.text },
+        ...(native
+          ? {
+              observation: {
+                provider: 'codex-native-read_thread',
+                threadId: 'fixed-room',
+                turnId: 'native-turn',
+                message: { id: 'native-message', phase: 'commentary', text: pending.text + '\n' },
+                observedAt: new Date().toISOString(),
+              },
+            }
+          : {}),
+      };
+      const ack = native ? 'ack-native-commentary' : 'ack-notification';
+      const file = path.join(root, 'receipt.json');
+      writeFileSync(file, JSON.stringify(envelope));
+      await assert.rejects(cleanupCommand(root, [ack, file], deps), /never claimed/);
+      assert.equal((await cleanupCommand(root, ['claim-notification', file], deps)).status, 'send-once');
+      assert.equal((await cleanupCommand(root, ['claim-notification', file], deps)).status, 'delivery-unknown');
+      envelope.receipt.deliveredAt = new Date().toISOString();
+      if (native) envelope.observation.observedAt = envelope.receipt.deliveredAt;
+      writeFileSync(
+        file,
+        JSON.stringify(
+          native
+            ? {
+                ...envelope,
+                observation: {
+                  ...envelope.observation,
+                  message: { ...envelope.observation.message, text: 'stdout is not delivery' },
+                },
+              }
+            : { ...envelope, readback: { ...envelope.readback, text: 'stdout is not delivery' } },
+        ),
+      );
+      await assert.rejects(cleanupCommand(root, [ack, file], deps), /text differs|final LF/);
+      assert.equal(acknowledged, false);
+      writeFileSync(file, JSON.stringify(envelope));
+      assert.equal((await cleanupCommand(root, [ack, file], deps)).acknowledged, true);
+      assert.deepEqual((await cleanupCommand(root, ['pending-notifications'], deps)).notifications, []);
+      writeFileSync(path.join(base, 'index.json'), 'corrupt index');
+      writeFileSync(path.join(base, 'scheduler-state.json'), JSON.stringify({ version: 1, status: 'failed' }), {
+        mode: 0o600,
+      });
+      assert.equal((await cleanupCommand(root, ['schedule-status'], deps)).schedule.status, 'failed');
+    },
   );
-  const event = {
-    key: 'a'.repeat(64),
-    id: 'exact-event',
-    task: 'other-artifact-owner',
-    reason: 'retained live reference',
-  };
-  let acknowledged = false;
-  const queue = {
-    base,
-    pendingNotifications: () => (acknowledged ? [] : [event]),
-    acknowledgeNotification: () => {
-      acknowledged = true;
-      return { acknowledged: true };
-    },
-    run: () => {
-      throw Error('must not execute cleanup');
-    },
-  };
-  const deps = { queue, registry: { commonDir } };
-  const pending = (await cleanupCommand(root, ['pending-notifications'], deps)).notifications[0];
-  assert.equal(pending.delivery.status, 'unclaimed');
-  assert.equal(pending.task, 'other-artifact-owner');
-  const envelope = {
-    key: event.key,
-    id: event.id,
-    eventId: pending.eventId,
-    receipt: {
-      provider: 'codex-fixed-channel-readback',
-      destination: 'fixed-room',
-      messageId: 'message-1',
-      deliveredAt: new Date().toISOString(),
-    },
-    readback: { roomId: 'fixed-room', messageId: 'message-1', text: pending.text },
-  };
-  const file = path.join(root, 'receipt.json');
-  writeFileSync(file, JSON.stringify(envelope));
-  await assert.rejects(cleanupCommand(root, ['ack-notification', file], deps), /never claimed/);
-  assert.equal((await cleanupCommand(root, ['claim-notification', file], deps)).status, 'send-once');
-  assert.equal((await cleanupCommand(root, ['claim-notification', file], deps)).status, 'delivery-unknown');
-  envelope.receipt.deliveredAt = new Date().toISOString();
-  writeFileSync(
-    file,
-    JSON.stringify({ ...envelope, readback: { ...envelope.readback, text: 'stdout is not delivery' } }),
-  );
-  await assert.rejects(cleanupCommand(root, ['ack-notification', file], deps), /text differs/);
-  assert.equal(acknowledged, false);
-  writeFileSync(file, JSON.stringify(envelope));
-  assert.equal((await cleanupCommand(root, ['ack-notification', file], deps)).acknowledged, true);
-  assert.deepEqual((await cleanupCommand(root, ['pending-notifications'], deps)).notifications, []);
-  writeFileSync(path.join(base, 'index.json'), 'corrupt index');
-  writeFileSync(path.join(base, 'scheduler-state.json'), JSON.stringify({ version: 1, status: 'failed' }), {
-    mode: 0o600,
-  });
-  assert.equal((await cleanupCommand(root, ['schedule-status'], deps)).schedule.status, 'failed');
-});
 const record = () => {
   const r = {
     version: 1,
