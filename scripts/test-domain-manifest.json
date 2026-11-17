@@ -23,7 +23,7 @@
       "dynamicImports": 0
     },
     "ci/browser-image.lock.json": {
-      "digest": "7b21321a33e3300406b9790c8439338241cfb3e11a33dada8e75fa1580489d09",
+      "digest": "cf7a02dd450d676383a6170982d2ddcd5a45dad081d0fb8a806de7c741a24d35",
       "imports": [],
       "dynamicImports": 0
     },
@@ -2245,7 +2245,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "a14dc4ba431613f2b5010dee7b9a967a806d7e052a236ebedf6ed25114a01e58",
+      "digest": "9dc66803bafcf93043edb25249e87f150955eed806996ae6a1980ca70e4061f9",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",
@@ -2759,7 +2759,7 @@
       "dynamicImports": 0
     },
     "scripts/task-rebinding.test.mjs": {
-      "digest": "5279a976d09eaae35f819bb44823ff6e2f434d2ee72c340e41c89fd852484400",
+      "digest": "74b0f65695574a2a354631032110427c903c7ed31a0c2965e68c374c0973cce9",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-cli.mjs",
@@ -2768,6 +2768,7 @@
         "scripts/task-batch.mjs",
         "scripts/task-board-intake.mjs",
         "scripts/task-completion-progress.mjs",
+        "scripts/task-completion.mjs",
         "scripts/task-coordination.mjs",
         "scripts/task-development.mjs",
         "scripts/task-execution-binding.mjs",

@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   mkdtempSync,
@@ -515,6 +516,17 @@ test('preparation admission rejects final commands and generic measured shell ef
   });
   process.env.ZDM_EXECUTION_ADMISSION = started.decision.admission;
   const head = f.git(f.worktree, 'rev-parse', 'HEAD');
+  const entry = spawnSync(
+    process.execPath,
+    [fileURLToPath(new URL('./task-completion.mjs', import.meta.url)), 'prepare'],
+    { cwd: f.worktree, env: process.env, encoding: 'utf8' },
+  );
+  assert.notEqual(entry.status, 0);
+  assert.match(
+    entry.stderr,
+    /Unexpected completion arguments/,
+    'The public prepare entry must route to the protected completion controller before validating its arguments',
+  );
   for (const args of [
     ['deliver', 'task', head],
     ['final-handoff', head],
