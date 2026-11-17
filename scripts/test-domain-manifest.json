@@ -1879,12 +1879,12 @@
       "dynamicImports": 0
     },
     "scripts/task-cancellation-proof.mjs": {
-      "digest": "1e855632775b964981f0650ab5cbe5478806a6d9d2d751ae74f287f5a74ffba4",
+      "digest": "9642a270d94477323ac5f394693a71e09602d191cc40fa55cbf69dc6c1cb372b",
       "imports": ["scripts/dev-task.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-cancellation-proof.test.mjs": {
-      "digest": "6c0f43d1503228bff4718225342e76ef6499b32e1628686092eb328f60554b81",
+      "digest": "b3dd809f80d0485326d68f45a4be90cb88c967f08400bd778b66822e0b10ab93",
       "imports": [
         "scripts/task-cancellation-proof.mjs",
         "scripts/task-entry.mjs",
