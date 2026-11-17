@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { requireTaskCoordinator } from './task-coordination.mjs';
+import { requireTaskCoordinator, readTaskCoordination } from './task-coordination.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -66,7 +66,7 @@ export function verifyNativeCreation(record, actual) {
     ?.flatMap((turn) => turn.items ?? [])
     .find((item) => {
       if (!item.id) return false;
-      if (item.type === 'userMessage')
+      if (item.type === 'userMessage' && !record.creationRootThreadId)
         return item.content?.some(
           (part) =>
             part.type === 'text' && (part.text === record.creationPrompt || part.text === record.creationPrompt + '\n'),
@@ -82,7 +82,10 @@ export function verifyNativeCreation(record, actual) {
       const delegation = item.output.text.match(
         /^<codex_delegation>\n {2}<source_thread_id>([^<]+)<\/source_thread_id>\n {2}<input>([\s\S]*)<\/input>\n<\/codex_delegation>$/,
       );
-      return delegation?.[1] === record.rootThreadId && delegation[2] === record.creationPrompt;
+      return (
+        delegation?.[1] === (record.creationRootThreadId ?? record.rootThreadId) &&
+        delegation[2] === record.creationPrompt
+      );
     });
   assert.ok(provenance?.id, 'Native thread must read back this exact task creation instruction');
   return provenance;
@@ -137,8 +140,16 @@ export function activatePublishedTaskThreads(commonDir, { head, remoteHead, bran
   );
   return enableTaskThreadPolicy(commonDir, { sourceHead: head });
 }
-export function requireNativeIntake(commonDir, { taskId, rootThreadId, request }) {
-  requireTaskCoordinator(commonDir, rootThreadId);
+export function requireNativeIntake(commonDir, { taskId, rootThreadId, request, coordinatorThreadId }) {
+  requireTaskCoordinator(commonDir, coordinatorThreadId ?? rootThreadId);
+  if (coordinatorThreadId) {
+    assert.equal(process.env.CODEX_THREAD_ID, coordinatorThreadId, 'Actual current intake coordinator required');
+    assert.equal(
+      readTaskCoordination(commonDir)?.current.request.authorId,
+      request.authorId,
+      'Original intake authorization user differs',
+    );
+  }
   assert.match(taskId, TASK_ID);
   assert.match(rootThreadId, THREAD_ID);
   const receipt = privateRead(path.join(commonDir, 'task-board-intake', taskId + '.json'));
@@ -233,6 +244,7 @@ export function createTaskThreadTitles(commonDir) {
       threadId: record.threadId,
       taskId: record.taskId,
       rootThreadId: record.rootThreadId,
+      ...(record.creationRootThreadId ? { creationRootThreadId: record.creationRootThreadId } : {}),
       messageId: record.messageId,
       createRequestId: record.createRequestId,
     };
@@ -261,6 +273,9 @@ export function createTaskThreadTitles(commonDir) {
           mode: TASK_THREAD_MODE,
           taskId: input.taskId,
           rootThreadId: input.rootThreadId,
+          ...(input.coordinatorThreadId && input.coordinatorThreadId !== input.rootThreadId
+            ? { creationRootThreadId: input.coordinatorThreadId }
+            : {}),
           messageId: input.request.messageId,
           createRequestId: randomUUID(),
           state: 'creation-intent',

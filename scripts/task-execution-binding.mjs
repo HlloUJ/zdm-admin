@@ -77,6 +77,21 @@ function nativeDelegation(snapshot, source, includes) {
       return match?.[1] === source && token.test(match[2]);
     });
 }
+// An appointment already accepted into the project ledger can be identified
+// from the current chat's original native event without waking its source chat.
+export function verifyCoordinatorObservation(snapshot, input) {
+  assert.equal(snapshot?.thread?.id, input.rootThreadId, 'Actual current coordinator observation required');
+  if (input.rootThreadId === input.request.roomId) {
+    const message = snapshot.turns
+      ?.flatMap((turn) => turn.items ?? [])
+      .find((item) => item.type === 'userMessage' && item.id === input.request.messageId);
+    assert.ok(message, 'Stored coordinator appointment message missing');
+    return message;
+  }
+  const creation = nativeDelegation(snapshot, input.request.roomId, input.request.messageId);
+  assert.ok(creation, 'Stored coordinator appointment has conflicting native provenance');
+  return creation;
+}
 // Read the real authorization room, even when a new coordinator now dispatches
 // it. Cross-room authority needs the original native coordinator creation event.
 export async function verifyCoordinatorSource(input, readThread) {

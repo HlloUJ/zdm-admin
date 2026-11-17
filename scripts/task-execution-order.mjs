@@ -7,6 +7,7 @@ import path from 'node:path';
 import { withTaskRegistryWriteLock } from './task-registry.mjs';
 import { captureQueueProgress } from './task-delivery-status-sync.mjs';
 import { executionBinding, assertTaskExecutor } from './task-execution-binding.mjs';
+import { queuedProjectReference } from './task-board-intake.mjs';
 
 export const EXECUTION_LANES = ['development', 'delivery'];
 const occupied = new Set(['running', 'blocked']);
@@ -317,8 +318,8 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(added);
     });
   }
-  function reserveNativeCreation({ task, owner, request, capacity }) {
-    requireNativeIntake(commonDir, { taskId: task, rootThreadId: owner, request });
+  function reserveNativeCreation({ task, owner, request, capacity, coordinatorThreadId }) {
+    requireNativeIntake(commonDir, { taskId: task, rootThreadId: owner, request, coordinatorThreadId });
     assert.ok(capacity && Number.isSafeInteger(capacity.limit) && capacity.limit > 0);
     for (const key of ['activeDevelopment', 'activeDelivery', 'activeOther'])
       assert.ok(Number.isSafeInteger(capacity[key]) && capacity[key] >= 0);
@@ -346,8 +347,8 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(current);
     });
   }
-  function bindNativeWorker({ task, coordinatorOwner, workerOwner, request, context }) {
-    requireNativeIntake(commonDir, { taskId: task, rootThreadId: coordinatorOwner, request });
+  function bindNativeWorker({ task, coordinatorOwner, workerOwner, request, context, coordinatorThreadId }) {
+    requireNativeIntake(commonDir, { taskId: task, rootThreadId: coordinatorOwner, request, coordinatorThreadId });
     createTaskThreadTitles(commonDir).requireBinding(context, task, workerOwner);
     assert.notEqual(coordinatorOwner, workerOwner);
     return update((state) => {
@@ -460,16 +461,40 @@ export function createExecutionOrder(commonDir) {
       if (expectedRevision !== undefined) assert.equal(state.revision, expectedRevision, 'Queue revision changed');
       if (bindingRef !== undefined) {
         assert.ok(['resume-only', 'resume-selected'].includes(action), 'Binding cannot authorize global changes');
-        const file = path.join(commonDir, 'task-registry/tasks', bindingRef.task + '.json');
-        safe(file);
-        const registered = JSON.parse(readFileSync(file, 'utf8')),
-          binding = executionBinding(registered);
-        assertTaskExecutor(registered);
-        assert.equal(binding?.revision, bindingRef.revision);
-        assert.deepEqual(binding.request, source);
+        if (bindingRef.kind === 'queued-native') {
+          assert.equal(
+            action,
+            'resume-selected',
+            'Queued native continuation cannot authorize delivery/global changes',
+          );
+          const actual = queuedProjectReference(
+            commonDir,
+            {
+              taskId: bindingRef.task,
+              owner: bindingRef.executor,
+              rootThreadId: bindingRef.originalRoot,
+              coordinatorThreadId: bindingRef.coordinator,
+              request: bindingRef.originalRequest,
+            },
+            state,
+          );
+          assert.deepEqual(actual, bindingRef, 'Queued project source changed');
+          assert.deepEqual(actual.executionRequest, source, 'Queued execution authority differs');
+          assert.ok(
+            members?.length === 1 && members[0].task === bindingRef.task && members[0].owner === bindingRef.executor,
+          );
+        } else {
+          const file = path.join(commonDir, 'task-registry/tasks', bindingRef.task + '.json');
+          safe(file);
+          const registered = JSON.parse(readFileSync(file, 'utf8')),
+            binding = executionBinding(registered);
+          assertTaskExecutor(registered);
+          assert.equal(binding?.revision, bindingRef.revision);
+          assert.deepEqual(binding.request, source);
+          if (action === 'resume-only') assert.equal(task, registered.id);
+          else assert.ok(members?.length === 1 && members[0].task === registered.id, 'One exact bound task required');
+        }
         assert.ok(source.sequence > lastPauseSequence(state), 'A later pause revoked this direction');
-        if (action === 'resume-only') assert.equal(task, registered.id);
-        else assert.ok(members?.length === 1 && members[0].task === registered.id, 'One exact bound task required');
       }
       const sameSource = state.events.filter(
         (e) => e.request?.messageId === source.messageId && JSON.stringify(e.bindingRef) === JSON.stringify(bindingRef),
@@ -519,7 +544,10 @@ export function createExecutionOrder(commonDir) {
             (e) =>
               e.request.sequence < source.sequence ||
               (continuation && e === sameSource[0]) ||
-              (bindingRef && JSON.stringify(e.request) === JSON.stringify(source)),
+              // Exact current binding was independently checked above, including
+              // actor, request and the latest pause. Unrelated later task events
+              // do not revoke this task's persistent takeover authorization.
+              bindingRef !== undefined,
           ),
         'Stale user direction refused',
       );
@@ -588,7 +616,7 @@ export function createExecutionOrder(commonDir) {
               assert.equal(current.executionKind, m.kind, 'Task kind cannot be retagged');
           }
           assert.ok(['queued', 'running', 'blocked'].includes(current.status), 'Terminal task cannot resume');
-          assertDirectionAuthority(current, source);
+          if (bindingRef?.kind !== 'queued-native') assertDirectionAuthority(current, source);
           assert.ok(current.request.sequence <= source.sequence, 'Stale selected direction refused');
           return { current, m };
         });
@@ -640,11 +668,12 @@ export function createExecutionOrder(commonDir) {
         );
         assertDirectionAuthority(current, source);
         assert.ok(
-          state.tickets.every(
-            (t) =>
-              t.request.sequence < source.sequence ||
-              (t === current && JSON.stringify(t.request) === JSON.stringify(source)),
-          ),
+          bindingRef !== undefined ||
+            state.tickets.every(
+              (t) =>
+                t.request.sequence < source.sequence ||
+                (t === current && JSON.stringify(t.request) === JSON.stringify(source)),
+            ),
           'Stale scoped direction refused',
         );
         assert.ok(
