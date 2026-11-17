@@ -44,11 +44,15 @@ receive、continue-intake及start返回时将实际等待创建、身份读回�
 
 首次接管旧协作执行面时，`executionSurface: collaboration-agent`或无该字段但worker为`/root/...`的原监测按历史协作记录核验，不把历史owner UUID伪装为原生聊天。默认路径保留原owner和worker路径，独立读回原monitoring.rootThreadId为同host的idle/error，再读回原roomId内authorizationRef对应的真实用户消息，并核对原正式start-intent的task、owner、worktree、branch、base和registered状态。绑定证据分别记录真实root、历史owner、worker路径和原授权摘要。历史聊天不可读时可使用下述项目状态恢复路径；普通网络错误、未知状态、跨host和来源冲突不能转换成恢复许可。已绑定任务再次接管仍核验当前执行绑定，不退回最初历史协作分支。
 
-### 历史聊天不可读：接管持久项目状态
+### 历史聊天不可读或未加载：接管持久项目状态
 
 已有任务的历史聊天可读性与其项目资产归属分开。用户新的明确接管指令及当前协调者/新worker仍须完成真实原生核验；原任务的授权引用保存在原队列、登记、监测、开工及冻结中，保持原样，不伪称重新读到了旧用户消息。入口不需要旧root执行命令或续证，也不把not-found记成idle。
 
 当前协调者可在同一已发布私有桥使用`action: "rebind-plan"`，task提供正常rebind所需准确身份和revision，并明确传`historicalRecovery: {mode: "preserved-project-state"}`。当轮额外的`unavailableNativeObservations`每项包含provider=`codex-native-read_thread`、真实被查询threadId、60秒内observedAt及原生工具原样result。只接受本机原生工具明确的`No Codex thread found ... local`结果；过期、错ID、网络错误、其他主机或同时出现可读快照均拒绝。旧协作记录查询其登记的root，缺原监测记录查询原owner；再次接管则查询当前绑定的真实执行者。
+
+历史原生聊天可读但状态为`notLoaded`时，仍使用上述显式项目状态路径，提供正常`nativeObservations`，不制造not-found。仅接受准确旧执行者（历史协作则为原root）、本机local host、无其他运行标志的`{type: "notLoaded"}`；已返回回合若带状态，只能为completed/interrupted/failed。普通绑定仍拒绝notLoaded，active、未知回合、跨host和额外运行标志继续拒绝。[官方thread/read说明](https://learn.chatgpt.com/docs/app-server#read-a-stored-thread-without-resuming)表明读取不加载或恢复聊天；notLoaded只描述服务内存状态，不能单独证明旧执行已停止。因此本分支必须通过同一原载体/授权/冻结/全源码摘要、双轮本机进程/打开文件/Docker及旧执行者引用核验，计划返回`native-not-loaded`，证据保留原状态和原生观察摘要，不改记idle。它不调用thread/resume、不发消息或唤醒旧root。
+
+真正绑定必须携带计划的准确historicalRecovery.digest；原生可用状态已变化时拒绝，不静默降级为普通绑定，须按新观察重新审查计划。上述证明仍只覆盖当前本机受管工作流，不宣称另一服务或主机没有远程执行器。
 
 只读计划完整核对原任务登记及本仓库Worktree/Git归属、同一真实用户的原队列指令、原registered start-intent；缺start-intent的冻结载体则核对原accepted-source及Git对象/消息摘要，不创建或重建冻结。原监测缺失时明确记录historical-unclassified，不编造root或执行面。计划摘要包含原登记、原票据、开工/冻结来源、HEAD、索引及所有跟踪/非忽略未跟踪源码的内容与删除状态；数据环境登记、保留锁、正式session、进程日志和main占位仍按原保护检查。两轮完整本机进程、打开文件、Docker及历史执行者引用检查均须通过，前后源码和资源证据一致。
 

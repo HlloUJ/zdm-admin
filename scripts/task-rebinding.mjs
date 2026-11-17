@@ -44,6 +44,34 @@ async function previousExecutorEvidence(task, binding, worker, host, input) {
         source: 'preserved-project-state',
       };
     }
+    const stored = await host.readThread(target);
+    if (stored?.thread?.status?.type === 'notLoaded') {
+      assert.equal(stored.thread.id, target, 'Stored historical executor identity differs');
+      assert.equal(stored.thread.hostId, 'local', 'Stored executor requires independent remote evidence');
+      assert.equal(worker.thread.hostId, 'local', 'Project-state recovery only proves this local registered carrier');
+      assert.deepEqual(Object.keys(stored.thread.status), ['type'], 'Unknown stored executor runtime flags');
+      for (const turn of stored.turns ?? [])
+        if (turn.status !== undefined)
+          assert.ok(
+            ['completed', 'interrupted', 'failed'].includes(turn.status),
+            'Stored executor has an active or unknown turn; preserve original carrier',
+          );
+      // notLoaded only describes this app-server's memory, not quiescence.
+      // Use the full original carrier/source review and two OS/resource rounds
+      // below; never add this status to the normal idle/error allowlist.
+      return {
+        executionSurface: collaboration ? 'collaboration-agent' : binding ? 'codex-thread' : 'historical-unclassified',
+        historicalOwner: task.owner,
+        previousExecutor: previous,
+        availability: 'native-not-loaded',
+        threadId: target,
+        hostId: stored.thread.hostId,
+        status: stored.thread.status,
+        nativeObservationDigest: digest(stored),
+        historicalMonitoring: monitoring ?? null,
+        source: 'preserved-project-state',
+      };
+    }
   }
   if (collaboration) {
     assert.match(monitoring.worker, /^\/root\/[a-z0-9_]+(?:\/[a-z0-9_]+)*$/);
@@ -398,6 +426,12 @@ export async function rebindHistoricalTask(
     'Task already belongs to this executor and coordinator',
   );
   const previousEvidence = await previousExecutorEvidence(initial, priorBinding, worker, host, input);
+  if (input.historicalRecovery?.digest)
+    assert.equal(
+      previousEvidence.source,
+      'preserved-project-state',
+      'Project recovery availability changed; re-read the plan without downgrading its review',
+    );
   const monitoring = {
     version: 1,
     mode: 'confirmed-interruption-notice-only',

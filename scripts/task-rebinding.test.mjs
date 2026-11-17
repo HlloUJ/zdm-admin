@@ -242,6 +242,93 @@ function originalIntent(f) {
   );
 }
 
+for (const collaboration of [false, true])
+  test(`notLoaded ${collaboration ? 'collaboration root' : 'native executor'} needs explicit full project review, not idle substitution`, async (t) => {
+    const f = fixture(t, { collaboration });
+    originalIntent(f);
+    const target = collaboration ? legacyRoot : old;
+    f.snapshots.get(target).thread.status = { type: 'notLoaded' };
+    f.snapshots.get(worker).thread.status = { type: 'notLoaded' };
+    f.snapshots.get(target).turns ??= [];
+    f.snapshots.get(target).turns.push({ status: 'completed', items: [] });
+    await assert.rejects(f.bind(), /active or unobservable/);
+    const before = f.registry.readTask('task'),
+      queue = f.queue.read();
+    const input = { historicalRecovery: { mode: 'preserved-project-state' } };
+    const plan = await f.bind(input, { planOnly: true });
+    assert.equal(plan.historicalAvailability, 'native-not-loaded');
+    assert.match(plan.historicalRecoveryDigest, /^[a-f0-9]{64}$/);
+    assert.deepEqual(f.registry.readTask('task'), before);
+    assert.deepEqual(f.queue.read(), queue);
+    await assert.rejects(f.bind(input), /review changed/);
+    const result = await f.bind({
+      historicalRecovery: { ...input.historicalRecovery, digest: plan.historicalRecoveryDigest },
+    });
+    const binding = result.task.executionBindings[0];
+    assert.equal(binding.nativeEvidence.previousExecutor.status.type, 'notLoaded');
+    assert.equal(binding.nativeEvidence.previousExecutor.availability, 'native-not-loaded');
+    assert.match(binding.nativeEvidence.previousExecutor.nativeObservationDigest, /^[a-f0-9]{64}$/);
+    assert.equal(result.task.owner, old);
+    assert.deepEqual(result.task.monitoring, before.monitoring);
+    assert.deepEqual(f.queue.read(), queue);
+    assert.equal(result.resumed, false);
+  });
+
+test('notLoaded reviewed binding cannot silently downgrade after native availability changes', async (t) => {
+  const f = fixture(t);
+  originalIntent(f);
+  f.snapshots.get(old).thread.status = { type: 'notLoaded' };
+  const input = { historicalRecovery: { mode: 'preserved-project-state' } };
+  const plan = await f.bind(input, { planOnly: true });
+  f.snapshots.get(old).thread.status = { type: 'idle' };
+  const before = f.registry.readTask('task');
+  await assert.rejects(
+    f.bind({ historicalRecovery: { ...input.historicalRecovery, digest: plan.historicalRecoveryDigest } }),
+    /availability changed/,
+  );
+  assert.deepEqual(f.registry.readTask('task'), before);
+});
+
+for (const failure of [
+  'active',
+  'unknown',
+  'foreign-host',
+  'runtime-flags',
+  'active-turn',
+  'unknown-turn',
+  'old-process',
+  'source-change',
+  'missing-carrier',
+])
+  test(`notLoaded project recovery preserves protection for ${failure}`, async (t) => {
+    const f = fixture(t);
+    originalIntent(f);
+    const snapshot = f.snapshots.get(old);
+    snapshot.thread.status = { type: 'notLoaded' };
+    if (failure === 'active' || failure === 'unknown') snapshot.thread.status.type = failure;
+    if (failure === 'foreign-host') snapshot.thread.hostId = 'remote';
+    if (failure === 'runtime-flags') snapshot.thread.status.activeFlags = ['waitingOnApproval'];
+    if (failure === 'active-turn' || failure === 'unknown-turn')
+      snapshot.turns = [{ status: failure === 'active-turn' ? 'inProgress' : 'unknown' }];
+    if (failure === 'missing-carrier') rmSync(path.join(f.registry.commonDir, 'task-registry/start-intents/task.json'));
+    let rounds = 0;
+    const observe = () => {
+      const result = f.observe();
+      if (failure === 'old-process')
+        result.processes.push({ pid: process.pid + 200, ppid: 1, command: `old-executor ${old}` });
+      if (failure === 'source-change' && ++rounds === 2)
+        writeFileSync(path.join(f.worktree, 'base.txt'), 'concurrent write');
+      return result;
+    };
+    const before = f.registry.readTask('task'),
+      queue = f.queue.read();
+    await assert.rejects(
+      f.bind({ historicalRecovery: { mode: 'preserved-project-state' } }, { planOnly: true, observe }),
+    );
+    assert.deepEqual(f.registry.readTask('task'), before);
+    assert.deepEqual(f.queue.read(), queue);
+  });
+
 test('missing historical monitoring uses exact registered carrier/queue provenance without inventing a root or surface', async (t) => {
   const f = fixture(t);
   originalIntent(f);
@@ -284,6 +371,44 @@ test('published recovery plan and binding use raw unavailable observations and d
   };
   const plan = await advanceTaskThread(input, adapters);
   assert.equal(plan.result.readyFor, 'binding-only');
+  const result = await advanceTaskThread(
+    {
+      ...input,
+      action: 'rebind',
+      task: {
+        ...input.task,
+        historicalRecovery: { ...input.task.historicalRecovery, digest: plan.result.historicalRecoveryDigest },
+      },
+    },
+    adapters,
+  );
+  assert.equal(result.result.status, 'bound');
+  assert.equal(result.result.resumed, false);
+  assert.equal(f.queue.read().tickets[0].status, 'queued');
+});
+
+test('published bridge uses real readable notLoaded observations only through full project-state planning', async (t) => {
+  const f = fixture(t, { collaboration: true });
+  f.snapshots.get(legacyRoot).thread.status = { type: 'notLoaded' };
+  f.snapshots.get(worker).thread.status = { type: 'notLoaded' };
+  const input = {
+    action: 'rebind-plan',
+    task: { ...f.input, historicalRecovery: { mode: 'preserved-project-state' } },
+    nativeObservations: [...f.snapshots.values()].map((snapshot) => ({
+      provider: 'codex-native-read_thread',
+      observedAt: new Date().toISOString(),
+      snapshot,
+    })),
+  };
+  const adapters = {
+    commonDir: f.registry.commonDir,
+    registry: f.registry,
+    readTask: f.host.readTask,
+    observe: f.observe,
+  };
+  const plan = await advanceTaskThread(input, adapters);
+  assert.equal(plan.result.historicalAvailability, 'native-not-loaded');
+  assert.equal(plan.result.resumed, false);
   const result = await advanceTaskThread(
     {
       ...input,
