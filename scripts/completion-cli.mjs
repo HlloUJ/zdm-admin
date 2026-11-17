@@ -790,6 +790,21 @@ export function verifyPreservation(file, directory) {
 }
 
 export async function completionCommand(root, args, options = {}) {
+  if (args[0] === 'reference-proof') {
+    assert.equal(args.length, 3, 'Expected reference-proof <foreign-task-id> <exact-native-history-file>');
+    const { collectPreviewReferenceProof } = await import('./delivery-repairs/preview-reference-proof.mjs');
+    return collectPreviewReferenceProof(root, args[1], args[2]);
+  }
+  const proofFlag = args.indexOf('--reference-proof');
+  if (proofFlag >= 0) {
+    assert.ok(['deliver', 'settle'].includes(args[0]), 'Reference selection only belongs to formal deliver/settle');
+    assert.equal(proofFlag, args[0] === 'deliver' ? 3 : 4);
+    assert.equal(args.length, proofFlag + 2, 'Unexpected reference-proof arguments');
+    const { withPreviewReferenceProof } = await import('./delivery-repairs/preview-reference-proof.mjs');
+    return withPreviewReferenceProof(root, args[proofFlag + 1], () =>
+      completionCommand(root, args.slice(0, proofFlag), options),
+    );
+  }
   const registry = createTaskRegistry(root);
   const explicit = [
     'report',

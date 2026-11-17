@@ -486,7 +486,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "848d941293ba87983ac112c713c0d10e4bc91336dfb569bdba3d0b2998a72ffb",
+      "digest": "c6f8f900f961ab415e1b09b3e2fb198c0dca8ba723311f03e8983fdb94a32070",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -499,6 +499,7 @@
         "scripts/completion-recovery.mjs",
         "scripts/completion-session.mjs",
         "scripts/completion-status.mjs",
+        "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/delivery-repairs/task-cleanup-npm.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
@@ -520,7 +521,7 @@
         "scripts/task-runtime-references.mjs",
         "scripts/wait-quality.mjs"
       ],
-      "dynamicImports": 0
+      "dynamicImports": 2
     },
     "scripts/completion-cli.test.mjs": {
       "digest": "bc3c5ccbc3cc3cde71cefcc735d04f45b6dff586b90b327ce7f0e54dcc46089a",
@@ -776,6 +777,48 @@
       "imports": [
         "scripts/delivery-repairs/fixtures/timing-v2/batch-timing-core.mjs",
         "scripts/delivery-repairs/fixtures/timing-v2/batch-timing-observer.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/preview-reference-history.mjs": {
+      "digest": "629732d6b174d3a3ede59e37af69f0311657ae0da40db3ac84660341c90f37e8",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/preview-reference-proof-core.mjs": {
+      "digest": "07935c030086ac8cbbdabad65496a35cc7473cd0eb0af1bf12b363641c674f40",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/preview-reference-proof.mjs": {
+      "digest": "dd5c605ca55caa226d6f795239227a03c24c3b9c230eccd784b3a1d87db90236",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/completion-cli.mjs",
+        "scripts/delivery-repairs/preview-reference-history.mjs",
+        "scripts/delivery-repairs/preview-reference-proof-core.mjs",
+        "scripts/delivery-repairs/preview-reference-proof.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/git-workflow-core.mjs",
+        "scripts/preview-consumers.mjs",
+        "scripts/task-cancellation-proof.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/task-data-environment.mjs",
+        "scripts/task-execution-binding.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-registry.mjs",
+        "scripts/task-runtime-state.mjs"
+      ],
+      "dynamicImports": 1
+    },
+    "scripts/delivery-repairs/preview-reference-proof.test.mjs": {
+      "digest": "fb6b612e0ff58b276ee2d1f76dbdce1807896ab6f53153086a1352a8d46e951a",
+      "imports": [
+        "scripts/delivery-repairs/preview-reference-history.mjs",
+        "scripts/delivery-repairs/preview-reference-proof-core.mjs",
+        "scripts/delivery-repairs/preview-reference-proof.mjs",
+        "scripts/preview-consumers.mjs",
+        "scripts/task-completion.mjs"
       ],
       "dynamicImports": 0
     },
@@ -1599,9 +1642,9 @@
       "dynamicImports": 0
     },
     "scripts/preview-consumers.mjs": {
-      "digest": "79466303c1e838836f5e8f0e43e28ba706de18876f74916b2dc89b87e68d68ff",
-      "imports": ["scripts/resource-lease.mjs"],
-      "dynamicImports": 0
+      "digest": "fdbdecd27e6e04854e2aa0b9417e8c39890e938193ef53380e8c70d55424ff96",
+      "imports": ["scripts/delivery-repairs/preview-reference-proof.mjs", "scripts/resource-lease.mjs"],
+      "dynamicImports": 1
     },
     "scripts/preview-consumers.test.mjs": {
       "digest": "d08320d4efe5e6c6be860f51b3b22b1e8d34d6e27a8d7c7eb2b5d7a70df6d452",
@@ -2245,7 +2288,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "9dc66803bafcf93043edb25249e87f150955eed806996ae6a1980ca70e4061f9",
+      "digest": "467c2cce41fd94e185a1fe85cdb74bd537537da082c195498b906c0ff72b1321",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",
