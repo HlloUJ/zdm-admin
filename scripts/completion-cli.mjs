@@ -793,7 +793,12 @@ export async function completionCommand(root, args, options = {}) {
   // Before private-lease recovery, freeze, automatic session restoration, or any external effect.
   // Even legacy/unregistered mutation is denied when the explicit policy is active.
   const executionOrder = createExecutionOrder(registry.commonDir);
-  if (task && !orderReadOnly) assertTaskExecutor(task, options.owner ?? process.env.CODEX_THREAD_ID);
+  if (task && !orderReadOnly)
+    assertTaskExecutor(
+      task,
+      options.owner ?? process.env.CODEX_THREAD_ID,
+      'Completion must belong to the exact current chat/task',
+    );
   if (!orderReadOnly && executionOrder.read()) {
     assert.ok(task, 'No registered execution-order task; do not adopt legacy work');
     executionOrder.assertAdmission({
@@ -807,7 +812,12 @@ export async function completionCommand(root, args, options = {}) {
     assert.ok(!task.previewOnly, 'Temporary combined previews cannot enter formal completion');
     assert.ok(!task.compatibility?.readOnly, 'Legacy frozen task remains on its reviewed recovery path');
     const readOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
-    if (!readOnly) assertTaskExecutor(task, options.owner ?? process.env.CODEX_THREAD_ID);
+    if (!readOnly)
+      assertTaskExecutor(
+        task,
+        options.owner ?? process.env.CODEX_THREAD_ID,
+        'Completion must belong to the exact current chat/task',
+      );
     return withTaskContext({ id: task.id, commonDir: registry.commonDir, owner: task.owner }, async () => {
       if (readOnly) return completionCommandLocked(root, args, options);
       const leases = createResourceLeases(registry.commonDir);

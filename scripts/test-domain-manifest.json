@@ -486,7 +486,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "d7a6b927145d8c0aca6c540874f8fef6b60ba9232d454f458f034df8cb7dde6e",
+      "digest": "66f9ac8e018f4eff864c8aadca727f98eb25d5bd294a51a309e664b983f915d0",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -2578,7 +2578,7 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
-      "digest": "754f4e508f4466d3e2711c1a3ce016f1e00f863c48f2d301edfb65772ff10afa",
+      "digest": "569881584b65b313bcde16dc2953963a6b137461df496f30ed36499fd7bd9634",
       "imports": [
         "scripts/preview-consumers.mjs",
         "scripts/preview-target.mjs",
