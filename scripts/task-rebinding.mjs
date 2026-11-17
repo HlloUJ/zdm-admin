@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
+import { execFileSync } from 'node:child_process';
+import { existsSync, lstatSync, readFileSync, readdirSync, readlinkSync } from 'node:fs';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
@@ -14,19 +15,37 @@ import {
 } from './task-execution-binding.mjs';
 import { threadTitle } from './task-thread-titles.mjs';
 import { requireTaskCoordinator } from './task-coordination.mjs';
+import { readAcceptance } from './accepted-source.mjs';
 
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
 
 // A legacy collaboration worker is an execution surface, not a native chat ID.
 // Its original coordinator and authorization must be independently observable.
-async function previousExecutorEvidence(task, binding, worker, host) {
+async function previousExecutorEvidence(task, binding, worker, host, input) {
   const monitoring = task.monitoring;
   const collaboration =
     !binding &&
     (monitoring?.executionSurface === 'collaboration-agent' ||
       (monitoring?.executionSurface === undefined && monitoring?.worker?.startsWith('/root/')));
   const previous = taskExecutor(task);
+  if (input.historicalRecovery?.mode === 'preserved-project-state') {
+    const target = collaboration ? monitoring.rootThreadId : previous;
+    const unavailable = await host.readUnavailableThread?.(target);
+    if (unavailable) {
+      assert.equal(worker.thread.hostId, 'local', 'Project-state recovery only proves this local registered carrier');
+      return {
+        executionSurface: collaboration ? 'collaboration-agent' : binding ? 'codex-thread' : 'historical-unclassified',
+        historicalOwner: task.owner,
+        previousExecutor: previous,
+        availability: 'native-not-found',
+        unavailableThreadId: target,
+        unavailableDigest: digest(unavailable),
+        historicalMonitoring: monitoring ?? null,
+        source: 'preserved-project-state',
+      };
+    }
+  }
   if (collaboration) {
     assert.match(monitoring.worker, /^\/root\/[a-z0-9_]+(?:\/[a-z0-9_]+)*$/);
     assert.match(monitoring.rootThreadId, uuid, 'Original collaboration root is missing');
@@ -70,6 +89,60 @@ async function previousExecutorEvidence(task, binding, worker, host) {
   return { threadId: old.thread.id, hostId: old.thread.hostId, status: old.thread.status };
 }
 
+function projectSource(task, state, input) {
+  const common = task.repository.commonDir;
+  const tickets = state.tickets.filter((ticket) => ticket.task === task.id);
+  assert.ok(tickets.length, 'Original project authorization ledger is missing');
+  for (const ticket of tickets) {
+    assert.equal(ticket.owner, task.owner, 'Original project ledger owner differs');
+    assert.equal(ticket.request.authorId, input.request.authorId, 'Original project user differs');
+    assert.ok(ticket.request.messageId && ticket.request.roomId && ticket.request.sequence < input.request.sequence);
+  }
+  const intentFile = path.join(common, 'task-registry/start-intents', task.id + '.json');
+  safe(intentFile);
+  let carrier;
+  if (existsSync(intentFile)) {
+    const intent = JSON.parse(readFileSync(intentFile));
+    for (const key of ['owner', 'branch', 'worktree', 'base'])
+      assert.equal(intent[key], task[key], 'Original registered project carrier differs');
+    assert.equal(intent.task, task.id);
+    assert.equal(intent.state, 'registered');
+    carrier = { kind: 'registered-start-intent', value: intent };
+  } else {
+    const file = path.join(common, 'task-delivery', task.id, 'accepted-source.json');
+    safe(file);
+    assert.ok(task.frozen && existsSync(file), 'Original registered carrier/freeze is missing');
+    const accepted = JSON.parse(readFileSync(file));
+    assert.equal(accepted.batch, task.id);
+    assert.equal(accepted.branch, task.branch);
+    assert.equal(accepted.commit, task.frozen.accepted);
+    assert.equal(accepted.tree, task.frozen.tree);
+    carrier = { kind: 'preserved-freeze', value: accepted };
+  }
+  const git = (...args) =>
+    execFileSync('git', ['--no-replace-objects', '-C', task.worktree, ...args], {
+      encoding: 'utf8',
+      maxBuffer: 64 * 1024 * 1024,
+    });
+  const files = git('ls-files', '--cached', '--others', '--exclude-standard', '-z').split('\0').filter(Boolean);
+  const entries = [...new Set(files)].sort().map((name) => {
+    assert.ok(!path.isAbsolute(name) && !name.split('/').includes('..'), 'Unsafe project source path');
+    const file = path.join(task.worktree, name);
+    safe(file);
+    if (!existsSync(file)) return { name, deleted: true };
+    assert.ok(lstatSync(file).isFile(), 'Unknown project source entry');
+    return { name, mode: lstatSync(file).mode, digest: createHash('sha256').update(readFileSync(file)).digest('hex') };
+  });
+  return {
+    task,
+    tickets,
+    carrier,
+    head: git('rev-parse', 'HEAD').trim(),
+    index: git('ls-files', '--stage', '-z'),
+    entries,
+  };
+}
+
 function assertProcessRecord(name, record) {
   const token = name.slice('process-'.length, -'.json'.length);
   if (uuid.test(token)) {
@@ -103,7 +176,11 @@ function assertProcessRecord(name, record) {
 }
 function safe(file) {
   for (let cursor = path.resolve(file); ; cursor = path.dirname(cursor)) {
-    if (existsSync(cursor)) assert.ok(!lstatSync(cursor).isSymbolicLink(), 'Linked rebinding state refused');
+    try {
+      assert.ok(!lstatSync(cursor).isSymbolicLink(), 'Linked rebinding state refused');
+    } catch (error) {
+      if (error.code !== 'ENOENT') throw error;
+    }
     if (cursor === path.dirname(cursor)) break;
   }
 }
@@ -139,6 +216,13 @@ function resources(task) {
       );
     }
   const delivery = path.join(common, 'task-delivery', task.id);
+  for (const environment of [
+    path.join(common, 'task-environments', task.id, 'environment.json'),
+    path.join(common, 'preview-environment/environment.json'),
+  ]) {
+    safe(environment);
+    if (existsSync(environment)) add(environment);
+  }
   const referencedProcesses = new Set();
   const originalReferences = new Set();
   let hasSession = false;
@@ -152,8 +236,7 @@ function resources(task) {
     assert.equal(start.state, 'registered', 'Unfinished collaboration start intent');
     assert.equal(start.base, task.base, 'Original collaboration source differs');
   }
-  if (task.frozen)
-    assert.ok(existsSync(path.join(delivery, 'accepted-source.json')), 'Original frozen source is missing');
+  if (task.frozen) assert.ok(readAcceptance(task.worktree, task.id), 'Original frozen source is missing');
   for (const name of ['accepted-source.json', 'completion-session.json']) {
     const file = path.join(delivery, name);
     safe(file);
@@ -196,6 +279,13 @@ function resources(task) {
       if (!existsSync(folder)) return;
       for (const name of readdirSync(folder)) {
         const file = path.join(folder, name);
+        // Dependency directories were already excluded from journal traversal.
+        // Preserve a legacy node_modules link by identity, without following it
+        // or granting permission to alter its target. Other links still refuse.
+        if (name === 'node_modules' && lstatSync(file).isSymbolicLink()) {
+          result.push({ file, excludedDependencyLink: readlinkSync(file) });
+          continue;
+        }
         safe(file);
         assert.ok(!name.endsWith('.lock'), 'Retained task lock requires original recovery');
         if (lstatSync(file).isDirectory()) {
@@ -236,7 +326,7 @@ function resources(task) {
 export async function rebindHistoricalTask(
   input,
   host,
-  { registry, queue, observe = observeCancellationHost, now = Date.now() },
+  { registry, queue, observe = observeCancellationHost, now = Date.now(), planOnly = false },
 ) {
   assert.equal(process.env.CODEX_THREAD_ID, input.rootThreadId, 'Actual coordinator runtime required');
   requireTaskCoordinator(registry.commonDir, input.rootThreadId);
@@ -279,7 +369,7 @@ export async function rebindHistoricalTask(
     previous !== input.owner || (priorBinding?.coordinator ?? initial.monitoring?.rootThreadId) !== input.rootThreadId,
     'Task already belongs to this executor and coordinator',
   );
-  const previousEvidence = await previousExecutorEvidence(initial, priorBinding, worker, host);
+  const previousEvidence = await previousExecutorEvidence(initial, priorBinding, worker, host, input);
   const monitoring = {
     version: 1,
     mode: 'confirmed-interruption-notice-only',
@@ -332,26 +422,84 @@ export async function rebindHistoricalTask(
     const state = queue.read();
     assert.equal(state?.revision, input.queueRevision, 'Queue revision changed; do not rebase');
     assert.equal(state.paused, true, 'Fence execution before changing its binding');
-    assert.ok(!state.scopedAdmission && !state.scopedAdmissions?.length, 'Scoped executor remains admitted');
+    assert.ok(
+      ![...(state.scopedAdmissions ?? []), ...(state.scopedAdmission ? [state.scopedAdmission] : [])].some(
+        (scope) => scope.task === initial.id,
+      ),
+      'Target scoped executor remains admitted',
+    );
     for (const ticket of state.tickets.filter((t) => t.task === initial.id)) {
       assert.equal(ticket.owner, initial.owner, 'Historical queue owner differs');
       assert.equal(ticket.request.authorId, input.request.authorId, 'Original user required');
       assert.ok(ticket.request.sequence < input.request.sequence, 'Fresh explicit takeover instruction required');
     }
-    return registry.bindExecution(initial.id, input.expectedRevision, binding, (record) => {
+    const check = (record) => {
       assert.deepEqual(record, initial, 'Task changed during native observation');
       registry.validateLive(record);
+      const project =
+        previousEvidence.source === 'preserved-project-state' ? projectSource(record, state, input) : null;
+      if (project) {
+        binding.projectSourceDigest = digest(project);
+        binding.sourceContentDigest = digest({ head: project.head, index: project.index, entries: project.entries });
+        if (!planOnly)
+          assert.equal(
+            input.historicalRecovery.digest,
+            binding.projectSourceDigest,
+            'Project recovery review changed; re-read plan without rebasing',
+          );
+      }
       const before = resources(record),
         first = observe();
       assertHostIdle(first, record);
+      const assertHistoricalWriterAbsent = (snapshot) => {
+        if (!project) return;
+        const tokens = [record.owner, taskExecutor(record), record.monitoring?.worker].filter(Boolean);
+        for (const process of snapshot.processes)
+          if (process.pid !== globalThis.process.pid)
+            assert.ok(
+              !tokens.some((token) => process.command.includes(token)),
+              'Historical executor process remains; retain original carrier',
+            );
+      };
+      assertHistoricalWriterAbsent(first);
       const second = observe();
       assertHostIdle(second, record);
+      assertHistoricalWriterAbsent(second);
       assert.deepEqual(resources(record), before, 'Resource evidence changed during observation');
+      if (project)
+        assert.deepEqual(
+          projectSource(record, state, input),
+          project,
+          'Original project source changed during observation',
+        );
       binding.quiescenceDigest = digest({ first, second, resources: before });
       executionBinding({ ...record, executionBindings: [...(record.executionBindings ?? []), binding] });
       return true;
-    });
+    };
+    if (planOnly) {
+      assert.equal(initial.revision, input.expectedRevision, 'Task revision changed; do not rebase');
+      check(initial);
+      assert.deepEqual(registry.readTask(initial.id), initial, 'Task changed during plan');
+      return {
+        status: 'ready-to-bind',
+        taskId: initial.id,
+        boardTaskId,
+        executor: input.owner,
+        expectedRevision: input.expectedRevision,
+        queueRevision: input.queueRevision,
+        boardRevision: input.boardRevision,
+        readyFor: 'binding-only',
+        historicalRecoveryDigest: binding.projectSourceDigest ?? null,
+        historicalAvailability: previousEvidence.availability ?? 'native-readable',
+        sourceReviewed: true,
+        resumed: false,
+        previewStarted: false,
+        instruction: 'Re-read exact native observations, then rebind with this source digest and unchanged revisions',
+      };
+    }
+    return registry.bindExecution(initial.id, input.expectedRevision, binding, check);
   });
+  if (planOnly) return task;
   return { status: 'bound', task, replayed: false, resumed: false, previewStarted: false };
 }
 
@@ -360,7 +508,11 @@ export function rebindingAdapters(root) {
   return { registry, queue: createExecutionOrder(registry.commonDir) };
 }
 
-export async function resumeBoundTask(input, host, { registry, queue }) {
+export async function resumeBoundTask(
+  input,
+  host,
+  { registry, queue, observe = host.observe ?? observeCancellationHost },
+) {
   const task = registry.resolve({ id: input.taskId });
   assert.equal(task.revision, input.taskRevision, 'Task revision changed before resume');
   const binding = executionBinding(task);
@@ -400,6 +552,33 @@ export async function resumeBoundTask(input, host, { registry, queue }) {
     'Only a fenced historical task may resume; never replay a running task',
   );
   assert.equal(ticket.owner, task.owner);
+  if (task.dependsOn?.length) {
+    assert.equal(typeof host.dependenciesReady, 'function', 'Formal delivered dependency proof required');
+    assert.equal(host.dependenciesReady(task), true, 'Waiting for formally delivered task dependencies');
+  }
+  const assertResumeReady = () => {
+    const before = resources(task);
+    const source = binding.sourceContentDigest ? projectSource(task, state, input) : null;
+    const sourceDigest = (value) => digest({ head: value.head, index: value.index, entries: value.entries });
+    if (source)
+      assert.equal(
+        sourceDigest(source),
+        binding.sourceContentDigest,
+        'Project source changed since binding; preserve and review a new binding',
+      );
+    const first = observe();
+    assertHostIdle(first, task);
+    const second = observe();
+    assertHostIdle(second, task);
+    assert.deepEqual(resources(task), before, 'Resources changed before admission');
+    if (source)
+      assert.equal(
+        sourceDigest(projectSource(task, state, input)),
+        binding.sourceContentDigest,
+        'Project source changed before admission',
+      );
+    assert.deepEqual(registry.readTask(task.id), task, 'Task changed before admission');
+  };
   if (input.lane === 'development') {
     assert.ok(
       !task.frozen && ['developing', 'dev-validated', 'blocked'].includes(task.stage),
@@ -413,6 +592,7 @@ export async function resumeBoundTask(input, host, { registry, queue }) {
         capacity.activeDevelopment + capacity.activeDelivery + capacity.activeOther <= capacity.limit,
     );
     assert.ok(capacity.activeDevelopment < capacity.limit - capacity.activeOther - 1, 'Reserve delivery executor');
+    assertResumeReady();
     queue.direct({
       action: 'resume-selected',
       request: input.request,
@@ -426,7 +606,8 @@ export async function resumeBoundTask(input, host, { registry, queue }) {
   } else {
     assert.equal(input.lane, 'delivery');
     assert.equal(typeof host.dependenciesReady, 'function', 'Formal delivered dependency proof required');
-    assert.equal(host.dependenciesReady(task), true);
+    assert.equal(host.dependenciesReady(task), true, 'Waiting for formally delivered task dependencies');
+    assertResumeReady();
     queue.direct({
       action: 'resume-only',
       lane: 'delivery',

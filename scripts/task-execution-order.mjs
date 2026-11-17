@@ -519,7 +519,10 @@ export function createExecutionOrder(commonDir) {
             (e) =>
               e.request.sequence < source.sequence ||
               (continuation && e === sameSource[0]) ||
-              (bindingRef && JSON.stringify(e.request) === JSON.stringify(source)),
+              // Exact current binding was independently checked above, including
+              // actor, request and the latest pause. Unrelated later task events
+              // do not revoke this task's persistent takeover authorization.
+              bindingRef !== undefined,
           ),
         'Stale user direction refused',
       );
@@ -640,11 +643,12 @@ export function createExecutionOrder(commonDir) {
         );
         assertDirectionAuthority(current, source);
         assert.ok(
-          state.tickets.every(
-            (t) =>
-              t.request.sequence < source.sequence ||
-              (t === current && JSON.stringify(t.request) === JSON.stringify(source)),
-          ),
+          bindingRef !== undefined ||
+            state.tickets.every(
+              (t) =>
+                t.request.sequence < source.sequence ||
+                (t === current && JSON.stringify(t.request) === JSON.stringify(source)),
+            ),
           'Stale scoped direction refused',
         );
         assert.ok(

@@ -2444,7 +2444,7 @@
       "dynamicImports": 3
     },
     "scripts/task-execution-order.mjs": {
-      "digest": "718f686d325908e6a843e53ba752e0b40919d4262789eeac9d9567504687a133",
+      "digest": "0c1a3de7b06b595af75f4a16b8b67b5e16f704d375a82be513f7e8a97f621d65",
       "imports": [
         "scripts/task-delivery-status-sync.mjs",
         "scripts/task-execution-binding.mjs",
@@ -2686,8 +2686,9 @@
       "dynamicImports": 0
     },
     "scripts/task-rebinding.mjs": {
-      "digest": "b5c3084f8146a361a22018211d384c36764d9e920c8120cdf1478816c0c84b50",
+      "digest": "2b00b3c9fa8c5765aceee1a4e09714028cbe1385a25735cb63d8d19c578c36ff",
       "imports": [
+        "scripts/accepted-source.mjs",
         "scripts/task-cancellation-proof.mjs",
         "scripts/task-coordination.mjs",
         "scripts/task-execution-binding.mjs",
@@ -2698,7 +2699,7 @@
       "dynamicImports": 0
     },
     "scripts/task-rebinding.test.mjs": {
-      "digest": "563b17f5d02ef2d6a0eefdbd57e4db256dc15c87b8020401ab9071b3a3730bcd",
+      "digest": "7545ff7dd47f4e84131559c519a411a2a48f2994fdc9e48e891bf570d6309e53",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/task-board-intake.mjs",
@@ -2711,7 +2712,8 @@
         "scripts/task-progress-host.mjs",
         "scripts/task-rebinding.mjs",
         "scripts/task-registry.mjs",
-        "scripts/task-start.mjs"
+        "scripts/task-start.mjs",
+        "scripts/task-thread-host-bridge.mjs"
       ],
       "dynamicImports": 0
     },
@@ -2791,7 +2793,7 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-host-bridge-cli.mjs": {
-      "digest": "689720fc098d922873224d0dffb5dcda328ebaed05dd94a977e6957ddbcda679",
+      "digest": "8d9598bd9bce795aa50c39aabbaa94b9990fbe3ba16728b2c764f6aba491290a",
       "imports": [
         "scripts/task-context.mjs",
         "scripts/task-entry.mjs",
@@ -2803,7 +2805,7 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-host-bridge.mjs": {
-      "digest": "365b36636c954d406029c0ce9743245150870a9c3b1af3a498550feb66894dfc",
+      "digest": "69306c7c1a74cea61281e9baf64608b394f9588c5b2e1d070a4d8f91edd90d00",
       "imports": [
         "scripts/task-board-intake.mjs",
         "scripts/task-codex-host.mjs",

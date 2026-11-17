@@ -2,7 +2,16 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync } from 'node:fs';
+import {
+  mkdtempSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  realpathSync,
+  symlinkSync,
+  readlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
@@ -17,12 +26,30 @@ import { runCompletionWithProgress } from './task-completion-progress.mjs';
 import { prepareProgressStage, notifyProgressHost } from './task-progress-host.mjs';
 import { collectTaskProgress } from './task-progress-collector.mjs';
 import { authorizeTaskCoordinator, readTaskCoordination } from './task-coordination.mjs';
+import { advanceTaskThread, taskHandoffFailure } from './task-thread-host-bridge.mjs';
 
 const old = '11111111-1111-4111-8111-111111111111';
 const root = '22222222-2222-4222-8222-222222222222';
 const worker = '33333333-3333-4333-8333-333333333333';
 const source = '44444444-4444-4444-8444-444444444444';
 const legacyRoot = '66666666-6666-4666-8666-666666666666';
+
+test('handoff readback distinguishes capacity/dependency waits and unknown blockers without claiming execution or completion', () => {
+  for (const [reason, readiness] of [
+    ['Reserve delivery executor', 'waiting-capacity'],
+    ['Waiting for formally delivered task dependencies', 'waiting-dependencies'],
+    ['Original project source changed during observation', 'blocked'],
+    ['Unsealed original process journal', 'blocked'],
+    ['Only a fenced historical task may resume; never replay a running task', 'blocked'],
+  ]) {
+    const result = taskHandoffFailure(new Error(reason));
+    assert.equal(result.readiness, readiness);
+    assert.equal(result.reason, reason);
+    assert.equal(result.executionState, 'unknown-until-readback');
+    assert.equal(result.completionClaimed, false);
+    assert.ok(result.next);
+  }
+});
 function delegate(id, from, prompt, title = '') {
   return {
     thread: { id, title, hostId: 'local', status: { type: 'idle' } },
@@ -148,6 +175,7 @@ function fixture(t, { collaboration = false } = {}) {
     files: [{ name: '/outside', pid: process.pid }],
     containers: [],
   });
+  host.observe = observe;
   const bind = (changes = {}, options = {}) =>
     rebindHistoricalTask({ ...input, ...changes }, host, { registry, queue, observe, now: 5000, ...options });
   return { dir, main, worktree, registry, queue, input, host, snapshots, observe, bind, task, board, git };
@@ -183,6 +211,360 @@ test('legacy collaboration verifies its real root and authorization without inve
   assert.deepEqual(result.task.monitoring, before);
   assert.deepEqual(f.queue.read(), queue);
 });
+
+function unavailable(id) {
+  return {
+    provider: 'codex-native-read_thread',
+    threadId: id,
+    observedAt: new Date().toISOString(),
+    result: {
+      content: [
+        { type: 'text', text: `No Codex thread found for threadId: ${id}. Hosts without a readable match: local` },
+      ],
+      isError: false,
+    },
+  };
+}
+
+function originalIntent(f) {
+  const directory = path.join(f.registry.commonDir, 'task-registry/start-intents');
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(
+    path.join(directory, 'task.json'),
+    JSON.stringify({
+      task: 'task',
+      owner: old,
+      branch: f.task.branch,
+      worktree: f.worktree,
+      base: f.task.base,
+      state: 'registered',
+    }),
+  );
+}
+
+test('missing historical monitoring uses exact registered carrier/queue provenance without inventing a root or surface', async (t) => {
+  const f = fixture(t);
+  originalIntent(f);
+  f.registry.revise('task', f.task.revision, (record) => {
+    delete record.monitoring;
+  });
+  f.input.expectedRevision = f.registry.readTask('task').revision;
+  f.snapshots.delete(old);
+  f.host.readUnavailableThread = async (id) => (id === old ? unavailable(id) : null);
+  const input = { historicalRecovery: { mode: 'preserved-project-state' } };
+  const plan = await f.bind(input, { planOnly: true });
+  const bound = await f.bind({
+    historicalRecovery: { ...input.historicalRecovery, digest: plan.historicalRecoveryDigest },
+  });
+  const evidence = bound.task.executionBindings[0].nativeEvidence.previousExecutor;
+  assert.equal(evidence.executionSurface, 'historical-unclassified');
+  assert.equal(evidence.historicalMonitoring, null);
+  assert.equal(evidence.rootThreadId, undefined);
+});
+
+test('published recovery plan and binding use raw unavailable observations and do not call the unreadable old root', async (t) => {
+  const f = fixture(t, { collaboration: true });
+  f.snapshots.delete(legacyRoot);
+  const observedAt = new Date().toISOString();
+  const input = {
+    action: 'rebind-plan',
+    task: { ...f.input, historicalRecovery: { mode: 'preserved-project-state' } },
+    nativeObservations: [...f.snapshots.values()].map((snapshot) => ({
+      provider: 'codex-native-read_thread',
+      observedAt,
+      snapshot,
+    })),
+    unavailableNativeObservations: [unavailable(legacyRoot)],
+  };
+  const adapters = {
+    commonDir: f.registry.commonDir,
+    registry: f.registry,
+    readTask: f.host.readTask,
+    observe: f.observe,
+  };
+  const plan = await advanceTaskThread(input, adapters);
+  assert.equal(plan.result.readyFor, 'binding-only');
+  const result = await advanceTaskThread(
+    {
+      ...input,
+      action: 'rebind',
+      task: {
+        ...input.task,
+        historicalRecovery: { ...input.task.historicalRecovery, digest: plan.result.historicalRecoveryDigest },
+      },
+    },
+    adapters,
+  );
+  assert.equal(result.result.status, 'bound');
+  assert.equal(result.result.resumed, false);
+  assert.equal(f.queue.read().tickets[0].status, 'queued');
+});
+
+test('binding one fenced task preserves an unrelated active delivery admission', async (t) => {
+  const f = fixture(t);
+  const request = (n) => ({ ...f.input.request, messageId: 'unrelated-' + n, sequence: n });
+  f.queue.enqueue({ lane: 'delivery', task: 'another-delivery', owner: old, request: request(3) });
+  f.queue.direct({
+    action: 'resume-only',
+    lane: 'delivery',
+    task: 'another-delivery',
+    owner: old,
+    request: request(4),
+  });
+  f.input.queueRevision = f.queue.read().revision;
+  const before = f.queue.read();
+  await f.bind();
+  assert.deepEqual(f.queue.read(), before);
+  assert.equal(f.queue.read().scopedAdmission.task, 'another-delivery');
+});
+
+test('a subsequent lost native worker can be rebound under new authority from the same permanent project state', async (t) => {
+  const f = fixture(t, { collaboration: true });
+  await f.bind();
+  const first = f.registry.readTask('task').executionBindings[0];
+  const next = '77777777-7777-4777-8777-777777777777',
+    second = '88888888-8888-4888-8888-888888888888';
+  const request = { ...f.input.request, messageId: 'next-takeover', sequence: 6 };
+  f.snapshots.get(source).turns[0].items.push({ type: 'userMessage', id: request.messageId });
+  f.snapshots.set(next, delegate(next, source, 'Coordinator from next-takeover'));
+  f.snapshots.set(second, delegate(second, next, 'Execute task task', '750｜fixture'));
+  f.snapshots.delete(worker);
+  f.snapshots.delete(legacyRoot);
+  f.host.readUnavailableThread = async (id) => (id === worker ? unavailable(id) : null);
+  process.env.CODEX_THREAD_ID = next;
+  const input = {
+    ...f.input,
+    owner: second,
+    rootThreadId: next,
+    request,
+    expectedRevision: f.registry.readTask('task').revision,
+    historicalRecovery: { mode: 'preserved-project-state' },
+  };
+  const options = { registry: f.registry, queue: f.queue, observe: f.observe };
+  const plan = await rebindHistoricalTask(input, f.host, { ...options, planOnly: true });
+  const result = await rebindHistoricalTask(
+    { ...input, historicalRecovery: { ...input.historicalRecovery, digest: plan.historicalRecoveryDigest } },
+    f.host,
+    options,
+  );
+  assert.deepEqual(result.task.executionBindings[0], first);
+  assert.equal(result.task.executionBindings[1].previousExecutor, worker);
+  assert.equal(result.task.executionBindings[1].nativeEvidence.previousExecutor.unavailableThreadId, worker);
+  assert.equal(taskExecutor(result.task), second);
+});
+
+test('legacy excluded dependency links are retained without traversal while unknown runtime links still refuse', async (t) => {
+  const f = fixture(t),
+    directory = path.join(f.worktree, '.task-runtime/dependency');
+  mkdirSync(directory, { recursive: true });
+  const target = path.join(f.dir, 'dependencies');
+  mkdirSync(target);
+  writeFileSync(path.join(target, 'process-not-a-task-journal.json'), 'dependency fixture');
+  const link = path.join(directory, 'node_modules');
+  symlinkSync(target, link, 'dir');
+  const plan = await f.bind({}, { planOnly: true });
+  assert.equal(plan.status, 'ready-to-bind');
+  assert.equal(readlinkSync(link), target);
+  symlinkSync(target, path.join(directory, 'unknown-link'), 'dir');
+  await assert.rejects(f.bind({}, { planOnly: true }), /Linked/);
+  assert.equal(readFileSync(path.join(target, 'process-not-a-task-journal.json'), 'utf8'), 'dependency fixture');
+});
+
+test('frozen carrier without a start intent recovers from its original accepted object without rebuilding freeze/session', async (t) => {
+  const f = fixture(t);
+  const req = (n) => ({ ...f.input.request, sequence: n, messageId: 'user-' + n });
+  f.queue.enqueue({ lane: 'delivery', task: 'task', owner: old, request: req(2) });
+  f.queue.direct({ action: 'resume-only', lane: 'delivery', task: 'task', owner: old, request: req(3) });
+  process.env.CODEX_THREAD_ID = old;
+  process.env.ZDM_EXECUTION_ADMISSION = f.queue.read().tickets.find((t) => t.lane === 'delivery').admission;
+  await completionCommand(f.worktree, ['begin']);
+  f.queue.direct({ action: 'pause-all', request: req(4) });
+  process.env.CODEX_THREAD_ID = root;
+  f.input.expectedRevision = f.registry.readTask('task').revision;
+  f.input.queueRevision = f.queue.read().revision;
+  f.snapshots.delete(old);
+  f.host.readUnavailableThread = async (id) => (id === old ? unavailable(id) : null);
+  const directory = path.join(f.registry.commonDir, 'task-delivery/task');
+  const source = readFileSync(path.join(directory, 'accepted-source.json'));
+  const session = readFileSync(path.join(directory, 'completion-session.json'));
+  const plan = await f.bind({ historicalRecovery: { mode: 'preserved-project-state' } }, { planOnly: true });
+  await f.bind({ historicalRecovery: { mode: 'preserved-project-state', digest: plan.historicalRecoveryDigest } });
+  assert.deepEqual(readFileSync(path.join(directory, 'accepted-source.json')), source);
+  assert.deepEqual(readFileSync(path.join(directory, 'completion-session.json')), session);
+});
+
+for (const failure of ['stale', 'wrong-id', 'network-error', 'active-conflict']) {
+  test(`native unavailability bridge refuses ${failure} instead of treating it as idle`, async (t) => {
+    const f = fixture(t, { collaboration: true });
+    f.snapshots.delete(legacyRoot);
+    const observedAt = new Date().toISOString();
+    const absent = unavailable(legacyRoot);
+    if (failure === 'stale') absent.observedAt = new Date(Date.now() - 60001).toISOString();
+    if (failure === 'wrong-id') absent.result.content[0].text = unavailable(old).result.content[0].text;
+    if (failure === 'network-error') absent.result.content[0].text = 'Native read transport unavailable';
+    const nativeObservations = [...f.snapshots.values()].map((snapshot) => ({
+      provider: 'codex-native-read_thread',
+      observedAt,
+      snapshot,
+    }));
+    if (failure === 'active-conflict')
+      nativeObservations.push({
+        provider: 'codex-native-read_thread',
+        observedAt,
+        snapshot: { thread: { id: legacyRoot, hostId: 'local', status: { type: 'active' } } },
+      });
+    const before = f.registry.readTask('task'),
+      queue = f.queue.read();
+    await assert.rejects(
+      advanceTaskThread(
+        {
+          action: 'rebind-plan',
+          task: { ...f.input, historicalRecovery: { mode: 'preserved-project-state' } },
+          nativeObservations,
+          unavailableNativeObservations: [absent],
+        },
+        { commonDir: f.registry.commonDir, registry: f.registry, readTask: f.host.readTask, observe: f.observe },
+      ),
+    );
+    assert.deepEqual(f.registry.readTask('task'), before);
+    assert.deepEqual(f.queue.read(), queue);
+  });
+}
+
+test('unreadable historical collaboration recovers from preserved project provenance and a new explicit authority without the old root', async (t) => {
+  const f = fixture(t, { collaboration: true });
+  f.snapshots.delete(old);
+  f.snapshots.delete(legacyRoot);
+  f.host.readUnavailableThread = async (id) => (id === legacyRoot ? unavailable(id) : null);
+  const input = { historicalRecovery: { mode: 'preserved-project-state' } };
+  const before = f.registry.readTask('task'),
+    queue = f.queue.read();
+  writeFileSync(path.join(f.worktree, 'unfinished.txt'), 'original uncommitted work');
+  const plan = await f.bind(input, { planOnly: true });
+  assert.equal(plan.status, 'ready-to-bind');
+  assert.match(plan.historicalRecoveryDigest, /^[a-f0-9]{64}$/);
+  assert.deepEqual(f.registry.readTask('task'), before);
+  assert.deepEqual(f.queue.read(), queue);
+  const result = await f.bind({
+    historicalRecovery: { ...input.historicalRecovery, digest: plan.historicalRecoveryDigest },
+  });
+  const evidence = result.task.executionBindings[0];
+  assert.equal(evidence.nativeEvidence.previousExecutor.availability, 'native-not-found');
+  assert.equal(Object.hasOwn(evidence.nativeEvidence.previousExecutor, 'status'), false);
+  assert.equal(evidence.nativeEvidence.previousExecutor.historicalMonitoring.rootThreadId, legacyRoot);
+  assert.equal(evidence.projectSourceDigest, plan.historicalRecoveryDigest);
+  assert.deepEqual(result.task.monitoring, before.monitoring);
+  assert.deepEqual(f.queue.read(), queue);
+  assert.equal(readFileSync(path.join(f.worktree, 'unfinished.txt'), 'utf8'), 'original uncommitted work');
+  const replay = await f.bind(
+    { historicalRecovery: { ...input.historicalRecovery, digest: plan.historicalRecoveryDigest } },
+    { observe: () => assert.fail('no replay') },
+  );
+  assert.equal(replay.replayed, true);
+  process.env.CODEX_THREAD_ID = worker;
+  f.host.start = async () => ({ task: f.registry.readTask('task') });
+  const resumed = await resumeBoundTask(
+    { ...f.input, taskRevision: result.task.revision, lane: 'development' },
+    f.host,
+    {
+      registry: f.registry,
+      queue: f.queue,
+    },
+  );
+  assert.equal(taskExecutor(resumed.task), worker);
+});
+
+for (const failure of ['source-change', 'live-process', 'capacity', 'dependency', 'unknown-inventory']) {
+  test(`delayed recovered worker rechecks ${failure} before acquiring admission`, async (t) => {
+    const f = fixture(t, { collaboration: true });
+    f.snapshots.delete(legacyRoot);
+    f.host.readUnavailableThread = async (id) => (id === legacyRoot ? unavailable(id) : null);
+    if (failure === 'dependency') {
+      f.registry.revise('task', f.task.revision, (record) => {
+        record.dependsOn = ['required-task'];
+      });
+      f.input.expectedRevision = f.registry.readTask('task').revision;
+    }
+    const plan = await f.bind({ historicalRecovery: { mode: 'preserved-project-state' } }, { planOnly: true });
+    const result = await f.bind({
+      historicalRecovery: { mode: 'preserved-project-state', digest: plan.historicalRecoveryDigest },
+    });
+    let observations = 0;
+    if (failure === 'source-change') writeFileSync(path.join(f.worktree, 'base.txt'), 'changed after binding');
+    f.host.observe = () => {
+      observations++;
+      if (failure === 'unknown-inventory') throw Error('inventory unavailable');
+      const value = f.observe();
+      if (failure === 'live-process')
+        value.processes.push({ pid: process.pid + 99, ppid: 1, command: 'node ' + f.worktree });
+      return value;
+    };
+    if (failure === 'capacity')
+      f.host.readCapacity = async () => ({ limit: 1, activeDevelopment: 0, activeDelivery: 0, activeOther: 0 });
+    if (failure === 'dependency') f.host.dependenciesReady = () => false;
+    f.host.start = () => assert.fail('unsafe delayed worker must not start');
+    process.env.CODEX_THREAD_ID = worker;
+    const before = f.queue.read();
+    await assert.rejects(
+      resumeBoundTask({ ...f.input, taskRevision: result.task.revision, lane: 'development' }, f.host, {
+        registry: f.registry,
+        queue: f.queue,
+      }),
+    );
+    assert.deepEqual(f.queue.read(), before);
+    if (['capacity', 'dependency'].includes(failure)) assert.equal(observations, 0);
+  });
+}
+
+for (const failure of [
+  'missing-review',
+  'source-changed',
+  'missing-carrier',
+  'wrong-user',
+  'live-process',
+  'open-file',
+  'resource-lease',
+  'unknown-unavailability',
+]) {
+  test(`project-state recovery refuses unsafe historical absence: ${failure}`, async (t) => {
+    const f = fixture(t, { collaboration: true });
+    f.snapshots.delete(legacyRoot);
+    f.host.readUnavailableThread = async (id) => (failure === 'unknown-unavailability' ? null : unavailable(id));
+    const input = { historicalRecovery: { mode: 'preserved-project-state' } };
+    if (failure === 'unknown-unavailability') {
+      await assert.rejects(f.bind(input, { planOnly: true }));
+      return;
+    }
+    const plan = await f.bind(input, { planOnly: true });
+    input.historicalRecovery.digest = plan.historicalRecoveryDigest;
+    const options = {};
+    if (failure === 'missing-review') delete input.historicalRecovery.digest;
+    if (failure === 'source-changed') writeFileSync(path.join(f.worktree, 'base.txt'), 'changed after read-only plan');
+    if (failure === 'missing-carrier') rmSync(path.join(f.registry.commonDir, 'task-registry/start-intents/task.json'));
+    if (failure === 'wrong-user') input.request = { ...f.input.request, authorId: 'different' };
+    if (['live-process', 'open-file'].includes(failure))
+      options.observe = () => {
+        const value = f.observe();
+        if (failure === 'live-process')
+          value.processes.push({ pid: process.pid + 999, ppid: 1, command: 'node ' + f.worktree });
+        else value.files.push({ name: f.worktree + '/deleted.log (deleted)' });
+        return value;
+      };
+    if (failure === 'resource-lease') {
+      const d = path.join(f.registry.commonDir, 'task-registry/resource-leases/task-resource');
+      mkdirSync(d, { recursive: true });
+      writeFileSync(
+        path.join(d, 'owner.json'),
+        JSON.stringify({ resource: 'task-resource', task: old, token: 'retained', pid: process.pid }),
+      );
+    }
+    const before = f.registry.readTask('task'),
+      queue = f.queue.read();
+    await assert.rejects(f.bind(input, options));
+    assert.deepEqual(f.registry.readTask('task'), before);
+    assert.deepEqual(f.queue.read(), queue);
+  });
+}
 
 for (const failure of [
   'root-not-found',
@@ -459,6 +841,44 @@ test('bound worker resumes through admission/start/checkpoint while retaining hi
   );
   await assert.rejects(completionCommand(f.worktree, ['begin'], { owner: old }), /must own/);
 });
+
+for (const laterPause of [false, true]) {
+  test(`bound task authority survives unrelated later intake/directions but not a newer pause: pause=${laterPause}`, async (t) => {
+    const f = fixture(t);
+    f.queue.enqueue({
+      lane: 'delivery',
+      task: 'task',
+      owner: old,
+      request: { ...f.input.request, sequence: 2, messageId: 'original-delivery' },
+    });
+    f.input.queueRevision = f.queue.read().revision;
+    const result = await f.bind();
+    f.queue.enqueue({ lane: 'development', task: 'unrelated-new-task', owner: root, request: f.input.request });
+    f.queue.direct({
+      action: 'set-limits',
+      request: { ...f.input.request, sequence: 6, messageId: 'later-limits' },
+      limits: { development: null, delivery: 1 },
+    });
+    if (laterPause)
+      f.queue.direct({ action: 'pause-all', request: { ...f.input.request, sequence: 7, messageId: 'later-pause' } });
+    process.env.CODEX_THREAD_ID = worker;
+    const input = {
+      ...f.input,
+      taskRevision: result.task.revision,
+      queueRevision: f.queue.read().revision,
+      lane: 'delivery',
+    };
+    const before = f.queue.read();
+    if (laterPause) {
+      await assert.rejects(resumeBoundTask(input, f.host, { registry: f.registry, queue: f.queue }), /later pause/);
+      assert.deepEqual(f.queue.read(), before);
+    } else {
+      const resumed = await resumeBoundTask(input, f.host, { registry: f.registry, queue: f.queue });
+      assert.equal(resumed.status, 'admitted');
+      assert.equal(f.queue.read().tickets.find((t) => t.task === 'unrelated-new-task').status, 'queued');
+    }
+  });
+}
 
 test('fenced running delivery keeps its original freeze, session and occupied ticket across rebinding', async (t) => {
   const f = fixture(t),
