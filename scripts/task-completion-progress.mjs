@@ -14,6 +14,7 @@ import {
 } from './task-progress-outbox.mjs';
 import { completionCommand } from './completion-cli.mjs';
 import { preserveAssets, checkCompletionRuntime } from './task-completion.mjs';
+import { recordToolProgress } from './task-delivery-status-sync.mjs';
 
 // The host chooses a published entry or an accurately reviewed first-upgrade source.
 // This wrapper supplies transport only: completionCommand keeps all authorization/quality/leases.
@@ -121,10 +122,22 @@ export async function runCompletionWithProgress(
         checkRuntime: checkCompletionRuntime,
         ...completionOptions,
       });
+      if (result?.status === 'deferred') {
+        assert.equal(result.formalDeliveryComplete, false);
+        assert.match(result.main, /^[a-f0-9]{40}$/);
+        assert.match(result.runId, /^\d+$/);
+        recordToolProgress(directory, task.id, `settlement-deferred:${result.main}:${result.runId}`, {
+          observed_at: result.deferredAt,
+          event: 'completed',
+          action: { id: `main-handoff:${result.main}`, label: '主线验证与运行交接已完成' },
+          evidence_refs: [`main:${result.main}`, `main-ci:${result.runId}`],
+          next: { kind: 'wait', label: '外部周期验收待完成' },
+        });
+      }
     } catch (error) {
       failure = error;
     } finally {
-      if (['deliver', 'settle'].includes(args[0])) {
+      if (['deliver', 'settle'].includes(args[0]) && result?.status !== 'deferred') {
         try {
           placements.push({
             kind: 'delivery_complete',

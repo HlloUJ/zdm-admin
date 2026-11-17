@@ -1,7 +1,16 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
+import {
+  mkdtempSync,
+  realpathSync,
+  mkdirSync,
+  writeFileSync,
+  readFileSync,
+  rmSync,
+  existsSync,
+  symlinkSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { handoffPreservedReportCopies } from './task-cleanup-handoff.mjs';
@@ -56,6 +65,60 @@ function fixture(t) {
   };
   return { root, blob, manifest, input, api, fail: () => (failed = true), recover: () => (failed = false) };
 }
+function withoutReportPreservation(f) {
+  const content = '[]\n',
+    manifest = path.join(path.dirname(f.manifest), 'assets-' + sha(content) + '.json');
+  writeFileSync(manifest, content, { mode: 0o600 });
+  f.input.preserved = { manifest };
+}
+test('genuinely empty report directories stay untouched without claiming preserved copies or released space', async (t) => {
+  const f = fixture(t);
+  rmSync(path.join(f.root, 'test-results/failure.json'));
+  withoutReportPreservation(f);
+  const directories = ['test-results', 'playwright-report', 'coverage'];
+  for (const relative of directories.slice(1)) mkdirSync(path.join(f.root, relative), { mode: 0o700 });
+  const before = directories.map((relative) => cleanupIdentity(path.join(f.root, relative)));
+  f.api.createCleanupQueue = () => ({ handoff: () => assert.fail('Empty directory cannot enter cleanup queue') });
+  f.input.assertUnreferenced = async () => assert.fail('Empty retained directory needs no mutation reference check');
+  assert.deepEqual(await handoffPreservedReportCopies(f.input, { api: f.api }), []);
+  assert.deepEqual(
+    directories.map((relative) => cleanupIdentity(path.join(f.root, relative))),
+    before,
+  );
+  for (const relative of directories)
+    assert.equal(existsSync(path.join(f.root, '.task-runtime', 'cleanup-preserved-' + relative + '.json')), false);
+  assert.ok(existsSync(f.blob));
+});
+for (const member of ['file', 'empty-child-directory'])
+  test('nonempty report directory without preservation stays protected: ' + member, async (t) => {
+    const f = fixture(t);
+    withoutReportPreservation(f);
+    if (member === 'empty-child-directory') {
+      rmSync(path.join(f.root, 'test-results/failure.json'));
+      mkdirSync(path.join(f.root, 'test-results/child'));
+    }
+    const before = cleanupIdentity(path.join(f.root, 'test-results'));
+    await assert.rejects(handoffPreservedReportCopies(f.input, { api: f.api }), /no complete preservation proof/);
+    assert.deepEqual(cleanupIdentity(path.join(f.root, 'test-results')), before);
+    assert.ok(existsSync(f.blob));
+  });
+for (const link of ['report-root', 'report-member'])
+  test('linked report cannot be treated as an empty unpreserved directory: ' + link, async (t) => {
+    const f = fixture(t),
+      source = path.join(f.root, 'test-results'),
+      target = path.join(f.root, 'retained-target');
+    rmSync(path.join(source, 'failure.json'));
+    mkdirSync(target);
+    withoutReportPreservation(f);
+    if (link === 'report-root') {
+      rmSync(source, { recursive: true });
+      symlinkSync(target, source);
+    } else symlinkSync(target, path.join(source, 'linked'));
+    await assert.rejects(handoffPreservedReportCopies(f.input, { api: f.api }), /Linked|linked/);
+    assert.ok(existsSync(source));
+    assert.ok(existsSync(target));
+    assert.ok(existsSync(f.blob));
+  });
 test('complete preserved report copy moves once and keeps immutable original blob and failure bytes', async (t) => {
   const f = fixture(t),
     before = readFileSync(f.blob),

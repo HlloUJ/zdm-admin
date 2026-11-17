@@ -28,11 +28,19 @@ export async function runCompletionFlow(
     inventoryAssets,
     previewControl,
     candidateRuntime = withCandidateRuntime,
+    deferSettle = false,
+    readState = () => state,
   },
 ) {
+  assert.equal(typeof deferSettle, 'boolean');
+  assert.ok(
+    !deferSettle || (!state.closedAt && !state.events.some((e) => ['preserve', 'cleanup', 'close'].includes(e.name))),
+    'Deferred settlement cannot rewind already-started closeout',
+  );
   assert.match(head, /^[a-f0-9]{40}$/);
   const anchor = batch.repository.anchor;
   if (!existsSync(batch.worktree)) {
+    assert.equal(deferSettle, false, 'Cannot defer after the task Git carrier is already missing');
     const ci = [...state.events]
       .reverse()
       .find((e) => e.name === 'ci' && e.status === 'success' && e.result?.branch === 'main');
@@ -270,6 +278,56 @@ export async function runCompletionFlow(
     if (parallel) refresh('main-verified', { main: { local: main.sha, remote: main.sha, runId: String(ci.runId) } });
     await dispatch(anchor, ['final-handoff', main.sha]);
     if (parallel) refresh('handoff-verified');
+    if (deferSettle) {
+      const proof = readState(),
+        mainCi = [...proof.events]
+          .reverse()
+          .find(
+            (e) =>
+              e.name === 'ci' &&
+              e.status === 'success' &&
+              e.result?.branch === 'main' &&
+              e.result?.headSha === main.sha,
+          ),
+        handoff = proof.events.find(
+          (e) =>
+            e.name === 'handoff' &&
+            e.key === main.sha + ':final' &&
+            e.status === 'success' &&
+            e.result?.main === main.sha,
+        );
+      assert.ok(mainCi && handoff, 'Defer settlement requires exact successful main CI and final handoff evidence');
+      assert.equal(mainCi.result.eventName, 'push');
+      assertCompletionQuality(mainCi.result, main.sha, String(ci.runId));
+      assert.equal(ci.headSha, main.sha);
+      assert.ok(!proof.closedAt, 'Closed delivery cannot defer settlement');
+      const prior = proof.deferredSettlement;
+      const deferred = {
+        version: 1,
+        status: 'pending',
+        head,
+        main: main.sha,
+        runId: String(ci.runId),
+        deferredAt:
+          prior?.head === head && prior.main === main.sha && prior.runId === String(ci.runId)
+            ? prior.deferredAt
+            : new Date().toISOString(),
+        reason: '外部周期验收待完成',
+      };
+      proof.deferredSettlement = deferred;
+      save(proof);
+      return {
+        ...deferred,
+        status: 'deferred',
+        formalDeliveryComplete: false,
+        batch: batch.id,
+        next: {
+          kind: 'wait',
+          label: deferred.reason,
+          settle: ['npm', 'run', 'task:completion', '--', 'settle', batch.id, main.sha, String(ci.runId)],
+        },
+      };
+    }
     return dispatch(anchor, ['settle', batch.id, main.sha, String(ci.runId)]);
   }
   if (!parallel) return complete();
@@ -306,6 +364,15 @@ export async function runCompletionFlow(
       if (changed) await awaitRun('pr', head);
     } else assert.equal(current.state, 'MERGED');
     const result = await complete(turn, queue);
+    if (result.status === 'deferred') {
+      const retained = await queue.deferSettlement(turn, {
+        head,
+        main: result.main,
+        runId: result.runId,
+        deferredAt: result.deferredAt,
+      });
+      return { ...result, criticalResourcesReleased: true, queueTicket: retained.id };
+    }
     await queue.finish(turn, { success: true });
     return result;
   } catch (error) {

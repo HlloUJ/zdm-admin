@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
@@ -84,6 +84,22 @@ test('an interrupted composition resumes only its proven merge and keeps origina
   assert.equal(readFileSync(path.join(f.a, 'published-b.txt'), 'utf8'), 'independent published main change');
   assert.equal(readFileSync(path.join(f.b, 'unfinished.txt'), 'utf8'), 'unfinished B must survive');
   assert.equal(applyTaskComposition(f.a, 'a', undefined, { recover: true }).recordedHead, result.recordedHead);
+});
+test('explicit defer cannot reclassify already-started closeout or settle a missing task carrier', async (t) => {
+  const f = fixture(t),
+    base = {
+      state: { events: [{ name: 'cleanup', status: 'failure' }] },
+      deferSettle: true,
+      execute: () => assert.fail('no delivery effects'),
+    };
+  await assert.rejects(runCompletionFlow(f.a, readActiveBatch(f.a), f.head, base), /cannot rewind/);
+  await assert.rejects(
+    runCompletionFlow(f.a, { ...readActiveBatch(f.a), worktree: path.join(f.dir, 'missing') }, f.head, {
+      ...base,
+      state: { events: [] },
+    }),
+    /already missing/,
+  );
 });
 
 for (const mode of ['main already included', 'recorded merge', 'same-tree main advance'])
@@ -212,8 +228,16 @@ test('v2 published integration rejects an unpublished combination before changin
   assert.equal(readFileSync(path.join(integration, 'unpublished.txt'), 'utf8'), 'must be retained');
 });
 
-for (const failure of [null, 'composed-ci', 'handoff'])
-  test(`parallel delivery controller preserves exact ordering and ownership: ${failure ?? 'success'}`, async (t) => {
+for (const [failure, deferSettle] of [
+  [null, false],
+  ['composed-ci', false],
+  ['handoff', false],
+  [null, true],
+  ['main-ci', true],
+  ['handoff', true],
+  ['missing-handoff-proof', true],
+])
+  test(`parallel delivery controller preserves exact ordering and ownership: ${failure ?? 'success'} defer=${deferSettle}`, async (t) => {
     const f = fixture(t),
       events = [],
       state = { events: [] },
@@ -259,6 +283,7 @@ for (const failure of [null, 'composed-ci', 'handoff'])
       state,
       save: () => {},
       common: f.registry.commonDir,
+      deferSettle,
       inventoryAssets: () => [],
       candidateRuntime: async (_task, _head, action) => action({}),
       checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
@@ -273,6 +298,7 @@ for (const failure of [null, 'composed-ci', 'handoff'])
       dispatch: async (cwd, args) => {
         if (args[0] === 'wait') {
           events.push('wait:' + args[1]);
+          if (args[1] === 'main' && failure === 'main-ci') throw Error('main CI failed');
           if (args[1] === 'pr') {
             prWaits++;
             assert.equal(queue.inspect().tickets.length, prWaits === 1 ? 0 : 1);
@@ -301,7 +327,8 @@ for (const failure of [null, 'composed-ci', 'handoff'])
             handoffFailed = true;
             throw Error('handoff failed');
           }
-          return {};
+          if (failure === 'missing-handoff-proof') return {};
+          return (await completionStage(state, 'handoff', args[1] + ':final', async () => ({ main: args[1] }))).result;
         }
         assert.equal(args[0], 'settle');
         assert.equal(f.registry.readTask('a').stage, 'handoff-verified');
@@ -311,8 +338,36 @@ for (const failure of [null, 'composed-ci', 'handoff'])
     };
     const run = () => runCompletionFlow(f.a, readActiveBatch(f.a), f.head, options);
     if (failure)
-      await assert.rejects(run(), new RegExp(failure === 'handoff' ? 'handoff failed' : 'composed CI failed'));
-    else assert.equal((await run()).settled, true);
+      await assert.rejects(
+        run(),
+        new RegExp(
+          failure === 'handoff'
+            ? 'handoff failed'
+            : failure === 'main-ci'
+              ? 'main CI failed'
+              : failure === 'missing-handoff-proof'
+                ? 'Defer settlement requires'
+                : 'composed CI failed',
+        ),
+      );
+    else {
+      const result = await run();
+      if (deferSettle) {
+        assert.equal(result.status, 'deferred');
+        assert.equal(result.formalDeliveryComplete, false);
+        assert.equal(result.criticalResourcesReleased, true);
+        assert.equal(createResourceLeases(f.registry.commonDir).inspect('main-delivery'), null);
+        assert.equal(createResourceLeases(f.registry.commonDir).inspect('main-sync'), null);
+        const retained = queue.inspect().tickets[0];
+        assert.equal(retained.status, 'waiting');
+        assert.equal(retained.owner, 'chat-a');
+        assert.equal(retained.accepted, f.accepted.commit);
+        assert.equal(retained.deferred.main, result.main);
+        assert.equal(f.registry.readTask('a').stage, 'handoff-verified');
+        assert.ok(existsSync(f.a));
+        assert.equal(state.closedAt, undefined);
+      } else assert.equal(result.settled, true);
+    }
     assert.deepEqual(f.registry.readTask('b'), beforeB);
     assert.equal(readFileSync(path.join(f.b, 'unfinished.txt'), 'utf8'), 'unfinished B must survive');
     assert.equal(f.registry.readTask('a').frozen.accepted, f.accepted.commit);
@@ -324,14 +379,28 @@ for (const failure of [null, 'composed-ci', 'handoff'])
       assert.ok(!events.includes('settle'));
       assert.equal(queue.inspect().tickets[0].status, 'blocked');
       const readinessCount = events.filter((e) => e.startsWith('readiness:')).length;
-      assert.equal((await run()).settled, true);
-      assert.equal(queue.inspect().tickets.length, 0);
+      const result = await run();
+      assert.equal(deferSettle ? result.status : result.settled, deferSettle ? 'deferred' : true);
+      assert.equal(queue.inspect().tickets.length, deferSettle ? 1 : 0);
       assert.equal(events.filter((e) => e.startsWith('readiness:')).length, readinessCount);
+    } else if (failure === 'main-ci' || failure === 'missing-handoff-proof') {
+      if (failure === 'main-ci') assert.ok(!events.includes('handoff'));
+      assert.ok(!events.includes('settle'));
+      assert.equal(state.deferredSettlement, undefined);
+      assert.equal(queue.inspect().tickets[0].status, 'blocked');
     } else {
       assert.deepEqual(
         events.filter((e) => !e.startsWith('readiness:')),
-        ['wait:pr', 'quiesce-a-preserve-b', 'wait:pr', 'merge', 'wait:main', 'handoff', 'settle'],
+        [
+          'wait:pr',
+          'quiesce-a-preserve-b',
+          'wait:pr',
+          'merge',
+          'wait:main',
+          'handoff',
+          ...(deferSettle ? [] : ['settle']),
+        ],
       );
-      assert.equal(queue.inspect().tickets.length, 0);
+      assert.equal(queue.inspect().tickets.length, deferSettle ? 1 : 0);
     }
   });

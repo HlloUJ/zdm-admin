@@ -131,3 +131,45 @@ test('explicit drain consumes its scheduled kick and never self-retries a failed
   assert.equal(reads, 1);
   assert.equal(createProgressOutbox(f.directory).read().pending.length, 1);
 });
+test('deferred completion emits only a wait receipt and never requests or submits delivery_complete', async (t) => {
+  const f = fixture(t),
+    registry = { commonDir: f.root, resolve: () => ({ id: 'fixture', worktree: f.root }) };
+  let completedReads = 0;
+  const result = await runCompletionWithProgress(
+    {
+      root: f.root,
+      args: ['deliver', 'fixture', 'a'.repeat(40)],
+      completionOptions: { deferSettle: true },
+      call: async () => {
+        throw Error('isolated transport unavailable');
+      },
+    },
+    {
+      registry,
+      readClosedSource: () => {
+        completedReads++;
+        throw Error('must not request completed source');
+      },
+      command: async (_root, _args, options) => {
+        assert.equal(options.deferSettle, true);
+        return {
+          status: 'deferred',
+          formalDeliveryComplete: false,
+          main: 'b'.repeat(40),
+          runId: '42',
+          deferredAt: new Date().toISOString(),
+        };
+      },
+    },
+  );
+  assert.equal(result.completion.formalDeliveryComplete, false);
+  assert.equal(completedReads, 0);
+  const receipts = createProgressOutbox(f.directory)
+    .read()
+    .pending.map((e) => e.receipt);
+  assert.equal(receipts.length, 1);
+  assert.equal(receipts[0].next.kind, 'wait');
+  assert.equal(receipts[0].next.label, '外部周期验收待完成');
+  assert.ok(receipts.every((r) => r.stage_fact?.kind !== 'delivery_complete'));
+  assert.ok(!result.progress.placements.some((p) => p.kind === 'delivery_complete'));
+});
