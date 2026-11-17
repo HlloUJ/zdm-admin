@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync, lstatSync, realpathSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
+import { readFileSync, writeFileSync, mkdirSync, lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
 import { nativeDockerVnodeSource } from './preview-docker-vnode-source.mjs';
 import { referenceHash } from './preview-reference-history.mjs';
@@ -41,7 +42,8 @@ export function collectRetainedDockerDirectories(identity, inventory, record) {
     'Non-directory task reference',
   );
   const file = record('docker-directory-start', { matching });
-  const directory = path.dirname(file);
+  const directory = path.join(path.dirname(file), 'native-' + randomUUID());
+  mkdirSync(directory, { mode: 0o700 });
   const execute = (command, args) => {
     const r = spawnSync(command, args, { encoding: 'utf8', timeout: 20000, maxBuffer: 64 * 1024 * 1024 });
     record('docker-native-command', {
