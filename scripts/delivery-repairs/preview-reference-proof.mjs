@@ -8,6 +8,7 @@ import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createTaskRegistry } from '../task-registry.mjs';
 import { assertTaskExecutor, taskExecutor } from '../task-execution-binding.mjs';
 import { createExecutionOrder } from '../task-execution-order.mjs';
+import { collectRetainedDockerDirectories } from './preview-docker-directories.mjs';
 import { readAcceptance } from '../accepted-source.mjs';
 import { parseWorktreePorcelain } from '../git-workflow-core.mjs';
 import {
@@ -39,6 +40,8 @@ const sourceFiles = [
   'scripts/delivery-repairs/preview-reference-proof.mjs',
   'scripts/delivery-repairs/preview-reference-proof-core.mjs',
   'scripts/delivery-repairs/preview-reference-history.mjs',
+  'scripts/delivery-repairs/preview-docker-directories.mjs',
+  'scripts/delivery-repairs/preview-docker-vnode-source.mjs',
 ];
 const publishedFiles = [
   'scripts/task-cancellation-proof.mjs',
@@ -48,6 +51,23 @@ const publishedFiles = [
   'scripts/preview-consumers.mjs',
   'scripts/accepted-source.mjs',
 ];
+
+// Write each obtained observation before checking it. A rejected proof is still
+// evidence; its raw rounds must not disappear with the exception. No event is
+// overwritten and only the consumer's private namespace is selected below.
+export function createReferenceEvidenceJournal(directory) {
+  mkdirSync(directory, { recursive: false, mode: 0o700 });
+  let sequence = 0;
+  return (kind, value) => {
+    assert.match(kind, /^[a-z][a-z0-9-]*$/);
+    const file = path.join(directory, String(++sequence).padStart(3, '0') + '-' + kind + '.json');
+    writeFileSync(file, JSON.stringify({ observedAt: Date.now(), kind, value }, null, 2) + '\n', {
+      flag: 'wx',
+      mode: 0o600,
+    });
+    return file;
+  };
+}
 
 export function referenceConsumerAnchor(root, common) {
   const mains = parseWorktreePorcelain(git(root, 'worktree', 'list', '--porcelain')).filter((w) => w.branch === 'main');
@@ -127,7 +147,7 @@ function leaseRecord(common, port) {
   };
 }
 
-async function captureIdentity(scope, selector, core) {
+async function captureIdentity(scope, selector, core, record) {
   const { registry, task: consumer, anchor } = scope;
   const task = registry.readTask(selector.foreignTask);
   assert.notEqual(task.id, consumer.id, 'Stopped-foreign proof cannot replace own shutdown protocol');
@@ -193,6 +213,16 @@ async function captureIdentity(scope, selector, core) {
   });
   const backendRecord = regularReferenceFile(path.join(task.worktree, '.task-runtime/backend-state.json'));
   const previous = JSON.parse(backendRecord.bytes);
+  record('backend-source-binding', {
+    container: { id: container.Id, labels: container.Config.Labels, mounts: container.Mounts },
+    mountedMigrationSource: migration.Source,
+    observedMigrationPath,
+    migrationDirectory,
+    recordedContainerIdentity: previous.containerIdentity,
+    observedContainerIdentity: containerIdentity,
+    recordedSourceIdentity: previous.sourceIdentity,
+    observedSourceIdentity: runtime.taskBackendSourceIdentity({ root: task.worktree, migrationDirectory }),
+  });
   assert.ok(
     containerIdentity && previous.version === 1 && previous.containerIdentity === containerIdentity,
     'Retained backend identity mismatch',
@@ -273,14 +303,17 @@ async function captureIdentity(scope, selector, core) {
       inventory: { id: container.Id, labels: container.Config.Labels, mounts: container.Mounts },
     },
   };
+  record('identity', identity);
   assertStoppedPreviewIdentity(identity);
   return identity;
 }
 
-async function observe(identity, scope, core) {
+async function observe(identity, scope, core, record) {
   const observedAt = Date.now();
   // Mandatory original published implementation, with no exec/env test adapter.
   const inventory = core['scripts/task-cancellation-proof.mjs'].observeCancellationHost();
+  record('host-inventory', inventory);
+  const retainedDirectoryReferences = collectRetainedDockerDirectories(identity, inventory, record);
   const previews = core['scripts/preview-consumers.mjs'];
   const leases = previews.temporaryPreviewLeases(scope.registry.commonDir);
   const ports = [5175, 5176, ...Array.from({ length: 23 }, (_, i) => 5177 + i)];
@@ -290,6 +323,7 @@ async function observe(identity, scope, core) {
       response: await previews.readPreviewResponse(`http://127.0.0.1:${port}/__zdm_task_preview__`),
     })),
   );
+  record('frontend-observations', { leases, responses });
   assert.deepEqual(
     previews.temporaryPreviewLeases(scope.registry.commonDir),
     leases,
@@ -318,6 +352,7 @@ async function observe(identity, scope, core) {
     observedAt,
     observerPid: process.pid,
     wrapperAncestors: [],
+    retainedDirectoryReferences,
     frontend: { statusCode: response.statusCode, errorCode: response.errorCode },
     backendHealth: { statusCode: health.statusCode, status },
     backendConsumers,
@@ -327,18 +362,32 @@ async function observe(identity, scope, core) {
 }
 
 async function liveProof(scope, selector, expected = null) {
-  const core = await publishedCore(scope, selector.publishedBaseline);
-  const identity = await captureIdentity(scope, selector, core);
-  if (expected) assert.deepEqual(identity, expected, 'Original lease/registry/source/history/data binding changed');
-  const first = await observe(identity, scope, core);
-  assertStoppedPreviewRound(first, identity, Date.now());
-  const afterFirst = await captureIdentity(scope, selector, core);
-  assert.deepEqual(afterFirst, identity, 'Identity changed after first full observation');
-  const second = await observe(identity, scope, core);
-  assertStoppedPreviewRound(second, identity, Date.now());
-  const afterSecond = await captureIdentity(scope, selector, core);
-  assertStoppedPreviewPair({ identity, afterFirst, afterSecond, first, second }, Date.now());
-  return { identity, rounds: [first, second], finishedAt: Date.now() };
+  const parent = path.join(scope.registry.commonDir, 'task-delivery', scope.task.id, 'reference-proofs');
+  mkdirSync(parent, { recursive: true, mode: 0o700 });
+  const evidenceDirectory = path.join(parent, 'observation-' + randomUUID());
+  const record = createReferenceEvidenceJournal(evidenceDirectory);
+  record('started', { selector, consumerTask: scope.task.id, observerPid: process.pid });
+  try {
+    const core = await publishedCore(scope, selector.publishedBaseline);
+    const identity = await captureIdentity(scope, selector, core, record);
+    if (expected) assert.deepEqual(identity, expected, 'Original lease/registry/source/history/data binding changed');
+    const first = await observe(identity, scope, core, record);
+    record('round', first);
+    assertStoppedPreviewRound(first, identity, Date.now());
+    const afterFirst = await captureIdentity(scope, selector, core, record);
+    assert.deepEqual(afterFirst, identity, 'Identity changed after first full observation');
+    const second = await observe(identity, scope, core, record);
+    record('round', second);
+    assertStoppedPreviewRound(second, identity, Date.now());
+    const afterSecond = await captureIdentity(scope, selector, core, record);
+    assertStoppedPreviewPair({ identity, afterFirst, afterSecond, first, second }, Date.now());
+    record('accepted', { finishedAt: Date.now() });
+    return { identity, rounds: [first, second], finishedAt: Date.now(), evidenceDirectory };
+  } catch (error) {
+    record('rejected', { name: error.name, message: error.message, stack: error.stack });
+    error.message += '\nRead-only observation evidence: ' + evidenceDirectory;
+    throw error;
+  }
 }
 
 export async function collectPreviewReferenceProof(root, foreignTask, historyFile) {
@@ -415,6 +464,7 @@ function loadSelection(root, file) {
     'collectorPid',
     'consumer',
     'contract',
+    'evidenceDirectory',
     'finishedAt',
     'identity',
     'mutation',

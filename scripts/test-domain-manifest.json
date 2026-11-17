@@ -780,21 +780,37 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/preview-docker-directories.mjs": {
+      "digest": "e09dd4fab9abc4ed7d01adb794267b160b22037b3d9fa2500d0d0a0767fe8c80",
+      "imports": [
+        "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
+        "scripts/delivery-repairs/preview-reference-history.mjs",
+        "scripts/delivery-repairs/preview-reference-proof-core.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/preview-docker-vnode-source.mjs": {
+      "digest": "2bd6f5a600c87ab54fe3c838f9100243caf6f37fce221c73160551f2d582cb2d",
+      "imports": [],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/preview-reference-history.mjs": {
       "digest": "629732d6b174d3a3ede59e37af69f0311657ae0da40db3ac84660341c90f37e8",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof-core.mjs": {
-      "digest": "2caf6e64e460ea1d5588c9d235053a6114b71f70c640dc03616a472137305742",
+      "digest": "e3d37ad31035acc6ecde641334e53291c3c8a7932178c874d6d0242850cf4fce",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof.mjs": {
-      "digest": "84223c60576b6945e7fd1bc8dfbd70937fbbd4476a990cf87513db29212df44d",
+      "digest": "9447a227019d17c0b9a49cf11c48497a34fcb5d1ab3bdc5a9f041a101026946e",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-cli.mjs",
+        "scripts/delivery-repairs/preview-docker-directories.mjs",
+        "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
         "scripts/delivery-repairs/preview-reference-proof-core.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
@@ -812,8 +828,9 @@
       "dynamicImports": 1
     },
     "scripts/delivery-repairs/preview-reference-proof.test.mjs": {
-      "digest": "f271f0ba975395707b4750e5b57d807a45e8656b9b33ec1d32b29c67a17e39df",
+      "digest": "f45f2dcd4e569a5d4e8083f24b1790f58a455a24f9e9ecfdccf65ff911568a7b",
       "imports": [
+        "scripts/delivery-repairs/preview-docker-directories.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
         "scripts/delivery-repairs/preview-reference-proof-core.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",

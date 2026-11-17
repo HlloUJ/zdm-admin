@@ -18,6 +18,95 @@ export function observedHostMountPath(value, platform) {
   return platform === 'darwin' && value.startsWith('/host_mnt/') ? value.slice('/host_mnt'.length) : value;
 }
 
+export function retainedDirectoryKeys(round, identity) {
+  const proof = round.retainedDirectoryReferences;
+  if (!proof) return new Set();
+  assert.equal(proof.kind, 'retained-docker-source-directories-v1');
+  assert.equal(proof.cleanupAuthorized, false);
+  assert.equal(proof.backend, identity.backend.id);
+  const mounts = identity.backend.inventory.mounts.filter(
+    (m) => m.Type === 'bind' && observedHostMountPath(m.Source, 'darwin') === identity.worktree,
+  );
+  assert.equal(mounts.length, 1);
+  assert.deepEqual(proof.sourceMount, mounts[0]);
+  assert.equal(proof.sourceMount.Destination, '/workspace');
+  assert.equal(proof.endpoint.path, identity.dockerEndpoint.slice('unix://'.length));
+  assert.ok(
+    round.files.some((f) => f.pid === proof.endpoint.ownerPid && f.type === 'unix' && f.name === proof.endpoint.path),
+  );
+  const keys = new Set(),
+    pids = new Set();
+  for (const service of proof.services) {
+    assert.ok(!pids.has(service.pid));
+    pids.add(service.pid);
+    const owner = service.pid === proof.endpoint.ownerPid;
+    assert.equal(
+      service.executable,
+      '/Applications/Docker.app/Contents/MacOS/' + (owner ? 'com.docker.backend' : 'com.docker.sailor'),
+    );
+    assert.equal(service.image.executable, service.executable);
+    assert.equal(service.image.identifier, owner ? 'com.docker.docker' : 'com.docker');
+    assert.equal(service.image.team, '9BNSXJN65R');
+    assert.equal(service.image.signatureVerified, true);
+    assert.match(service.image.hash, /^[a-f0-9]{64}$/);
+    assert.equal(service.processStable, true);
+    assert.ok(Number.isSafeInteger(service.startSeconds) && service.startSeconds > 0);
+    const process = round.processes.find((p) => p.pid === service.pid);
+    assert.ok(process && process.ppid === service.ppid);
+    if (!owner) assert.equal(service.ppid, proof.endpoint.ownerPid);
+    assert.equal(service.uid, proof.sourceUid);
+    assert.ok(service.fds.length > 0);
+    for (const fd of service.fds) {
+      assert.equal(fd.returnedSize, service.expectedSize);
+      assert.equal(fd.errno, 0);
+      assert.ok(Number.isSafeInteger(fd.fd) && fd.fd >= 0);
+      assert.equal(fd.directory, true);
+      assert.equal(fd.vnodeType, 2);
+      assert.equal(fd.fileType, 1);
+      assert.equal(fd.openFlags, 1);
+      assert.equal(fd.guardFlags, 0);
+      assert.equal(String(fd.device), proof.sourceDevice);
+      assert.ok(Number.isSafeInteger(fd.inode) && fd.inode > 0);
+      assert.equal(fd.mode & 0o170000, 0o040000);
+      assert.ok(under(fd.path, identity.worktree));
+      if (fd.lstatStatus === 0) {
+        assert.equal(fd.pathDevice, fd.device);
+        assert.equal(fd.pathInode, fd.inode);
+        assert.equal(fd.pathMode, fd.mode);
+        assert.equal(fd.fsgetpathErrno, 0);
+        assert.equal(fd.fsgetpath, fd.path);
+      } else {
+        assert.equal(fd.lstatStatus, -1);
+        assert.equal(fd.lstatErrno, 2);
+        assert.equal(fd.fsgetpathSize, -1);
+        assert.equal(fd.fsgetpathErrno, 2);
+        assert.equal(fd.fsgetpath, '');
+        assert.equal(fd.parent, path.dirname(fd.path));
+        assert.ok(under(fd.parent, identity.worktree));
+        assert.equal(fd.parentStatus, 0);
+        assert.equal(fd.parentDevice, fd.device);
+        assert.ok(Number.isSafeInteger(fd.parentInode) && fd.parentInode > 0);
+        assert.equal(fd.parentMode & 0o170000, 0o040000);
+      }
+      const key = JSON.stringify([service.pid, String(fd.fd), fd.path]);
+      assert.ok(!keys.has(key));
+      keys.add(key);
+      assert.ok(
+        round.files.some(
+          (f) => f.pid === service.pid && f.descriptor === String(fd.fd) && f.name === fd.path && f.type === 'DIR',
+        ),
+      );
+    }
+  }
+  assert.ok(pids.has(proof.endpoint.ownerPid));
+  const owner = proof.services.find((service) => service.pid === proof.endpoint.ownerPid);
+  assert.ok(
+    owner.fds.some((fd) => fd.path === identity.worktree && String(fd.inode) === proof.sourceInode),
+    'Actual Docker endpoint owner must retain the exact source root vnode',
+  );
+  return keys;
+}
+
 // Mirror the published metadata/unknown policy. This proof observes other
 // frontends; it neither stops them nor adds a new nonce/ownership requirement.
 export function referenceFrontendMetadata(port, response, lease) {
@@ -64,6 +153,7 @@ export function assertStoppedPreviewRound(round, identity, now) {
   assert.ok(!round.processes.some((p) => p.pid === identity.lease.pid), 'Lease process active or PID reused');
   assert.deepEqual(round.frontend, { statusCode: 0, errorCode: 'ECONNREFUSED' }, 'Frontend not positively closed');
   const tokens = [identity.task, identity.worktree, identity.lease.token];
+  const retained = retainedDirectoryKeys(round, identity);
   const ignored = new Set([round.observerPid]);
   // Invoke the public collector with exec. No process-name/wrapper allowlist.
   assert.deepEqual(round.wrapperAncestors, []);
@@ -83,7 +173,9 @@ export function assertStoppedPreviewRound(round, identity, now) {
     }
     assert.ok(file.name, 'Unknown open file');
     assert.ok(
-      !under(file.name, identity.worktree) && !file.name.includes(identity.lease.token),
+      (!under(file.name, identity.worktree) ||
+        (file.type === 'DIR' && retained.has(JSON.stringify([file.pid, file.descriptor, file.name])))) &&
+        !file.name.includes(identity.lease.token),
       'Task file/nonce remains open',
     );
     if (['IPv4', 'IPv6'].includes(file.type)) {
@@ -105,7 +197,12 @@ export function assertStoppedPreviewRound(round, identity, now) {
       'Other task container remains',
     );
     assert.ok(
-      !container.mounts.some((m) => typeof m.Source === 'string' && under(m.Source, identity.worktree)),
+      !container.mounts.some(
+        (m) =>
+          typeof m.Source === 'string' &&
+          (under(m.Source, identity.worktree) ||
+            (retained.size && under(identity.worktree, observedHostMountPath(m.Source, 'darwin')))),
+      ),
       'Other container retains the source',
     );
   }
@@ -125,6 +222,11 @@ export function assertStoppedPreviewPair({ identity, afterFirst, afterSecond, fi
   assert.deepEqual(afterSecond, identity, 'Identity changed after second full observation');
   assert.ok(second.observedAt >= first.observedAt, 'Observation order reversed');
   assert.deepEqual(second.previewLeases, first.previewLeases, 'Leases changed between full observations');
+  assert.deepEqual(
+    second.retainedDirectoryReferences,
+    first.retainedDirectoryReferences,
+    'Retained Docker directory identities changed between rounds',
+  );
   assert.deepEqual(
     second.frontendObservations,
     first.frontendObservations,

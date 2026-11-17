@@ -10,6 +10,9 @@ import {
   realpathSync,
   mkdirSync,
   existsSync,
+  readFileSync,
+  readdirSync,
+  lstatSync,
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -28,11 +31,45 @@ import {
   regularReferenceFile,
   verifyPublishedReferenceSnapshot,
 } from './preview-reference-history.mjs';
-import { verifyClosedPreviewReference, referenceConsumerAnchor } from './preview-reference-proof.mjs';
+import {
+  verifyClosedPreviewReference,
+  referenceConsumerAnchor,
+  createReferenceEvidenceJournal,
+} from './preview-reference-proof.mjs';
 import { inspectPreviewConsumers } from '../preview-consumers.mjs';
+import { parseDockerVnodeInventory } from './preview-docker-directories.mjs';
 
 const sha = 'a'.repeat(64),
   head = 'b'.repeat(40);
+test('rejected observations retain the original inventory before failure without overwriting events', () => {
+  const parent = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'reference-evidence-')));
+  const directory = path.join(parent, 'attempt');
+  try {
+    const record = createReferenceEvidenceJournal(directory);
+    const inventory = { files: [{ pid: 887, descriptor: '5004', type: 'DIR', name: '/missing' }] };
+    const original = record('host-inventory', inventory);
+    inventory.files[0].name = '/later';
+    const rejected = record('rejected', { name: 'AssertionError', message: 'Task file/nonce remains open' });
+    assert.deepEqual(JSON.parse(readFileSync(original)).value.files[0], {
+      pid: 887,
+      descriptor: '5004',
+      type: 'DIR',
+      name: '/missing',
+    });
+    assert.equal(JSON.parse(readFileSync(rejected)).value.message, 'Task file/nonce remains open');
+    assert.deepEqual(readdirSync(directory), ['001-host-inventory.json', '002-rejected.json']);
+    assert.equal(lstatSync(directory).mode & 0o777, 0o700);
+    assert.equal(lstatSync(original).mode & 0o777, 0o600);
+    assert.throws(() => createReferenceEvidenceJournal(directory), /EEXIST/);
+    assert.throws(() => record('../escape', {}));
+    const collision = path.join(directory, '003-round.json');
+    writeFileSync(collision, 'existing observation');
+    assert.throws(() => record('round', {}), /EEXIST/);
+    assert.equal(readFileSync(collision, 'utf8'), 'existing observation');
+  } finally {
+    rmSync(parent, { recursive: true, force: true });
+  }
+});
 test('Docker Desktop migration mount uses its actual macOS host path without changing Linux paths', () => {
   assert.equal(observedHostMountPath('/host_mnt/private/task/migrations', 'darwin'), '/private/task/migrations');
   assert.equal(observedHostMountPath('/private/task/migrations', 'darwin'), '/private/task/migrations');
@@ -93,6 +130,183 @@ function round(i = identity()) {
     backendConsumers: [],
   };
 }
+function retainedDirectoryFixture() {
+  const i = identity(),
+    r = round(i);
+  const mount = { Type: 'bind', Source: '/host_mnt/repo/foreign', Destination: '/workspace' };
+  i.backend.inventory.mounts = [mount];
+  r.containers = [structuredClone(i.backend.inventory)];
+  r.processes.push(
+    { pid: 10, ppid: 2, command: '/Applications/Docker.app/Contents/MacOS/com.docker.backend services' },
+    { pid: 11, ppid: 10, command: '/Applications/Docker.app/Contents/MacOS/com.docker.sailor' },
+  );
+  r.files.push({ pid: 10, descriptor: '20', type: 'unix', name: '/docker.sock' });
+  const directory = (fd, name) => ({
+    fd,
+    returnedSize: 1200,
+    errno: 0,
+    device: 12,
+    inode: fd + 100,
+    nlink: 2,
+    mode: 0o40755,
+    directory: true,
+    vnodeType: 2,
+    fileType: 1,
+    openFlags: 1,
+    guardFlags: 0,
+    path: name,
+    lstatStatus: 0,
+    lstatErrno: 0,
+    pathDevice: 12,
+    pathInode: fd + 100,
+    pathMode: 0o40755,
+    fsgetpathErrno: 0,
+    fsgetpath: name,
+  });
+  const services = [10, 11].map((pid) => ({
+    pid,
+    ppid: pid === 10 ? 2 : 10,
+    uid: 501,
+    startSeconds: 50,
+    startMicros: 1,
+    processStable: true,
+    expectedSize: 1200,
+    executable: '/Applications/Docker.app/Contents/MacOS/' + (pid === 10 ? 'com.docker.backend' : 'com.docker.sailor'),
+    fds: [directory(pid, pid === 10 ? i.worktree : i.worktree + '/src')],
+  }));
+  for (const service of services) {
+    service.image = {
+      executable: service.executable,
+      identifier: service.pid === 10 ? 'com.docker.docker' : 'com.docker',
+      team: '9BNSXJN65R',
+      hash: sha,
+      signatureVerified: true,
+    };
+    for (const fd of service.fds)
+      r.files.push({ pid: service.pid, descriptor: String(fd.fd), type: 'DIR', name: fd.path });
+  }
+  r.retainedDirectoryReferences = {
+    kind: 'retained-docker-source-directories-v1',
+    backend: i.backend.id,
+    sourceMount: mount,
+    sourceDevice: '12',
+    sourceInode: '110',
+    sourceUid: 501,
+    endpoint: { path: '/docker.sock', ownerPid: 10 },
+    services,
+    cleanupAuthorized: false,
+  };
+  return { i, r };
+}
+test('actual Docker vnode inventory preserves numeric DIR and executable image identities', () => {
+  assert.deepEqual(
+    parseDockerVnodeInventory('p10\0\nf20\0ar\0tDIR\0D0xc\0i110\0n/repo/foreign\0\nf txt\0tREG\0n/image\0'),
+    [
+      { pid: 10, descriptor: '20', a: 'r', t: 'DIR', D: '0xc', i: '110', n: '/repo/foreign' },
+      { pid: 10, descriptor: ' txt', t: 'REG', n: '/image' },
+    ],
+  );
+  assert.throws(() => parseDockerVnodeInventory('p10\0f20\0tDIR\0tREG\0'), /Duplicate/);
+});
+test('retained signed Docker service directory references are preserved and grant no asset cleanup', () => {
+  const { i, r } = retainedDirectoryFixture();
+  assertStoppedPreviewRound(r, i, 950);
+  const second = structuredClone(r);
+  second.observedAt++;
+  assertStoppedPreviewPair({ identity: i, afterFirst: i, afterSecond: i, first: r, second }, 950);
+  const fd = r.retainedDirectoryReferences.services[1].fds[0];
+  Object.assign(fd, {
+    lstatStatus: -1,
+    lstatErrno: 2,
+    fsgetpathSize: -1,
+    fsgetpathErrno: 2,
+    fsgetpath: '',
+    parent: i.worktree,
+    parentStatus: 0,
+    parentDevice: 12,
+    parentInode: 110,
+    parentMode: 0o40755,
+  });
+  assertStoppedPreviewRound(r, i, 950);
+  assert.equal(fd.nlink, 2);
+  assert.equal(r.retainedDirectoryReferences.cleanupAuthorized, false);
+});
+for (const [name, mutate] of [
+  ['wrong endpoint', (p) => (p.endpoint.path = '/remote.sock')],
+  ['wrong endpoint owner', (p) => (p.endpoint.ownerPid = 12)],
+  ['source mount changed', (p) => (p.sourceMount = { ...p.sourceMount, Destination: '/other' })],
+  ['container changed', (p) => (p.backend = 'd'.repeat(64))],
+  ['source device changed', (p) => (p.sourceDevice = '13')],
+  ['wrong signer', (p) => (p.services[1].image.team = 'unknown')],
+  ['no signature', (p) => (p.services[1].image.signatureVerified = false)],
+  ['wrong executable', (p) => (p.services[1].executable = '/usr/bin/node')],
+  ['no direct parent', (p) => (p.services[1].ppid = 2)],
+  ['changed UID', (p) => (p.services[1].uid = 0)],
+  ['PID reused', (p) => (p.services[1].startSeconds = 0)],
+  ['unstable PID', (p) => (p.services[1].processStable = false)],
+  ['not a directory', (p) => (p.services[1].fds[0].directory = false)],
+  ['wrong vnode type', (p) => (p.services[1].fds[0].vnodeType = 1)],
+  ['writable handle', (p) => (p.services[1].fds[0].openFlags = 3)],
+  ['unknown kernel result', (p) => (p.services[1].fds[0].returnedSize = 0)],
+  ['inode path changed', (p) => p.services[1].fds[0].pathInode++],
+  ['unmapped path', (p) => (p.services[1].fds[0].path = '/elsewhere')],
+  ['guarded handle', (p) => (p.services[1].fds[0].guardFlags = 1)],
+  ['cleanup flag', (p) => (p.cleanupAuthorized = true)],
+])
+  test('retained directory proof rejects ' + name, () => {
+    const { i, r } = retainedDirectoryFixture();
+    mutate(r.retainedDirectoryReferences);
+    assert.throws(() => assertStoppedPreviewRound(r, i, 950));
+  });
+test('retained Docker directories do not exempt REG, unknown PIDs, extra directories, sockets or overlapping containers', () => {
+  for (const extra of [
+    { pid: 11, descriptor: '11', type: 'REG', name: '/repo/foreign/src' },
+    { pid: 12, descriptor: '11', type: 'DIR', name: '/repo/foreign/src' },
+    { pid: 11, descriptor: '99', type: 'DIR', name: '/repo/foreign/new' },
+    { pid: 11, descriptor: '12', type: 'IPv4', name: '127.0.0.1:8000->127.0.0.1:8082' },
+  ]) {
+    const { i, r } = retainedDirectoryFixture();
+    r.files.push(extra);
+    assert.throws(() => assertStoppedPreviewRound(r, i, 950));
+  }
+  const { i, r } = retainedDirectoryFixture();
+  r.containers.push({ id: 'd'.repeat(64), labels: {}, mounts: [{ Source: '/host_mnt/repo' }] });
+  assert.throws(() => assertStoppedPreviewRound(r, i, 950), /Other container/);
+});
+test('missing retained namespace requires a real same-device existing parent and stable two-round vnode identities', () => {
+  for (const change of [
+    (fd) => (fd.parent = '/elsewhere'),
+    (fd) => (fd.parentDevice = 13),
+    (fd) => (fd.parentStatus = -1),
+    (fd) => (fd.lstatErrno = 13),
+    (fd) => (fd.fsgetpathErrno = 13),
+    (fd) => (fd.parentInode = 0),
+  ]) {
+    const { i, r } = retainedDirectoryFixture(),
+      fd = r.retainedDirectoryReferences.services[1].fds[0];
+    Object.assign(fd, {
+      lstatStatus: -1,
+      lstatErrno: 2,
+      fsgetpathSize: -1,
+      fsgetpathErrno: 2,
+      fsgetpath: '',
+      parent: i.worktree,
+      parentStatus: 0,
+      parentDevice: 12,
+      parentInode: 110,
+      parentMode: 0o40755,
+    });
+    change(fd);
+    assert.throws(() => assertStoppedPreviewRound(r, i, 950));
+  }
+  const { i, r } = retainedDirectoryFixture(),
+    second = structuredClone(r);
+  second.retainedDirectoryReferences.services[1].startMicros++;
+  assert.throws(
+    () => assertStoppedPreviewPair({ identity: i, afterFirst: i, afterSecond: i, first: r, second }, 950),
+    /identities changed/,
+  );
+});
 test('complete stopped-frontend checks preserve the retained backend and never mutate supplied observations', () => {
   const i = identity(),
     r = round(i),
