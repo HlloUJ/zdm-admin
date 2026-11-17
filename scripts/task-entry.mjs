@@ -1,4 +1,5 @@
 import { createBoardIntake } from './task-board-intake.mjs';
+import './task-network.mjs';
 import { checkStartMonitoringArgs } from './task-monitor-registration.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';

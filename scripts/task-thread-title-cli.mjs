@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readBoardTask } from './task-network.mjs';
 import { execFileSync } from 'node:child_process';
 import { readFileSync, lstatSync, realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -49,21 +50,7 @@ process.stdin.on('data', async (chunk) => {
       else {
         assert.equal(input.url, 'https://uj-task-board-preview-nov12.hanjian-uj.chatgpt.site');
         assert.equal(typeof input.token, 'string');
-        const readTask = async (id) => {
-          const response = await fetch(input.url + '/service/tasks', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'OAI-Sites-Authorization': 'Bearer ' + input.token },
-            body: JSON.stringify({
-              operation: 'get_task_progress_receipt',
-              args: { id, receipt_id: 'title-sync-' + id },
-            }),
-            signal: AbortSignal.timeout(30000),
-          });
-          assert.ok(response.ok, 'Board read failed');
-          const body = await response.json();
-          assert.ok(!body.error && body.data?.task?.id === id, 'Exact board task readback required');
-          return body.data.task;
-        };
+        const readTask = (id) => readBoardTask({ url: input.url, token: input.token, id });
         result =
           input.action === 'plan'
             ? await store.plan(input.task, readTask)

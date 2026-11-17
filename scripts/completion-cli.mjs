@@ -1,3 +1,4 @@
+import { assertTaskExecutor } from './task-execution-binding.mjs';
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
 import { handoffAuditedDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
 import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
@@ -792,12 +793,18 @@ export async function completionCommand(root, args, options = {}) {
   // Before private-lease recovery, freeze, automatic session restoration, or any external effect.
   // Even legacy/unregistered mutation is denied when the explicit policy is active.
   const executionOrder = createExecutionOrder(registry.commonDir);
+  if (task && !orderReadOnly)
+    assertTaskExecutor(
+      task,
+      options.owner ?? process.env.CODEX_THREAD_ID,
+      'Completion must belong to the exact current chat/task',
+    );
   if (!orderReadOnly && executionOrder.read()) {
     assert.ok(task, 'No registered execution-order task; do not adopt legacy work');
     executionOrder.assertAdmission({
       lane: 'delivery',
       task: task.id,
-      owner: options.owner ?? process.env.CODEX_THREAD_ID,
+      owner: task.owner,
       admission: process.env.ZDM_EXECUTION_ADMISSION,
     });
   }
@@ -806,9 +813,9 @@ export async function completionCommand(root, args, options = {}) {
     assert.ok(!task.compatibility?.readOnly, 'Legacy frozen task remains on its reviewed recovery path');
     const readOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
     if (!readOnly)
-      assert.equal(
+      assertTaskExecutor(
+        task,
         options.owner ?? process.env.CODEX_THREAD_ID,
-        task.owner,
         'Completion must belong to the exact current chat/task',
       );
     return withTaskContext({ id: task.id, commonDir: registry.commonDir, owner: task.owner }, async () => {

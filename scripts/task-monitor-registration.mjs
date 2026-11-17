@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
 
 // Written with the new task registry record, never backfilled into historical tasks.
 export function monitoringRegistration(owner, context, runtimeOwner = process.env.CODEX_THREAD_ID) {
@@ -29,12 +30,15 @@ export function monitoringRegistration(owner, context, runtimeOwner = process.en
     assert.match(context.worker, /^\/root\/[a-z0-9_/]+$/);
   }
   // This stores provenance, not a fabricated platform liveness check.
+  if (context.coordinatorThreadId !== undefined)
+    assert.match(context.coordinatorThreadId, /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/);
   return {
     ...base,
     state: 'registered',
     platformWorkerVerified: false,
     ...Object.fromEntries(fields.map((key) => [key, context[key]])),
     ...(context.executionSurface ? { executionSurface: context.executionSurface } : {}),
+    ...(context.coordinatorThreadId ? { coordinatorThreadId: context.coordinatorThreadId } : {}),
   };
 }
 
@@ -73,7 +77,7 @@ export function verifyStartMonitoringReadback(registry, task, context) {
     'Monitoring readback differs; inspect existing state, do not replay start',
   );
   if (context !== undefined) {
-    monitoringRegistration(task.owner, context); // Existing explicit carrier-to-board bindings remain valid.
+    monitoringRegistration(taskExecutor(task), context); // Keep historical monitoring unchanged.
     for (const key of [
       'taskNumber',
       'taskName',
@@ -83,9 +87,10 @@ export function verifyStartMonitoringReadback(registry, task, context) {
       'roomId',
       'authorizationRef',
       'executionSurface',
+      'coordinatorThreadId',
     ])
-      assert.equal(saved.monitoring?.[key], context[key], 'Monitoring readback differs: ' + key);
-    assert.equal(saved.monitoring.state, 'registered');
+      assert.equal(taskMonitoring(saved)?.[key], context[key], 'Monitoring readback differs: ' + key);
+    if (!saved.executionBindings) assert.equal(saved.monitoring.state, 'registered');
   }
   return saved;
 }

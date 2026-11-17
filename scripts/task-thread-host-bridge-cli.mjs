@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { readBoardTask } from './task-network.mjs';
 import { execFileSync, execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import { realpathSync } from 'node:fs';
@@ -6,6 +7,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { advanceTaskThread } from './task-thread-host-bridge.mjs';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
+import { assertDeliveredDependencies } from './task-context.mjs';
 const execute = promisify(execFile);
 assert.ok(process.stdin.isTTY, 'Use a private PTY for authenticated host input');
 process.stdin.setRawMode(true);
@@ -37,21 +39,9 @@ process.stdin.on('data', async (chunk) => {
     const registry = createTaskRegistry(main);
     const result = await advanceTaskThread(input, {
       commonDir: registry.commonDir,
-      readTask: async (id) => {
-        const response = await fetch(input.url + '/service/tasks', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'OAI-Sites-Authorization': 'Bearer ' + input.token },
-          body: JSON.stringify({
-            operation: 'get_task_progress_receipt',
-            args: { id, receipt_id: 'title-sync-' + id },
-          }),
-          signal: AbortSignal.timeout(30000),
-        });
-        assert.ok(response.ok, 'Board read failed; do not infer an absent task');
-        const body = await response.json();
-        assert.ok(!body.error && body.data?.task?.id === id, 'Exact board task required');
-        return body.data.task;
-      },
+      registry,
+      dependenciesReady: (task) => assertDeliveredDependencies(main, task),
+      readTask: (id) => readBoardTask({ url: input.url, token: input.token, id }),
       start: async ({ taskId, owner, monitorContext, admission }) => {
         await execute(
           process.execPath,

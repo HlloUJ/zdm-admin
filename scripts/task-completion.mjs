@@ -1,3 +1,4 @@
+import './task-network.mjs';
 import { fixedPreviewConfigFile, hasFixedPreview, inspectFixedCompletionPreview } from './completion-fixed-preview.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';

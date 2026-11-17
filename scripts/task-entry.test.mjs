@@ -24,6 +24,9 @@ function fixture(t) {
     'task-monitor-registration.mjs',
     'task-board-intake.mjs',
     'task-thread-titles.mjs',
+    'task-execution-binding.mjs',
+    'task-coordination.mjs',
+    'task-network.mjs',
   ])
     copyFileSync(path.join(here, name), path.join(main, 'scripts', name));
   mkdirSync(path.join(main, '.codex'));
@@ -34,7 +37,13 @@ function fixture(t) {
   const a = path.join(dir, 'a');
   git('worktree', 'add', '-b', 'codex/a', a);
   const run = (script = path.join(main, 'scripts/task-entry.mjs'), ...args) =>
-    spawnSync(process.execPath, [script, ...args], { cwd: a, encoding: 'utf8' });
+    spawnSync(process.execPath, [script, ...args], {
+      cwd: a,
+      encoding: 'utf8',
+      // These dependency-free Git/entry fixtures never access a network. The
+      // actual proxy-enabled Node 22/24 chain is covered by task-network tests.
+      env: { ...process.env, NODE_USE_ENV_PROXY: '0' },
+    });
   return { main, a, git, run };
 }
 test('published main entry reads exact old-task context without copying source over it', (t) => {

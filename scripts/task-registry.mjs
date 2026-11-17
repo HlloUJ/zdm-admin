@@ -1,4 +1,5 @@
 import { monitoringRegistration } from './task-monitor-registration.mjs';
+import { executionBinding } from './task-execution-binding.mjs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -194,6 +195,7 @@ function shape(record) {
   );
   record.dependsOn.forEach(id);
   assert.ok(!record.dependsOn.includes(record.id), 'Task cannot depend on itself');
+  executionBinding(record);
   return record;
 }
 export function createTaskRegistry(root) {
@@ -470,7 +472,16 @@ export function createTaskRegistry(root) {
       const before = Object.fromEntries(identities.map((key) => [key, structuredClone(record[key])]));
       const frozen = record.frozen ? structuredClone(record.frozen) : null;
       const previewOnly = record.previewOnly ? structuredClone(record.previewOnly) : null;
+      const bindings = structuredClone(record.executionBindings);
+      const historicalMonitoring = record.executionBindings ? structuredClone(record.monitoring) : null;
       change(record);
+      assert.deepEqual(record.executionBindings, bindings, 'Execution bindings require the verified host entry');
+      if (bindings)
+        assert.deepEqual(
+          record.monitoring,
+          historicalMonitoring,
+          'Historical monitoring is immutable after execution binding',
+        );
       if (previewOnly) assert.deepEqual(record.previewOnly, previewOnly, 'Preview-only identity is immutable');
       if (frozen) assert.deepEqual(record.frozen, frozen, 'Original accepted-source identity is immutable');
       assert.deepEqual(
@@ -479,6 +490,29 @@ export function createTaskRegistry(root) {
         'Task identity and original baseline are immutable',
       );
       record.revision += 1;
+      record.updatedAt = new Date().toISOString();
+      return write(record);
+    });
+  }
+  function bindExecution(taskId, expectedRevision, binding, verify) {
+    return locked(() => {
+      const record = readTask(taskId);
+      assert.ok(
+        record && !record.compatibility?.readOnly && !record.previewOnly && record.stage !== 'closed',
+        'Exact unfinished writable task required',
+      );
+      const history = record.executionBindings ?? [];
+      const existing = history.find((entry) => entry.request.messageId === binding.request.messageId);
+      if (existing) {
+        assert.deepEqual(existing, binding, 'Replayed binding differs; never rebase a stale observation');
+        assert.equal(existing, history.at(-1), 'A later execution binding already exists');
+        return record;
+      }
+      assert.equal(record.revision, expectedRevision, 'Task revision changed; re-read exact task');
+      assert.equal(binding.revision, history.length + 1);
+      assert.equal(verify(record), true, 'Verified native host and quiescent resource evidence required');
+      record.executionBindings = [...history, structuredClone(binding)];
+      record.revision++;
       record.updatedAt = new Date().toISOString();
       return write(record);
     });
@@ -492,6 +526,7 @@ export function createTaskRegistry(root) {
     resolve,
     register,
     revise,
+    bindExecution,
     validateLive,
     legacy,
     inspectLegacy,

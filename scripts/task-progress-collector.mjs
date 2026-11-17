@@ -1,4 +1,6 @@
 import assert from 'node:assert/strict';
+import { taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
@@ -21,14 +23,19 @@ function read(file) {
 // Local disk evidence only. The root must independently verify platform worker identity.
 export function collectTaskProgress(root, options = {}) {
   const registry = createTaskRegistry(root);
+  const coordinator = readTaskCoordination(registry.commonDir)?.current.rootThreadId;
   return registry
     .list()
-    .filter((task) => Object.hasOwn(task, 'monitoring'))
+    .filter((task) => task.executionBindings || Object.hasOwn(task, 'monitoring'))
     .map((task) => {
-      const monitoring = task.monitoring;
+      const monitoring = taskMonitoring(task);
       const metadata = {
         task: task.id,
-        owner: task.owner,
+        owner: taskExecutor(task),
+        ...(task.executionBindings ? { historicalOwner: task.owner } : {}),
+        ...(coordinator || monitoring?.coordinatorThreadId
+          ? { coordinatorThreadId: coordinator ?? monitoring.coordinatorThreadId }
+          : {}),
         monitoring,
         ...Object.fromEntries(
           ['taskNumber', 'taskName', 'taskStableId', 'roomId', 'worker', 'rootThreadId', 'authorizationRef'].map(

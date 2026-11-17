@@ -3,28 +3,46 @@ import { createBoardIntake } from './task-board-intake.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { createTaskThreadTitles } from './task-thread-titles.mjs';
 import { receiveCodexTask, startIndependentCodexTask } from './task-codex-host.mjs';
+import { rebindHistoricalTask, resumeBoundTask } from './task-rebinding.mjs';
+import { authorizeTaskCoordinator, readTaskCoordination, requireTaskCoordinator } from './task-coordination.mjs';
 
 // A single bounded desktop-host step. The host supplies actual native tool observations.
 // This is a handoff contract, not an independent security boundary against its local owner.
-export async function advanceTaskThread(input, { commonDir, readTask, start, now = Date.now() }) {
-  assert.ok(['receive', 'start', 'rename'].includes(input.action));
+export async function advanceTaskThread(
+  input,
+  { commonDir, readTask, start, registry, dependenciesReady, now = Date.now() },
+) {
+  assert.ok(['receive', 'start', 'rename', 'rebind', 'resume', 'coordinate'].includes(input.action));
+  const coordination = readTaskCoordination(commonDir);
+  if (input.action === 'start' && coordination)
+    input = { ...input, task: { ...input.task, coordinatorThreadId: coordination.current.rootThreadId } };
+  if (['receive', 'rename', 'rebind', 'resume'].includes(input.action))
+    requireTaskCoordinator(commonDir, input.task.rootThreadId);
   const actions = [];
+  const beganAt = Date.now();
+  const observationNow = () => now + Math.max(0, Date.now() - beganAt);
   const host = {
     intake: createBoardIntake(commonDir),
     queue: createExecutionOrder(commonDir),
     readTask,
     start,
+    dependenciesReady,
     readThread: async (id) => {
       const observation = input.nativeObservations?.find((item) => item.snapshot?.thread?.id === id);
       assert.equal(observation?.provider, 'codex-native-read_thread', 'Actual native read_thread observation required');
       const at = Date.parse(observation.observedAt);
-      assert.ok(Number.isFinite(at) && at <= now && now - at <= 60000, 'Fresh native host observation required');
+      const current = observationNow();
+      assert.ok(
+        Number.isFinite(at) && at <= current && current - at <= 60000,
+        'Fresh native host observation required',
+      );
       return observation.snapshot;
     },
     readCapacity: async () => {
       assert.equal(input.capacity?.provider, 'codex-native-capacity', 'Actual executor capacity observation required');
       const at = Date.parse(input.capacity.observedAt);
-      assert.ok(Number.isFinite(at) && at <= now && now - at <= 60000, 'Fresh native capacity required');
+      const current = observationNow();
+      assert.ok(Number.isFinite(at) && at <= current && current - at <= 60000, 'Fresh native capacity required');
       return input.capacity.snapshot;
     },
     createThread: async (plan) => {
@@ -42,7 +60,15 @@ export async function advanceTaskThread(input, { commonDir, readTask, start, now
     },
   };
   let result;
-  if (input.action === 'receive') result = await receiveCodexTask(input.task, host);
+  if (input.action === 'coordinate') result = await authorizeTaskCoordinator(commonDir, input.task, host);
+  else if (['rebind', 'resume'].includes(input.action)) {
+    assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
+    const adapters = { registry, queue: host.queue, now };
+    result =
+      input.action === 'rebind'
+        ? await rebindHistoricalTask(input.task, host, adapters)
+        : await resumeBoundTask(input.task, host, adapters);
+  } else if (input.action === 'receive') result = await receiveCodexTask(input.task, host);
   else if (input.action === 'start') {
     assert.equal(typeof start, 'function', 'Published task entry adapter required');
     result = await startIndependentCodexTask(input.task, host);
