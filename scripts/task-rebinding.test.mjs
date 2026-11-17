@@ -21,6 +21,7 @@ const old = '11111111-1111-4111-8111-111111111111';
 const root = '22222222-2222-4222-8222-222222222222';
 const worker = '33333333-3333-4333-8333-333333333333';
 const source = '44444444-4444-4444-8444-444444444444';
+const legacyRoot = '66666666-6666-4666-8666-666666666666';
 function delegate(id, from, prompt, title = '') {
   return {
     thread: { id, title, hostId: 'local', status: { type: 'idle' } },
@@ -42,7 +43,7 @@ function delegate(id, from, prompt, title = '') {
     ],
   };
 }
-function fixture(t) {
+function fixture(t, { collaboration = false } = {}) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'rebinding-fixture-'))),
     main = path.join(dir, 'main'),
     worktree = path.join(dir, 'task');
@@ -66,8 +67,36 @@ function fixture(t) {
   git(main, 'commit', '-m', 'base');
   git(main, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
   git(main, 'worktree', 'add', '-b', 'codex/task', worktree);
-  const registry = createTaskRegistry(main),
-    task = registry.register({ id: 'task', worktree, owner: old, kind: 'infrastructure' });
+  const registry = createTaskRegistry(main);
+  process.env.CODEX_THREAD_ID = old;
+  const monitorContext = collaboration
+    ? {
+        worker: '/root/original_worker',
+        rootThreadId: legacyRoot,
+        roomId: legacyRoot,
+        authorizationRef: 'original-authorization',
+        taskStableId: 'task',
+        taskNumber: '750',
+        taskName: 'fixture',
+      }
+    : undefined;
+  const task = registry.register({ id: 'task', worktree, owner: old, kind: 'infrastructure', monitorContext });
+  process.env.CODEX_THREAD_ID = root;
+  if (collaboration) {
+    const dir = path.join(registry.commonDir, 'task-registry/start-intents');
+    mkdirSync(dir, { recursive: true });
+    writeFileSync(
+      path.join(dir, 'task.json'),
+      JSON.stringify({
+        task: 'task',
+        owner: old,
+        worktree,
+        branch: task.branch,
+        base: task.base,
+        state: 'registered',
+      }),
+    );
+  }
   const queue = createExecutionOrder(registry.commonDir);
   const req = (n, roomId = source) => ({ messageId: 'user-' + n, roomId, authorId: 'human', sequence: n });
   queue.initialize(req(1));
@@ -85,10 +114,28 @@ function fixture(t) {
   };
   const snapshots = new Map([
     [old, { thread: { id: old, hostId: 'local', status: { type: 'idle' } } }],
-    [source, { thread: { id: source }, turns: [{ items: [{ type: 'userMessage', id: input.request.messageId }] }] }],
+    [
+      source,
+      {
+        thread: { id: source, hostId: 'local', status: { type: 'idle' } },
+        turns: [
+          {
+            items: [
+              { type: 'userMessage', id: input.request.messageId },
+              ...(collaboration ? [{ type: 'userMessage', id: 'original-authorization', text: 'Execute task' }] : []),
+            ],
+          },
+        ],
+      },
+    ],
     [root, delegate(root, source, 'authorized coordinator ' + input.request.messageId)],
     [worker, delegate(worker, root, 'Execute task task', '750｜fixture')],
   ]);
+  if (collaboration)
+    snapshots.set(legacyRoot, {
+      thread: { id: legacyRoot, hostId: 'local', status: { type: 'idle' } },
+      turns: [{ items: [{ type: 'userMessage', id: 'original-authorization', text: 'Execute task' }] }],
+    });
   const host = {
     readThread: async (id) => snapshots.get(id),
     readTask: async () => board,
@@ -119,6 +166,132 @@ test('native cross-coordinator intake preserves the source room and rejects forg
   f.snapshots.set(source, { thread: { id: source }, turns: [] });
   await assert.rejects(verifyCoordinatorSource(input, f.host.readThread), /user execution/);
 });
+
+test('legacy collaboration verifies its real root and authorization without inventing a native owner chat', async (t) => {
+  const f = fixture(t, { collaboration: true });
+  f.snapshots.delete(old);
+  const before = f.task.monitoring,
+    queue = f.queue.read();
+  const result = await f.bind();
+  const proof = result.task.executionBindings[0].nativeEvidence.previousExecutor;
+  assert.equal(proof.executionSurface, 'collaboration-agent');
+  assert.equal(proof.rootThreadId, legacyRoot);
+  assert.equal(proof.historicalOwner, old);
+  assert.equal(proof.worker, '/root/original_worker');
+  assert.equal(Object.hasOwn(proof, 'threadId'), false);
+  assert.deepEqual(result.task.monitoring, before);
+  assert.deepEqual(f.queue.read(), queue);
+});
+
+for (const failure of [
+  'root-not-found',
+  'root-active',
+  'cross-host',
+  'original-authorization',
+  'start-intent',
+  'process',
+]) {
+  test(`legacy collaboration remains fenced on missing/unsafe evidence: ${failure}`, async (t) => {
+    const f = fixture(t, { collaboration: true });
+    const adapters = {};
+    f.snapshots.delete(old);
+    if (failure === 'root-not-found') f.snapshots.delete(legacyRoot);
+    if (failure === 'root-active') f.snapshots.get(legacyRoot).thread.status.type = 'active';
+    if (failure === 'cross-host') f.snapshots.get(legacyRoot).thread.hostId = 'remote';
+    if (failure === 'original-authorization') f.snapshots.get(legacyRoot).turns[0].items = [];
+    if (failure === 'start-intent') rmSync(path.join(f.registry.commonDir, 'task-registry/start-intents/task.json'));
+    if (failure === 'process')
+      adapters.observe = () => ({
+        ...f.observe(),
+        processes: [...f.observe().processes, { pid: process.pid + 999, ppid: 1, command: 'node ' + f.worktree }],
+      });
+    const before = f.registry.readTask('task'),
+      queue = f.queue.read();
+    await assert.rejects(f.bind({}, adapters));
+    assert.deepEqual(f.registry.readTask('task'), before);
+    assert.deepEqual(f.queue.read(), queue);
+  });
+}
+
+test('a process-prefixed test report is preserved with UUID journals and original event references', async (t) => {
+  const f = fixture(t);
+  const reportDir = path.join(f.worktree, '.task-verification/checkpoint');
+  mkdirSync(reportDir, { recursive: true });
+  const reportFile = path.join(reportDir, 'process-example-checkpoint-report.json');
+  const report = JSON.stringify({
+    scope: 'isolated tests',
+    baseCheckpoint: 'a'.repeat(40),
+    tests: { passed: 127, failed: 0, skipped: 0, retries: 0 },
+    static: {},
+    production: {},
+  });
+  writeFileSync(reportFile, report);
+  const delivery = path.join(f.registry.commonDir, 'task-delivery/task');
+  mkdirSync(delivery, { recursive: true });
+  const token = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const journalFile = path.join(delivery, 'process-' + token + '.json');
+  const journal = JSON.stringify({ token, host: 'historical-host', pgid: 12345, status: 'quiescent' });
+  writeFileSync(journalFile, journal);
+  const sessionFile = path.join(delivery, 'completion-session.json');
+  const session = JSON.stringify({ events: [{ status: 'failed', processTracking: 1, processes: [{ token }] }] });
+  writeFileSync(sessionFile, session);
+  await f.bind();
+  assert.equal(readFileSync(reportFile, 'utf8'), report);
+  assert.equal(readFileSync(journalFile, 'utf8'), journal);
+  assert.equal(readFileSync(sessionFile, 'utf8'), session);
+});
+
+for (const failure of [
+  'unsealed',
+  'malformed',
+  'token-mismatch',
+  'renamed-journal',
+  'unknown-report',
+  'invalid-json',
+  'missing-reference',
+  'invalid-reference',
+  'orphan-journal',
+]) {
+  test(`process identity cannot be bypassed by report compatibility: ${failure}`, async (t) => {
+    const f = fixture(t);
+    const directory = path.join(f.registry.commonDir, 'task-delivery/task');
+    mkdirSync(directory, { recursive: true });
+    const token = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    let name = 'process-' + token + '.json';
+    let record = { token, host: 'original-host', pgid: 12345, status: 'quiescent' };
+    if (failure === 'unsealed') record.status = 'started';
+    if (failure === 'malformed') delete record.pgid;
+    if (failure === 'token-mismatch') record.token = worker;
+    if (failure === 'renamed-journal') name = 'process-renamed.json';
+    if (failure === 'unknown-report') {
+      name = 'process-unknown.json';
+      record = { passed: true };
+    }
+    writeFileSync(path.join(directory, name), failure === 'invalid-json' ? '{' : JSON.stringify(record));
+    if (failure.includes('reference')) {
+      if (failure === 'missing-reference') rmSync(path.join(directory, name));
+      writeFileSync(
+        path.join(directory, 'completion-session.json'),
+        JSON.stringify({
+          events: [
+            {
+              status: 'passed',
+              processTracking: 1,
+              processes: [{ token: failure === 'invalid-reference' ? '../escape' : token }],
+            },
+          ],
+        }),
+      );
+    }
+    if (failure === 'orphan-journal')
+      writeFileSync(path.join(directory, 'completion-session.json'), JSON.stringify({ events: [] }));
+    const before = f.registry.readTask('task'),
+      queue = f.queue.read();
+    await assert.rejects(f.bind());
+    assert.deepEqual(f.registry.readTask('task'), before);
+    assert.deepEqual(f.queue.read(), queue);
+  });
+}
 
 test('binding is additive, exact replay is read-only and old executor loses access', async (t) => {
   const f = fixture(t),

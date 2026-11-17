@@ -16,6 +16,91 @@ import { threadTitle } from './task-thread-titles.mjs';
 import { requireTaskCoordinator } from './task-coordination.mjs';
 
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+
+// A legacy collaboration worker is an execution surface, not a native chat ID.
+// Its original coordinator and authorization must be independently observable.
+async function previousExecutorEvidence(task, binding, worker, host) {
+  const monitoring = task.monitoring;
+  const collaboration =
+    !binding &&
+    (monitoring?.executionSurface === 'collaboration-agent' ||
+      (monitoring?.executionSurface === undefined && monitoring?.worker?.startsWith('/root/')));
+  const previous = taskExecutor(task);
+  if (collaboration) {
+    assert.match(monitoring.worker, /^\/root\/[a-z0-9_]+(?:\/[a-z0-9_]+)*$/);
+    assert.match(monitoring.rootThreadId, uuid, 'Original collaboration root is missing');
+    assert.equal(monitoring.owner, task.owner, 'Original collaboration owner differs');
+    assert.ok(monitoring.roomId && monitoring.authorizationRef, 'Original collaboration authorization is missing');
+    const root = await host.readThread(monitoring.rootThreadId);
+    assert.equal(root?.thread?.id, monitoring.rootThreadId, 'Original collaboration root is unobservable; retain task');
+    assert.equal(
+      root.thread.hostId,
+      worker.thread.hostId,
+      'Cross-host collaboration requires independent remote evidence',
+    );
+    assert.ok(
+      ['idle', 'error'].includes(root.thread.status?.type),
+      'Original collaboration root is active or unobservable',
+    );
+    const source = monitoring.roomId === root.thread.id ? root : await host.readThread(monitoring.roomId);
+    assert.equal(source?.thread?.id, monitoring.roomId, 'Original collaboration authorization room is unobservable');
+    const authorization = source.turns
+      ?.flatMap((turn) => turn.items ?? [])
+      .find((item) => item.type === 'userMessage' && item.id === monitoring.authorizationRef);
+    assert.ok(authorization, 'Original collaboration authorization message is missing');
+    return {
+      executionSurface: 'collaboration-agent',
+      historicalOwner: previous,
+      worker: monitoring.worker,
+      rootThreadId: root.thread.id,
+      hostId: root.thread.hostId,
+      rootStatus: root.thread.status,
+      authorization: { roomId: source.thread.id, messageId: authorization.id, digest: digest(authorization) },
+    };
+  }
+  assert.ok(
+    binding || monitoring?.executionSurface === undefined || monitoring.executionSurface === 'codex-thread',
+    'Unknown historical execution surface; retain task',
+  );
+  const old = await host.readThread(previous);
+  assert.equal(old?.thread?.id, previous, 'Previous native executor is unobservable; retain task');
+  assert.equal(old.thread.hostId, worker.thread.hostId, 'Cross-host takeover requires independent remote evidence');
+  assert.ok(['idle', 'error'].includes(old.thread.status?.type), 'Previous executor is active or unobservable');
+  return { threadId: old.thread.id, hostId: old.thread.hostId, status: old.thread.status };
+}
+
+function assertProcessRecord(name, record) {
+  const token = name.slice('process-'.length, -'.json'.length);
+  if (uuid.test(token)) {
+    assert.ok(
+      record.token === token &&
+        typeof record.host === 'string' &&
+        record.host &&
+        Number.isSafeInteger(record.pgid) &&
+        record.pgid > 1,
+      'Unknown original process journal',
+    );
+    assert.equal(record.status, 'quiescent', 'Unsealed original process journal');
+    return;
+  }
+  // Report names share the prefix. Only a structured test report without any
+  // launch fields is unrelated; unknown or renamed journals still fail closed.
+  assert.ok(
+    !['token', 'host', 'pgid', 'status'].some((key) => Object.hasOwn(record, key)) &&
+      typeof record.scope === 'string' &&
+      record.scope &&
+      /^[a-f0-9]{40}$/.test(record.baseCheckpoint) &&
+      ['passed', 'failed', 'skipped', 'retries'].every(
+        (key) => Number.isSafeInteger(record.tests?.[key]) && record.tests[key] >= 0,
+      ) &&
+      record.static &&
+      typeof record.static === 'object' &&
+      record.production &&
+      typeof record.production === 'object',
+    'Unknown process-prefixed record; retain original evidence',
+  );
+}
 function safe(file) {
   for (let cursor = path.resolve(file); ; cursor = path.dirname(cursor)) {
     if (existsSync(cursor)) assert.ok(!lstatSync(cursor).isSymbolicLink(), 'Linked rebinding state refused');
@@ -54,6 +139,19 @@ function resources(task) {
       );
     }
   const delivery = path.join(common, 'task-delivery', task.id);
+  const referencedProcesses = new Set();
+  const originalReferences = new Set();
+  let hasSession = false;
+  const startIntent = path.join(common, 'task-registry/start-intents', task.id + '.json');
+  if (!executionBinding(task) && task.monitoring?.worker?.startsWith('/root/')) {
+    assert.ok(existsSync(startIntent), 'Original collaboration start intent is missing');
+    const start = add(startIntent);
+    for (const key of ['owner', 'branch', 'worktree'])
+      assert.equal(start[key], task[key], 'Original collaboration start identity differs');
+    assert.equal(start.task, task.id);
+    assert.equal(start.state, 'registered', 'Unfinished collaboration start intent');
+    assert.equal(start.base, task.base, 'Original collaboration source differs');
+  }
   if (task.frozen)
     assert.ok(existsSync(path.join(delivery, 'accepted-source.json')), 'Original frozen source is missing');
   for (const name of ['accepted-source.json', 'completion-session.json']) {
@@ -66,11 +164,26 @@ function resources(task) {
         assert.equal(record.commit, task.frozen?.accepted, 'Original accepted source identity differs');
         assert.equal(record.tree, task.frozen?.tree, 'Original frozen tree differs');
       }
-      if (name === 'completion-session.json')
+      if (name === 'completion-session.json') {
+        hasSession = true;
         assert.ok(
           !record.events?.some((e) => e.status === 'running'),
           'Unresolved formal delivery process; retain original session',
         );
+        for (const event of record.events ?? []) {
+          if (event.processTracking !== undefined || event.processes !== undefined)
+            assert.ok(
+              event.processTracking === 1 && Array.isArray(event.processes),
+              'Unknown original process inventory',
+            );
+          for (const child of event.processes ?? []) {
+            assert.match(child.token, uuid, 'Unknown original process reference');
+            const journal = path.join(delivery, 'process-' + child.token + '.json');
+            referencedProcesses.add(journal);
+            originalReferences.add(journal);
+          }
+        }
+      }
     }
   }
   for (const base of [
@@ -87,12 +200,17 @@ function resources(task) {
         assert.ok(!name.endsWith('.lock'), 'Retained task lock requires original recovery');
         if (lstatSync(file).isDirectory()) {
           if (!['cache', 'node_modules', 'maven-local', 'maven-tools'].includes(name)) visit(file);
-        } else if (/^process-.*\.json$/.test(name))
-          assert.equal(add(file).status, 'quiescent', 'Unsealed original process journal');
+        } else if (/^process-.*\.json$/.test(name)) {
+          assertProcessRecord(name, add(file));
+          if (hasSession && uuid.test(name.slice('process-'.length, -'.json'.length)))
+            assert.ok(originalReferences.has(file), 'Original process journal has no session reference');
+          referencedProcesses.delete(file);
+        }
       }
     };
     visit(base);
   }
+  assert.equal(referencedProcesses.size, 0, 'Referenced original process journal is missing');
   const mainQueue = path.join(common, 'task-registry/delivery-queue.json');
   safe(mainQueue);
   if (existsSync(mainQueue)) {
@@ -161,10 +279,7 @@ export async function rebindHistoricalTask(
     previous !== input.owner || (priorBinding?.coordinator ?? initial.monitoring?.rootThreadId) !== input.rootThreadId,
     'Task already belongs to this executor and coordinator',
   );
-  const old = await host.readThread(previous);
-  assert.equal(old.thread.id, previous);
-  assert.equal(old.thread.hostId, worker.thread.hostId, 'Cross-host takeover requires independent remote evidence');
-  assert.ok(['idle', 'error'].includes(old.thread.status?.type), 'Previous executor is active or unobservable');
+  const previousEvidence = await previousExecutorEvidence(initial, priorBinding, worker, host);
   const monitoring = {
     version: 1,
     mode: 'confirmed-interruption-notice-only',
@@ -204,7 +319,7 @@ export async function rebindHistoricalTask(
         creationMessageId: workerCreation.id,
         creationDigest: digest(workerCreation),
       },
-      previousExecutor: { threadId: old.thread.id, hostId: old.thread.hostId, status: old.thread.status },
+      previousExecutor: previousEvidence,
       authorization: { threadId: input.request.roomId, messageId: input.request.messageId },
     },
     worktree: initial.worktree,

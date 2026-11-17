@@ -28,9 +28,13 @@
 
 工程ID与看板ID不同的旧载体保留原监测中的taskStableId；缺少原映射时须显式提供boardTaskId，worker的原生创建事件必须同时包含这两个ID。首次绑定后映射固定。672／134仍只绑定672这一名联合工程写入者，134保持只读，不产生第二份工程绑定或交付位。
 
-执行须已暂停且没有有效单任务准入。旧执行者须能独立读回为idle/error；新旧worker同host；新worker须有由当前协调者创建且明确关联工程ID的原生事件，标题与当前看板一致。idle只证明平台状态，不能代替进程检查。
+执行须已暂停且没有有效单任务准入。旧原生执行者须能独立读回为idle/error；新旧worker同host；新worker须有由当前协调者创建且明确关联工程ID的原生事件，标题与当前看板一致。idle只证明平台状态，不能代替进程检查。
+
+首次接管旧协作执行面时，`executionSurface: collaboration-agent`或无该字段但worker为`/root/...`的原监测按历史协作记录核验，不把历史owner UUID伪装为原生聊天。入口保留原owner和worker路径，独立读回原monitoring.rootThreadId为同host的idle/error，再读回原roomId内authorizationRef对应的真实用户消息，并核对原正式start-intent的task、owner、worktree、branch、base和registered状态。绑定证据分别记录真实root、历史owner、worker路径和原授权摘要。原root或授权房间不可读、缺少原监测/开工来源、状态未知、跨host或来源冲突时保持拒绝；not-found不等于idle，也不请求旧root代办或从新授权反推旧来源。已绑定任务再次接管仍核验当前真实原生执行者，不退回历史协作分支。
 
 CLI独立执行两轮本机进程、打开文件（含cwd和删除后仍打开的文件）及本地Unix socket Docker容器观察。核对任务租约、保留锁、进程日志、冻结、正式session和main队列。任务引用、容器、任务或原owner租约、运行中正式阶段/main票据、未封存日志、未知及读取失败均拒绝。入口不会删锁、停进程、修复原session或释放占位；须先按原恢复保护处理具体阻点。
+
+`process-<UUID>.json`按文件token、记录token、host、PGID及quiescent状态核验；正式session中每条process引用须有对应原日志，session存在时不接受无引用日志。其他`process-*.json`只有不含token/host/pgid/status启动字段，且具有scope、40位baseCheckpoint、完整非负整数测试计数及static/production对象的测试报告才单独识别，原文仍纳入稳定性摘要，不改名、不删除、不补封存状态。损坏JSON、未知记录、改名日志、未封存或结构错误日志继续拒绝；不按测试通过数推断进程已退出，也不以当前host名称覆盖历史封存host。
 
 写入同时持有队列和registry元数据锁，再核对版本、资源证据及源码目录身份。只追加绑定、递增任务revision，不改队列。相同输入重放只读回当前绑定；换对象、换版本或被后续绑定取代的输入拒绝。旧执行者失去受管开发、预览、数据、准入和交付入口的写权限；普通registry.revise不能改绑定历史。
 
