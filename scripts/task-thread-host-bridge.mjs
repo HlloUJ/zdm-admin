@@ -169,6 +169,40 @@ export async function advanceTaskThread(
       assert.ok(Number.isFinite(at) && at <= current && current - at <= 60000, 'Fresh native capacity required');
       return input.capacity.snapshot;
     },
+    readCreationProgress: async (id, receiptIds) => {
+      assert.equal(
+        input.progressNativeObservations?.length,
+        receiptIds.length + 1,
+        'Exact native history and receipt observation set required',
+      );
+      const read = (operation, args) => {
+        const keys = Object.keys(args);
+        const matches = (input.progressNativeObservations ?? []).filter(
+          (item) =>
+            item.operation === operation &&
+            Object.keys(item.args ?? {}).length === keys.length &&
+            keys.every((key) => item.args?.[key] === args[key]),
+        );
+        assert.equal(matches.length, 1, 'One exact native progress readback required');
+        const observation = matches[0];
+        assert.equal(observation.provider, 'codex-native-task-board');
+        const at = Date.parse(observation.observedAt),
+          current = observationNow();
+        assert.ok(
+          Number.isFinite(at) && at <= current && current - at <= 60000,
+          'Fresh native progress evidence required',
+        );
+        assert.equal(observation.result?.isError, false);
+        assert.equal(observation.result.content?.length, 1);
+        assert.equal(observation.result.content[0].type, 'text');
+        return JSON.parse(observation.result.content[0].text);
+      };
+      return {
+        history: read('task_history', { id }),
+        receipts: receiptIds.map((receipt_id) => read('get_task_progress_receipt', { id, receipt_id })),
+        nativeObservations: input.progressNativeObservations,
+      };
+    },
     createThread: async (plan) => {
       actions.push({ tool: 'create_thread', ...plan });
       return {};

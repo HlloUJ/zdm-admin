@@ -815,6 +815,11 @@
       ],
       "dynamicImports": 1
     },
+    "scripts/delivery-repairs/task-creation-progress.mjs": {
+      "digest": "928ee6a90ac7a7e54a279e987426f133a41d347d8babfc358950c20abfea5178",
+      "imports": ["scripts/task-thread-titles.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/task-dynamic-host.mjs": {
       "digest": "1f1c776366623a0e07dfcbc35b6f96e22aa6d8a7366c61b73629152c62f67b80",
       "imports": [
@@ -841,22 +846,26 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-failed-creation.mjs": {
-      "digest": "fda646890726e349e76b7c0bbdd544dae5251de4848904cd8e654464fc10f109",
+      "digest": "cb704907aae55f872795614685e71b92d9ddedbf79b66a73491af7824d8a764e",
       "imports": [
+        "scripts/delivery-repairs/task-creation-progress.mjs",
         "scripts/task-cancellation-proof.mjs",
         "scripts/task-coordination.mjs",
         "scripts/task-execution-binding.mjs",
+        "scripts/task-progress-outbox.mjs",
         "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-failed-creation.test.mjs": {
-      "digest": "cd9bca55c26a92af3c53514dc7dcd209a28a904f4752b84aaf333edce2de27f7",
+      "digest": "8afd469078ddfbf76f67eb505da7d49970b1e818cb709a746b75af7f4f9af409",
       "imports": [
+        "scripts/delivery-repairs/task-creation-progress.mjs",
         "scripts/task-board-intake.mjs",
         "scripts/task-codex-host.mjs",
         "scripts/task-coordination.mjs",
         "scripts/task-execution-order.mjs",
+        "scripts/task-progress-outbox.mjs",
         "scripts/task-registry.mjs",
         "scripts/task-thread-host-bridge.mjs",
         "scripts/task-thread-titles.mjs"
@@ -2383,7 +2392,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.mjs": {
-      "digest": "452d1016587c8a090f4be0632b5720114e738b460edf4278b4e598ded4760403",
+      "digest": "24159126a8d1612ff20e789844ea0e404df059b0205ff11669d9b08af36b12ac",
       "imports": [
         "scripts/task-execution-scope.mjs",
         "scripts/task-progress-host.mjs",
@@ -2392,7 +2401,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.test.mjs": {
-      "digest": "8ce0e30a98ff557a7bff3d9b55e210e36fec0e9c758241b2515f73cac6c022f7",
+      "digest": "84397e8a9e92b27261ca1108f9b94e7bd3ebc845f952094845e0e18018bae118",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/task-delivery-status-sync.mjs",
@@ -2707,8 +2716,8 @@
       "dynamicImports": 0
     },
     "scripts/task-progress-outbox.mjs": {
-      "digest": "8f182d679b1d95cc0cb69149943980ed3446c1f8b6d58c3a9fa2f1b0641754f3",
-      "imports": ["scripts/task-progress-supersession.mjs"],
+      "digest": "0035c6d848b847baa4e3ae046cbf292714063e082a5e5b65a7713e361f78e4ab",
+      "imports": ["scripts/delivery-repairs/task-creation-progress.mjs", "scripts/task-progress-supersession.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-progress-replay.mjs": {
@@ -2863,7 +2872,7 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-host-bridge.mjs": {
-      "digest": "6b6381c053ad9340a6132bcbae886a3c44a2ce7996ee4576faec40cf1b89d668",
+      "digest": "81d45fd42b7fe8f391fc172982e815aef8028dbbf76d4d24e2534e2df916ad24",
       "imports": [
         "scripts/delivery-repairs/task-dynamic-host.mjs",
         "scripts/task-board-intake.mjs",
@@ -2883,9 +2892,9 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-titles.mjs": {
-      "digest": "2f447363dbf03f98ef6bb3f957e84168fa63854249cd5891968b75616d2181ef",
+      "digest": "54024676d03d1f44dad241570c45c03854103e9946e423828ddd7090a19e7b25",
       "imports": ["scripts/delivery-repairs/task-failed-creation.mjs", "scripts/task-coordination.mjs"],
-      "dynamicImports": 0
+      "dynamicImports": 1
     },
     "scripts/task-thread-titles.test.mjs": {
       "digest": "4b638fdd2342f82b231dc37ff1b14c0e33b2e9b069deeeabad5b0980e1a4ac67",

@@ -162,6 +162,69 @@ test('queue admission is never represented as actual started', (t) => {
   );
 });
 
+test('new authorized pending-native intake is queued behind an older global fence; a later explicit pause still projects paused', (t) => {
+  const root = fixture(t),
+    ticket = {
+      task: 'fixture-task',
+      lane: 'development',
+      status: 'queued',
+      awaitingNativeWorker: true,
+      admission: null,
+      request: { sequence: 11, authorId: 'same-user' },
+    };
+  const initial = {
+    revision: 1,
+    paused: true,
+    events: [{ action: 'pause-all', request: { sequence: 10, authorId: 'same-user' } }],
+    tickets: [ticket],
+  };
+  captureQueueProgress(root, initial, null);
+  const box = createProgressOutbox(path.join(root, 'task-progress/fixture-task'));
+  assert.equal(box.read().pending[0].receipt.event, 'queued');
+  assert.equal(box.read().pending[0].receipt.next.label, '等待执行');
+  captureQueueProgress(
+    root,
+    {
+      ...initial,
+      revision: 2,
+      events: [...initial.events, { action: 'pause-all', request: { sequence: 12, authorId: 'same-user' } }],
+    },
+    initial,
+  );
+  assert.deepEqual(
+    box.read().pending.map((entry) => entry.receipt.event),
+    ['queued', 'paused'],
+  );
+  assert.equal(box.read().pending[1].receipt.next.label, '等待恢复指令');
+});
+for (const scenario of ['old-request', 'foreign-user', 'bound-worker', 'occupied-admission', 'unknown-fence'])
+  test('new intake projection keeps the real pause for ' + scenario, (t) => {
+    const root = fixture(t),
+      ticket = {
+        task: 'fixture-task',
+        lane: 'development',
+        status: 'queued',
+        awaitingNativeWorker: true,
+        admission: null,
+        request: { sequence: 11, authorId: 'same-user' },
+      };
+    const state = {
+      revision: 1,
+      paused: true,
+      events: [{ action: 'initialize', request: { sequence: 10, authorId: 'same-user' } }],
+      tickets: [ticket],
+    };
+    if (scenario === 'old-request') ticket.request.sequence = 9;
+    if (scenario === 'foreign-user') ticket.request.authorId = 'other-user';
+    if (scenario === 'bound-worker') ticket.awaitingNativeWorker = false;
+    if (scenario === 'occupied-admission') ticket.admission = 'existing-admission';
+    if (scenario === 'unknown-fence') state.events = [];
+    captureQueueProgress(root, state, null);
+    assert.equal(
+      createProgressOutbox(path.join(root, 'task-progress/fixture-task')).read().pending[0].receipt.event,
+      'paused',
+    );
+  });
 test('global pause never generates paused progress for terminal tickets', (t) => {
   const root = fixture(t);
   for (const status of ['completed', 'cancelled']) {

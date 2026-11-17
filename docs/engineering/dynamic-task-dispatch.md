@@ -68,3 +68,11 @@ npm run task:entry -- --worktree "<准确任务目录>" complete prepare "<准�
 入口重新执行原精确校验，确认实际失败原因；要求唯一完整原生 create_thread 来源、原 root/任务/nonce 和未改动的原提示正文。追加内容只作为失败证据归档，旧聊天仍不准绑定。确认旧聊天真实 idle、原票据仍 awaitingNativeWorker/queued、无绑定、任务登记、start-intent、任务 Git 载体、数据和交付资产，两次本机观察无目标资源，容量允许后，保全原记录原始字节、完整实际输入及原生观察、失败原因、真实授权和摘要。
 
 原档保存在 task-thread-titles/failed-creations 下，当前索引指向独立新尝试及新 nonce；新计划仍由真实宿主调用 create_thread。后续 receive/continue-intake 以新 requestId 读回实际结果，再经过完全相同的精确创建、标题、绑定和 start 检查。该入口不登记工作区、不启动任务、不修改原队列 owner 或位置。相同恢复决定只读回放，不重复发计划；新的结果未知、归档中断、已有替换尝试、未知/notLoaded/权限不足、仍活动或已有资源均保留现场，不再次创建。候选代码不能提前用于真实 344。
+
+初始尝试遗留进展只允许处理原 outbox 的最多两条初始 queue/receive 投影：原始 schema、从未 prepare、没有 failure/未知写入、无已确认或拒绝回执。宿主在顶层 progressNativeObservations 传完整原生 UJ 读回，逐项包含 provider=codex-native-task-board、operation=task_history 或 get_task_progress_receipt、准确 args、observedAt 及原 ToolResult；所有 receipt 均 not_found，完整历史连续且与新鲜真实看板一致、从未应用原 ID，才可继续。不得把审批拒绝写成服务端 stale/invalid。
+
+task.progressWriteAssessment 由当前真实协调者根据原客户端轨迹提供 coordinatorThreadId、originalRequestId、outboxSha256、准确 receiptIds 及 outcome=never-prepared-no-unknown-write；手工或非 outbox 传输结果未知时必须报告未知并拒绝。若原包包含 paused，还须 task.progressReviewEvidence 保存真实客户端审批拒绝：provider=codex-auto-review、outcome=rejected-before-submission、nativeCallId 和完整 originalResult；不得伪造 serverResponse。此为当前协调者的客户端证据与声明，不能称为独立远程证明。
+
+关闭来源不是用户传入的同形 JSON。正式恢复入口完成原生失败、空闲、无绑定/开工/资源及准确票据核验后，封存 contract=known-failed-native-intake-unsubmitted-v1/state=closed-known-failed，绑定原 nonce、完整原包 entryDigest 清单和实际证据摘要。只读 readClosedCreationAttempt 从私有不可变归档重验原始记录字节、完整 native 来源与追加输入失败、关闭状态和全部清单；原 creation-unknown 本身不能归档。未投递保全只消费该 reader，不借用 stale/invalid 路径。
+
+归档先 fsync 保全原 outbox 字节、包、序号、时间、客户端拒绝和完整原生读回；本地事务仅将它们登记为 retired-attempt-not-delivered，不加入 acknowledged、不删除首次事实。原序号不重排，只生成新的真实 queued 投影。相同恢复决定不重复生成；归档后、发布新计划前发生本地锁冲突时，保留首份归档和新 nonce，重新核验后续接同一决定；新计划索引持久化后才暴露 native create，结果未知则只读回原结果。准备过的新进展仍阻断，不能跨过未知写入。新受理任务须仍为 queued/awaitingNativeWorker/admission:null、请求为同一用户且晚于明确 initialize/pause 围栏，才仅报告 queued；后续明确用户 pause 继续产生 paused 并阻断旧恢复授权。未知围栏、旧请求、已绑定或占位不适用。

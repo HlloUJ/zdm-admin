@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import path from 'node:path';
@@ -11,6 +11,8 @@ import { createTaskThreadTitles, enableTaskThreadPolicy } from '../task-thread-t
 import { receiveCodexTask } from '../task-codex-host.mjs';
 import { authorizeTaskCoordinator } from '../task-coordination.mjs';
 import { advanceTaskThread } from '../task-thread-host-bridge.mjs';
+import { createProgressOutbox } from '../task-progress-outbox.mjs';
+import { readClosedCreationAttempt } from './task-creation-progress.mjs';
 
 const rootId = '11111111-1111-4111-8111-111111111111',
   oldWorker = '22222222-2222-4222-8222-222222222222',
@@ -77,6 +79,17 @@ async function fixture(t) {
     readTask: async () => structuredClone(board),
     readThread: async (id) => structuredClone(snapshots.get(id)),
     readCapacity: async () => ({ limit: 5, activeDevelopment: 0, activeDelivery: 0, activeOther: 1 }),
+    readCreationProgress: async (taskId, ids) => ({
+      history: [{ task_id: taskId, snapshot: structuredClone(board) }],
+      receipts: ids.map((receipt_id) => ({
+        version: 1,
+        receipt_id,
+        outcome: 'not_found',
+        applied_revision: null,
+        receipt: null,
+        task: structuredClone(board),
+      })),
+    }),
     createThread: async (plan) => {
       const id = ++creates === 1 ? oldWorker : newWorker;
       const text = `<codex_delegation>\n  <source_thread_id>${rootId}</source_thread_id>\n  <input>${plan.prompt}${creates === 1 ? '\nAdditional safety instruction' : ''}</input>\n</codex_delegation>`;
@@ -119,6 +132,14 @@ async function fixture(t) {
     files: [{ pid: process.pid, name: root, type: 'DIR', descriptor: 'cwd' }],
     containers: [],
   };
+  const originalOutboxFile = path.join(commonDir, 'task-progress', input.taskId, 'outbox.json');
+  retry.progressWriteAssessment = {
+    coordinatorThreadId: rootId,
+    originalRequestId: original.createRequestId,
+    outboxSha256: createHash('sha256').update(readFileSync(originalOutboxFile)).digest('hex'),
+    receiptIds: JSON.parse(readFileSync(originalOutboxFile)).pending.map((entry) => entry.receipt_id),
+    outcome: 'never-prepared-no-unknown-write',
+  };
   const recover = () => store.retryCreation(retry, host, { registry, observe: () => structuredClone(observation) });
   return {
     registry,
@@ -136,6 +157,7 @@ async function fixture(t) {
     parent,
     observation,
     recover,
+    box: createProgressOutbox(path.join(commonDir, 'task-progress', input.taskId)),
     creates: () => creates,
   };
 }
@@ -157,6 +179,17 @@ test('known complete appended-input failure is archived byte-for-byte and replac
   assert.deepEqual(archive.original, f.original);
   assert.deepEqual(archive.native, old);
   assert.equal(archive.actualInput, f.original.creationPrompt + '\nAdditional safety instruction');
+  assert.equal(archive.retiredProgress.kind, 'never-submitted-failed-creation-projections');
+  assert.equal(readClosedCreationAttempt(path.join(f.store.base, next.recovery.archive)).state, 'closed-known-failed');
+  assert.throws(
+    () => f.box.retireCreationAttempt({ closedAttempt: archive.closedAttempt }),
+    /Trusted sealed attempt archive reader/,
+  );
+  assert.equal(f.box.read().acknowledged.length, 0);
+  assert.equal(f.box.read().retired[0].state, 'retired-attempt-not-delivered');
+  assert.deepEqual(f.box.read().retired[0].receipt, archive.retiredProgress.entries[0].receipt);
+  assert.equal(f.box.read().pending[0].receipt.event, 'queued');
+  assert.equal(f.box.read().pending[0].receipt.sequence, archive.retiredProgress.lastSequence + 1);
   assert.deepEqual(f.queue.read(), q);
   assert.equal(f.creates(), 2);
   await f.recover();
@@ -270,6 +303,191 @@ test('replacement unknown result and a second decision preserve the new attempt 
   assert.deepEqual(f.store.get(f.input.taskId), next);
   assert.ok(existsSync(path.join(f.store.base, next.recovery.archive)));
 });
+test('the formal closed-attempt reader rejects a creation-unknown source instead of treating its JSON shape as closure', async (t) => {
+  const f = await fixture(t);
+  await f.recover();
+  const file = path.join(f.store.base, f.store.get(f.input.taskId).recovery.archive),
+    archive = JSON.parse(readFileSync(file));
+  archive.closedAttempt.state = 'creation-unknown';
+  writeFileSync(file, JSON.stringify(archive));
+  assert.throws(() => readClosedCreationAttempt(file), /Unknown creation is not a closed failure/);
+});
+test('two legacy unsent queue/pause projections retire as immutable never-delivered facts; only a new truthful queued receipt is pending', async (t) => {
+  const f = await fixture(t),
+    file = path.join(f.box.directory, 'outbox.json');
+  const state = f.box.read(),
+    entry = state.pending[0];
+  entry.receipt.event = 'paused';
+  entry.receipt.next.label = '等待恢复指令';
+  const payload = (receipt) => {
+    const value = { ...receipt };
+    for (const field of ['version', 'task_id', 'receipt_id', 'sequence']) delete value[field];
+    return value;
+  };
+  entry.payload_hash = createHash('sha256')
+    .update(JSON.stringify(payload(entry.receipt)))
+    .digest('hex');
+  writeFileSync(file, JSON.stringify(state) + '\n');
+  f.box.enqueue(f.input.taskId, 'original-native-readiness', {
+    event: 'queued',
+    observed_at: f.original.createdAt,
+    action: { id: 'receive', label: '原生创建／绑定仍在等待核验' },
+    evidence_refs: [`published-native-host:receive:${f.input.taskId}:${f.original.messageId}`],
+    next: { kind: 'action', label: 'native-create-result-unknown' },
+  });
+  const original = readFileSync(file),
+    oldEntries = f.box.read().pending;
+  f.retry.progressReviewEvidence = {
+    provider: 'codex-auto-review',
+    outcome: 'rejected-before-submission',
+    nativeCallId: 'fixture-native-auto-review-denial',
+    originalResult:
+      'Tool execution rejected by automatic approval review before provider submission; not an HTTP/server response',
+  };
+  f.retry.progressWriteAssessment.outboxSha256 = createHash('sha256').update(original).digest('hex');
+  f.retry.progressWriteAssessment.receiptIds = oldEntries.map((entry) => entry.receipt_id);
+  await f.recover();
+  const after = f.box.read(),
+    archive = JSON.parse(readFileSync(path.join(f.store.base, f.store.get(f.input.taskId).recovery.archive)));
+  assert.deepEqual(Buffer.from(archive.retiredProgress.bytes, 'base64'), original);
+  assert.deepEqual(
+    after.retired.map((item) => item.receipt),
+    oldEntries.map((item) => item.receipt),
+  );
+  assert.ok(
+    after.retired.every(
+      (item) => item.state === 'retired-attempt-not-delivered' && !item.failure && item.revision === undefined,
+    ),
+  );
+  assert.equal(after.acknowledged.length, 0);
+  assert.equal(after.pending.length, 1);
+  assert.equal(after.pending[0].receipt.sequence, 3);
+  assert.equal(after.pending[0].receipt.event, 'queued');
+  assert.equal(archive.progressReviewEvidence.classification, 'client-review-evidence-not-a-server-rejection');
+  const sourceRevision = oldEntries[0].receipt.evidence_refs[0].split(':')[1];
+  const replay = f.box.enqueue(f.input.taskId, `queue:${sourceRevision}:development`, payload(oldEntries[0].receipt));
+  assert.equal(replay.state, 'retired-attempt-not-delivered');
+  assert.deepEqual(f.box.read(), after);
+  await f.recover();
+  assert.deepEqual(f.box.read(), after);
+});
+for (const scenario of [
+  'prepared',
+  'failed',
+  'unknown-write-marker',
+  'unknown-manual-write',
+  'missing-write-assessment',
+  'already-applied',
+  'history-applied',
+  'history-work-started',
+  'history-gap',
+  'missing-readback',
+  'third-projection',
+  'explicit-later-pause',
+  'wrong-original-source',
+])
+  test('creation progress retirement refuses ' + scenario + ' and preserves all original delivery facts', async (t) => {
+    const f = await fixture(t),
+      originalReader = f.host.readCreationProgress;
+    const first = f.box.read().pending[0];
+    if (scenario === 'prepared') f.box.prepare(first.receipt_id, 1);
+    if (scenario === 'failed') f.box.fail(first.receipt_id, 'network_error');
+    if (scenario === 'unknown-write-marker') {
+      const state = f.box.read();
+      state.pending[0].unknown_write = true;
+      writeFileSync(path.join(f.box.directory, 'outbox.json'), JSON.stringify(state));
+    }
+    if (scenario === 'unknown-manual-write') f.retry.progressWriteAssessment.outcome = 'unknown-manual-write';
+    if (scenario === 'missing-write-assessment') delete f.retry.progressWriteAssessment;
+    if (scenario === 'third-projection')
+      for (let n = 0; n < 2; n++)
+        f.box.enqueue(f.input.taskId, 'extra-' + n, {
+          event: 'queued',
+          observed_at: f.original.createdAt,
+          action: { id: 'receive' },
+          evidence_refs: ['unknown'],
+          next: { kind: 'wait', label: 'unknown' },
+        });
+    if (scenario === 'explicit-later-pause')
+      f.queue.direct({
+        action: 'pause-all',
+        request: { ...f.retry.retryRequest, messageId: 'actual-later-pause', sequence: 5 },
+      });
+    if (scenario === 'wrong-original-source') {
+      const value = f.box.read();
+      value.pending[0].receipt.evidence_refs[0] = 'execution-order:1:development:other-task';
+      writeFileSync(path.join(f.box.directory, 'outbox.json'), JSON.stringify(value));
+    }
+    f.host.readCreationProgress = async (...args) => {
+      const proof = await originalReader(...args);
+      if (scenario === 'already-applied') proof.receipts[0].outcome = 'applied';
+      if (scenario === 'history-applied') proof.history[0].snapshot.progress_receipt = { receipt: first.receipt };
+      if (scenario === 'history-work-started')
+        proof.history[0].snapshot.progress_receipt = { receipt: { receipt_id: 'another-receipt', event: 'started' } };
+      if (scenario === 'history-gap') proof.history[0].snapshot.revision = 2;
+      if (scenario === 'missing-readback') proof.receipts = [];
+      return proof;
+    };
+    const before = readFileSync(path.join(f.box.directory, 'outbox.json')),
+      queue = f.queue.read();
+    await assert.rejects(f.recover());
+    assert.deepEqual(readFileSync(path.join(f.box.directory, 'outbox.json')), before);
+    assert.deepEqual(f.store.get(f.input.taskId), f.original);
+    assert.deepEqual(f.queue.read(), queue);
+    assert.equal(f.creates(), 1);
+  });
+test('interrupted local retirement retains the first archive and nonce; the same decision revalidates and emits exactly one new plan', async (t) => {
+  const f = await fixture(t),
+    lock = path.join(f.box.directory, 'outbox.lock');
+  writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 });
+  await assert.rejects(f.recover(), /EEXIST/);
+  assert.deepEqual(f.store.get(f.input.taskId), f.original);
+  assert.equal(f.creates(), 1);
+  const archiveFile = path.join(f.store.base, 'failed-creations', f.input.taskId, f.retry.decisionId + '.json');
+  const originalArchive = readFileSync(archiveFile),
+    next = JSON.parse(originalArchive).next;
+  rmSync(lock);
+  await f.recover();
+  assert.equal(f.store.get(f.input.taskId).createRequestId, next.createRequestId);
+  assert.deepEqual(readFileSync(archiveFile), originalArchive);
+  assert.equal(f.creates(), 2);
+  await f.recover();
+  assert.equal(f.creates(), 2);
+});
+for (const prepared of [false, true])
+  test(`durable retired transaction prefix resumes only with known unsubmitted replacement progress: prepared=${prepared}`, async (t) => {
+    const f = await fixture(t),
+      lock = path.join(f.box.directory, 'outbox.lock');
+    writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 });
+    await assert.rejects(f.recover(), /EEXIST/);
+    rmSync(lock);
+    const archiveFile = path.join(f.store.base, 'failed-creations', f.input.taskId, f.retry.decisionId + '.json');
+    const bytes = readFileSync(archiveFile),
+      archive = JSON.parse(bytes);
+    // Execute the real local transaction prefix, stopping before the active
+    // attempt index and before any new native plan is exposed.
+    f.box.retireCreationAttempt({
+      archiveFile,
+      archiveDigest: createHash('sha256').update(JSON.stringify(archive)).digest('hex'),
+    });
+    assert.deepEqual(f.store.get(f.input.taskId), f.original);
+    assert.equal(f.creates(), 1);
+    if (prepared) {
+      f.box.prepare(f.box.read().pending[0].receipt_id, 1);
+      await assert.rejects(f.recover(), /Prepared replacement progress/);
+      assert.deepEqual(f.store.get(f.input.taskId), f.original);
+      assert.equal(f.box.read().pending[0].revision, 1);
+      assert.equal(f.creates(), 1);
+    } else {
+      await f.recover();
+      assert.equal(f.store.get(f.input.taskId).createRequestId, archive.next.createRequestId);
+      assert.equal(f.creates(), 2);
+      assert.equal(f.box.read().pending.length, 1);
+      await f.recover();
+      assert.equal(f.creates(), 2);
+    }
+    assert.deepEqual(readFileSync(archiveFile), bytes);
+  });
 test('published host protocol emits one replacement plan, then requires a fresh exact native result through ordinary receive', async (t) => {
   const f = await fixture(t);
   const observations = () =>
@@ -283,9 +501,39 @@ test('published host protocol emits one replacement plan, then requires a fresh 
     observedAt: new Date().toISOString(),
     snapshot: await f.host.readCapacity(),
   };
-  const call = (input) =>
+  const progress = async () => {
+    const ids = f.box.read().pending.map((entry) => entry.receipt_id),
+      proof = await f.host.readCreationProgress(f.input.taskId, ids);
+    const raw = (value) => ({
+      content: [{ type: 'text', text: JSON.stringify(value) }],
+      structuredContent: null,
+      isError: false,
+    });
+    return [
+      {
+        provider: 'codex-native-task-board',
+        operation: 'task_history',
+        args: { id: f.input.taskId },
+        observedAt: new Date().toISOString(),
+        result: raw(proof.history),
+      },
+      ...proof.receipts.map((result) => ({
+        provider: 'codex-native-task-board',
+        operation: 'get_task_progress_receipt',
+        args: { id: f.input.taskId, receipt_id: result.receipt_id },
+        observedAt: new Date().toISOString(),
+        result: raw(result),
+      })),
+    ];
+  };
+  const call = async (input) =>
     advanceTaskThread(
-      { ...input, nativeObservations: observations(), capacity },
+      {
+        ...input,
+        nativeObservations: observations(),
+        capacity,
+        progressNativeObservations: input.progressNativeObservations ?? (await progress()),
+      },
       {
         commonDir: f.commonDir,
         registry: f.registry,
@@ -294,6 +542,11 @@ test('published host protocol emits one replacement plan, then requires a fresh 
       },
     );
   const input = { action: 'retry-creation', task: f.retry };
+  const stale = await progress();
+  stale[0].observedAt = '2000-01-01T00:00:00.000Z';
+  await assert.rejects(call({ ...input, progressNativeObservations: stale }), /Fresh native progress evidence/);
+  assert.deepEqual(f.store.get(f.input.taskId), f.original);
+  assert.equal(f.creates(), 1);
   const first = await call(input);
   assert.equal(first.nativeActions.length, 1);
   const plan = first.nativeActions[0];

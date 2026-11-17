@@ -59,7 +59,23 @@ export function captureCompletionProgress(directory, state, previous) {
   }
 }
 export function captureQueueProgress(commonDir, state, previous) {
-  const pausedFor = executionPausedFor;
+  const pausedFor = (current, ticket) => {
+    if (!executionPausedFor(current, ticket)) return false;
+    const fence = current.events?.findLast((event) => ['initialize', 'pause-all'].includes(event.action))?.request;
+    // A newly authorized pending native task is queued behind the fence. It
+    // has not been explicitly paused by the user and has not started either.
+    return !(
+      ticket.status === 'queued' &&
+      ticket.awaitingNativeWorker === true &&
+      ticket.admission === null &&
+      Number.isSafeInteger(fence?.sequence) &&
+      typeof fence.authorId === 'string' &&
+      fence.authorId.trim() &&
+      fence.authorId === ticket.request?.authorId &&
+      Number.isSafeInteger(ticket.request?.sequence) &&
+      ticket.request.sequence > fence.sequence
+    );
+  };
   for (const ticket of state.tickets) {
     if (['completed', 'cancelled'].includes(ticket.status)) continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
