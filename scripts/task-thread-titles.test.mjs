@@ -225,6 +225,98 @@ test('queued worker independently renews a receipt older than five minutes and s
   assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 1 });
   await assert.rejects(startIndependentCodexTask(received.workerInput, f.host), /Never replay/);
 });
+
+test('A to B to C renews queued original authorization through the current appointment, not an invented direct A to C creation', async (t) => {
+  const f = fixture(t),
+    received = await prepared(f),
+    old = expireReceipt(f);
+  const b = '77777777-7777-4777-8777-777777777777';
+  const c = '88888888-8888-4888-8888-888888888888';
+  const originalRead = f.host.readThread;
+  const snapshots = new Map([[coordinator, await originalRead(coordinator)]]);
+  f.host.readThread = async (id) => snapshots.get(id) ?? originalRead(id);
+  process.env.CODEX_THREAD_ID = coordinator;
+  await authorizeTaskCoordinator(
+    f.commonDir,
+    { rootThreadId: coordinator, request: f.input.request, expectedRevision: 0 },
+    f.host,
+  );
+  let previous = coordinator;
+  for (const [index, current] of [b, c].entries()) {
+    const request = {
+      ...f.input.request,
+      roomId: previous,
+      messageId: 'appointment-' + current,
+      sequence: f.input.request.sequence + index + 1,
+    };
+    snapshots.get(previous).turns[0].items.push({ type: 'userMessage', id: request.messageId });
+    snapshots.set(current, {
+      thread: { id: current },
+      turns: [
+        {
+          items: [
+            {
+              id: 'created-' + current,
+              type: 'functionCallOutput',
+              namespace: 'codex_app',
+              name: 'create_thread',
+              output: {
+                truncated: false,
+                text: `<codex_delegation>\n  <source_thread_id>${previous}</source_thread_id>\n  <input>New coordinator from ${request.messageId}</input>\n</codex_delegation>`,
+              },
+            },
+          ],
+        },
+      ],
+    });
+    process.env.CODEX_THREAD_ID = current;
+    await authorizeTaskCoordinator(
+      f.commonDir,
+      { rootThreadId: current, request, expectedRevision: index + 1 },
+      f.host,
+    );
+    previous = current;
+  }
+  const observedAt = new Date().toISOString();
+  const observations = await Promise.all(
+    [coordinator, b, c, worker].map(async (id) => ({
+      provider: 'codex-native-read_thread',
+      observedAt,
+      snapshot: await f.host.readThread(id),
+    })),
+  );
+  const input = {
+    action: 'start',
+    task: received.workerInput,
+    nativeObservations: observations,
+    capacity: { provider: 'codex-native-capacity', observedAt, snapshot: await f.host.readCapacity() },
+  };
+  const adapters = { commonDir: f.commonDir, readTask: f.host.readTask, start: f.host.start };
+  process.env.CODEX_THREAD_ID = coordinator;
+  await assert.rejects(
+    advanceTaskThread({ ...input, action: 'receive', task: f.input }, adapters),
+    /current authorized coordinator/,
+  );
+  process.env.CODEX_THREAD_ID = worker;
+  const before = f.queue.read();
+  const forged = structuredClone(input);
+  const event = forged.nativeObservations.find((o) => o.snapshot.thread.id === c).snapshot.turns[0].items[0];
+  event.output.text = event.output.text.replace(b, coordinator);
+  await assert.rejects(advanceTaskThread(forged, adapters), /provenance/);
+  assert.deepEqual(f.queue.read(), before);
+  assert.deepEqual(readFileSync(old.file), old.bytes);
+  const result = await advanceTaskThread(input, adapters);
+  assert.equal(result.result.task.monitoring.coordinatorThreadId, c);
+  assert.equal(result.result.task.monitoring.rootThreadId, coordinator);
+  const receipt = JSON.parse(readFileSync(old.file));
+  assert.equal(receipt.messageId, f.input.request.messageId);
+  assert.equal(receipt.owner, coordinator);
+  assert.equal(receipt.initialObservedAt, old.record.observedAt);
+  assert.equal(receipt.refreshHistory.at(-1).coordinator, c);
+  assert.equal(receipt.refreshHistory.at(-1).executor, worker);
+  assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 1 });
+  await assert.rejects(advanceTaskThread(input, adapters), /Never replay/);
+});
 for (const invalid of ['paused-card', 'done-card', 'renumbered', 'during-read-revision', 'network', 'queue-paused']) {
   test(`expired receipt does not claim, receive or recreate when ${invalid}`, async (t) => {
     const f = fixture(t),

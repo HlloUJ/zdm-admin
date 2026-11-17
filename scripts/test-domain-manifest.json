@@ -1860,7 +1860,7 @@
       "dynamicImports": 0
     },
     "scripts/task-board-intake.mjs": {
-      "digest": "04fe9c4cdafe1a9724408b035e95e35e026fe58f519d3257dde5bd2086bf7e77",
+      "digest": "72872dcfaf54f04ac736c11fddff9c5ba31d959712288a66fbc53672b45dce36",
       "imports": [
         "scripts/task-coordination.mjs",
         "scripts/task-execution-binding.mjs",
@@ -2118,7 +2118,7 @@
       "dynamicImports": 0
     },
     "scripts/task-codex-host.mjs": {
-      "digest": "917539dc860be718d128fd05332fa8c925bda56dd42f75e2223ac8a6f83c661c",
+      "digest": "a602b0a97b1e0dbfc35d1789c6b9cd92488dee2c0a1ad13ca2e8707eb2ad67c9",
       "imports": [
         "scripts/task-board-intake.mjs",
         "scripts/task-coordination.mjs",
@@ -2269,7 +2269,7 @@
       "dynamicImports": 11
     },
     "scripts/task-coordination.mjs": {
-      "digest": "93a1528b965ce2bac8ec6b81e89b6fb755a486628658259f8ec2b84710e2d37e",
+      "digest": "46c00fe6f3a1448268714e194235ef232ff65615bc23568089f400c66beef99e",
       "imports": ["scripts/task-execution-binding.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
@@ -2698,11 +2698,12 @@
       "dynamicImports": 0
     },
     "scripts/task-rebinding.test.mjs": {
-      "digest": "ec02d6160218dc6cb31e37bc6fb9861ce9c678a5c33b04fc65267ba3f93e852a",
+      "digest": "563b17f5d02ef2d6a0eefdbd57e4db256dc15c87b8020401ab9071b3a3730bcd",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/task-board-intake.mjs",
         "scripts/task-completion-progress.mjs",
+        "scripts/task-coordination.mjs",
         "scripts/task-development.mjs",
         "scripts/task-execution-binding.mjs",
         "scripts/task-execution-order.mjs",
@@ -2824,7 +2825,7 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-titles.test.mjs": {
-      "digest": "e452ad733ee45d78d1e5c3ba8ba0a8c3c547385e3c13b7106083c7ce2a4997fb",
+      "digest": "abb2141392759dca078d4e63655aa65051a74b2d19813e65e74e3b14172a1d31",
       "imports": [
         "scripts/task-board-intake.mjs",
         "scripts/task-codex-cycle.mjs",

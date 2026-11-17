@@ -41,6 +41,17 @@ export function requireTaskCoordinator(commonDir, coordinator) {
     );
   return coordinator;
 }
+// Task authorization and a later coordinator appointment are separate events.
+// A->B->C does not imply that A directly created C's native chat.
+export async function verifyTaskAuthorization(commonDir, input, readThread) {
+  const coordinator = input.coordinatorThreadId ?? input.rootThreadId;
+  const policy = commonDir ? readTaskCoordination(commonDir) : null;
+  if (commonDir) requireTaskCoordinator(commonDir, coordinator);
+  const source = await verifyCoordinatorSource(input, readThread);
+  if (coordinator !== input.rootThreadId)
+    await verifyCoordinatorSource(policy?.current ?? { rootThreadId: coordinator, request: input.request }, readThread);
+  return source;
+}
 export async function authorizeTaskCoordinator(commonDir, input, host) {
   assert.equal(process.env.CODEX_THREAD_ID, input.rootThreadId, 'Actual new coordinator runtime required');
   await verifyCoordinatorSource(input, host.readThread);

@@ -5,7 +5,7 @@ import {
   verifyNativeCreation,
 } from './task-thread-titles.mjs';
 import { verifyCoordinatorSource } from './task-execution-binding.mjs';
-import { requireTaskCoordinator } from './task-coordination.mjs';
+import { requireTaskCoordinator, verifyTaskAuthorization } from './task-coordination.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmdirSync, writeFileSync } from 'node:fs';
@@ -189,10 +189,7 @@ export function createBoardIntake(commonDir) {
     assert.equal(process.env.CODEX_THREAD_ID, input.owner, 'Actual worker runtime required for intake refresh');
     assert.equal(typeof verifyQueued, 'function', 'Exact queued instruction must be independently checked');
     verifyQueued();
-    await verifyCoordinatorSource(
-      { ...input, rootThreadId: input.coordinatorThreadId ?? input.rootThreadId },
-      readThread,
-    );
+    await verifyTaskAuthorization(commonDir, input, readThread);
     const target = file(input.taskId);
     safe(target);
     assert.ok(existsSync(target), 'Only an existing accepted receipt may refresh; never receive or create here');

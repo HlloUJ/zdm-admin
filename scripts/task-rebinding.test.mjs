@@ -16,6 +16,7 @@ import { completionCommand } from './completion-cli.mjs';
 import { runCompletionWithProgress } from './task-completion-progress.mjs';
 import { prepareProgressStage, notifyProgressHost } from './task-progress-host.mjs';
 import { collectTaskProgress } from './task-progress-collector.mjs';
+import { authorizeTaskCoordinator, readTaskCoordination } from './task-coordination.mjs';
 
 const old = '11111111-1111-4111-8111-111111111111';
 const root = '22222222-2222-4222-8222-222222222222';
@@ -645,6 +646,92 @@ test('a later authorized coordinator can retain the existing worker and its orig
     registry: f.registry,
     queue: f.queue,
   });
+});
+
+test('A to B to C preserves a collaboration origin while changing coordinator then native worker', async (t) => {
+  const f = fixture(t, { collaboration: true });
+  await authorizeTaskCoordinator(f.registry.commonDir, { ...f.input, expectedRevision: 0 }, f.host);
+  const first = (await f.bind()).task.executionBindings[0];
+  const b = '77777777-7777-4777-8777-777777777777';
+  const c = '88888888-8888-4888-8888-888888888888';
+  const nextWorker = '99999999-9999-4999-8999-999999999999';
+  const beforeQueue = f.queue.read();
+  // The original collaboration root is no longer a required executor after
+  // its first fully checked binding; the current native worker is checked.
+  f.snapshots.delete(legacyRoot);
+  let previousCoordinator = root;
+  let latest;
+  for (const [index, current] of [b, c].entries()) {
+    const request = {
+      messageId: 'handoff-' + current,
+      roomId: previousCoordinator,
+      authorId: 'human',
+      sequence: 6 + index,
+    };
+    f.snapshots.get(previousCoordinator).turns[0].items.push({ type: 'userMessage', id: request.messageId });
+    f.snapshots.set(current, delegate(current, previousCoordinator, 'Coordinator from ' + request.messageId));
+    process.env.CODEX_THREAD_ID = current;
+    const direction = { rootThreadId: current, request, expectedRevision: index + 1 };
+    await authorizeTaskCoordinator(f.registry.commonDir, direction, f.host);
+    const appointed = readTaskCoordination(f.registry.commonDir);
+    assert.deepEqual(await authorizeTaskCoordinator(f.registry.commonDir, direction, f.host), appointed);
+    await assert.rejects(
+      authorizeTaskCoordinator(f.registry.commonDir, { ...direction, expectedRevision: 0 }, f.host),
+      /replay|revision/i,
+    );
+    await assert.rejects(
+      authorizeTaskCoordinator(
+        f.registry.commonDir,
+        {
+          ...direction,
+          expectedRevision: appointed.revision,
+          request: { ...request, messageId: 'different-user', authorId: 'other', sequence: 20 },
+        },
+        f.host,
+      ),
+    );
+    if (current === c) f.snapshots.set(nextWorker, delegate(nextWorker, c, 'Execute task task', '750｜fixture'));
+    latest = {
+      ...f.input,
+      rootThreadId: current,
+      owner: current === c ? nextWorker : worker,
+      request,
+      expectedRevision: f.registry.readTask('task').revision,
+    };
+    const result = await rebindHistoricalTask(latest, f.host, {
+      registry: f.registry,
+      queue: f.queue,
+      observe: f.observe,
+    });
+    const bound = result.task.executionBindings.at(-1);
+    assert.equal(bound.nativeEvidence.worker.sourceRootThreadId, current === c ? c : root);
+    assert.deepEqual(result.task.executionBindings[0], first);
+    process.env.CODEX_THREAD_ID = previousCoordinator;
+    await assert.rejects(
+      rebindHistoricalTask({ ...latest, rootThreadId: previousCoordinator }, f.host, {
+        registry: f.registry,
+        queue: f.queue,
+        observe: f.observe,
+      }),
+      /current authorized coordinator/,
+    );
+    previousCoordinator = current;
+  }
+  assert.deepEqual(f.queue.read(), beforeQueue);
+  assert.equal(readTaskCoordination(f.registry.commonDir).revision, 3);
+  assert.equal(f.registry.readTask('task').executionBindings.length, 3);
+  process.env.CODEX_THREAD_ID = nextWorker;
+  f.host.start = async () => ({ task: f.registry.readTask('task') });
+  const result = await resumeBoundTask(
+    { ...latest, taskRevision: f.registry.readTask('task').revision, lane: 'development' },
+    f.host,
+    {
+      registry: f.registry,
+      queue: f.queue,
+    },
+  );
+  assert.equal(result.task.owner, old);
+  assert.equal(taskExecutor(result.task), nextWorker);
 });
 
 for (const status of ['paused', 'done', 'cancelled'])

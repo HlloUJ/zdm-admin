@@ -1,5 +1,5 @@
 import { TASK_THREAD_MODE, createTaskThreadTitles } from './task-thread-titles.mjs';
-import { verifyCoordinatorSource, taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
+import { taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
 import { executionPausedFor } from './task-execution-scope.mjs';
 import { createBoardIntake } from './task-board-intake.mjs';
 import assert from 'node:assert/strict';
@@ -11,20 +11,22 @@ import { createProgressOutbox, authenticatedBoardAdapter, flushProgress } from '
 import { recordToolProgress } from './task-delivery-status-sync.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
-import { readTaskCoordination } from './task-coordination.mjs';
+import { readTaskCoordination, verifyTaskAuthorization } from './task-coordination.mjs';
 
 // Platform reads and writes come from the authenticated host, never from repo credentials.
 // This module has no scheduler, implicit task discovery, retry, owner transfer or global resume.
 export async function codexMonitoringContext(
   { taskId, owner, rootThreadId, request, coordinatorThreadId },
-  { readTask, readThread },
+  { readTask, readThread, intake, queue },
 ) {
   const board = await readTask(taskId);
   assert.equal(board.id, taskId, 'Exact task overview registration required');
   assert.ok(board.task_number && !board.deleted_at && board.status !== 'done', 'Current unfinished task required');
-  const source = await verifyCoordinatorSource({ rootThreadId, request }, readThread);
-  if (coordinatorThreadId && coordinatorThreadId !== rootThreadId)
-    await verifyCoordinatorSource({ rootThreadId: coordinatorThreadId, request }, readThread);
+  const source = await verifyTaskAuthorization(
+    intake?.commonDir ?? queue?.commonDir,
+    { rootThreadId, request, coordinatorThreadId },
+    readThread,
+  );
   const worker = owner === request.roomId ? source : await readThread(owner);
   assert.equal(worker.thread.id, owner, 'Actual native execution thread required');
   const context = {
@@ -193,7 +195,7 @@ export async function startIndependentCodexTask(input, host) {
 }
 
 export async function startCodexTask(input, { queue, readTask, readThread, start, readCapacity }) {
-  const context = await codexMonitoringContext(input, { readTask, readThread });
+  const context = await codexMonitoringContext(input, { queue, readTask, readThread });
   assert.ok(queue.commonDir, 'Persistent intake store required before queue dispatch');
   createBoardIntake(queue.commonDir).require(context, input.taskId, input.owner);
   const state = queue.read();
