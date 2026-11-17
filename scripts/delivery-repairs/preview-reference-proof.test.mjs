@@ -15,6 +15,8 @@ import {
   lstatSync,
 } from 'node:fs';
 import os from 'node:os';
+import http from 'node:http';
+import { once } from 'node:events';
 import path from 'node:path';
 import { spawnSync, execFileSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -35,12 +37,32 @@ import {
   verifyClosedPreviewReference,
   referenceConsumerAnchor,
   createReferenceEvidenceJournal,
+  readReferenceBackendHealth,
 } from './preview-reference-proof.mjs';
 import { inspectPreviewConsumers } from '../preview-consumers.mjs';
 import { parseDockerVnodeInventory } from './preview-docker-directories.mjs';
 
 const sha = 'a'.repeat(64),
   head = 'b'.repeat(40);
+test('real health probe closes its client socket instead of granting an observer connection exemption', async () => {
+  const server = http.createServer((_request, response) => response.end('{"status":"UP"}'));
+  const accepted = new Promise((resolve) => server.once('connection', (socket) => resolve(once(socket, 'close'))));
+  server.listen(0, '127.0.0.1');
+  await once(server, 'listening');
+  try {
+    const response = await readReferenceBackendHealth(`http://127.0.0.1:${server.address().port}/actuator/health`);
+    assert.deepEqual(response, { statusCode: 200, body: '{"status":"UP"}' });
+    await accepted;
+    assert.equal(
+      await new Promise((resolve, reject) =>
+        server.getConnections((error, count) => (error ? reject(error) : resolve(count))),
+      ),
+      0,
+    );
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
 test('rejected observations retain the original inventory before failure without overwriting events', () => {
   const parent = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'reference-evidence-')));
   const directory = path.join(parent, 'attempt');

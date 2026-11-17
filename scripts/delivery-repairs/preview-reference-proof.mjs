@@ -3,6 +3,7 @@ import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { existsSync, mkdirSync, writeFileSync, lstatSync, realpathSync } from 'node:fs';
 import os from 'node:os';
+import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createTaskRegistry } from '../task-registry.mjs';
@@ -67,6 +68,45 @@ export function createReferenceEvidenceJournal(directory) {
     });
     return file;
   };
+}
+
+// A completed body is not a closed socket. Wait for the actual client socket
+// close before the next synchronous OS inventory; do not exempt our own client.
+export function readReferenceBackendHealth(url) {
+  return new Promise((resolve) => {
+    let result;
+    const request = http.get(url, { agent: false, timeout: 3000 }, (response) => {
+      const chunks = [];
+      let size = 0;
+      response.on('data', (chunk) => {
+        size += chunk.length;
+        if (size > 1024 * 1024) {
+          result = { statusCode: 0, body: '', errorCode: 'RESPONSE_TOO_LARGE' };
+          request.destroy();
+        } else chunks.push(chunk);
+      });
+      response.once('end', () => {
+        result ??= { statusCode: response.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') };
+        request.destroy();
+      });
+      response.once('error', (error) => {
+        result ??= { statusCode: 0, body: '', errorCode: error.code ?? 'RESPONSE_ERROR' };
+        request.destroy();
+      });
+    });
+    request.once('socket', (socket) =>
+      socket.once('close', () =>
+        resolve(result ?? { statusCode: 0, body: '', errorCode: 'SOCKET_CLOSED_WITHOUT_RESPONSE' }),
+      ),
+    );
+    request.once('timeout', () => {
+      result ??= { statusCode: 0, body: '', errorCode: 'ETIMEDOUT' };
+      request.destroy();
+    });
+    request.once('error', (error) => {
+      result ??= { statusCode: 0, body: '', errorCode: error.code ?? 'NETWORK_ERROR' };
+    });
+  });
 }
 
 export function referenceConsumerAnchor(root, common) {
@@ -339,7 +379,7 @@ async function observe(identity, scope, core, record) {
     }
   }
   const response = responses.find((r) => r.port === identity.port).response;
-  const health = await previews.readPreviewResponse(`http://127.0.0.1:${identity.backendPort}/actuator/health`, 3000);
+  const health = await readReferenceBackendHealth(`http://127.0.0.1:${identity.backendPort}/actuator/health`);
   let status;
   try {
     status = JSON.parse(health.body).status;

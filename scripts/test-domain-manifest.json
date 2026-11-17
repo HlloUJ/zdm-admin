@@ -805,7 +805,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof.mjs": {
-      "digest": "9447a227019d17c0b9a49cf11c48497a34fcb5d1ab3bdc5a9f041a101026946e",
+      "digest": "8e61f7bd5f54218382fc3b0bcbcb41482f854aad7db614eb2734f8820af2e1f2",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-cli.mjs",
@@ -828,7 +828,7 @@
       "dynamicImports": 1
     },
     "scripts/delivery-repairs/preview-reference-proof.test.mjs": {
-      "digest": "4c4ea33d86006591fb738f4eb7e5c6a179f33b35a3f3bb5d6b96503705e67524",
+      "digest": "dd275219c5089bde2b2900ee9d5649bbbe93c7f1b915dba5f96ed346874d7d1c",
       "imports": [
         "scripts/delivery-repairs/preview-docker-directories.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
