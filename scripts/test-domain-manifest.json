@@ -2737,12 +2737,12 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-titles.mjs": {
-      "digest": "febc52c75b90f47b60c3202884c6517cd25cdd63deeb1e99e8e325bceb8725a8",
+      "digest": "e4684a6dd75087d3c8730494b23042e07914cf75584008e18a9f30dd5acee3cc",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/task-thread-titles.test.mjs": {
-      "digest": "13c613de55466dc9e1ebba2546d8c587cdb2b5203a508670c2f28a134abf824c",
+      "digest": "5507161b218f681a233e7bba8a5ec3d098ca5080d45024e0b28f0d027d77dc1a",
       "imports": [
         "scripts/task-board-intake.mjs",
         "scripts/task-codex-cycle.mjs",
