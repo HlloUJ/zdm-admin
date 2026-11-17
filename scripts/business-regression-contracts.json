@@ -378,7 +378,7 @@
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
-        "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+        "tests/e2e/finished-stock.spec.ts": "f12de268d0b142cc2bc14bedba1a597ff0a947c28ad404c4c495202a578d7772",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
         "tests/e2e/slab-collaboration.spec.ts": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
         "tests/e2e/store-finished-stock.spec.ts": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
@@ -2699,6 +2699,12 @@
           "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
           "after": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
           "reason": "款项配置改由真实API供给：保留分页、数量和订单回归全部断言，移除旧本地group夹具，补充并发删除后刷新且保留输入验证。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "after": "f12de268d0b142cc2bc14bedba1a597ff0a947c28ad404c4c495202a578d7772",
+          "reason": "432恢复诊断：仅在原视频播放断言失败时附加媒体错误、readyState、networkState、currentTime及页面可见性，随后原样抛出失败；原断言、超时、重试、用例与业务均不变。历史失败继续保留，不据此认定根因已修复。"
         }
       ],
       "routes": [
