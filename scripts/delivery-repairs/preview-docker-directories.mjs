@@ -112,7 +112,7 @@ export function collectRetainedDockerDirectories(identity, inventory, record) {
       '--verify',
       '--strict',
       '-R',
-      'anchor apple generic and certificate leaf[subject.OU] = "9BNSXJN65R" and identifier "' + identifier + '"',
+      '=anchor apple generic and certificate leaf[subject.OU] = "9BNSXJN65R" and identifier "' + identifier + '"',
       executable,
     ]);
     const imageHash = referenceHash(readFileSync(executable));

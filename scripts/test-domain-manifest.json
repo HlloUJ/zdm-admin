@@ -781,7 +781,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-docker-directories.mjs": {
-      "digest": "e09dd4fab9abc4ed7d01adb794267b160b22037b3d9fa2500d0d0a0767fe8c80",
+      "digest": "f1b44f34728337d1110bdde6dd9460327b2b001d3624f2ff948933515d40226c",
       "imports": [
         "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
