@@ -30,9 +30,9 @@
 
 macOS Docker Desktop 保留后端可能继续打开源挂载目录。此处只能证明“旧前端已停止、这些目录引用仍在且全部保留”，不能证明后端停止、资源无引用或资产可删除。生产收集器自行调用真实工具，无调用方观察适配器：唯一真实本地 Docker Unix socket 的持有进程必须是 Apple 签名链及 Docker 团队 `9BNSXJN65R` 验证通过的 backend 程序；其他目录持有者只能是同一安装中的已验证 sailor 直接子进程。签名文件的物理身份须匹配实际加载的 image vnode，进程父子、UID、启动时间和查询前后身份须一致，不能按进程名豁免。
 
-原后端容器须唯一挂载该准确物理源目录到 `/workspace`，其他容器的父级或子级重叠挂载均拒绝。逐个 numeric FD 同时核对原完整 OS 清单、额外原始 lsof 设备/inode/只读访问及本机 SDK `proc_pidfdinfo` 的真实 DIR vnode、文件类型、打开标志和路径；已存在目录还须由 lstat、realpath 和 fsgetpath 对应同一物理目录。目录 namespace 已缺失时，必须原样保留内核目录 inode、链接数、缓存路径及 lstat/fsgetpath 的 ENOENT，且其真实同设备父目录仍能映射到保留源；不把 ENOENT 或链接数解释为引用失效，不创建路径补证。两轮所有服务、FD、源挂载和 endpoint 身份须完全稳定。REG、cwd、未知 PID、未映射目录、写入句柄、前端 socket 和后端客户端不在此范围。
+原后端容器须唯一挂载该准确物理源目录到 `/workspace`，其他容器的父级或子级重叠挂载均拒绝。逐个 numeric FD 同时核对原完整 OS 清单、额外原始 lsof 设备/inode/只读访问及本机 SDK `proc_pidfdinfo` 的真实 DIR vnode、文件类型、打开标志和路径；fsgetpath 能解析的目录还须由 lstat、realpath 对应同一物理目录。旧 vnode 的 fsgetpath 已为 ENOENT 时，必须原样保留内核目录 inode、链接数、缓存路径及当前 namespace 状态：路径缺失须保留 lstat ENOENT；同名路径已替换则另存当前目录的不同 inode、同设备 DIR 身份与 realpath，不把它冒充旧 vnode。两种情况下真实同设备父目录都须仍能映射到保留源；同 inode 却 fsgetpath 失败或其他错误仍拒绝。不把 ENOENT 或链接数解释为引用失效，不创建或替换路径补证。两轮所有服务、FD、源挂载和 endpoint 身份须完全稳定。REG、cwd、未知 PID、未映射目录、写入句柄、前端 socket 和后端客户端不在此范围。
 
-本机原始诊断有两个 FD 指向同一 namespace 缺失的目录 vnode，链接数仍为 2；这些事实说明目录引用仍需保留。证明包始终 `cleanupAuthorized: false`，本入口及正式交付不得据此停止 Docker、489 后端或清理其源、租约、数据库、媒体及任何目录。
+本机原始诊断有两个 FD 指向同一 namespace 缺失的目录 vnode，另两个 FD 指向同名路径已替换的旧缓存目录 vnode，旧目录链接数仍为 2；这些事实说明目录引用仍需保留。证明包始终 `cleanupAuthorized: false`，本入口及正式交付不得据此停止 Docker、489 后端或清理其源、租约、数据库、媒体及任何目录。
 
 活进程、缺失或异常观察、跨主机/远程 Docker、变化、未知引用、改写/替换/链接材料、来源或授权不符一律拒绝。此能力不授权停止保留后端、删除任何租约或资产，也不等于另一任务已恢复或交付。只读证明不替代原 PR/main CI、冻结校验、主线互斥、运行交接和最终收尾。
 

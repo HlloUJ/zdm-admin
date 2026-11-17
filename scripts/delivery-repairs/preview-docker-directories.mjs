@@ -140,7 +140,8 @@ export function collectRetainedDockerDirectories(identity, inventory, record) {
       assert.equal(observed[0].n, fd.path);
       assert.equal(BigInt(observed[0].D), BigInt(fd.device));
       assert.equal(BigInt(observed[0].i), BigInt(fd.inode));
-      if (fd.lstatStatus === 0) {
+      if (fd.fsgetpathErrno === 0) {
+        assert.equal(fd.lstatStatus, 0);
         assert.equal(fd.pathDevice, fd.device);
         assert.equal(fd.pathInode, fd.inode);
         assert.equal(fd.pathMode, fd.mode);
@@ -150,11 +151,21 @@ export function collectRetainedDockerDirectories(identity, inventory, record) {
       } else {
         // This is a real open DIR vnode, not absence evidence. Its kernel path
         // maps to the preserved source; missing namespace entries remain missing.
-        assert.equal(fd.lstatStatus, -1);
-        assert.equal(fd.lstatErrno, 2);
         assert.equal(fd.fsgetpathSize, -1);
         assert.equal(fd.fsgetpathErrno, 2);
         assert.equal(fd.fsgetpath, '');
+        if (fd.lstatStatus === 0) {
+          assert.equal(fd.lstatErrno, 0);
+          assert.notEqual(fd.pathInode, fd.inode, 'Ambiguous existing vnode namespace');
+          assert.equal(fd.pathDevice, fd.device);
+          assert.equal(fd.pathMode & 0o170000, 0o040000);
+          assert.equal(realpathSync(fd.path), fd.path);
+          const current = lstatSync(fd.path, { bigint: true });
+          assert.equal(String(current.ino), String(fd.pathInode));
+        } else {
+          assert.equal(fd.lstatStatus, -1);
+          assert.equal(fd.lstatErrno, 2);
+        }
         assert.equal(fd.parent, path.dirname(fd.path));
         assert.ok(fd.parent === identity.worktree || fd.parent.startsWith(identity.worktree + path.sep));
         assert.equal(fd.parentStatus, 0);

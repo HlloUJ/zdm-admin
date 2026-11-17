@@ -232,6 +232,11 @@ test('retained signed Docker service directory references are preserved and gran
   assert.equal(r.retainedDirectoryReferences.cleanupAuthorized, false);
   fd.openFlags = 0x8001; // Actual macOS FREAD | O_EVTONLY watcher flags.
   assertStoppedPreviewRound(r, i, 950);
+  Object.assign(fd, { lstatStatus: 0, lstatErrno: 0, pathInode: fd.inode + 1 });
+  assertStoppedPreviewRound(r, i, 950);
+  assert.notEqual(fd.pathInode, fd.inode); // Preserve both old vnode and replacement namespace.
+  fd.pathInode = fd.inode;
+  assert.throws(() => assertStoppedPreviewRound(r, i, 950));
 });
 for (const [name, mutate] of [
   ['wrong endpoint', (p) => (p.endpoint.path = '/remote.sock')],

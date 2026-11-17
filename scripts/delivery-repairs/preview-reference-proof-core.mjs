@@ -69,18 +69,26 @@ export function retainedDirectoryKeys(round, identity) {
       assert.ok(Number.isSafeInteger(fd.inode) && fd.inode > 0);
       assert.equal(fd.mode & 0o170000, 0o040000);
       assert.ok(under(fd.path, identity.worktree));
-      if (fd.lstatStatus === 0) {
+      if (fd.fsgetpathErrno === 0) {
+        assert.equal(fd.lstatStatus, 0);
         assert.equal(fd.pathDevice, fd.device);
         assert.equal(fd.pathInode, fd.inode);
         assert.equal(fd.pathMode, fd.mode);
         assert.equal(fd.fsgetpathErrno, 0);
         assert.equal(fd.fsgetpath, fd.path);
       } else {
-        assert.equal(fd.lstatStatus, -1);
-        assert.equal(fd.lstatErrno, 2);
         assert.equal(fd.fsgetpathSize, -1);
         assert.equal(fd.fsgetpathErrno, 2);
         assert.equal(fd.fsgetpath, '');
+        if (fd.lstatStatus === 0) {
+          assert.equal(fd.lstatErrno, 0);
+          assert.notEqual(fd.pathInode, fd.inode);
+          assert.equal(fd.pathDevice, fd.device);
+          assert.equal(fd.pathMode & 0o170000, 0o040000);
+        } else {
+          assert.equal(fd.lstatStatus, -1);
+          assert.equal(fd.lstatErrno, 2);
+        }
         assert.equal(fd.parent, path.dirname(fd.path));
         assert.ok(under(fd.parent, identity.worktree));
         assert.equal(fd.parentStatus, 0);
