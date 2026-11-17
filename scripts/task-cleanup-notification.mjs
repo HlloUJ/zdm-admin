@@ -4,6 +4,52 @@ import { existsSync, mkdirSync, lstatSync, readFileSync, writeFileSync, renameSy
 import path from 'node:path';
 import { safePath } from './task-cleanup-queue.mjs';
 
+const NATIVE_COMMENTARY_PROVIDER = 'codex-native-commentary-lf-v1';
+const textDigest = (text) => createHash('sha256').update(text).digest('hex');
+function assertNativeCommentaryReadback(notice, receipt, readback, destination) {
+  const observation = readback.nativeObservation;
+  assert.equal(observation?.provider, 'codex-native-read_thread');
+  assert.equal(observation.threadId, destination, 'Native notification target differs');
+  assert.ok(typeof observation.turnId === 'string' && observation.turnId);
+  assert.equal(observation.message?.phase, 'commentary');
+  assert.equal(observation.message.id, receipt.messageId, 'Native notification message differs');
+  assert.equal(observation.observedAt, receipt.deliveredAt);
+  assert.equal(readback.text, observation.message.text, 'Raw native notification text differs');
+  assert.equal(readback.text, notice.text + '\n', 'Native notification requires exactly one final LF');
+  assert.deepEqual(readback.adaptation, {
+    version: 1,
+    kind: NATIVE_COMMENTARY_PROVIDER,
+    expectedTextSha256: textDigest(notice.text),
+    rawTextSha256: textDigest(readback.text),
+  });
+}
+
+// Converts an already observed native message, never sends or claims a notification.
+// The original observation and text remain intact alongside the exact transformation.
+export function nativeCommentaryCleanupEnvelope(event, observation, destination) {
+  const notice = cleanupNotice(event),
+    receipt = {
+      provider: NATIVE_COMMENTARY_PROVIDER,
+      destination,
+      messageId: observation?.message?.id,
+      deliveredAt: observation?.observedAt,
+    },
+    readback = {
+      roomId: observation?.threadId,
+      messageId: observation?.message?.id,
+      text: observation?.message?.text,
+      nativeObservation: observation,
+      adaptation: {
+        version: 1,
+        kind: NATIVE_COMMENTARY_PROVIDER,
+        expectedTextSha256: textDigest(notice.text),
+        rawTextSha256: typeof observation?.message?.text === 'string' ? textDigest(observation.message.text) : null,
+      },
+    };
+  assertNativeCommentaryReadback(notice, receipt, readback, destination);
+  return { key: event.key, id: event.id, eventId: notice.eventId, receipt, readback };
+}
+
 export function cleanupNotice(event) {
   const eventId = createHash('sha256')
     .update(event.key + ':' + event.id)
@@ -66,7 +112,10 @@ export function acknowledgeCleanupNotice(queue, event, envelope, destination) {
   assert.equal(envelope.id, event.id);
   assert.equal(envelope.eventId, notice.eventId);
   assert.equal(record.destination, destination);
-  assert.equal(envelope.receipt?.provider, 'codex-fixed-channel-readback');
+  assert.ok(
+    ['codex-fixed-channel-readback', NATIVE_COMMENTARY_PROVIDER].includes(envelope.receipt?.provider),
+    'Unknown notification readback provider',
+  );
   assert.equal(envelope.receipt.destination, destination);
   assert.ok(typeof envelope.receipt.messageId === 'string' && envelope.receipt.messageId);
   assert.ok(Number.isFinite(Date.parse(envelope.receipt.deliveredAt)));
@@ -76,15 +125,20 @@ export function acknowledgeCleanupNotice(queue, event, envelope, destination) {
   );
   assert.equal(envelope.readback?.roomId, destination);
   assert.equal(envelope.readback.messageId, envelope.receipt.messageId);
-  assert.equal(envelope.readback.text, notice.text, 'Notification readback text differs');
+  if (envelope.receipt.provider === NATIVE_COMMENTARY_PROVIDER)
+    assertNativeCommentaryReadback(notice, envelope.receipt, envelope.readback, destination);
+  else assert.equal(envelope.readback.text, notice.text, 'Notification readback text differs');
   const file = path.join(queue.base, 'notices', notice.eventId + '.json'),
-    temp = file + '.' + randomUUID();
+    temp = file + '.' + randomUUID(),
+    content =
+      JSON.stringify({ ...record, status: 'delivered', receipt: envelope.receipt, readback: envelope.readback }) + '\n';
+  if (envelope.receipt.provider === NATIVE_COMMENTARY_PROVIDER)
+    assert.ok(
+      Buffer.byteLength(content) <= 32768,
+      'Native observation exceeds existing notice record limit; retain claim',
+    );
   safePath(file);
-  writeFileSync(
-    temp,
-    JSON.stringify({ ...record, status: 'delivered', receipt: envelope.receipt, readback: envelope.readback }) + '\n',
-    { mode: 0o600, flag: 'wx' },
-  );
+  writeFileSync(temp, content, { mode: 0o600, flag: 'wx' });
   renameSync(temp, file);
   return queue.acknowledgeNotification(envelope);
 }

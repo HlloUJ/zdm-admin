@@ -1,3 +1,4 @@
+import { requireNativeIntake, createTaskThreadTitles } from './task-thread-titles.mjs';
 import { hasScopedAdmission, scopedAdmissions } from './task-execution-scope.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
@@ -70,6 +71,28 @@ function validate(state) {
     const key = `${ticket.lane}:${ticket.task}`;
     assert.ok(!keys.has(key), 'Duplicate task lane');
     keys.add(key);
+    if (ticket.awaitingNativeWorker !== undefined) {
+      assert.equal(ticket.awaitingNativeWorker, true);
+      assert.equal(ticket.lane, 'development');
+      assert.equal(ticket.status, 'queued');
+      assert.equal(ticket.admission, null);
+      assert.equal(ticket.nativeCoordinatorOwner, undefined);
+    }
+    if (ticket.nativeLaunchReserved !== undefined) assert.equal(ticket.nativeLaunchReserved, true);
+    if (ticket.nativeCoordinatorOwner !== undefined) {
+      assert.equal(ticket.lane, 'development');
+      assert.notEqual(ticket.nativeCoordinatorOwner, ticket.owner);
+      assert.ok(
+        state.events.some(
+          (e) =>
+            e.action === 'bind-native-worker' &&
+            e.task === ticket.task &&
+            e.coordinatorOwner === ticket.nativeCoordinatorOwner &&
+            e.workerOwner === ticket.owner,
+        ),
+        'Native binding event missing',
+      );
+    }
     if (ticket.recoveryAuthorization) recoveryAuthorization(state, ticket);
     if (ticket.derivedAuthorization) {
       assert.equal(ticket.lane, 'delivery');
@@ -233,13 +256,18 @@ export function createExecutionOrder(commonDir) {
     assert.equal(found.owner, owner, 'Original execution owner required');
     return found;
   }
-  function enqueue({ lane, task, owner, request }) {
+  function enqueue({ lane, task, owner, request, awaitingNativeWorker = false }) {
     assert.ok(EXECUTION_LANES.includes(lane) && id(task) && text(owner));
     const source = event(request);
+    if (awaitingNativeWorker) {
+      assert.equal(lane, 'development');
+      requireNativeIntake(commonDir, { taskId: task, rootThreadId: owner, request });
+    }
     return update((state) => {
       const old = state.tickets.find((t) => t.lane === lane && t.task === task);
       if (old) {
         assert.equal(old.owner, owner);
+        assert.equal(old.awaitingNativeWorker === true, awaitingNativeWorker);
         assert.deepEqual(old.request, source, 'Task already has a different immutable instruction');
         return structuredClone(old);
       }
@@ -255,14 +283,83 @@ export function createExecutionOrder(commonDir) {
         state.tickets.filter((t) => t.lane === lane).every((t) => t.request.sequence < source.sequence),
         'Late event cannot reorder registered instructions',
       );
-      const added = { lane, task, owner, request: source, order: source.sequence, status: 'queued', admission: null };
+      const added = {
+        lane,
+        task,
+        owner,
+        request: source,
+        order: source.sequence,
+        status: 'queued',
+        admission: null,
+        ...(awaitingNativeWorker ? { awaitingNativeWorker: true } : {}),
+      };
       state.tickets.push(added);
       return structuredClone(added);
+    });
+  }
+  function reserveNativeCreation({ task, owner, request, capacity }) {
+    requireNativeIntake(commonDir, { taskId: task, rootThreadId: owner, request });
+    assert.ok(capacity && Number.isSafeInteger(capacity.limit) && capacity.limit > 0);
+    for (const key of ['activeDevelopment', 'activeDelivery', 'activeOther'])
+      assert.ok(Number.isSafeInteger(capacity[key]) && capacity[key] >= 0);
+    assert.ok(
+      capacity.activeDelivery <= 1 &&
+        capacity.activeDevelopment + capacity.activeDelivery + capacity.activeOther <= capacity.limit,
+    );
+    return update((state) => {
+      const current = state.tickets.find((t) => t.lane === 'development' && t.task === task);
+      assert.ok(current?.status === 'queued' && current.admission === null);
+      assert.deepEqual(current.request, request);
+      assert.ok(current.owner === owner || current.nativeCoordinatorOwner === owner);
+      if (current.nativeLaunchReserved) return structuredClone(current);
+      assert.equal(current.awaitingNativeWorker, true);
+      const reservations = state.tickets.filter((t) => t.status === 'queued' && t.nativeLaunchReserved).length;
+      assert.ok(
+        capacity.activeDevelopment + reservations + 1 <= capacity.limit - capacity.activeOther - 1,
+        'Reserve one executor for delivery, including outstanding native launches',
+      );
+      const active = state.paused
+        ? scopedAdmissions(state).filter((t) => t.lane === 'development').length
+        : state.tickets.filter((t) => t.lane === 'development' && occupied.has(t.status)).length;
+      assert.ok(active + reservations < laneLimit(state, 'development'), 'Development lane capacity exceeded');
+      current.nativeLaunchReserved = true;
+      return structuredClone(current);
+    });
+  }
+  function bindNativeWorker({ task, coordinatorOwner, workerOwner, request, context }) {
+    requireNativeIntake(commonDir, { taskId: task, rootThreadId: coordinatorOwner, request });
+    createTaskThreadTitles(commonDir).requireBinding(context, task, workerOwner);
+    assert.notEqual(coordinatorOwner, workerOwner);
+    return update((state) => {
+      const current = state.tickets.find((t) => t.lane === 'development' && t.task === task);
+      assert.ok(current, 'Original pending-native ticket required');
+      assert.deepEqual(current.request, request);
+      if (current.nativeCoordinatorOwner !== undefined) {
+        assert.equal(current.nativeCoordinatorOwner, coordinatorOwner);
+        assert.equal(current.owner, workerOwner);
+        return structuredClone(current);
+      }
+      assert.equal(current.owner, coordinatorOwner);
+      assert.equal(current.awaitingNativeWorker, true, 'Legacy/started owners cannot transfer');
+      assert.equal(current.status, 'queued');
+      assert.equal(current.admission, null);
+      assert.equal(
+        existsSync(path.join(commonDir, 'task-registry', 'tasks', task + '.json')),
+        false,
+        'Registered tasks cannot transfer owners',
+      );
+      current.nativeCoordinatorOwner = coordinatorOwner;
+      current.owner = workerOwner;
+      delete current.awaitingNativeWorker;
+      state.events.push({ action: 'bind-native-worker', task, coordinatorOwner, workerOwner });
+      return structuredClone(current);
     });
   }
   function claim({ lane, task, owner, monitorContext }, dependenciesReady) {
     return update((state) => {
       const current = ticket(state, lane, task, owner);
+      assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
+      if (current.nativeCoordinatorOwner) createTaskThreadTitles(commonDir).requireBinding(monitorContext, task, owner);
       assert.ok(!state.paused || scopedFor(state, current), 'All execution launches paused');
       if (current.status === 'running') {
         if (monitorContext !== undefined)
@@ -275,7 +372,11 @@ export function createExecutionOrder(commonDir) {
         assert.equal(dependenciesReady(structuredClone(current)), true, 'Task dependencies are not delivered');
       }
       assert.ok(
-        state.tickets.filter((t) => t.lane === lane && occupied.has(t.status)).length < laneLimit(state, lane),
+        state.tickets.filter(
+          (t) =>
+            t.lane === lane &&
+            (occupied.has(t.status) || (t !== current && t.status === 'queued' && t.nativeLaunchReserved)),
+        ).length < laneLimit(state, lane),
         'All lane slots occupied',
       );
       const next = state.tickets
@@ -436,6 +537,7 @@ export function createExecutionOrder(commonDir) {
             'Selected restore only admits development; final delivery remains serial',
           );
           const current = ticket(state, m.lane, m.task, m.owner);
+          assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
           if (m.kind !== undefined) {
             assert.ok(['business', 'infrastructure', 'maintenance'].includes(m.kind), 'Unknown task kind');
             if (current.executionKind !== undefined)
@@ -488,6 +590,7 @@ export function createExecutionOrder(commonDir) {
           'Another scoped direction remains active',
         );
         const current = ticket(state, lane, task, owner);
+        assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
         assert.ok(['queued', 'blocked'].includes(current.status), 'Only queued or blocked tasks can resume alone');
         assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
         assert.equal(source.authorId, current.request.authorId, 'Original user required');
@@ -719,6 +822,8 @@ export function createExecutionOrder(commonDir) {
     read,
     initialize,
     enqueue,
+    reserveNativeCreation,
+    bindNativeWorker,
     claim,
     assertAdmission,
     block,

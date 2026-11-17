@@ -1,3 +1,4 @@
+import { TASK_THREAD_MODE, taskThreadPolicy, createTaskThreadTitles } from './task-thread-titles.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmdirSync, writeFileSync } from 'node:fs';
@@ -33,9 +34,25 @@ export function createBoardIntake(commonDir) {
     writeFileSync(temp, JSON.stringify(record) + '\n', { flag: 'wx', mode: 0o600 });
     renameSync(temp, target);
   }
+  function modeFor(task) {
+    const target = file(task);
+    safe(target);
+    if (existsSync(target)) {
+      const previous = JSON.parse(readFileSync(target, 'utf8'));
+      assert.ok([1, 2].includes(previous.version), 'Unknown existing intake cannot be converted');
+      return previous.version === 2 ? TASK_THREAD_MODE : undefined;
+    }
+    return taskThreadPolicy(commonDir).enabled ? TASK_THREAD_MODE : undefined;
+  }
   async function accept(input, { readTask, createTask, readThread, now = Date.now() }) {
+    const automaticMode = modeFor(input.taskId);
+    if (input.threadMode === undefined && automaticMode) input = { ...input, threadMode: automaticMode };
     assert.equal(input.request.roomId, input.rootThreadId);
-    assert.equal(input.owner, input.rootThreadId, 'Current implementation accepts coordinator-owned work only');
+    assert.equal(input.owner, input.rootThreadId, 'Board intake belongs to the actual coordinator');
+    assert.ok(
+      input.threadMode === undefined || input.threadMode === TASK_THREAD_MODE,
+      'Unknown native task/thread mode',
+    );
     const source = await readThread(input.rootThreadId);
     assert.equal(source.thread.id, input.rootThreadId);
     assert.ok(
@@ -50,6 +67,32 @@ export function createBoardIntake(commonDir) {
     try {
       let board = await readTask(input.taskId); // Only explicit null means absent; transport errors must propagate.
       const previous = existsSync(target) ? JSON.parse(readFileSync(target, 'utf8')) : null;
+      if (!previous && taskThreadPolicy(commonDir).enabled)
+        assert.equal(
+          input.threadMode,
+          TASK_THREAD_MODE,
+          'New tasks require the enabled independent native thread flow',
+        );
+      if (input.threadMode === TASK_THREAD_MODE) {
+        assert.equal(taskThreadPolicy(commonDir).enabled, true, 'Independent native task/thread policy is not enabled');
+        if (!previous) {
+          const registered = path.join(commonDir, 'task-registry', 'tasks', input.taskId + '.json');
+          safe(registered);
+          assert.equal(existsSync(registered), false, 'Historical registered task cannot enroll as a new native task');
+          const queueFile = path.join(commonDir, 'task-registry', 'execution-order', 'state.json');
+          safe(queueFile);
+          if (existsSync(queueFile)) {
+            const queue = JSON.parse(readFileSync(queueFile, 'utf8'));
+            assert.ok(Array.isArray(queue.tickets), 'Unknown queue state; preserve original identity');
+            assert.equal(
+              queue.tickets.some((entry) => entry.task === input.taskId),
+              false,
+              'Historical queued task cannot enroll as a new native task',
+            );
+          }
+        }
+        assert.ok(!previous || previous.version === 2, 'Legacy intake cannot be converted or its owner transferred');
+      } else assert.ok(!previous || previous.version === 1, 'Independent intake cannot downgrade to the legacy flow');
       if (previous) {
         assert.equal(previous.taskId, input.taskId);
         assert.equal(previous.owner, input.owner);
@@ -61,7 +104,8 @@ export function createBoardIntake(commonDir) {
           'Previously accepted task disappeared; inspect original state',
         );
         save(target, {
-          version: 1,
+          version: input.threadMode === TASK_THREAD_MODE ? 2 : 1,
+          ...(input.threadMode ? { threadMode: input.threadMode } : {}),
           state: 'intent',
           taskId: input.taskId,
           owner: input.owner,
@@ -84,7 +128,8 @@ export function createBoardIntake(commonDir) {
       board = await readTask(input.taskId); // Mandatory independent readback, never trust create response.
       validate(board, input);
       const receipt = {
-        version: 1,
+        version: input.threadMode === TASK_THREAD_MODE ? 2 : 1,
+        ...(input.threadMode ? { threadMode: input.threadMode } : {}),
         state: 'accepted',
         taskId: input.taskId,
         owner: input.owner,
@@ -109,19 +154,26 @@ export function createBoardIntake(commonDir) {
     safe(target);
     assert.ok(existsSync(target), 'Board intake missing: register and read back before investigation or start');
     const r = JSON.parse(readFileSync(target, 'utf8'));
-    assert.equal(r.version, 1);
+    assert.ok([1, 2].includes(r.version), 'Unknown board intake version');
     assert.equal(r.state, 'accepted');
     assert.equal(r.taskId, task);
-    assert.equal(r.owner, owner);
+    if (r.version === 1) assert.equal(r.owner, owner);
+    else {
+      assert.equal(r.threadMode, TASK_THREAD_MODE);
+      assert.equal(r.owner, r.rootThreadId, 'Coordinator intake identity cannot be replaced');
+      createTaskThreadTitles(commonDir).requireBinding(context, task, owner);
+    }
     assert.equal(r.rootThreadId, context.rootThreadId);
     assert.equal(r.messageId, context.authorizationRef);
-    assert.equal(r.number, context.taskNumber);
-    assert.equal(r.title, context.taskName);
+    if (r.version === 1) {
+      assert.equal(r.number, context.taskNumber);
+      assert.equal(r.title, context.taskName);
+    }
     assert.equal(r.card, 'active');
     assert.ok(Number.isSafeInteger(r.revision) && r.revision > 0);
     assert.ok(Number.isFinite(r.observedAt) && r.observedAt <= now);
     if (fresh) assert.ok(now - r.observedAt <= 300000, 'Intake readback expired; re-read exact task, do not recreate');
     return r;
   }
-  return { accept, require };
+  return { commonDir, modeFor, accept, require };
 }

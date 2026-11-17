@@ -18,7 +18,13 @@ function fixture(t) {
   git('config', 'user.name', 'Fixture');
   git('config', 'user.email', 'test@example.invalid');
   const here = path.dirname(fileURLToPath(import.meta.url));
-  for (const name of ['task-entry.mjs', 'task-registry.mjs', 'task-monitor-registration.mjs', 'task-board-intake.mjs'])
+  for (const name of [
+    'task-entry.mjs',
+    'task-registry.mjs',
+    'task-monitor-registration.mjs',
+    'task-board-intake.mjs',
+    'task-thread-titles.mjs',
+  ])
     copyFileSync(path.join(here, name), path.join(main, 'scripts', name));
   mkdirSync(path.join(main, '.codex'));
   writeFileSync(path.join(main, '.codex/zdm-project-workflow.yaml'), 'batch:\n  mode: parallel-independent\n');
