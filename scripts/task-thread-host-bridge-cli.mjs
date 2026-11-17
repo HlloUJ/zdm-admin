@@ -5,7 +5,7 @@ import { promisify } from 'node:util';
 import { realpathSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
-import { advanceTaskThread } from './task-thread-host-bridge.mjs';
+import { advanceTaskThread, taskHandoffFailure } from './task-thread-host-bridge.mjs';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
 import { assertDeliveredDependencies } from './task-context.mjs';
 const execute = promisify(execFile);
@@ -66,7 +66,7 @@ process.stdin.on('data', async (chunk) => {
     });
     console.log(JSON.stringify(result));
   } catch (error) {
-    console.error(JSON.stringify({ status: 'failed', reason: error.message }));
+    console.error(JSON.stringify(taskHandoffFailure(error)));
     process.exitCode = 1;
   } finally {
     process.stdin.setRawMode(false);

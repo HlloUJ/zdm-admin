@@ -210,6 +210,200 @@ function expireReceipt(f) {
   writeFileSync(file, JSON.stringify(record), { mode: 0o600 });
   return { file, record, bytes: readFileSync(file) };
 }
+
+for (const phase of ['before-create', 'unknown-create', 'bound-worker']) {
+  test(`current coordinator continues accepted ${phase} without old root, re-intake or duplicate creation`, async (t) => {
+    const f = fixture(t, { paused: true });
+    const originalCapacity = f.host.readCapacity,
+      originalCreate = f.host.createThread,
+      originalRead = f.host.readThread;
+    if (phase === 'before-create') f.host.readCapacity = async () => null;
+    if (phase === 'unknown-create')
+      f.host.createThread = async (plan) => {
+        await originalCreate(plan);
+        return {};
+      };
+    await receiveCodexTask(f.input, f.host);
+    f.host.readCapacity = originalCapacity;
+    f.queue.direct({ action: 'pause-all', request: request(5) });
+    const originalReceipt = JSON.parse(
+      readFileSync(path.join(f.commonDir, 'task-board-intake', f.input.taskId + '.json')),
+    );
+    const current = '77777777-7777-4777-8777-777777777777';
+    const execution = { ...request(6), roomId: current };
+    const currentSnapshot = {
+      thread: { id: current },
+      turns: [
+        {
+          items: [
+            {
+              id: 'current-native-creation',
+              type: 'functionCallOutput',
+              namespace: 'codex_app',
+              name: 'create_thread',
+              output: {
+                truncated: false,
+                text: `<codex_delegation>\n  <source_thread_id>${coordinator}</source_thread_id>\n  <input>Coordinator from user-4</input>\n</codex_delegation>`,
+              },
+            },
+            { type: 'userMessage', id: execution.messageId, content: [{ type: 'text', text: '继续原任务' }] },
+          ],
+        },
+      ],
+    };
+    f.host.readThread = async (id) => (id === current ? currentSnapshot : originalRead(id));
+    process.env.CODEX_THREAD_ID = current;
+    await authorizeTaskCoordinator(
+      f.commonDir,
+      { rootThreadId: current, request: request(4), expectedRevision: 0 },
+      f.host,
+    );
+    let workerSnapshot = phase === 'before-create' ? null : await originalRead(worker);
+    const task = {
+      ...f.input,
+      threadMode: TASK_THREAD_MODE,
+      coordinatorThreadId: current,
+      continuationRequest: execution,
+    };
+    const adapters = { commonDir: f.commonDir, readTask: f.host.readTask, start: f.host.start };
+    const call = async (creationResult) => {
+      const observedAt = new Date().toISOString();
+      return advanceTaskThread(
+        {
+          action: 'continue-intake',
+          task,
+          nativeObservations: [currentSnapshot, ...(workerSnapshot ? [workerSnapshot] : [])].map((snapshot) => ({
+            provider: 'codex-native-read_thread',
+            observedAt,
+            snapshot,
+          })),
+          capacity: { provider: 'codex-native-capacity', observedAt, snapshot: await originalCapacity() },
+          ...(creationResult ? { creationResult } : {}),
+        },
+        adapters,
+      );
+    };
+    let creationResult;
+    if (phase === 'unknown-create')
+      creationResult = { requestId: f.store.get(f.input.taskId).createRequestId, threadId: worker };
+    const originalQueueBytes = readFileSync(path.join(f.commonDir, 'task-registry/execution-order/state.json'));
+    process.env.CODEX_THREAD_ID = coordinator;
+    await assert.rejects(call(creationResult), /Actual current continuation coordinator/);
+    assert.deepEqual(
+      readFileSync(path.join(f.commonDir, 'task-registry/execution-order/state.json')),
+      originalQueueBytes,
+    );
+    process.env.CODEX_THREAD_ID = current;
+    if (phase === 'unknown-create') {
+      const waiting = await call();
+      assert.equal(waiting.result.status, 'waiting-thread-identity');
+      assert.equal(waiting.nativeActions.length, 0);
+      assert.equal(f.counts().creates, 1);
+      assert.equal(f.store.get(f.input.taskId).createRequestId, creationResult.requestId);
+    }
+    if (phase === 'bound-worker') {
+      task.kind = 'business';
+      const bytes = readFileSync(path.join(f.commonDir, 'task-board-intake', f.input.taskId + '.json'));
+      await assert.rejects(call(), /Original queued kind differs/);
+      assert.deepEqual(readFileSync(path.join(f.commonDir, 'task-board-intake', f.input.taskId + '.json')), bytes);
+      task.kind = f.input.kind;
+    }
+    let continued = await call(creationResult);
+    if (phase === 'before-create') {
+      assert.equal(continued.result.status, 'waiting-thread-identity');
+      assert.equal(continued.nativeActions.length, 1);
+      const plan = continued.nativeActions[0];
+      await originalCreate(plan);
+      workerSnapshot = {
+        thread: { id: worker, title: plan.title },
+        turns: [
+          {
+            items: [
+              {
+                id: 'new-current-created-worker',
+                type: 'functionCallOutput',
+                namespace: 'codex_app',
+                name: 'create_thread',
+                output: {
+                  truncated: false,
+                  text: `<codex_delegation>\n  <source_thread_id>${current}</source_thread_id>\n  <input>${plan.prompt}</input>\n</codex_delegation>`,
+                },
+              },
+            ],
+          },
+        ],
+      };
+      creationResult = { requestId: plan.requestId, threadId: worker };
+      continued = await call(creationResult);
+      assert.equal(f.store.get(f.input.taskId).creationRootThreadId, current);
+    }
+    assert.equal(continued.result.status, 'awaiting-worker-start');
+    assert.equal(continued.nativeActions.length, 0);
+    await call(creationResult);
+    assert.equal(f.counts().creates, 1);
+    const renewed = JSON.parse(readFileSync(path.join(f.commonDir, 'task-board-intake', f.input.taskId + '.json')));
+    assert.equal(renewed.owner, originalReceipt.owner);
+    assert.equal(renewed.messageId, originalReceipt.messageId);
+    assert.equal(renewed.continuations.length, 1);
+    assert.deepEqual(renewed.continuations[0].request, execution);
+    assert.equal(f.queue.read().tickets[0].request.sequence, 3);
+    const start = async (workerInput) => {
+      const observedAt = new Date().toISOString();
+      return advanceTaskThread(
+        {
+          action: 'start',
+          task: workerInput,
+          nativeObservations: [currentSnapshot, workerSnapshot].map((snapshot) => ({
+            provider: 'codex-native-read_thread',
+            observedAt,
+            snapshot,
+          })),
+          unavailableNativeObservations: [
+            {
+              provider: 'codex-native-read_thread',
+              threadId: coordinator,
+              observedAt,
+              result: {
+                content: [
+                  {
+                    type: 'text',
+                    text: `No Codex thread found for threadId: ${coordinator}. Hosts without a readable match: local`,
+                  },
+                ],
+                isError: false,
+              },
+            },
+          ],
+          capacity: { provider: 'codex-native-capacity', observedAt, snapshot: await originalCapacity() },
+        },
+        adapters,
+      );
+    };
+    if (phase === 'bound-worker') {
+      f.queue.direct({ action: 'pause-all', request: { ...request(7), roomId: current } });
+      process.env.CODEX_THREAD_ID = worker;
+      await assert.rejects(start(continued.result.workerInput), /later pause/);
+      assert.equal(f.counts().starts, 0);
+      process.env.CODEX_THREAD_ID = current;
+      task.continuationRequest = { ...request(8), roomId: current };
+      currentSnapshot.turns[0].items.push({
+        type: 'userMessage',
+        id: 'user-8',
+        content: [{ type: 'text', text: '恢复原任务' }],
+      });
+      continued = await call();
+      const latest = JSON.parse(readFileSync(path.join(f.commonDir, 'task-board-intake', f.input.taskId + '.json')));
+      assert.equal(latest.continuations.length, 2);
+      assert.deepEqual(latest.continuations[0].request, execution);
+      assert.deepEqual(latest.continuations[1].request, task.continuationRequest);
+    }
+    process.env.CODEX_THREAD_ID = worker;
+    const result = await start(continued.result.workerInput);
+    assert.equal(result.result.task.owner, worker);
+    assert.equal(f.counts().starts, 1);
+    assert.equal(f.queue.read().scopedAdmissions[0].request.messageId, task.continuationRequest.messageId);
+  });
+}
 test('queued worker independently renews a receipt older than five minutes and starts once without root execution', async (t) => {
   const f = fixture(t),
     received = await prepared(f),
@@ -225,6 +419,133 @@ test('queued worker independently renews a receipt older than five minutes and s
   assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 1 });
   await assert.rejects(startIndependentCodexTask(received.workerInput, f.host), /Never replay/);
 });
+
+for (const { unreadable, paused } of [
+  { unreadable: false, paused: false },
+  { unreadable: true, paused: false },
+  { unreadable: true, paused: true },
+]) {
+  test(`A to B to C renews queued project authority: unreadable=${unreadable}, paused=${paused}`, async (t) => {
+    const f = fixture(t, { paused }),
+      received = await prepared(f),
+      old = expireReceipt(f);
+    const b = '77777777-7777-4777-8777-777777777777';
+    const c = '88888888-8888-4888-8888-888888888888';
+    const originalRead = f.host.readThread;
+    const snapshots = new Map([[coordinator, await originalRead(coordinator)]]);
+    f.host.readThread = async (id) => snapshots.get(id) ?? originalRead(id);
+    process.env.CODEX_THREAD_ID = coordinator;
+    await authorizeTaskCoordinator(
+      f.commonDir,
+      { rootThreadId: coordinator, request: f.input.request, expectedRevision: 0 },
+      f.host,
+    );
+    let previous = coordinator,
+      currentAppointment;
+    for (const [index, current] of [b, c].entries()) {
+      const request = {
+        ...f.input.request,
+        roomId: previous,
+        messageId: 'appointment-' + current,
+        sequence: f.input.request.sequence + index + 1,
+      };
+      snapshots.get(previous).turns[0].items.push({ type: 'userMessage', id: request.messageId });
+      snapshots.set(current, {
+        thread: { id: current },
+        turns: [
+          {
+            items: [
+              {
+                id: 'created-' + current,
+                type: 'functionCallOutput',
+                namespace: 'codex_app',
+                name: 'create_thread',
+                output: {
+                  truncated: false,
+                  text: `<codex_delegation>\n  <source_thread_id>${previous}</source_thread_id>\n  <input>New coordinator from ${request.messageId}</input>\n</codex_delegation>`,
+                },
+              },
+            ],
+          },
+        ],
+      });
+      process.env.CODEX_THREAD_ID = current;
+      currentAppointment = { rootThreadId: current, request, expectedRevision: index + 1 };
+      await authorizeTaskCoordinator(f.commonDir, currentAppointment, f.host);
+      previous = current;
+    }
+    if (paused)
+      f.queue.direct({ action: 'set-limits', request: request(13), limits: { development: null, delivery: 1 } });
+    const observedAt = new Date().toISOString();
+    const observations = await Promise.all(
+      [coordinator, b, c, worker].map(async (id) => ({
+        provider: 'codex-native-read_thread',
+        observedAt,
+        snapshot: await f.host.readThread(id),
+      })),
+    );
+    const input = {
+      action: 'start',
+      task: received.workerInput,
+      nativeObservations: observations,
+      capacity: { provider: 'codex-native-capacity', observedAt, snapshot: await f.host.readCapacity() },
+    };
+    if (unreadable) {
+      input.nativeObservations = input.nativeObservations.filter(
+        (o) => ![coordinator, b].includes(o.snapshot.thread.id),
+      );
+      input.unavailableNativeObservations = [coordinator, b].map((threadId) => ({
+        provider: 'codex-native-read_thread',
+        threadId,
+        observedAt,
+        result: {
+          content: [
+            {
+              type: 'text',
+              text: `No Codex thread found for threadId: ${threadId}. Hosts without a readable match: local`,
+            },
+          ],
+          isError: false,
+        },
+      }));
+      const readable = f.host.readThread;
+      f.host.readThread = async (id) => {
+        assert.ok(![coordinator, b].includes(id), 'Old coordinator must not participate in appointment replay');
+        return readable(id);
+      };
+      process.env.CODEX_THREAD_ID = c;
+      const beforeAppointment = readFileSync(path.join(f.commonDir, 'task-coordination/current.json'));
+      await authorizeTaskCoordinator(f.commonDir, currentAppointment, f.host);
+      assert.deepEqual(readFileSync(path.join(f.commonDir, 'task-coordination/current.json')), beforeAppointment);
+    }
+    const adapters = { commonDir: f.commonDir, readTask: f.host.readTask, start: f.host.start };
+    process.env.CODEX_THREAD_ID = coordinator;
+    await assert.rejects(
+      advanceTaskThread({ ...input, action: 'receive', task: f.input }, adapters),
+      /current authorized coordinator/,
+    );
+    process.env.CODEX_THREAD_ID = worker;
+    const before = f.queue.read();
+    const forged = structuredClone(input);
+    const event = forged.nativeObservations.find((o) => o.snapshot.thread.id === c).snapshot.turns[0].items[0];
+    event.output.text = event.output.text.replace(b, coordinator);
+    await assert.rejects(advanceTaskThread(forged, adapters), /provenance/);
+    assert.deepEqual(f.queue.read(), before);
+    assert.deepEqual(readFileSync(old.file), old.bytes);
+    const result = await advanceTaskThread(input, adapters);
+    assert.equal(result.result.task.monitoring.coordinatorThreadId, c);
+    assert.equal(result.result.task.monitoring.rootThreadId, coordinator);
+    const receipt = JSON.parse(readFileSync(old.file));
+    assert.equal(receipt.messageId, f.input.request.messageId);
+    assert.equal(receipt.owner, coordinator);
+    assert.equal(receipt.initialObservedAt, old.record.observedAt);
+    assert.equal(receipt.refreshHistory.at(-1).coordinator, c);
+    assert.equal(receipt.refreshHistory.at(-1).executor, worker);
+    if (unreadable) assert.equal(receipt.refreshHistory.at(-1).sourceRecovery.kind, 'queued-native');
+    assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 1 });
+    await assert.rejects(advanceTaskThread(input, adapters), /Never replay/);
+  });
+}
 for (const invalid of ['paused-card', 'done-card', 'renumbered', 'during-read-revision', 'network', 'queue-paused']) {
   test(`expired receipt does not claim, receive or recreate when ${invalid}`, async (t) => {
     const f = fixture(t),
@@ -255,6 +576,101 @@ for (const invalid of ['paused-card', 'done-card', 'renumbered', 'during-read-re
       assert.equal(f.counts().starts, 1);
       assert.equal(f.counts().creates, 1);
     }
+  });
+}
+
+for (const invalid of [
+  'missing-intake',
+  'wrong-intake-source',
+  'wrong-queue-owner',
+  'wrong-current-user',
+  'new-pause',
+  'unknown-native-error',
+]) {
+  test(`unreadable queued authorization refuses ${invalid} without recreating or launching`, async (t) => {
+    const f = fixture(t, { paused: true }),
+      received = await prepared(f),
+      expired = expireReceipt(f);
+    const current = '77777777-7777-4777-8777-777777777777';
+    const originalRead = f.host.readThread;
+    const direction = {
+      rootThreadId: current,
+      expectedRevision: 0,
+      request: { ...request(4), ...(invalid === 'wrong-current-user' ? { authorId: 'another-user' } : {}) },
+    };
+    const coordinatorSnapshot = {
+      thread: { id: current },
+      turns: [
+        {
+          items: [
+            {
+              id: 'native-current',
+              type: 'functionCallOutput',
+              namespace: 'codex_app',
+              name: 'create_thread',
+              output: {
+                truncated: false,
+                text: `<codex_delegation>\n  <source_thread_id>${coordinator}</source_thread_id>\n  <input>Current coordinator from user-4</input>\n</codex_delegation>`,
+              },
+            },
+          ],
+        },
+      ],
+    };
+    f.host.readThread = async (id) => (id === current ? coordinatorSnapshot : originalRead(id));
+    process.env.CODEX_THREAD_ID = current;
+    await authorizeTaskCoordinator(f.commonDir, direction, f.host);
+    if (invalid === 'missing-intake') rmSync(expired.file);
+    if (invalid === 'wrong-intake-source')
+      writeFileSync(expired.file, JSON.stringify({ ...expired.record, messageId: 'forged-source' }));
+    if (invalid === 'wrong-queue-owner') {
+      const file = path.join(f.commonDir, 'task-registry/execution-order/state.json');
+      const value = JSON.parse(readFileSync(file));
+      value.tickets[0].owner = '99999999-9999-4999-8999-999999999999';
+      writeFileSync(file, JSON.stringify(value));
+    }
+    if (invalid === 'new-pause') f.queue.direct({ action: 'pause-all', request: request(5) });
+    const queueFile = path.join(f.commonDir, 'task-registry/execution-order/state.json');
+    const queueBytes = readFileSync(queueFile);
+    const intakeBytes = invalid === 'missing-intake' ? null : readFileSync(expired.file);
+    const observedAt = new Date().toISOString();
+    const unavailable = {
+      provider: 'codex-native-read_thread',
+      threadId: coordinator,
+      observedAt,
+      result: {
+        content: [
+          {
+            type: 'text',
+            text:
+              invalid === 'unknown-native-error'
+                ? 'Native transport unavailable'
+                : `No Codex thread found for threadId: ${coordinator}. Hosts without a readable match: local`,
+          },
+        ],
+        isError: false,
+      },
+    };
+    process.env.CODEX_THREAD_ID = worker;
+    await assert.rejects(
+      advanceTaskThread(
+        {
+          action: 'start',
+          task: received.workerInput,
+          nativeObservations: [coordinatorSnapshot, await originalRead(worker)].map((snapshot) => ({
+            provider: 'codex-native-read_thread',
+            observedAt,
+            snapshot,
+          })),
+          unavailableNativeObservations: [unavailable],
+          capacity: { provider: 'codex-native-capacity', observedAt, snapshot: await f.host.readCapacity() },
+        },
+        { commonDir: f.commonDir, readTask: f.host.readTask, start: f.host.start },
+      ),
+    );
+    assert.deepEqual(readFileSync(queueFile), queueBytes);
+    if (intakeBytes) assert.deepEqual(readFileSync(expired.file), intakeBytes);
+    assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 0 });
   });
 }
 test('published host routes an expired queued worker to current coordination without invoking or impersonating old root', async (t) => {
