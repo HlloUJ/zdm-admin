@@ -1,3 +1,4 @@
+import { TASK_THREAD_MODE, createTaskThreadTitles } from './task-thread-titles.mjs';
 import { executionPausedFor } from './task-execution-scope.mjs';
 import { createBoardIntake } from './task-board-intake.mjs';
 import assert from 'node:assert/strict';
@@ -53,11 +54,130 @@ export function developmentCapacity({ limit, activeDevelopment, activeDelivery, 
 // Coordinator intake is mandatory before preflight, queue work or task dispatch.
 export async function receiveCodexTask(input, host) {
   assert.ok(host.intake, 'Persistent board intake adapter required');
+  const automaticMode = host.intake.modeFor?.(input.taskId);
+  if (automaticMode && input.threadMode === undefined) input = { ...input, threadMode: automaticMode };
   await host.intake.accept(input, host);
+  if (input.threadMode === TASK_THREAD_MODE) return receiveIndependentCodexTask(input, host);
   const context = await codexMonitoringContext(input, host);
   host.intake.require(context, input.taskId, input.owner);
   if (host.preflight) await host.preflight(input);
   return startCodexTask(input, host);
+}
+
+// Native callbacks are supplied by the authenticated desktop host. Node never invents a platform API.
+async function receiveIndependentCodexTask(input, host) {
+  assert.equal(process.env.CODEX_THREAD_ID, input.rootThreadId, 'Actual coordinator runtime required');
+  assert.equal(host.intake.commonDir, host.queue?.commonDir, 'Intake and queue must share the actual store');
+  const { queue } = host;
+  let state = queue.read();
+  assert.ok(state, 'Execution policy required');
+  const titles = createTaskThreadTitles(queue.commonDir);
+  const existing = state.tickets.find((t) => t.lane === 'development' && t.task === input.taskId);
+  if (!existing || existing.awaitingNativeWorker)
+    queue.enqueue({
+      lane: 'development',
+      task: input.taskId,
+      owner: input.rootThreadId,
+      request: input.request,
+      awaitingNativeWorker: true,
+    });
+  else {
+    assert.equal(existing.nativeCoordinatorOwner, input.rootThreadId, 'Existing task cannot be adopted');
+    assert.deepEqual(existing.request, input.request);
+    assert.ok(titles.get(input.taskId), 'Original native binding required');
+    assert.equal(existing.status, 'queued', 'Started tasks cannot be dispatched again');
+  }
+  state = queue.read();
+  if (state.paused && input.startWhilePaused !== true)
+    return { status: 'queued', taskId: input.taskId, reason: 'global-pause' };
+  const first = state.tickets
+    .filter((t) => t.lane === 'development' && t.status === 'queued')
+    .sort((a, b) => a.order - b.order)[0];
+  // Explicit fresh-task scoped start may leave old paused tickets untouched; ordinary mode remains FIFO.
+  if (!state.paused && first.task !== input.taskId) return { status: 'queued', taskId: input.taskId, reason: 'fifo' };
+  let capacity, snapshot;
+  try {
+    snapshot = host.readCapacity ? await host.readCapacity() : null;
+    capacity = snapshot ? developmentCapacity(snapshot) : null;
+  } catch {
+    /* no unverified spawn */
+  }
+  const occupied = state.tickets.filter(
+    (t) => t.lane === 'development' && ['running', 'blocked'].includes(t.status),
+  ).length;
+  if (!capacity?.available || (!state.paused && occupied >= (state.limits?.development ?? state.limit)))
+    return { status: 'queued', taskId: input.taskId, reason: 'execution-capacity-unverified-or-reserved' };
+  try {
+    queue.reserveNativeCreation({
+      task: input.taskId,
+      owner: input.rootThreadId,
+      request: input.request,
+      capacity: snapshot,
+    });
+  } catch (error) {
+    return { status: 'queued', taskId: input.taskId, reason: error.message };
+  }
+  if (host.preflight) await host.preflight(input);
+  const title = await titles.ensure(input, host);
+  if (title.status !== 'confirmed') return title;
+  const workerInput = { ...input, owner: title.threadId };
+  const board = await host.readTask(input.taskId);
+  const context = {
+    executionSurface: 'codex-thread',
+    worker: title.threadId,
+    rootThreadId: input.rootThreadId,
+    roomId: input.rootThreadId,
+    authorizationRef: input.request.messageId,
+    taskStableId: input.taskId,
+    taskNumber: board.task_number,
+    taskName: board.title,
+  };
+  queue.bindNativeWorker({
+    task: input.taskId,
+    coordinatorOwner: input.rootThreadId,
+    workerOwner: title.threadId,
+    request: input.request,
+    context,
+  });
+  if (!host.dispatchWorker) return { status: 'awaiting-worker-start', taskId: input.taskId, workerInput, title };
+  return { ...(await titles.dispatch(input.taskId, workerInput, host)), workerInput, title };
+}
+
+export async function startIndependentCodexTask(input, host) {
+  assert.equal(input.threadMode, TASK_THREAD_MODE);
+  const context = await codexMonitoringContext(input, host); // Checks the actual worker process identity.
+  createBoardIntake(host.queue.commonDir).require(context, input.taskId, input.owner);
+  const state = host.queue.read();
+  const ticket = state.tickets.find((t) => t.lane === 'development' && t.task === input.taskId);
+  assert.ok(ticket && ticket.nativeCoordinatorOwner === input.rootThreadId && !ticket.awaitingNativeWorker);
+  assert.equal(ticket.owner, input.owner);
+  assert.deepEqual(ticket.request, input.request);
+  assert.equal(ticket.status, 'queued', 'Never replay a started or blocked worker');
+  assert.equal(ticket.admission, null);
+  if (!state.paused) return startCodexTask(input, host);
+  assert.equal(input.startWhilePaused, true, 'Global pause remains in effect');
+  const capacity = await host.readCapacity();
+  developmentCapacity(capacity);
+  host.queue.direct({
+    action: 'resume-selected',
+    request: input.request,
+    capacity,
+    members: [
+      { lane: 'development', task: input.taskId, owner: input.owner, kind: input.kind, monitorContext: context },
+    ],
+  });
+  const admission = host.queue.read().tickets.find((t) => t.lane === 'development' && t.task === input.taskId);
+  const result = await host.start({
+    taskId: input.taskId,
+    owner: input.owner,
+    monitorContext: context,
+    admission: admission.admission,
+  });
+  assert.equal(result.task.id, input.taskId);
+  assert.equal(result.task.owner, input.owner);
+  assert.equal(result.task.monitoring.worker, context.worker);
+  assert.equal(result.task.monitoring.executionSurface, 'codex-thread');
+  return result;
 }
 
 export async function startCodexTask(input, { queue, readTask, readThread, start, readCapacity }) {

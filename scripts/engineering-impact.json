@@ -1384,6 +1384,15 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/task-thread-host-bridge-cli.mjs": {
+      "imports": [
+        "scripts/task-entry.mjs",
+        "scripts/task-registry.mjs",
+        "scripts/task-thread-host-bridge-cli.mjs",
+        "scripts/task-thread-host-bridge.mjs"
+      ],
+      "dynamicImports": 0
+    },
     "scripts/task-timing.mjs": {
       "imports": [
         "scripts/batch-timing-runtime.mjs",
@@ -1688,7 +1697,7 @@
     "scripts/task-artifacts.test.mjs": "e1c33bc4280ff63f227b8a7d1514a035b7a7f29e8aeec3383a4bfc8b96ef3883",
     "scripts/task-batch.mjs": "0446947089827818de273c97cbade29ba164d080f041ce875052fafc186b8372",
     "scripts/task-batch.test.mjs": "a30763c68d692f25bafbade803a3853c091bc4ed5059d81f721ac0a1387598d9",
-    "scripts/task-board-intake.mjs": "b1f681451e36895f2a06ca68fc2334c75ec1ed108c6cd1867b83aa8385080b42",
+    "scripts/task-board-intake.mjs": "499724a7a6be033b3cb08d934d57e87e45966996a1a7a622c8c24b9d0284354c",
     "scripts/task-board-intake.test.mjs": "6f7fe4becd85b1982b8bc92b9dab519bb80e92cecad54cfb9f866428990bf4c0",
     "scripts/task-cancellation-proof.mjs": "7b898455a4600106248e112d2c9d74d91a8a167d8764e6a0c65103011bb67f0d",
     "scripts/task-cancellation-proof.test.mjs": "6c0f43d1503228bff4718225342e76ef6499b32e1628686092eb328f60554b81",
@@ -1717,9 +1726,9 @@
     "scripts/task-cleanup-scheduled-cli.mjs": "32cea0eb40b81ef71f6bd8d2769dd96c04c51a922ae3fe5eafbc4a1e2eeaa99d",
     "scripts/task-cleanup-scheduled-cli.test.mjs": "6e243adbcca0b9790402172a36f0a940872fb30537946fb6f69d8f5a35824db5",
     "scripts/task-cleanup-types.mjs": "1c0c63bf3df57eb3c95e36fd6c1815a1919620fe8daaa789a602a6305ce0efef",
-    "scripts/task-codex-cycle-cli.mjs": "edf3ef3b94c6b17bbf31eec899de38b68902d2653b3523d13484771d4b2756c9",
+    "scripts/task-codex-cycle-cli.mjs": "7af701e2085a536c372d4332f6c169af24ea8a46f8298faae04c0af308fc87ce",
     "scripts/task-codex-cycle.test.mjs": "c2230ee41c3abe7d70c3f2d65d2c5dcc4e8d43c88f725ed72d06d3ccedb4ecf5",
-    "scripts/task-codex-host.mjs": "4f39ddfd5389cb6cab67b6ccf9dc35948d049d9638d3177306c184dd3c8760fd",
+    "scripts/task-codex-host.mjs": "e68a0e0595b7962d0264c92e8ae6848a1fd8a3af3ed9e840aa991c24ae7917a4",
     "scripts/task-codex-host.test.mjs": "28f912102c75f7c6531b273a748a83e0c8ff116b1bac1db89eff7c314cf005bb",
     "scripts/task-commit-ownership.mjs": "7505dd878d4190042f94056481a868a455815a1bf5ad77807f4b1d74ffef6b60",
     "scripts/task-completion-placement.test.mjs": "fa75c9c8343ee434d4640f76827a1715b856d1deb85e7efade576773017c2991",
@@ -1750,9 +1759,9 @@
     "scripts/task-development.mjs": "a1ed58754497b3acfda233a765290d7bdc859ccca73f471c336d98d19ffeb109",
     "scripts/task-development.test.mjs": "02f8e7a9fa30f9263060e76ae94d41cefc79311e042b553bd1828361133bdace",
     "scripts/task-entry.mjs": "ae0017500b312cc13d8299ce69005766294958f023a81ae17ee5c53a896e0803",
-    "scripts/task-entry.test.mjs": "6c5f017ac77d6186a189b1fc9f4d536db9945ba305f81d3f03795b41ee66b049",
+    "scripts/task-entry.test.mjs": "ae4200c99b0deeb53ba06771480e421455f2f56a8d030c0fe2c3dd085f3aef59",
     "scripts/task-execution-order-cli.mjs": "5ef9f8d7ccf437e1e11eb2fb48c847964bca072e3406f79cff7c71a923b9deaa",
-    "scripts/task-execution-order.mjs": "9ab5c9f8e84425acd80bb9e884a51e10b19502c9396683fdbf74ea195989d2a5",
+    "scripts/task-execution-order.mjs": "bb61873c233c64e2eb181fffef547be8eab94e49a38c7886dd3c31a6b3776f26",
     "scripts/task-execution-order.test.mjs": "eff9d49f191d2e79511a3cdc2b77808bebdac182b755f5ca473912155e798f2d",
     "scripts/task-frozen-history.test.mjs": "35b98594b3ca7f25f42dc0b34018580944d0ea2f5af905fe4362606190e0e70e",
     "scripts/task-interruption-notice.mjs": "a22fa2b0db433ad714affff37551a962c0cc50b3faa3369131ce1bccf26cbd82",
@@ -1780,6 +1789,10 @@
     "scripts/task-selected-resume.test.mjs": "8bb488583ee7aa050c0617cb3a6498d59f7b2701745b9900f2e1abb3acaef6be",
     "scripts/task-start.mjs": "dc141f7b00f55388ed91089d9030894d25d5ff53a4a0c4f63306c5e0ca53b46d",
     "scripts/task-start.test.mjs": "184ad4d48aa040c46a5f4cc50cad8020c1b9ce26bd825e3762198de565f6e36a",
+    "scripts/task-thread-host-bridge-cli.mjs": "110055eb6a75bf5037007bcbf968e5d85004f8ba03748d4e6fb9550912cc4f2b",
+    "scripts/task-thread-title-cli.mjs": "3aa2cbef92485bb5d393912af1c2fbeb501749aded431994905ebd78fe4ae075",
+    "scripts/task-thread-titles.mjs": "febc52c75b90f47b60c3202884c6517cd25cdd63deeb1e99e8e325bceb8725a8",
+    "scripts/task-thread-titles.test.mjs": "dc39835c41f2ff16c6646e8a311d6d7330df72a46fcad8819bafc4758918eb24",
     "scripts/task-timing.mjs": "1b2603f8c9502e2c00e591f20b9038c6250ad48dd5e809a2091178452515b30d",
     "scripts/task-timing.test.mjs": "b39b2cff24b759fe0678dbff0bed979eb3cf5fa0b97090fbe74740881e448677",
     "scripts/test-support/cleanup-created-fixture.mjs": "f4fbfe871f3825a03b29aee8de0a06f3c468bae3315cb0938396239f5e88628e",
