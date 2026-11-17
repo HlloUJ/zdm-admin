@@ -1,4 +1,5 @@
 import { TASK_THREAD_MODE, createTaskThreadTitles } from './task-thread-titles.mjs';
+import { verifyCoordinatorSource, taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
 import { executionPausedFor } from './task-execution-scope.mjs';
 import { createBoardIntake } from './task-board-intake.mjs';
 import assert from 'node:assert/strict';
@@ -10,23 +11,21 @@ import { createProgressOutbox, authenticatedBoardAdapter, flushProgress } from '
 import { recordToolProgress } from './task-delivery-status-sync.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
 
 // Platform reads and writes come from the authenticated host, never from repo credentials.
 // This module has no scheduler, implicit task discovery, retry, owner transfer or global resume.
-export async function codexMonitoringContext({ taskId, owner, rootThreadId, request }, { readTask, readThread }) {
+export async function codexMonitoringContext(
+  { taskId, owner, rootThreadId, request, coordinatorThreadId },
+  { readTask, readThread },
+) {
   const board = await readTask(taskId);
   assert.equal(board.id, taskId, 'Exact task overview registration required');
   assert.ok(board.task_number && !board.deleted_at && board.status !== 'done', 'Current unfinished task required');
-  assert.equal(request.roomId, rootThreadId, 'Native instruction room must be the coordinator thread');
-  const source = await readThread(rootThreadId);
-  assert.equal(source.thread.id, rootThreadId);
-  assert.ok(
-    source.turns.some((turn) =>
-      turn.items?.some((item) => item.type === 'userMessage' && item.id === request.messageId),
-    ),
-    'Actual user execution message must be read from the platform',
-  );
-  const worker = owner === rootThreadId ? source : await readThread(owner);
+  const source = await verifyCoordinatorSource({ rootThreadId, request }, readThread);
+  if (coordinatorThreadId && coordinatorThreadId !== rootThreadId)
+    await verifyCoordinatorSource({ rootThreadId: coordinatorThreadId, request }, readThread);
+  const worker = owner === request.roomId ? source : await readThread(owner);
   assert.equal(worker.thread.id, owner, 'Actual native execution thread required');
   const context = {
     executionSurface: 'codex-thread',
@@ -37,6 +36,7 @@ export async function codexMonitoringContext({ taskId, owner, rootThreadId, requ
     taskStableId: taskId,
     taskNumber: board.task_number,
     taskName: board.title,
+    ...(coordinatorThreadId ? { coordinatorThreadId } : {}),
   };
   requireStartMonitoring(owner, taskId, context);
   return context;
@@ -126,7 +126,7 @@ async function receiveIndependentCodexTask(input, host) {
     executionSurface: 'codex-thread',
     worker: title.threadId,
     rootThreadId: input.rootThreadId,
-    roomId: input.rootThreadId,
+    roomId: input.request.roomId,
     authorizationRef: input.request.messageId,
     taskStableId: input.taskId,
     taskNumber: board.task_number,
@@ -146,7 +146,6 @@ async function receiveIndependentCodexTask(input, host) {
 export async function startIndependentCodexTask(input, host) {
   assert.equal(input.threadMode, TASK_THREAD_MODE);
   const context = await codexMonitoringContext(input, host); // Checks the actual worker process identity.
-  createBoardIntake(host.queue.commonDir).require(context, input.taskId, input.owner);
   const state = host.queue.read();
   const ticket = state.tickets.find((t) => t.lane === 'development' && t.task === input.taskId);
   assert.ok(ticket && ticket.nativeCoordinatorOwner === input.rootThreadId && !ticket.awaitingNativeWorker);
@@ -154,6 +153,19 @@ export async function startIndependentCodexTask(input, host) {
   assert.deepEqual(ticket.request, input.request);
   assert.equal(ticket.status, 'queued', 'Never replay a started or blocked worker');
   assert.equal(ticket.admission, null);
+  if (state.paused) assert.equal(input.startWhilePaused, true, 'Global pause remains in effect');
+  await host.intake.refreshForStart(input, {
+    ...host,
+    verifyQueued: () => {
+      const fresh = host.queue.read();
+      assert.equal(fresh.revision, state.revision, 'Queue changed during start preflight');
+      assert.deepEqual(
+        fresh.tickets.find((t) => t.lane === 'development' && t.task === input.taskId),
+        ticket,
+      );
+    },
+  });
+  createBoardIntake(host.queue.commonDir).require(context, input.taskId, input.owner);
   if (!state.paused) return startCodexTask(input, host);
   assert.equal(input.startWhilePaused, true, 'Global pause remains in effect');
   const capacity = await host.readCapacity();
@@ -228,7 +240,7 @@ export async function observeCodexTask(task, { readThread, readAgent, paused, no
   if (task.stage === 'closed') return { ...base, status: 'closed' };
   if (paused === true) return { ...base, status: 'paused' };
   if (paused !== false) return { ...base, status: 'unknown', reason: 'Current pause state not verified' };
-  const m = task.monitoring;
+  const m = taskMonitoring(task);
   if (m.executionSurface === 'collaboration-agent') {
     if (typeof readAgent !== 'function')
       return {
@@ -288,10 +300,10 @@ export async function observeCodexTask(task, { readThread, readAgent, paused, no
   }
   assert.equal(m.executionSurface, 'codex-thread');
   assert.equal(m.state, 'registered');
-  assert.equal(m.worker, task.owner);
+  assert.equal(m.worker, taskExecutor(task));
   try {
     const snapshot = await readThread(m.worker);
-    assert.equal(snapshot.thread.id, task.owner, 'Wrong platform thread');
+    assert.equal(snapshot.thread.id, taskExecutor(task), 'Wrong platform thread');
     if (snapshot.thread.cwd && task.worktree && path.resolve(snapshot.thread.cwd) !== path.resolve(task.worktree)) {
       // Native chats can stay attached to the main anchor while each tool uses its exact task cwd.
       // Only the newest command in the latest platform turn can establish that binding.
@@ -334,7 +346,7 @@ export async function inspectCodexTasks(root, { taskIds, readThread, readAgent, 
     const task = registry.readTask(id);
     assert.ok(task, 'Exact registered task required');
     const ticket = queue?.tickets.find((t) => t.task === id && t.lane === 'development');
-    const paused = executionPausedFor(queue, ticket) || task.monitoring?.paused === true;
+    const paused = executionPausedFor(queue, ticket) || taskMonitoring(task)?.paused === true;
     if (ticket?.status === 'queued') {
       results.push({ task: id, status: paused ? 'paused' : 'queued', automaticResumptionEnabled: false });
       continue;
@@ -349,18 +361,23 @@ export async function notifyCodexObservation(
   observation,
   { directory, paused, readThread, sendMessage, readMessage, now = Date.now() },
 ) {
-  const m = task.monitoring;
+  const m = taskMonitoring(task);
   assert.ok(['codex-thread', 'collaboration-agent'].includes(m.executionSurface));
-  assert.equal(m.rootThreadId, process.env.CODEX_THREAD_ID, 'Original coordinator must send');
+  const currentCoordinator = task.repository?.commonDir
+    ? readTaskCoordination(task.repository.commonDir)?.current.rootThreadId
+    : null;
+  const coordinator = currentCoordinator ?? m.coordinatorThreadId ?? m.rootThreadId;
+  assert.equal(coordinator, process.env.CODEX_THREAD_ID, 'Current coordinator must send');
   const observedAt = observation.observedAt;
   if (!Number.isFinite(observedAt) || observedAt > now || now - observedAt > 60_000)
     return { status: 'stale-observation' };
   if (paused === true) return { status: 'silent' };
   // Re-read platform identity immediately before notification. Unknown delivery is never resent.
-  const target = await readThread(m.roomId);
-  assert.equal(target.thread.id, m.roomId);
+  const roomId = coordinator;
+  const target = await readThread(roomId);
+  assert.equal(target.thread.id, roomId);
   const notice = interruptionNotice(
-    { ...m, task: task.id, monitoringMode: m.mode, resumeAllowed: false },
+    { ...m, rootThreadId: coordinator, roomId, task: task.id, monitoringMode: m.mode, resumeAllowed: false },
     observation,
     { connected: true, paused, now, observedAt },
   );
@@ -371,8 +388,8 @@ export async function notifyCodexObservation(
     return { status: existsSync(receipt) ? 'already-delivered' : 'delivery-unknown', eventId: notice.eventId };
   }
   try {
-    const sent = await sendMessage({ threadId: m.roomId, text: notice.text, eventId: notice.eventId });
-    const back = await readMessage(m.roomId, sent.messageId);
+    const sent = await sendMessage({ threadId: roomId, text: notice.text, eventId: notice.eventId });
+    const back = await readMessage(roomId, sent.messageId);
     receiptInterruptionNotice(directory, notice, {
       messageId: sent.messageId,
       readbackRoom: back.roomId,

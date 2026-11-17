@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, rmSync, readFileSync, realpathSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createBoardIntake } from './task-board-intake.mjs';
@@ -8,6 +8,7 @@ import { createExecutionOrder } from './task-execution-order.mjs';
 import { receiveCodexTask, startIndependentCodexTask } from './task-codex-host.mjs';
 import { advanceTaskThread } from './task-thread-host-bridge.mjs';
 import { createProgressOutbox } from './task-progress-outbox.mjs';
+import { authorizeTaskCoordinator } from './task-coordination.mjs';
 import { syncCodexCycle, planCycleThreadTitle } from './task-codex-cycle.mjs';
 import {
   verifyNativeCreation,
@@ -161,6 +162,192 @@ test('enabled official entry automatically enrolls v2, binds real child and pres
   assert.equal((await startIndependentCodexTask(result.workerInput, f.host)).task.owner, worker);
   assert.equal(f.counts().starts, 1);
   await assert.rejects(startIndependentCodexTask(result.workerInput, f.host), /Never replay/);
+});
+test('native v2 receive and worker start accept proven cross-coordinator source without rewriting its room', async (t) => {
+  const f = fixture(t),
+    source = '44444444-4444-4444-8444-444444444444';
+  f.input.request.roomId = source;
+  const originalRead = f.host.readThread;
+  f.host.readThread = async (id) => {
+    if (id === source)
+      return { thread: { id }, turns: [{ items: [{ type: 'userMessage', id: f.input.request.messageId }] }] };
+    if (id === coordinator)
+      return {
+        thread: { id },
+        turns: [
+          {
+            items: [
+              {
+                id: 'original-coordinator-creation',
+                type: 'functionCallOutput',
+                namespace: 'codex_app',
+                name: 'create_thread',
+                output: {
+                  truncated: false,
+                  text: `<codex_delegation>\n  <source_thread_id>${source}</source_thread_id>\n  <input>authorized coordinator from ${f.input.request.messageId}</input>\n</codex_delegation>`,
+                },
+              },
+            ],
+          },
+        ],
+      };
+    return originalRead(id);
+  };
+  const received = await prepared(f);
+  assert.equal(f.queue.read().tickets[0].request.roomId, source);
+  process.env.CODEX_THREAD_ID = worker;
+  const started = await startIndependentCodexTask(received.workerInput, f.host);
+  assert.equal(started.task.monitoring.roomId, source);
+  assert.equal(started.task.monitoring.rootThreadId, coordinator);
+  assert.equal(started.task.owner, worker);
+});
+
+function expireReceipt(f) {
+  const file = path.join(f.commonDir, 'task-board-intake', f.input.taskId + '.json');
+  const record = JSON.parse(readFileSync(file));
+  record.observedAt = Date.now() - 600001;
+  record.initialObservedAt = record.observedAt;
+  writeFileSync(file, JSON.stringify(record), { mode: 0o600 });
+  return { file, record, bytes: readFileSync(file) };
+}
+test('queued worker independently renews a receipt older than five minutes and starts once without root execution', async (t) => {
+  const f = fixture(t),
+    received = await prepared(f),
+    old = expireReceipt(f);
+  process.env.CODEX_THREAD_ID = worker;
+  const result = await startIndependentCodexTask(received.workerInput, f.host);
+  assert.equal(result.task.owner, worker);
+  const refreshed = JSON.parse(readFileSync(old.file));
+  assert.equal(refreshed.initialObservedAt, old.record.observedAt);
+  assert.equal(refreshed.owner, coordinator);
+  assert.equal(refreshed.messageId, old.record.messageId);
+  assert.equal(refreshed.refreshHistory[0].executor, worker);
+  assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 1 });
+  await assert.rejects(startIndependentCodexTask(received.workerInput, f.host), /Never replay/);
+});
+for (const invalid of ['paused-card', 'done-card', 'renumbered', 'during-read-revision', 'network', 'queue-paused']) {
+  test(`expired receipt does not claim, receive or recreate when ${invalid}`, async (t) => {
+    const f = fixture(t),
+      received = await prepared(f),
+      old = expireReceipt(f);
+    const originalRead = f.host.readTask;
+    let reads = 0;
+    f.host.readTask = async (id) => {
+      const board = await originalRead(id);
+      reads++;
+      if (invalid === 'paused-card') board.status = 'paused';
+      if (invalid === 'done-card') board.status = 'done';
+      if (invalid === 'renumbered') board.task_number = '999';
+      if (invalid === 'during-read-revision' && reads >= 3) board.revision++;
+      if (invalid === 'network' && reads >= 3) throw Error('network unavailable');
+      return board;
+    };
+    if (invalid === 'queue-paused') f.queue.direct({ action: 'pause-all', request: request(4) });
+    const before = f.queue.read();
+    process.env.CODEX_THREAD_ID = worker;
+    await assert.rejects(startIndependentCodexTask(received.workerInput, f.host));
+    assert.deepEqual(f.queue.read(), before);
+    assert.deepEqual(readFileSync(old.file), old.bytes);
+    assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 0 });
+    if (invalid === 'network') {
+      f.host.readTask = originalRead;
+      await startIndependentCodexTask(received.workerInput, f.host);
+      assert.equal(f.counts().starts, 1);
+      assert.equal(f.counts().creates, 1);
+    }
+  });
+}
+test('published host routes an expired queued worker to current coordination without invoking or impersonating old root', async (t) => {
+  const f = fixture(t),
+    received = await prepared(f),
+    old = expireReceipt(f);
+  const current = '55555555-5555-4555-8555-555555555555',
+    originalRead = f.host.readThread;
+  f.host.readThread = async (id) =>
+    id === current
+      ? {
+          thread: { id },
+          turns: [
+            {
+              items: [
+                {
+                  id: 'native-current-coordinator',
+                  type: 'functionCallOutput',
+                  namespace: 'codex_app',
+                  name: 'create_thread',
+                  output: {
+                    truncated: false,
+                    text: `<codex_delegation>\n  <source_thread_id>${coordinator}</source_thread_id>\n  <input>current coordinator authorized by ${f.input.request.messageId}</input>\n</codex_delegation>`,
+                  },
+                },
+              ],
+            },
+          ],
+        }
+      : originalRead(id);
+  process.env.CODEX_THREAD_ID = current;
+  await authorizeTaskCoordinator(
+    f.commonDir,
+    { rootThreadId: current, request: f.input.request, expectedRevision: 0 },
+    f.host,
+  );
+  process.env.CODEX_THREAD_ID = worker;
+  const observedAt = new Date().toISOString();
+  const nativeObservations = await Promise.all(
+    [coordinator, current, worker].map(async (id) => ({
+      provider: 'codex-native-read_thread',
+      observedAt,
+      snapshot: await f.host.readThread(id),
+    })),
+  );
+  const result = await advanceTaskThread(
+    {
+      action: 'start',
+      task: received.workerInput,
+      nativeObservations,
+      capacity: { provider: 'codex-native-capacity', observedAt, snapshot: await f.host.readCapacity() },
+    },
+    { commonDir: f.commonDir, readTask: f.host.readTask, start: f.host.start },
+  );
+  assert.equal(result.result.task.monitoring.coordinatorThreadId, current);
+  assert.equal(result.result.task.monitoring.rootThreadId, coordinator);
+  const receipt = JSON.parse(readFileSync(old.file));
+  assert.equal(receipt.owner, coordinator);
+  assert.equal(receipt.refreshHistory[0].coordinator, current);
+  process.env.CODEX_THREAD_ID = current;
+  const directory = path.join(f.commonDir, 'current-coordinator-outbox');
+  createProgressOutbox(directory).enqueue(f.input.taskId, 'verified-current-start', {
+    event: 'started',
+    observed_at: new Date().toISOString(),
+    action: { id: 'start', label: 'started' },
+    evidence_refs: ['fixture:actual-start'],
+    next: { kind: 'wait', label: 'wait' },
+  });
+  let saved = null,
+    writes = 0;
+  const call = async (operation, args) => {
+    if (operation === 'apply_task_progress_receipt') {
+      writes++;
+      saved = args.receipt;
+      return {};
+    }
+    return {
+      task: { id: f.input.taskId, revision: saved ? 2 : 1 },
+      receipt_id: args.receipt_id,
+      outcome: saved ? 'applied' : 'not_found',
+      receipt: saved,
+      applied_revision: saved ? 2 : null,
+    };
+  };
+  const config = { task: f.input.taskId, directories: [directory] };
+  assert.equal((await syncCodexCycle(config, call)).status, 'confirmed');
+  assert.equal((await syncCodexCycle(config, call)).status, 'confirmed');
+  assert.equal(writes, 1);
+  await assert.rejects(
+    advanceTaskThread({ action: 'receive', task: f.input }, { commonDir: f.commonDir }),
+    /current authorized coordinator/,
+  );
+  assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 1 });
 });
 test('one proven native LF boundary is accepted and raw provenance retained', async (t) => {
   const f = fixture(t, { suffix: '\n' });

@@ -137,7 +137,7 @@ function references(value, token) {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp('(?<![a-zA-Z0-9_-])' + escaped + '(?![a-zA-Z0-9_-])').test(value);
 }
-function assertHostIdle(snapshot, task) {
+export function assertHostIdle(snapshot, task) {
   assert.ok(
     Array.isArray(snapshot.processes) &&
       snapshot.processes.length &&

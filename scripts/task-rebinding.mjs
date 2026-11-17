@@ -1,0 +1,342 @@
+import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
+import path from 'node:path';
+import { createTaskRegistry } from './task-registry.mjs';
+import { createExecutionOrder } from './task-execution-order.mjs';
+import { observeCancellationHost, assertHostIdle } from './task-cancellation-proof.mjs';
+import {
+  assertTaskExecutor,
+  executionBinding,
+  taskExecutor,
+  verifyCoordinatorSource,
+  verifyExecutionWorker,
+} from './task-execution-binding.mjs';
+import { threadTitle } from './task-thread-titles.mjs';
+import { requireTaskCoordinator } from './task-coordination.mjs';
+
+const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+function safe(file) {
+  for (let cursor = path.resolve(file); ; cursor = path.dirname(cursor)) {
+    if (existsSync(cursor)) assert.ok(!lstatSync(cursor).isSymbolicLink(), 'Linked rebinding state refused');
+    if (cursor === path.dirname(cursor)) break;
+  }
+}
+function resources(task) {
+  const common = task.repository.commonDir,
+    result = [];
+  const add = (file) => {
+    safe(file);
+    assert.ok(lstatSync(file).isFile());
+    const bytes = readFileSync(file),
+      value = JSON.parse(bytes);
+    result.push({ file, digest: createHash('sha256').update(bytes).digest('hex') });
+    return value;
+  };
+  const leases = path.join(common, 'task-registry/resource-leases');
+  safe(leases);
+  if (existsSync(leases))
+    for (const name of readdirSync(leases)) {
+      const lease = add(path.join(leases, name, 'owner.json'));
+      assert.ok(
+        lease.resource === name &&
+          typeof lease.task === 'string' &&
+          lease.task &&
+          typeof lease.token === 'string' &&
+          lease.token &&
+          Number.isSafeInteger(lease.pid) &&
+          lease.pid > 1,
+        'Unknown resource ownership',
+      );
+      assert.ok(
+        ![task.id, task.owner, taskExecutor(task)].includes(lease.task),
+        'Task resource lease remains; resolve its original ownership before rebinding',
+      );
+    }
+  const delivery = path.join(common, 'task-delivery', task.id);
+  if (task.frozen)
+    assert.ok(existsSync(path.join(delivery, 'accepted-source.json')), 'Original frozen source is missing');
+  for (const name of ['accepted-source.json', 'completion-session.json']) {
+    const file = path.join(delivery, name);
+    safe(file);
+    if (existsSync(file)) {
+      const record = add(file);
+      if (name === 'accepted-source.json') {
+        assert.equal(record.batch, task.id, 'Frozen source belongs to another task');
+        assert.equal(record.commit, task.frozen?.accepted, 'Original accepted source identity differs');
+        assert.equal(record.tree, task.frozen?.tree, 'Original frozen tree differs');
+      }
+      if (name === 'completion-session.json')
+        assert.ok(
+          !record.events?.some((e) => e.status === 'running'),
+          'Unresolved formal delivery process; retain original session',
+        );
+    }
+  }
+  for (const base of [
+    delivery,
+    path.join(task.worktree, '.task-runtime'),
+    path.join(task.worktree, '.task-verification'),
+  ]) {
+    const visit = (folder) => {
+      safe(folder);
+      if (!existsSync(folder)) return;
+      for (const name of readdirSync(folder)) {
+        const file = path.join(folder, name);
+        safe(file);
+        assert.ok(!name.endsWith('.lock'), 'Retained task lock requires original recovery');
+        if (lstatSync(file).isDirectory()) {
+          if (!['cache', 'node_modules', 'maven-local', 'maven-tools'].includes(name)) visit(file);
+        } else if (/^process-.*\.json$/.test(name))
+          assert.equal(add(file).status, 'quiescent', 'Unsealed original process journal');
+      }
+    };
+    visit(base);
+  }
+  const mainQueue = path.join(common, 'task-registry/delivery-queue.json');
+  safe(mainQueue);
+  if (existsSync(mainQueue)) {
+    const state = add(mainQueue);
+    assert.ok(Array.isArray(state.tickets), 'Unknown main queue');
+    for (const ticket of state.tickets)
+      assert.ok(
+        ticket.task && ticket.owner && ticket.id && ['waiting', 'running', 'blocked'].includes(ticket.status),
+        'Unknown main queue ownership',
+      );
+    // Preserve reservations, including the original owner. A live main writer
+    // must finish/recover through its existing protected entry first.
+    assert.ok(
+      !state.tickets.some((t) => t.task === task.id && t.status === 'running'),
+      'Task is writing main; rebinding is not permitted',
+    );
+  }
+  return result;
+}
+
+// The authenticated host supplies real native observations; the published CLI
+// supplies OS evidence itself. JSON cannot inject a safe flag or inventory.
+export async function rebindHistoricalTask(
+  input,
+  host,
+  { registry, queue, observe = observeCancellationHost, now = Date.now() },
+) {
+  assert.equal(process.env.CODEX_THREAD_ID, input.rootThreadId, 'Actual coordinator runtime required');
+  requireTaskCoordinator(registry.commonDir, input.rootThreadId);
+  await verifyCoordinatorSource(input, host.readThread);
+  const initial = registry.readTask(input.taskId);
+  assert.ok(initial, 'Historical task must already be registered');
+  const priorBinding = executionBinding(initial);
+  const boardTaskId =
+    input.boardTaskId ?? priorBinding?.boardTaskId ?? initial.monitoring?.taskStableId ?? input.taskId;
+  if (priorBinding) assert.equal(boardTaskId, priorBinding.boardTaskId, 'Keep original bound carrier-to-board mapping');
+  if (initial.monitoring?.taskStableId)
+    assert.equal(boardTaskId, initial.monitoring.taskStableId, 'Keep original carrier-to-board mapping');
+  const board = await host.readTask(boardTaskId);
+  assert.ok(board && board.id === boardTaskId && !board.deleted_at && board.status !== 'done');
+  assert.equal(board.revision, input.boardRevision, 'Board revision changed; do not rebase');
+  const worker = await host.readThread(input.owner);
+  const previous = taskExecutor(initial);
+  const creationRoot =
+    input.owner === previous
+      ? (priorBinding?.nativeEvidence?.worker.sourceRootThreadId ??
+        priorBinding?.coordinator ??
+        initial.monitoring?.rootThreadId ??
+        input.rootThreadId)
+      : input.rootThreadId;
+  const workerCreation = verifyExecutionWorker(worker, { ...input, rootThreadId: creationRoot }, threadTitle(board));
+  if (boardTaskId !== input.taskId)
+    verifyExecutionWorker(worker, { ...input, rootThreadId: creationRoot, taskId: boardTaskId }, threadTitle(board));
+  const existing = priorBinding;
+  if (existing?.request.messageId === input.request.messageId) {
+    assert.equal(existing.executor, input.owner, 'Replayed binding has a different worker');
+    assert.equal(existing.coordinator, input.rootThreadId, 'Replayed binding has a different coordinator');
+    assert.deepEqual(existing.request, input.request);
+    assert.equal(existing.expectedRevision, input.expectedRevision);
+    assert.equal(existing.queueRevision, input.queueRevision);
+    assert.equal(existing.boardRevision, input.boardRevision);
+    assert.equal(existing.boardTaskId, boardTaskId);
+    return { status: 'bound', task: initial, replayed: true }; // No inventory, mutation or resume.
+  }
+  assert.ok(
+    previous !== input.owner || (priorBinding?.coordinator ?? initial.monitoring?.rootThreadId) !== input.rootThreadId,
+    'Task already belongs to this executor and coordinator',
+  );
+  const old = await host.readThread(previous);
+  assert.equal(old.thread.id, previous);
+  assert.equal(old.thread.hostId, worker.thread.hostId, 'Cross-host takeover requires independent remote evidence');
+  assert.ok(['idle', 'error'].includes(old.thread.status?.type), 'Previous executor is active or unobservable');
+  const monitoring = {
+    version: 1,
+    mode: 'confirmed-interruption-notice-only',
+    state: 'registered',
+    owner: input.owner,
+    runtimeOwnerVerified: false,
+    platformWorkerVerified: true,
+    registeredAt: new Date(now).toISOString(),
+    paused: false,
+    automaticResumptionEnabled: false,
+    executionSurface: 'codex-thread',
+    worker: input.owner,
+    rootThreadId: input.rootThreadId,
+    roomId: input.request.roomId,
+    authorizationRef: input.request.messageId,
+    taskStableId: boardTaskId,
+    taskNumber: board.task_number,
+    taskName: board.title,
+  };
+  const binding = {
+    version: 1,
+    revision: (initial.executionBindings?.length ?? 0) + 1,
+    taskId: initial.id,
+    historicalOwner: initial.owner,
+    previousExecutor: previous,
+    executor: input.owner,
+    coordinator: input.rootThreadId,
+    request: input.request,
+    expectedRevision: input.expectedRevision,
+    queueRevision: input.queueRevision,
+    boardRevision: input.boardRevision,
+    boardTaskId,
+    nativeEvidence: {
+      worker: {
+        threadId: worker.thread.id,
+        sourceRootThreadId: creationRoot,
+        creationMessageId: workerCreation.id,
+        creationDigest: digest(workerCreation),
+      },
+      previousExecutor: { threadId: old.thread.id, hostId: old.thread.hostId, status: old.thread.status },
+      authorization: { threadId: input.request.roomId, messageId: input.request.messageId },
+    },
+    worktree: initial.worktree,
+    branch: initial.branch,
+    commonDir: registry.commonDir,
+    monitoring,
+    boundAt: new Date(now).toISOString(),
+  };
+  const task = queue.guard(() => {
+    const state = queue.read();
+    assert.equal(state?.revision, input.queueRevision, 'Queue revision changed; do not rebase');
+    assert.equal(state.paused, true, 'Fence execution before changing its binding');
+    assert.ok(!state.scopedAdmission && !state.scopedAdmissions?.length, 'Scoped executor remains admitted');
+    for (const ticket of state.tickets.filter((t) => t.task === initial.id)) {
+      assert.equal(ticket.owner, initial.owner, 'Historical queue owner differs');
+      assert.equal(ticket.request.authorId, input.request.authorId, 'Original user required');
+      assert.ok(ticket.request.sequence < input.request.sequence, 'Fresh explicit takeover instruction required');
+    }
+    return registry.bindExecution(initial.id, input.expectedRevision, binding, (record) => {
+      assert.deepEqual(record, initial, 'Task changed during native observation');
+      registry.validateLive(record);
+      const before = resources(record),
+        first = observe();
+      assertHostIdle(first, record);
+      const second = observe();
+      assertHostIdle(second, record);
+      assert.deepEqual(resources(record), before, 'Resource evidence changed during observation');
+      binding.quiescenceDigest = digest({ first, second, resources: before });
+      executionBinding({ ...record, executionBindings: [...(record.executionBindings ?? []), binding] });
+      return true;
+    });
+  });
+  return { status: 'bound', task, replayed: false, resumed: false, previewStarted: false };
+}
+
+export function rebindingAdapters(root) {
+  const registry = createTaskRegistry(root);
+  return { registry, queue: createExecutionOrder(registry.commonDir) };
+}
+
+export async function resumeBoundTask(input, host, { registry, queue }) {
+  const task = registry.resolve({ id: input.taskId });
+  assert.equal(task.revision, input.taskRevision, 'Task revision changed before resume');
+  const binding = executionBinding(task);
+  assert.ok(binding, 'No historical execution binding; use normal enrolled start');
+  assertTaskExecutor(task);
+  assert.equal(input.owner, binding.executor);
+  assert.equal(input.rootThreadId, binding.coordinator);
+  requireTaskCoordinator(registry.commonDir, input.rootThreadId);
+  assert.deepEqual(input.request, binding.request, 'Exact bound takeover instruction required');
+  assert.equal(input.kind, task.kind, 'Task kind must remain unchanged');
+  await verifyCoordinatorSource(input, host.readThread);
+  const board = await host.readTask(binding.boardTaskId);
+  assert.ok(
+    board && !board.deleted_at && ['active', 'review', 'merging'].includes(board.status),
+    'Paused, cancelled, archived or completed board task cannot resume',
+  );
+  if (input.lane === 'development') assert.equal(board.status, 'active', 'Development must remain in its active card');
+  assert.equal(board.id, binding.boardTaskId);
+  assert.equal(board.revision, input.boardRevision, 'Board revision changed before resume');
+  verifyExecutionWorker(
+    await host.readThread(input.owner),
+    { ...input, rootThreadId: binding.nativeEvidence?.worker.sourceRootThreadId ?? input.rootThreadId },
+    threadTitle(board),
+  );
+  assert.equal(board.task_number, binding.monitoring.taskNumber);
+  assert.equal(board.title, binding.monitoring.taskName);
+  const state = queue.read();
+  assert.equal(state?.revision, input.queueRevision, 'Queue changed; read back before resuming');
+  assert.equal(state.paused, true, 'Use the ordinary FIFO when not paused');
+  const ticket = state.tickets.find((t) => t.task === task.id && t.lane === input.lane);
+  const scoped = [...(state.scopedAdmissions ?? []), ...(state.scopedAdmission ? [state.scopedAdmission] : [])];
+  assert.ok(
+    ticket &&
+      ['queued', 'blocked', 'running'].includes(ticket.status) &&
+      !scoped.some((s) => s.task === task.id && s.lane === input.lane) &&
+      !state.events.some((e) => e.bindingRef?.task === task.id && e.bindingRef?.revision === binding.revision),
+    'Only a fenced historical task may resume; never replay a running task',
+  );
+  assert.equal(ticket.owner, task.owner);
+  if (input.lane === 'development') {
+    assert.ok(
+      !task.frozen && ['developing', 'dev-validated', 'blocked'].includes(task.stage),
+      'Frozen formal source must resume in the delivery lane',
+    );
+    const capacity = await host.readCapacity();
+    for (const key of ['limit', 'activeDevelopment', 'activeDelivery', 'activeOther'])
+      assert.ok(Number.isSafeInteger(capacity[key]) && capacity[key] >= 0, 'Actual capacity required');
+    assert.ok(
+      capacity.activeDelivery <= 1 &&
+        capacity.activeDevelopment + capacity.activeDelivery + capacity.activeOther <= capacity.limit,
+    );
+    assert.ok(capacity.activeDevelopment < capacity.limit - capacity.activeOther - 1, 'Reserve delivery executor');
+    queue.direct({
+      action: 'resume-selected',
+      request: input.request,
+      capacity,
+      expectedRevision: input.queueRevision,
+      bindingRef: { task: task.id, revision: binding.revision },
+      members: [
+        { lane: 'development', task: task.id, owner: task.owner, kind: task.kind, monitorContext: binding.monitoring },
+      ],
+    });
+  } else {
+    assert.equal(input.lane, 'delivery');
+    assert.equal(typeof host.dependenciesReady, 'function', 'Formal delivered dependency proof required');
+    assert.equal(host.dependenciesReady(task), true);
+    queue.direct({
+      action: 'resume-only',
+      lane: 'delivery',
+      task: task.id,
+      owner: task.owner,
+      request: input.request,
+      expectedRevision: input.queueRevision,
+      bindingRef: { task: task.id, revision: binding.revision },
+    });
+  }
+  const admitted = queue.read().tickets.find((t) => t.task === task.id && t.lane === input.lane);
+  if (input.lane === 'delivery')
+    return {
+      status: 'admitted',
+      task,
+      lane: 'delivery',
+      admission: admitted.admission,
+      actor: input.owner,
+      historicalOwner: task.owner,
+      deliveryStarted: false,
+    };
+  return host.start({
+    taskId: task.id,
+    owner: input.owner,
+    monitorContext: binding.monitoring,
+    admission: admitted.admission,
+  });
+}

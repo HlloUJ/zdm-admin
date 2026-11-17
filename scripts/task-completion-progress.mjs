@@ -1,4 +1,5 @@
 import { verifyDevelopmentPlacementEvidence } from './task-execution-order-cli.mjs';
+import { assertTaskExecutor } from './task-execution-binding.mjs';
 import { ensureDeliveryPlacement, recordCompletePlacement } from './task-completion-placement.mjs';
 import { readAcceptance } from './accepted-source.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
@@ -88,7 +89,7 @@ export async function runCompletionWithProgress(
         const admitted = order.assertAdmission({
           lane: 'delivery',
           task: task.id,
-          owner: completionOptions.owner ?? process.env.CODEX_THREAD_ID,
+          owner: assertTaskExecutor(current, completionOptions.owner ?? process.env.CODEX_THREAD_ID),
           admission: process.env.ZDM_EXECUTION_ADMISSION,
         });
         assert.equal(admitted.active, true);

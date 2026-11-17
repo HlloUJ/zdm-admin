@@ -6,6 +6,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSy
 import path from 'node:path';
 import { withTaskRegistryWriteLock } from './task-registry.mjs';
 import { captureQueueProgress } from './task-delivery-status-sync.mjs';
+import { executionBinding, assertTaskExecutor } from './task-execution-binding.mjs';
 
 export const EXECUTION_LANES = ['development', 'delivery'];
 const occupied = new Set(['running', 'blocked']);
@@ -254,7 +255,26 @@ export function createExecutionOrder(commonDir) {
     const found = state.tickets.find((t) => t.lane === lane && t.task === task);
     assert.ok(found, 'Task has no explicit execution instruction in this lane');
     assert.equal(found.owner, owner, 'Original execution owner required');
+    const registeredFile = path.join(commonDir, 'task-registry/tasks', task + '.json');
+    safe(registeredFile);
+    if (existsSync(registeredFile)) {
+      const registered = JSON.parse(readFileSync(registeredFile, 'utf8'));
+      if (executionBinding(registered)) assertTaskExecutor(registered);
+    }
     return found;
+  }
+  function assertDirectionAuthority(current, source) {
+    const registryFile = path.join(commonDir, 'task-registry/tasks', current.task + '.json');
+    safe(registryFile);
+    const binding = existsSync(registryFile) ? executionBinding(JSON.parse(readFileSync(registryFile, 'utf8'))) : null;
+    if (binding) {
+      assert.equal(source.roomId, binding.request.roomId, 'Bound authorization room required');
+      assert.equal(source.authorId, binding.request.authorId, 'Bound authorization user required');
+      assert.ok(source.sequence >= binding.request.sequence, 'Direction predates current binding');
+    } else {
+      assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
+      assert.equal(source.authorId, current.request.authorId, 'Original user required');
+    }
   }
   function enqueue({ lane, task, owner, request, awaitingNativeWorker = false }) {
     assert.ok(EXECUTION_LANES.includes(lane) && id(task) && text(owner));
@@ -426,6 +446,8 @@ export function createExecutionOrder(commonDir) {
     monitorContext,
     members,
     capacity,
+    bindingRef,
+    expectedRevision,
   }) {
     const source = event(request);
     assert.ok(
@@ -435,7 +457,23 @@ export function createExecutionOrder(commonDir) {
       'Only explicit supported user directions',
     );
     return update((state) => {
-      const sameSource = state.events.filter((e) => e.request?.messageId === source.messageId);
+      if (expectedRevision !== undefined) assert.equal(state.revision, expectedRevision, 'Queue revision changed');
+      if (bindingRef !== undefined) {
+        assert.ok(['resume-only', 'resume-selected'].includes(action), 'Binding cannot authorize global changes');
+        const file = path.join(commonDir, 'task-registry/tasks', bindingRef.task + '.json');
+        safe(file);
+        const registered = JSON.parse(readFileSync(file, 'utf8')),
+          binding = executionBinding(registered);
+        assertTaskExecutor(registered);
+        assert.equal(binding?.revision, bindingRef.revision);
+        assert.deepEqual(binding.request, source);
+        assert.ok(source.sequence > lastPauseSequence(state), 'A later pause revoked this direction');
+        if (action === 'resume-only') assert.equal(task, registered.id);
+        else assert.ok(members?.length === 1 && members[0].task === registered.id, 'One exact bound task required');
+      }
+      const sameSource = state.events.filter(
+        (e) => e.request?.messageId === source.messageId && JSON.stringify(e.bindingRef) === JSON.stringify(bindingRef),
+      );
       const continuation =
         action === 'resume-only' &&
         sameSource.length === 1 &&
@@ -445,6 +483,7 @@ export function createExecutionOrder(commonDir) {
       const command = {
         action,
         request: source,
+        ...(bindingRef ? { bindingRef } : {}),
         ...(['resume-task', 'resume-only'].includes(action) ? { lane, task, owner } : {}),
         ...(action === 'resume-only' && monitorContext !== undefined ? { monitorContext } : {}),
         ...(action === 'reorder' ? { lane, tasks } : {}),
@@ -476,7 +515,12 @@ export function createExecutionOrder(commonDir) {
       assert.ok(
         state.events
           .filter((e) => e.request)
-          .every((e) => e.request.sequence < source.sequence || (continuation && e === sameSource[0])),
+          .every(
+            (e) =>
+              e.request.sequence < source.sequence ||
+              (continuation && e === sameSource[0]) ||
+              (bindingRef && JSON.stringify(e.request) === JSON.stringify(source)),
+          ),
         'Stale user direction refused',
       );
       if (action === 'pause-all' || action === 'resume-all') {
@@ -544,8 +588,7 @@ export function createExecutionOrder(commonDir) {
               assert.equal(current.executionKind, m.kind, 'Task kind cannot be retagged');
           }
           assert.ok(['queued', 'running', 'blocked'].includes(current.status), 'Terminal task cannot resume');
-          assert.equal(current.request.roomId, source.roomId, 'Original user conversation required');
-          assert.equal(current.request.authorId, source.authorId, 'Original user required');
+          assertDirectionAuthority(current, source);
           assert.ok(current.request.sequence <= source.sequence, 'Stale selected direction refused');
           return { current, m };
         });
@@ -591,9 +634,11 @@ export function createExecutionOrder(commonDir) {
         );
         const current = ticket(state, lane, task, owner);
         assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
-        assert.ok(['queued', 'blocked'].includes(current.status), 'Only queued or blocked tasks can resume alone');
-        assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
-        assert.equal(source.authorId, current.request.authorId, 'Original user required');
+        assert.ok(
+          ['queued', 'blocked'].includes(current.status) || (bindingRef && current.status === 'running'),
+          'Only queued, blocked or verified fenced bound tasks can resume alone',
+        );
+        assertDirectionAuthority(current, source);
         assert.ok(
           state.tickets.every(
             (t) =>
@@ -603,7 +648,7 @@ export function createExecutionOrder(commonDir) {
           'Stale scoped direction refused',
         );
         assert.ok(
-          current.status === 'blocked' ||
+          occupied.has(current.status) ||
             state.tickets.filter((t) => t.lane === lane && occupied.has(t.status)).length < retainedLimit(state, lane),
           'All lane slots occupied',
         );
@@ -832,5 +877,6 @@ export function createExecutionOrder(commonDir) {
     promoteDelivery,
     cancel,
     cancellationTarget,
+    guard: (operation) => withTaskRegistryWriteLock(directory, operation),
   };
 }

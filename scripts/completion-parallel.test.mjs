@@ -17,6 +17,7 @@ import { frozenRestoreArgs } from './task-preview-service.mjs';
 import { assertFrozenValidationStart } from './dev-task.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { finalHandoffPlan } from './completion-handoff.mjs';
+import { completionCommand } from './completion-cli.mjs';
 
 function fixture(t) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'completion-parallel-'))),
@@ -71,6 +72,49 @@ function fixture(t) {
   git(main, 'push', 'origin', 'main');
   return { dir, main, a, b, git, registry, head, accepted, latest: git(main, 'rev-parse', 'HEAD') };
 }
+
+test('a separately bound real executor reopens frozen completion without replacing historical source or owner', async (t) => {
+  const f = fixture(t),
+    task = f.registry.readTask('a');
+  const worker = '33333333-3333-4333-8333-333333333333',
+    coordinator = '22222222-2222-4222-8222-222222222222';
+  const originalEnv = process.env.CODEX_THREAD_ID;
+  t.after(() => {
+    if (originalEnv === undefined) delete process.env.CODEX_THREAD_ID;
+    else process.env.CODEX_THREAD_ID = originalEnv;
+  });
+  const request = { messageId: 'fixture-takeover', roomId: coordinator, authorId: 'human', sequence: 5 };
+  const binding = {
+    version: 1,
+    revision: 1,
+    taskId: task.id,
+    historicalOwner: task.owner,
+    previousExecutor: task.owner,
+    executor: worker,
+    coordinator,
+    request,
+    worktree: task.worktree,
+    branch: task.branch,
+    commonDir: task.repository.commonDir,
+    monitoring: { worker, rootThreadId: coordinator, roomId: coordinator, authorizationRef: request.messageId },
+    boundAt: new Date().toISOString(),
+    quiescenceDigest: 'a'.repeat(64),
+  };
+  const originalAcceptance = readFileSync(path.join(f.registry.commonDir, 'task-delivery/a/accepted-source.json'));
+  f.registry.bindExecution(task.id, task.revision, binding, () => true); // Isolated downstream contract fixture.
+  process.env.CODEX_THREAD_ID = worker;
+  await completionCommand(f.a, ['begin']);
+  assert.deepEqual(
+    readFileSync(path.join(f.registry.commonDir, 'task-delivery/a/accepted-source.json')),
+    originalAcceptance,
+  );
+  const current = f.registry.readTask('a');
+  assert.equal(current.owner, task.owner);
+  assert.deepEqual(current.frozen, task.frozen);
+  assert.deepEqual(current.monitoring, task.monitoring);
+  process.env.CODEX_THREAD_ID = 'old-chat';
+  await assert.rejects(completionCommand(f.a, ['begin'], { owner: worker }), /Real bound executor/);
+});
 
 test('an interrupted composition resumes only its proven merge and keeps original freeze and unfinished B', (t) => {
   const f = fixture(t),

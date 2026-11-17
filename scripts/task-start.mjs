@@ -1,4 +1,6 @@
 import { createBoardIntake } from './task-board-intake.mjs';
+import './task-network.mjs';
+import { assertTaskExecutor, executionBinding } from './task-execution-binding.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import {
   requireStartMonitoring,
@@ -68,6 +70,13 @@ export function startParallelTask(
 ) {
   root = realpathSync(root);
   const owner = options.owner || process.env.CODEX_THREAD_ID;
+  const registered = options.slug ? registry.readTask(options.slug) : registry.resolve({ worktree: root });
+  const binding = registered && executionBinding(registered);
+  if (binding) {
+    assertTaskExecutor(registered);
+    assert.equal(owner, binding.executor, 'Start must name the actual bound executor');
+    assert.deepEqual(options.monitorContext, binding.monitoring, 'Exact current execution monitoring required');
+  }
   function ready(result) {
     result.task = verifyStartMonitoringReadback(registry, result.task, options.monitorContext);
     result.artifacts = prepare(result.task);
@@ -88,26 +97,26 @@ export function startParallelTask(
     typeof owner === 'string' && owner.trim(),
     'Explicit task owner required when execution identity is unavailable',
   );
-  if (['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface))
+  if (!binding && ['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface))
     createBoardIntake(registry.commonDir).require(options.monitorContext, options.slug, owner);
   // The explicit root-thread receipt/claim precedes worktree creation or restoration.
   const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;
   const admission = createExecutionOrder(registry.commonDir).assertAdmission({
     lane: 'development',
     task: orderedTask,
-    owner,
+    owner: binding ? registered.owner : owner,
     admission: process.env.ZDM_EXECUTION_ADMISSION,
   });
   if (admission.ticket?.executionKind !== undefined)
     assert.equal(options.kind, admission.ticket.executionKind, 'Start kind differs from the authorized task');
   if (!options.slug) {
     const task = registry.resolve({ worktree: root });
-    assert.equal(task.owner, owner, 'Another owner controls this task');
+    assertTaskExecutor(task, owner, 'Another owner controls this task');
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   const existing = registry.readTask(options.slug);
   if (existing) {
-    assert.equal(existing.owner, owner, 'Another owner controls this task');
+    assertTaskExecutor(existing, owner, 'Another owner controls this task');
     assert.equal(existing.kind, options.kind, 'Task kind differs');
     const task = registry.resolve({ id: options.slug });
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });

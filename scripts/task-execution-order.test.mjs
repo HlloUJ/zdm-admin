@@ -270,7 +270,7 @@ test('linked state cannot redirect writes', (t) => {
 });
 test('development formal start refuses missing admission before any git/prepare effect', (t) => {
   const { root } = fixture(t);
-  const registry = { commonDir: root, resolve: () => ({ id: 'task-1' }) };
+  const registry = { commonDir: root, readTask: () => null, resolve: () => ({ id: 'task-1' }) };
   let calls = 0;
   assert.throws(
     () =>
