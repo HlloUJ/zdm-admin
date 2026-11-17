@@ -10,11 +10,10 @@ import {
   assertTaskExecutor,
   executionBinding,
   taskExecutor,
-  verifyCoordinatorSource,
   verifyExecutionWorker,
 } from './task-execution-binding.mjs';
-import { threadTitle } from './task-thread-titles.mjs';
-import { requireTaskCoordinator } from './task-coordination.mjs';
+import { threadTitle, createTaskThreadTitles } from './task-thread-titles.mjs';
+import { requireTaskCoordinator, verifyTaskAuthorization, readTaskCoordination } from './task-coordination.mjs';
 import { readAcceptance } from './accepted-source.mjs';
 
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -330,10 +329,37 @@ export async function rebindHistoricalTask(
 ) {
   assert.equal(process.env.CODEX_THREAD_ID, input.rootThreadId, 'Actual coordinator runtime required');
   requireTaskCoordinator(registry.commonDir, input.rootThreadId);
-  await verifyCoordinatorSource(input, host.readThread);
   const initial = registry.readTask(input.taskId);
   assert.ok(initial, 'Historical task must already be registered');
   const priorBinding = executionBinding(initial);
+  await verifyTaskAuthorization(registry.commonDir, input, host.readThread, {
+    readUnavailableThread: host.readUnavailableThread,
+    verifyPreservedSource: async () => {
+      const current = readTaskCoordination(registry.commonDir);
+      if (
+        current?.current.rootThreadId === input.rootThreadId &&
+        current.current.request.messageId === input.request.messageId
+      ) {
+        assert.deepEqual(current.current.request, input.request);
+        const tickets = queue.read().tickets.filter((ticket) => ticket.task === initial.id);
+        assert.ok(tickets.length, 'Original task authorization ledger missing');
+        for (const ticket of tickets) {
+          assert.equal(ticket.owner, initial.owner);
+          assert.equal(ticket.request.authorId, input.request.authorId);
+          assert.ok(ticket.request.sequence < input.request.sequence);
+        }
+        return; // The exact current appointment was already natively accepted.
+      }
+      assert.ok(priorBinding, 'No previously accepted takeover authorization');
+      assert.equal(priorBinding.executor, input.owner);
+      assert.equal(priorBinding.coordinator, input.rootThreadId);
+      assert.deepEqual(
+        priorBinding.request,
+        input.request,
+        'Unreadable new authorization cannot replace the accepted binding',
+      );
+    },
+  });
   const boardTaskId =
     input.boardTaskId ?? priorBinding?.boardTaskId ?? initial.monitoring?.taskStableId ?? input.taskId;
   if (priorBinding) assert.equal(boardTaskId, priorBinding.boardTaskId, 'Keep original bound carrier-to-board mapping');
@@ -344,10 +370,12 @@ export async function rebindHistoricalTask(
   assert.equal(board.revision, input.boardRevision, 'Board revision changed; do not rebase');
   const worker = await host.readThread(input.owner);
   const previous = taskExecutor(initial);
+  const nativeOrigin = createTaskThreadTitles(registry.commonDir).get(input.taskId);
   const creationRoot =
     input.owner === previous
       ? (priorBinding?.nativeEvidence?.worker.sourceRootThreadId ??
         priorBinding?.coordinator ??
+        (nativeOrigin?.threadId === previous ? nativeOrigin.creationRootThreadId : undefined) ??
         initial.monitoring?.rootThreadId ??
         input.rootThreadId)
       : input.rootThreadId;
@@ -523,7 +551,25 @@ export async function resumeBoundTask(
   requireTaskCoordinator(registry.commonDir, input.rootThreadId);
   assert.deepEqual(input.request, binding.request, 'Exact bound takeover instruction required');
   assert.equal(input.kind, task.kind, 'Task kind must remain unchanged');
-  await verifyCoordinatorSource(input, host.readThread);
+  await verifyTaskAuthorization(registry.commonDir, input, host.readThread, {
+    readUnavailableThread: host.readUnavailableThread,
+    verifyPreservedSource: async () => {
+      assert.deepEqual(binding.request, input.request);
+      const current = registry.readTask(task.id);
+      assert.deepEqual(current, task, 'Bound project source changed');
+      const state = queue.read();
+      assert.equal(state.revision, input.queueRevision);
+      assert.ok(
+        state.tickets.some(
+          (ticket) =>
+            ticket.task === task.id &&
+            ticket.owner === task.owner &&
+            ticket.request.authorId === input.request.authorId,
+        ),
+        'Original bound project authorization is missing',
+      );
+    },
+  });
   const board = await host.readTask(binding.boardTaskId);
   assert.ok(
     board && !board.deleted_at && ['active', 'review', 'merging'].includes(board.status),

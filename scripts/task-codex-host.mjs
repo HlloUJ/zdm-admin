@@ -1,7 +1,7 @@
 import { TASK_THREAD_MODE, createTaskThreadTitles } from './task-thread-titles.mjs';
 import { taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
 import { executionPausedFor } from './task-execution-scope.mjs';
-import { createBoardIntake } from './task-board-intake.mjs';
+import { createBoardIntake, queuedProjectReference } from './task-board-intake.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -17,7 +17,7 @@ import { readTaskCoordination, verifyTaskAuthorization } from './task-coordinati
 // This module has no scheduler, implicit task discovery, retry, owner transfer or global resume.
 export async function codexMonitoringContext(
   { taskId, owner, rootThreadId, request, coordinatorThreadId },
-  { readTask, readThread, intake, queue },
+  { readTask, readThread, readUnavailableThread, intake, queue },
 ) {
   const board = await readTask(taskId);
   assert.equal(board.id, taskId, 'Exact task overview registration required');
@@ -26,9 +26,21 @@ export async function codexMonitoringContext(
     intake?.commonDir ?? queue?.commonDir,
     { rootThreadId, request, coordinatorThreadId },
     readThread,
+    {
+      readUnavailableThread,
+      ...(intake && queue
+        ? {
+            verifyPreservedSource: () =>
+              intake.verifyQueuedSource(
+                { taskId, owner, rootThreadId, request, coordinatorThreadId },
+                { queue, readThread },
+              ),
+          }
+        : {}),
+    },
   );
   const worker = owner === request.roomId ? source : await readThread(owner);
-  assert.equal(worker.thread.id, owner, 'Actual native execution thread required');
+  assert.equal(worker?.thread?.id, owner, 'Actual native execution thread required');
   const context = {
     executionSurface: 'codex-thread',
     worker: owner,
@@ -67,15 +79,19 @@ export async function receiveCodexTask(input, host) {
 }
 
 // Native callbacks are supplied by the authenticated desktop host. Node never invents a platform API.
-async function receiveIndependentCodexTask(input, host) {
-  assert.equal(process.env.CODEX_THREAD_ID, input.rootThreadId, 'Actual coordinator runtime required');
+async function receiveIndependentCodexTask(input, host, { continuing = false } = {}) {
+  assert.equal(
+    process.env.CODEX_THREAD_ID,
+    input.coordinatorThreadId ?? input.rootThreadId,
+    'Actual coordinator runtime required',
+  );
   assert.equal(host.intake.commonDir, host.queue?.commonDir, 'Intake and queue must share the actual store');
   const { queue } = host;
   let state = queue.read();
   assert.ok(state, 'Execution policy required');
   const titles = createTaskThreadTitles(queue.commonDir);
   const existing = state.tickets.find((t) => t.lane === 'development' && t.task === input.taskId);
-  if (!existing || existing.awaitingNativeWorker)
+  if ((!existing || existing.awaitingNativeWorker) && !continuing)
     queue.enqueue({
       lane: 'development',
       task: input.taskId,
@@ -83,7 +99,7 @@ async function receiveIndependentCodexTask(input, host) {
       request: input.request,
       awaitingNativeWorker: true,
     });
-  else {
+  else if (!continuing) {
     assert.equal(existing.nativeCoordinatorOwner, input.rootThreadId, 'Existing task cannot be adopted');
     assert.deepEqual(existing.request, input.request);
     assert.ok(titles.get(input.taskId), 'Original native binding required');
@@ -115,6 +131,7 @@ async function receiveIndependentCodexTask(input, host) {
       owner: input.rootThreadId,
       request: input.request,
       capacity: snapshot,
+      ...(input.coordinatorThreadId ? { coordinatorThreadId: input.coordinatorThreadId } : {}),
     });
   } catch (error) {
     return { status: 'queued', taskId: input.taskId, reason: error.message };
@@ -133,6 +150,7 @@ async function receiveIndependentCodexTask(input, host) {
     taskStableId: input.taskId,
     taskNumber: board.task_number,
     taskName: board.title,
+    ...(input.coordinatorThreadId ? { coordinatorThreadId: input.coordinatorThreadId } : {}),
   };
   queue.bindNativeWorker({
     task: input.taskId,
@@ -140,9 +158,28 @@ async function receiveIndependentCodexTask(input, host) {
     workerOwner: title.threadId,
     request: input.request,
     context,
+    ...(input.coordinatorThreadId ? { coordinatorThreadId: input.coordinatorThreadId } : {}),
   });
   if (!host.dispatchWorker) return { status: 'awaiting-worker-start', taskId: input.taskId, workerInput, title };
   return { ...(await titles.dispatch(input.taskId, workerInput, host)), workerInput, title };
+}
+
+export async function continueAcceptedCodexTask(input, host) {
+  assert.equal(input.threadMode, TASK_THREAD_MODE);
+  assert.equal(
+    process.env.CODEX_THREAD_ID,
+    input.coordinatorThreadId,
+    'Actual current continuation coordinator required',
+  );
+  await host.intake.continueCoordinator(input, host);
+  const state = host.queue.read();
+  const latestPause = Math.max(
+    0,
+    ...state.events.filter((event) => event.action === 'pause-all').map((event) => event.request.sequence),
+  );
+  if (input.continuationRequest.sequence <= latestPause)
+    return { status: 'queued', taskId: input.taskId, reason: 'newer-global-pause' };
+  return receiveIndependentCodexTask({ ...input, startWhilePaused: true }, host, { continuing: true });
 }
 
 export async function startIndependentCodexTask(input, host) {
@@ -155,7 +192,20 @@ export async function startIndependentCodexTask(input, host) {
   assert.deepEqual(ticket.request, input.request);
   assert.equal(ticket.status, 'queued', 'Never replay a started or blocked worker');
   assert.equal(ticket.admission, null);
-  if (state.paused) assert.equal(input.startWhilePaused, true, 'Global pause remains in effect');
+  const projectAuthority = readTaskCoordination(host.queue.commonDir)
+    ? queuedProjectReference(host.queue.commonDir, input, state)
+    : null;
+  const executionRequest = projectAuthority?.executionRequest ?? input.request;
+  if (projectAuthority?.executionKind)
+    assert.equal(input.kind, projectAuthority.executionKind, 'Accepted queued kind differs');
+  if (state.paused) {
+    assert.ok(input.startWhilePaused === true || executionRequest !== input.request, 'Global pause remains in effect');
+    const latestPause = Math.max(
+      0,
+      ...state.events.filter((event) => event.action === 'pause-all').map((event) => event.request.sequence),
+    );
+    assert.ok(executionRequest.sequence > latestPause, 'A later pause revoked this queued direction');
+  }
   await host.intake.refreshForStart(input, {
     ...host,
     verifyQueued: () => {
@@ -169,13 +219,17 @@ export async function startIndependentCodexTask(input, host) {
   });
   createBoardIntake(host.queue.commonDir).require(context, input.taskId, input.owner);
   if (!state.paused) return startCodexTask(input, host);
-  assert.equal(input.startWhilePaused, true, 'Global pause remains in effect');
   const capacity = await host.readCapacity();
   developmentCapacity(capacity);
+  const currentCoordination = readTaskCoordination(host.queue.commonDir);
+  const bindingRef = currentCoordination
+    ? queuedProjectReference(host.queue.commonDir, input, host.queue.read())
+    : null;
   host.queue.direct({
     action: 'resume-selected',
-    request: input.request,
+    request: bindingRef?.executionRequest ?? input.request,
     capacity,
+    ...(bindingRef ? { bindingRef } : {}),
     members: [
       { lane: 'development', task: input.taskId, owner: input.owner, kind: input.kind, monitorContext: context },
     ],
@@ -194,8 +248,11 @@ export async function startIndependentCodexTask(input, host) {
   return result;
 }
 
-export async function startCodexTask(input, { queue, readTask, readThread, start, readCapacity }) {
-  const context = await codexMonitoringContext(input, { queue, readTask, readThread });
+export async function startCodexTask(
+  input,
+  { queue, readTask, readThread, start, readCapacity, intake, readUnavailableThread },
+) {
+  const context = await codexMonitoringContext(input, { queue, readTask, readThread, intake, readUnavailableThread });
   assert.ok(queue.commonDir, 'Persistent intake store required before queue dispatch');
   createBoardIntake(queue.commonDir).require(context, input.taskId, input.owner);
   const state = queue.read();

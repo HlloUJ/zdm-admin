@@ -3,7 +3,7 @@ import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync, renameSy
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { withTaskRegistryWriteLock } from './task-registry.mjs';
-import { verifyCoordinatorSource } from './task-execution-binding.mjs';
+import { verifyCoordinatorSource, verifyCoordinatorObservation } from './task-execution-binding.mjs';
 
 function location(commonDir) {
   const file = path.join(commonDir, 'task-coordination', 'current.json');
@@ -43,26 +43,71 @@ export function requireTaskCoordinator(commonDir, coordinator) {
 }
 // Task authorization and a later coordinator appointment are separate events.
 // A->B->C does not imply that A directly created C's native chat.
-export async function verifyTaskAuthorization(commonDir, input, readThread) {
+export async function verifyTaskAuthorization(
+  commonDir,
+  input,
+  readThread,
+  { readUnavailableThread, verifyPreservedSource } = {},
+) {
   const coordinator = input.coordinatorThreadId ?? input.rootThreadId;
   const policy = commonDir ? readTaskCoordination(commonDir) : null;
   if (commonDir) requireTaskCoordinator(commonDir, coordinator);
-  const source = await verifyCoordinatorSource(input, readThread);
-  if (coordinator !== input.rootThreadId)
-    await verifyCoordinatorSource(policy?.current ?? { rootThreadId: coordinator, request: input.request }, readThread);
+  let source;
+  try {
+    source = await verifyCoordinatorSource(input, readThread);
+  } catch (error) {
+    if (!policy || !verifyPreservedSource || !readUnavailableThread) throw error;
+    const missing =
+      (await readUnavailableThread(input.request.roomId)) ??
+      (input.rootThreadId !== input.request.roomId ? await readUnavailableThread(input.rootThreadId) : null);
+    if (!missing) throw error;
+    assert.equal(
+      policy.current.request.authorId,
+      input.request.authorId,
+      'Current and original authorization users differ',
+    );
+    await verifyPreservedSource();
+    source = null; // No invented native observation for the lost source.
+  }
+  if (policy) {
+    // The appointment's native authorization was verified before publication.
+    // Its old room may later disappear; re-identify the current live role, not
+    // re-authorize it through that old room on every worker continuation.
+    assert.equal(
+      policy.current.request.authorId,
+      input.request.authorId,
+      'Current and original authorization users differ',
+    );
+    const observed = await readThread(coordinator);
+    assert.equal(observed?.thread?.id, coordinator, 'Actual current coordinator observation required');
+    if (
+      policy.current.request.roomId !== coordinator &&
+      observed.turns?.some((turn) =>
+        turn.items?.some(
+          (item) =>
+            item.type === 'functionCallOutput' && item.namespace === 'codex_app' && item.name === 'create_thread',
+        ),
+      )
+    )
+      verifyCoordinatorObservation(observed, policy.current);
+  } else if (coordinator !== input.rootThreadId)
+    await verifyCoordinatorSource({ rootThreadId: coordinator, request: input.request }, readThread);
+  if (commonDir)
+    assert.deepEqual(readTaskCoordination(commonDir), policy, 'Coordination changed during authorization readback');
   return source;
 }
 export async function authorizeTaskCoordinator(commonDir, input, host) {
   assert.equal(process.env.CODEX_THREAD_ID, input.rootThreadId, 'Actual new coordinator runtime required');
-  await verifyCoordinatorSource(input, host.readThread);
   const file = location(commonDir),
     directory = path.dirname(file);
   const previous = readTaskCoordination(commonDir);
   const event = { rootThreadId: input.rootThreadId, request: input.request, expectedRevision: input.expectedRevision };
   if (previous?.current.request.messageId === input.request.messageId) {
     assert.deepEqual(previous.current, event, 'Coordination replay changed');
+    verifyCoordinatorObservation(await host.readThread(input.rootThreadId), previous.current);
     return previous;
   }
+  await verifyCoordinatorSource(input, host.readThread);
   assert.equal(previous?.revision ?? 0, input.expectedRevision, 'Coordination revision changed');
   if (previous) {
     assert.equal(input.request.authorId, previous.current.request.authorId, 'Original coordination user required');

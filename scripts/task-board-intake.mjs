@@ -5,7 +5,7 @@ import {
   verifyNativeCreation,
 } from './task-thread-titles.mjs';
 import { verifyCoordinatorSource } from './task-execution-binding.mjs';
-import { requireTaskCoordinator, verifyTaskAuthorization } from './task-coordination.mjs';
+import { requireTaskCoordinator, verifyTaskAuthorization, readTaskCoordination } from './task-coordination.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmdirSync, writeFileSync } from 'node:fs';
@@ -27,6 +27,103 @@ function validate(board, input) {
     'Task archived or in another card',
   );
   assert.ok(Number.isSafeInteger(board.revision) && board.revision > 0, 'Board revision required');
+}
+
+// Multiple original project records are required. This is a read-only source
+// reference, not a caller-supplied safe flag or a replacement user instruction.
+export function queuedProjectReference(commonDir, input, state, { controller = false } = {}) {
+  assert.match(input.taskId, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  const policy = readTaskCoordination(commonDir);
+  assert.ok(policy, 'Current project coordination is missing');
+  const coordinator = input.coordinatorThreadId ?? input.rootThreadId;
+  assert.equal(
+    process.env.CODEX_THREAD_ID,
+    controller ? coordinator : input.owner,
+    'Actual queued continuation actor required',
+  );
+  requireTaskCoordinator(commonDir, coordinator);
+  assert.equal(policy.current.request.authorId, input.request.authorId, 'Original queued authorization user differs');
+  assert.equal(
+    existsSync(path.join(commonDir, 'task-registry/tasks', input.taskId + '.json')),
+    false,
+    'Registered tasks must use their historical execution binding',
+  );
+  const ticket = state?.tickets.find((t) => t.task === input.taskId && t.lane === 'development');
+  assert.ok(
+    ticket && ticket.status === 'queued' && ticket.admission === null && (controller || !ticket.awaitingNativeWorker),
+    'Only an exact accepted queued task may continue; Never replay a started or unknown worker',
+  );
+  if (controller) {
+    assert.equal(input.owner, input.rootThreadId, 'Preserve original intake owner as provenance');
+    assert.equal(ticket.awaitingNativeWorker ? ticket.owner : ticket.nativeCoordinatorOwner, input.rootThreadId);
+  } else {
+    assert.equal(ticket.owner, input.owner);
+    assert.equal(ticket.nativeCoordinatorOwner, input.rootThreadId);
+  }
+  assert.deepEqual(ticket.request, input.request, 'Original queued instruction differs');
+  const target = path.join(commonDir, 'task-board-intake', input.taskId + '.json');
+  safe(target);
+  const receipt = JSON.parse(readFileSync(target));
+  assert.equal(receipt.version, 2);
+  assert.equal(receipt.state, 'accepted');
+  assert.equal(receipt.threadMode, TASK_THREAD_MODE);
+  assert.equal(receipt.taskId, input.taskId);
+  assert.equal(receipt.owner, input.rootThreadId);
+  assert.equal(receipt.rootThreadId, input.rootThreadId);
+  assert.equal(receipt.sourceRoomId ?? receipt.rootThreadId, input.request.roomId);
+  assert.equal(receipt.messageId, input.request.messageId);
+  assert.equal(receipt.card, 'active');
+  const titles = createTaskThreadTitles(commonDir),
+    binding = titles.get(input.taskId);
+  if (!controller || !ticket.awaitingNativeWorker) {
+    assert.ok(binding?.state === 'bound', 'Original queued native creation binding missing');
+    titles.requireBinding(
+      {
+        rootThreadId: input.rootThreadId,
+        coordinatorThreadId: coordinator,
+        authorizationRef: input.request.messageId,
+        worker: ticket.owner,
+        taskNumber: receipt.number,
+        taskName: receipt.title,
+      },
+      input.taskId,
+      ticket.owner,
+    );
+  } else if (binding) {
+    assert.equal(binding.rootThreadId, input.rootThreadId);
+    assert.equal(binding.messageId, input.request.messageId);
+    assert.ok(
+      ['creation-intent', 'creation-unknown', 'bound'].includes(binding.state),
+      'Unknown pending native creation state',
+    );
+  }
+  const continuation = receipt.continuations?.at(-1);
+  if (continuation) {
+    assert.equal(continuation.taskId, input.taskId);
+    assert.equal(continuation.originalRoot, input.rootThreadId);
+    assert.equal(continuation.originalMessageId, input.request.messageId);
+    assert.equal(continuation.request.authorId, input.request.authorId);
+    assert.equal(
+      policy.history[continuation.coordinationRevision - 1]?.rootThreadId,
+      continuation.coordinator,
+      'Accepted continuation coordinator history differs',
+    );
+    assert.match(continuation.authorizationDigest, /^[a-f0-9]{64}$/);
+  }
+  return {
+    kind: controller ? 'queued-coordinator' : 'queued-native',
+    task: input.taskId,
+    executor: input.owner,
+    originalRoot: input.rootThreadId,
+    coordinator,
+    coordinatorRevision: policy.revision,
+    receiptDigest: hash(receipt),
+    nativeBindingDigest: binding ? hash(binding) : null,
+    ticketDigest: hash(ticket),
+    originalRequest: input.request,
+    executionRequest: continuation?.request ?? input.request,
+    ...(continuation ? { executionKind: continuation.kind } : {}),
+  };
 }
 export function createBoardIntake(commonDir) {
   const directory = path.join(commonDir, 'task-board-intake');
@@ -142,6 +239,7 @@ export function createBoardIntake(commonDir) {
         messageId: input.request.messageId,
         number: board.task_number,
         title: board.title,
+        kind: input.kind ?? 'business',
         revision: board.revision,
         card: 'active',
         observedAt: now,
@@ -184,12 +282,116 @@ export function createBoardIntake(commonDir) {
     if (fresh) assert.ok(now - r.observedAt <= 300000, 'Intake readback expired; re-read exact task, do not recreate');
     return r;
   }
-  async function refreshForStart(input, { readTask, readThread, verifyQueued, now = Date.now() }) {
+  async function verifyQueuedSource(input, { queue, readThread }) {
+    assert.equal(queue?.commonDir, commonDir, 'Actual queued project store required');
+    const reference = queuedProjectReference(commonDir, input, queue.read());
+    verifyNativeCreation(createTaskThreadTitles(commonDir).get(input.taskId), await readThread(input.owner));
+    return reference;
+  }
+  async function continueCoordinator(input, { queue, readTask, readThread, readUnavailableThread, now = Date.now() }) {
+    const originalState = queue.read();
+    queuedProjectReference(commonDir, input, originalState, { controller: true });
+    assert.ok(input.continuationRequest, 'Explicit continuation execution authorization required');
+    assert.equal(input.continuationRequest.authorId, input.request.authorId);
+    assert.ok(
+      Number.isSafeInteger(input.continuationRequest.sequence) && input.continuationRequest.sequence > 0,
+      'Exact continuation receipt sequence required',
+    );
+    let retainedAuthorization;
+    const source = await verifyTaskAuthorization(
+      commonDir,
+      { rootThreadId: input.coordinatorThreadId, request: input.continuationRequest },
+      readThread,
+      {
+        readUnavailableThread,
+        verifyPreservedSource: async () => {
+          const policy = readTaskCoordination(commonDir);
+          const previous = JSON.parse(readFileSync(file(input.taskId)));
+          const accepted = [policy.current, ...(previous.continuations ?? [])].find(
+            (entry) => entry.request.messageId === input.continuationRequest.messageId,
+          );
+          assert.ok(accepted, 'Unreadable new execution authority has not been accepted');
+          assert.deepEqual(accepted.request, input.continuationRequest);
+          retainedAuthorization = accepted;
+        },
+      },
+    );
+    const target = file(input.taskId),
+      lock = target + '.lock';
+    safe(target);
+    mkdirSync(lock, { mode: 0o700 });
+    try {
+      const previous = JSON.parse(readFileSync(target));
+      const first = await readTask(input.taskId);
+      validate(first, input);
+      assert.equal(first.task_number, previous.number);
+      assert.equal(first.title, previous.title);
+      if (previous.kind !== undefined) assert.equal(input.kind, previous.kind, 'Original queued kind differs');
+      const second = await readTask(input.taskId);
+      assert.deepEqual(second, first, 'Board changed during coordinator continuation');
+      assert.deepEqual(queue.read(), originalState, 'Queue changed during coordinator continuation');
+      queuedProjectReference(commonDir, input, originalState, { controller: true });
+      const latestPause = Math.max(
+        0,
+        ...originalState.events.filter((event) => event.action === 'pause-all').map((event) => event.request.sequence),
+      );
+      assert.ok(input.continuationRequest.sequence > latestPause, 'A later pause revoked this continuation');
+      assert.ok(input.continuationRequest.sequence >= input.request.sequence, 'Continuation predates original task');
+      const existing = previous.continuations?.at(-1);
+      if (existing) assert.equal(input.kind, existing.kind, 'Accepted queued kind cannot change');
+      let continuations = previous.continuations ?? [];
+      if (existing?.request.messageId === input.continuationRequest.messageId) {
+        assert.deepEqual(existing.request, input.continuationRequest);
+        assert.equal(existing.kind, input.kind);
+      } else {
+        const message = source?.turns
+          ?.flatMap((turn) => turn.items ?? [])
+          .find((item) => item.type === 'userMessage' && item.id === input.continuationRequest.messageId);
+        continuations = [
+          ...continuations,
+          {
+            version: 1,
+            taskId: input.taskId,
+            originalRoot: input.rootThreadId,
+            originalMessageId: input.request.messageId,
+            coordinator: input.coordinatorThreadId,
+            coordinationRevision: readTaskCoordination(commonDir).revision,
+            request: input.continuationRequest,
+            kind: input.kind,
+            observedAt: now,
+            previousReceiptDigest: hash(previous),
+            authorizationDigest: hash(message ?? retainedAuthorization),
+          },
+        ];
+      }
+      const receipt = {
+        ...previous,
+        observedAt: now,
+        revision: second.revision,
+        initialObservedAt: previous.initialObservedAt ?? previous.observedAt,
+        continuations,
+      };
+      save(target, receipt);
+      return receipt;
+    } finally {
+      rmdirSync(lock);
+    }
+  }
+  async function refreshForStart(
+    input,
+    { readTask, readThread, readUnavailableThread, queue, verifyQueued, now = Date.now() },
+  ) {
     requireTaskCoordinator(commonDir, input.coordinatorThreadId ?? input.rootThreadId);
     assert.equal(process.env.CODEX_THREAD_ID, input.owner, 'Actual worker runtime required for intake refresh');
     assert.equal(typeof verifyQueued, 'function', 'Exact queued instruction must be independently checked');
     verifyQueued();
-    await verifyTaskAuthorization(commonDir, input, readThread);
+    let recoveredSource;
+    await verifyTaskAuthorization(commonDir, input, readThread, {
+      readUnavailableThread,
+      verifyPreservedSource: async () => {
+        recoveredSource = await verifyQueuedSource(input, { queue, readThread });
+      },
+    });
     const target = file(input.taskId);
     safe(target);
     assert.ok(existsSync(target), 'Only an existing accepted receipt may refresh; never receive or create here');
@@ -236,7 +438,12 @@ export function createBoardIntake(commonDir) {
       validate(second, input);
       assert.deepEqual(second, first, 'Board changed during independent refresh; re-read without rebasing');
       verifyQueued();
-      if (previous.revision === second.revision && now >= previous.observedAt && now - previous.observedAt <= 300000)
+      if (
+        !recoveredSource &&
+        previous.revision === second.revision &&
+        now >= previous.observedAt &&
+        now - previous.observedAt <= 300000
+      )
         return previous;
       assert.ok(Number.isFinite(previous.observedAt) && previous.observedAt <= now, 'Invalid original receipt clock');
       const receipt = {
@@ -252,6 +459,7 @@ export function createBoardIntake(commonDir) {
             executor: input.owner,
             coordinator: input.coordinatorThreadId ?? input.rootThreadId,
             boardRevision: second.revision,
+            ...(recoveredSource ? { sourceRecovery: recoveredSource } : {}),
           },
         ],
       };
@@ -262,5 +470,5 @@ export function createBoardIntake(commonDir) {
       rmdirSync(lock);
     }
   }
-  return { commonDir, modeFor, accept, require, refreshForStart };
+  return { commonDir, modeFor, accept, require, refreshForStart, verifyQueuedSource, continueCoordinator };
 }

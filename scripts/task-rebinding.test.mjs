@@ -1068,6 +1068,65 @@ test('a later authorized coordinator can retain the existing worker and its orig
   });
 });
 
+test('accepted current appointment authorizes binding/replay/resume after its old source room disappears', async (t) => {
+  const f = fixture(t),
+    current = '77777777-7777-4777-8777-777777777777',
+    executor = '88888888-8888-4888-8888-888888888888';
+  await authorizeTaskCoordinator(f.registry.commonDir, { ...f.input, expectedRevision: 0 }, f.host);
+  const request = { ...f.input.request, roomId: root, messageId: 'current-handoff', sequence: 6 };
+  f.snapshots.get(root).turns[0].items.push({ type: 'userMessage', id: request.messageId });
+  f.snapshots.set(current, delegate(current, root, 'Coordinator from current-handoff'));
+  f.snapshots.set(executor, delegate(executor, current, 'Execute task task', '750｜fixture'));
+  process.env.CODEX_THREAD_ID = current;
+  await authorizeTaskCoordinator(f.registry.commonDir, { rootThreadId: current, request, expectedRevision: 1 }, f.host);
+  f.snapshots.delete(root);
+  f.host.readUnavailableThread = async (id) => (id === root ? unavailable(id) : null);
+  const input = { ...f.input, owner: executor, rootThreadId: current, request };
+  const options = { registry: f.registry, queue: f.queue, observe: f.observe };
+  const result = await rebindHistoricalTask(input, f.host, options);
+  const replay = await rebindHistoricalTask(input, f.host, {
+    ...options,
+    observe: () => assert.fail('read-only replay'),
+  });
+  assert.equal(replay.replayed, true);
+  assert.equal(result.task.owner, old);
+  process.env.CODEX_THREAD_ID = executor;
+  f.host.start = async () => ({ task: f.registry.readTask('task') });
+  const resumed = await resumeBoundTask(
+    { ...input, taskRevision: result.task.revision, lane: 'development' },
+    f.host,
+    options,
+  );
+  assert.equal(taskExecutor(resumed.task), executor);
+});
+
+test('first handoff can retain a worker created by a later coordinator while preserving original intake ownership', async (t) => {
+  const f = fixture(t),
+    creator = '77777777-7777-4777-8777-777777777777';
+  const dir = path.join(f.registry.commonDir, 'task-thread-titles/tasks');
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(
+    path.join(dir, 'task.json'),
+    JSON.stringify({
+      version: 1,
+      mode: 'task-thread-title-v1',
+      taskId: 'task',
+      rootThreadId: legacyRoot,
+      creationRootThreadId: creator,
+      messageId: 'original',
+      createRequestId: 'original-create',
+      threadId: old,
+      state: 'bound',
+    }),
+    { mode: 0o600 },
+  );
+  f.snapshots.set(old, delegate(old, creator, 'Execute task task', '750｜fixture'));
+  const result = await f.bind({ owner: old });
+  assert.equal(result.task.executionBindings[0].nativeEvidence.worker.sourceRootThreadId, creator);
+  assert.equal(result.task.executionBindings[0].coordinator, root);
+  assert.equal(result.task.owner, old);
+});
+
 test('A to B to C preserves a collaboration origin while changing coordinator then native worker', async (t) => {
   const f = fixture(t, { collaboration: true });
   await authorizeTaskCoordinator(f.registry.commonDir, { ...f.input, expectedRevision: 0 }, f.host);
@@ -1140,6 +1199,10 @@ test('A to B to C preserves a collaboration origin while changing coordinator th
   assert.deepEqual(f.queue.read(), beforeQueue);
   assert.equal(readTaskCoordination(f.registry.commonDir).revision, 3);
   assert.equal(f.registry.readTask('task').executionBindings.length, 3);
+  // Both old coordination rooms may disappear after their verified records
+  // were published. The current worker resumes from the permanent binding.
+  for (const id of [root, b, source]) f.snapshots.delete(id);
+  f.host.readUnavailableThread = async (id) => (id === b ? unavailable(id) : null);
   process.env.CODEX_THREAD_ID = nextWorker;
   f.host.start = async () => ({ task: f.registry.readTask('task') });
   const result = await resumeBoundTask(

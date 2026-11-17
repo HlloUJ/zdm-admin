@@ -2,9 +2,61 @@ import assert from 'node:assert/strict';
 import { createBoardIntake } from './task-board-intake.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { createTaskThreadTitles } from './task-thread-titles.mjs';
-import { receiveCodexTask, startIndependentCodexTask } from './task-codex-host.mjs';
+import { receiveCodexTask, startIndependentCodexTask, continueAcceptedCodexTask } from './task-codex-host.mjs';
 import { rebindHistoricalTask, resumeBoundTask } from './task-rebinding.mjs';
 import { authorizeTaskCoordinator, readTaskCoordination, requireTaskCoordinator } from './task-coordination.mjs';
+import { bestEffortProgress } from './task-delivery-status-sync.mjs';
+import { createProgressOutbox, progressSourceIdentity } from './task-progress-outbox.mjs';
+import { createHash } from 'node:crypto';
+import path from 'node:path';
+
+function recordReadiness(commonDir, input, result) {
+  if (!['receive', 'continue-intake', 'start'].includes(input.action)) return;
+  const task = input.task.taskId,
+    directory = path.join(commonDir, 'task-progress', task);
+  let label, next;
+  if (['receive', 'continue-intake'].includes(input.action)) {
+    label = result.status === 'awaiting-worker-start' ? '身份已核验，等待真实worker启动' : '原生创建／绑定仍在等待核验';
+    next =
+      result.status === 'awaiting-worker-start'
+        ? '由真实worker按同一任务启动，创建聊天不代表已恢复工作区'
+        : (result.reason ?? '沿原requestId读取实际创建结果，不重复创建');
+  } else {
+    label = '任务工作区已就绪，业务动作尚未开始';
+    next = '在已授权范围内接续原任务，并记录实际动作';
+  }
+  const sourceKey =
+    'native-readiness:' +
+    createHash('sha256')
+      .update(
+        JSON.stringify({
+          action: input.action,
+          task,
+          owner: input.task.owner,
+          coordinator: input.task.coordinatorThreadId ?? input.task.rootThreadId,
+          request: input.task.request.messageId,
+          continuation: input.task.continuationRequest?.messageId,
+          status: result.status ?? 'workspace-ready',
+          reason: result.reason,
+          worker: result.workerInput?.owner,
+          creation: input.creationResult?.requestId,
+          revision: result.task?.executionBindings?.at(-1)?.revision,
+        }),
+      )
+      .digest('hex');
+  const box = createProgressOutbox(directory),
+    id = progressSourceIdentity(task, sourceKey),
+    state = box.read();
+  if ([...state.pending, ...state.acknowledged, ...(state.rejected ?? [])].some((entry) => entry.receipt_id === id))
+    return;
+  bestEffortProgress(directory, task, sourceKey, {
+    event: 'queued',
+    observed_at: new Date().toISOString(),
+    action: { id: input.action, label },
+    evidence_refs: [`published-native-host:${input.action}:${task}:${input.task.request.messageId}`],
+    next: { kind: 'action', label: next },
+  });
+}
 
 export function taskHandoffFailure(error) {
   const reason = error.message;
@@ -39,12 +91,17 @@ export async function advanceTaskThread(
   input,
   { commonDir, readTask, start, registry, dependenciesReady, observe, now = Date.now() },
 ) {
-  assert.ok(['receive', 'start', 'rename', 'rebind', 'rebind-plan', 'resume', 'coordinate'].includes(input.action));
+  assert.ok(
+    ['receive', 'continue-intake', 'start', 'rename', 'rebind', 'rebind-plan', 'resume', 'coordinate'].includes(
+      input.action,
+    ),
+  );
   const coordination = readTaskCoordination(commonDir);
   if (input.action === 'start' && coordination)
     input = { ...input, task: { ...input.task, coordinatorThreadId: coordination.current.rootThreadId } };
   if (['receive', 'rename', 'rebind', 'rebind-plan', 'resume'].includes(input.action))
     requireTaskCoordinator(commonDir, input.task.rootThreadId);
+  if (input.action === 'continue-intake') requireTaskCoordinator(commonDir, input.task.coordinatorThreadId);
   const actions = [];
   const beganAt = Date.now();
   const observationNow = () => now + Math.max(0, Date.now() - beganAt);
@@ -122,6 +179,7 @@ export async function advanceTaskThread(
         ? await rebindHistoricalTask(input.task, host, { ...adapters, planOnly: input.action === 'rebind-plan' })
         : await resumeBoundTask(input.task, host, adapters);
   } else if (input.action === 'receive') result = await receiveCodexTask(input.task, host);
+  else if (input.action === 'continue-intake') result = await continueAcceptedCodexTask(input.task, host);
   else if (input.action === 'start') {
     assert.equal(typeof start, 'function', 'Published task entry adapter required');
     result = await startIndependentCodexTask(input.task, host);
@@ -145,5 +203,6 @@ export async function advanceTaskThread(
     );
     result = await store.sync(input.task.taskId, host);
   }
+  recordReadiness(commonDir, input, result);
   return { result, nativeActions: actions }; // Never describes a plan as a completed native action.
 }
