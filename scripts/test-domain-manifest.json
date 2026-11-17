@@ -627,7 +627,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-process.mjs": {
-      "digest": "dee2cd3aff4f24acc7ffd0a9a5a2bae1b0d1bfe6e8ebe037495d8918a08e9251",
+      "digest": "ee844b1fb01500becc3d00efb549ed176fa333e4ce2ba393e828e40cf054d78f",
       "imports": ["scripts/integration-resource.mjs"],
       "dynamicImports": 0
     },
@@ -637,7 +637,7 @@
       "dynamicImports": 1
     },
     "scripts/completion-recovery.mjs": {
-      "digest": "25028a3975cf28e74f33c4f95bb1875151624942f019ba10690e64cfd7cab401",
+      "digest": "10f9538d7735c9c8e7197e9191744c53f79e6ea60c4f678b97afa503cec8a9c5",
       "imports": [
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-process.mjs",
@@ -646,7 +646,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-recovery.test.mjs": {
-      "digest": "62bf48e30221444a315b7de06c694afc1a918c9c27bd01ae0a58db10ed4dd090",
+      "digest": "00f3b025172f4147f2a436a7e69a8786e6398c882ffd6e9a96d9d1ae34e8765c",
       "imports": [
         "scripts/completion-process.mjs",
         "scripts/completion-recovery.mjs",
