@@ -13,6 +13,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import path from 'node:path';
+import { recoverFailedCreation } from './delivery-repairs/task-failed-creation.mjs';
 
 export const TASK_THREAD_MODE = 'task-thread-title-v1';
 const TASK_ID = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -539,5 +540,25 @@ export function createTaskThreadTitles(commonDir) {
       return { status: 'confirmed', taskId, threadId: record.threadId, expectedTitle, boardRevision: board.revision };
     });
   }
-  return { get, enrolled, ensure, sync, rename, dispatch, requireBinding, plan, confirm, base, digest };
+  const retryCreation = (input, host, adapters) =>
+    recoverFailedCreation(
+      commonDir,
+      input,
+      host,
+      {
+        get,
+        exclusive,
+        file,
+        base,
+        privateRead,
+        save,
+        assertPending,
+        existingExecution,
+        assertReceipt,
+        verifyNativeCreation,
+        threadTitle,
+      },
+      adapters,
+    );
+  return { get, enrolled, ensure, sync, rename, dispatch, requireBinding, plan, confirm, retryCreation, base, digest };
 }

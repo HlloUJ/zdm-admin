@@ -8,6 +8,7 @@ import path from 'node:path';
 
 const scope = new AsyncLocalStorage();
 export const completionDirectory = Symbol('completionDirectory');
+export const completionPermission = Symbol('completionPermission');
 export function processScope(state, event, save, run) {
   return scope.run({ state, event, save }, run);
 }
@@ -57,6 +58,7 @@ export function runCompletionProcess(command, args, options = {}) {
   if (!current) return spawnSync(command, args, options);
   assert.notEqual(process.platform, 'win32', 'Completion recovery requires POSIX process groups');
   const { state, event, save } = current;
+  state[completionPermission]?.();
   const directory = state[completionDirectory];
   assert.ok(directory, 'Missing private process journal directory');
   const token = randomUUID(),
@@ -82,6 +84,7 @@ export function startCompletionProcess(command, args, options = {}) {
   assert.ok(current, 'Long-lived validation process requires its exact completion stage');
   const { state, event, save } = current,
     directory = state[completionDirectory];
+  state[completionPermission]?.();
   assert.ok(directory && process.platform !== 'win32');
   const token = randomUUID(),
     file = path.join(directory, 'process-' + token + '.json');

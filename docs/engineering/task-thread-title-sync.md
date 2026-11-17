@@ -1,5 +1,7 @@
 # 任务看板与 Codex 子对话名称统一 V1
 
+已登记任务在真实持续委托下的动态调度使用同一私有桥的 delegate/dispatch/dispatch-start/preparation-finish；身份、绑定、标题及原授权保持。入口及阶段副作用限制见[持续委托与动态任务调度](dynamic-task-dispatch.md)。新任务仍按本文正式受理，不用调度决定代替受理或原生创建证明。
+
 明确授权的历史任务接管及跨协调来源兼容见[历史任务执行绑定](historical-task-rebinding.md)。它保留旧owner和原生创建历史；普通新任务流程不自动接管历史任务。
 
 ## 适用边界

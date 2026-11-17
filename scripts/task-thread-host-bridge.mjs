@@ -9,6 +9,7 @@ import { bestEffortProgress } from './task-delivery-status-sync.mjs';
 import { createProgressOutbox, progressSourceIdentity } from './task-progress-outbox.mjs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { dynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
 
 function recordReadiness(commonDir, input, result) {
   if (!['receive', 'continue-intake', 'start'].includes(input.action)) return;
@@ -92,9 +93,22 @@ export async function advanceTaskThread(
   { commonDir, readTask, start, registry, dependenciesReady, observe, now = Date.now() },
 ) {
   assert.ok(
-    ['receive', 'continue-intake', 'start', 'rename', 'rebind', 'rebind-plan', 'resume', 'coordinate'].includes(
-      input.action,
-    ),
+    [
+      'receive',
+      'continue-intake',
+      'start',
+      'rename',
+      'rebind',
+      'rebind-plan',
+      'resume',
+      'coordinate',
+      'delegate',
+      'dispatch',
+      'dispatch-start',
+      'dispatch-cancel',
+      'preparation-finish',
+      'retry-creation',
+    ].includes(input.action),
   );
   const coordination = readTaskCoordination(commonDir);
   if (input.action === 'start' && coordination)
@@ -170,7 +184,21 @@ export async function advanceTaskThread(
     },
   };
   let result;
-  if (input.action === 'coordinate') result = await authorizeTaskCoordinator(commonDir, input.task, host);
+  if (['delegate', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(input.action)) {
+    assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
+    result = await dynamicHostAction(input.action, input.task, host, {
+      commonDir,
+      registry,
+      queue: host.queue,
+      ...(observe ? { observe } : {}),
+    });
+  } else if (input.action === 'retry-creation') {
+    assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
+    result = await createTaskThreadTitles(commonDir).retryCreation(input.task, host, {
+      registry,
+      ...(observe ? { observe } : {}),
+    });
+  } else if (input.action === 'coordinate') result = await authorizeTaskCoordinator(commonDir, input.task, host);
   else if (['rebind', 'rebind-plan', 'resume'].includes(input.action)) {
     assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
     const adapters = { registry, queue: host.queue, now, ...(observe ? { observe } : {}) };

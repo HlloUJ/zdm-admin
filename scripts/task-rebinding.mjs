@@ -570,6 +570,43 @@ export function rebindingAdapters(root) {
   return { registry, queue: createExecutionOrder(registry.commonDir) };
 }
 
+// Shared read-only source/resource proof. Dynamic decisions supply separately
+// verified checkpoint callbacks; the legacy binding replay path stays exact.
+export function assertBoundResumeReady(
+  task,
+  state,
+  input,
+  { registry, observe = observeCancellationHost, acceptFrozenCheckpoint, acceptRegisteredCheckpoint } = {},
+) {
+  const binding = executionBinding(task);
+  assert.ok(binding, 'Historical execution binding required');
+  const before = resources(task);
+  const source = binding.sourceContentDigest ? projectSource(task, state, input) : null;
+  const sourceDigest = (value) => digest({ head: value.head, index: value.index, entries: value.entries });
+  const currentDigest = source ? sourceDigest(source) : null;
+  if (source && currentDigest !== binding.sourceContentDigest) {
+    const verify = task.frozen ? acceptFrozenCheckpoint : acceptRegisteredCheckpoint;
+    assert.ok(verify, 'Project source changed since binding; preserve and review a new binding');
+    assert.equal(verify(source), true, 'Registered checkpoint source is not verified');
+  }
+  const first = observe();
+  assertHostIdle(first, task);
+  const second = observe();
+  assertHostIdle(second, task);
+  assert.deepEqual(resources(task), before, 'Resources changed before admission');
+  if (source)
+    assert.equal(
+      sourceDigest(projectSource(task, state, input)),
+      currentDigest,
+      'Project source changed before admission',
+    );
+  assert.deepEqual(registry.readTask(task.id), task, 'Task changed before admission');
+  return {
+    sourceDigest: currentDigest,
+    resourcesDigest: digest(before),
+    observationsDigest: digest({ first, second }),
+  };
+}
 export async function resumeBoundTask(
   input,
   host,
@@ -636,29 +673,7 @@ export async function resumeBoundTask(
     assert.equal(typeof host.dependenciesReady, 'function', 'Formal delivered dependency proof required');
     assert.equal(host.dependenciesReady(task), true, 'Waiting for formally delivered task dependencies');
   }
-  const assertResumeReady = () => {
-    const before = resources(task);
-    const source = binding.sourceContentDigest ? projectSource(task, state, input) : null;
-    const sourceDigest = (value) => digest({ head: value.head, index: value.index, entries: value.entries });
-    if (source)
-      assert.equal(
-        sourceDigest(source),
-        binding.sourceContentDigest,
-        'Project source changed since binding; preserve and review a new binding',
-      );
-    const first = observe();
-    assertHostIdle(first, task);
-    const second = observe();
-    assertHostIdle(second, task);
-    assert.deepEqual(resources(task), before, 'Resources changed before admission');
-    if (source)
-      assert.equal(
-        sourceDigest(projectSource(task, state, input)),
-        binding.sourceContentDigest,
-        'Project source changed before admission',
-      );
-    assert.deepEqual(registry.readTask(task.id), task, 'Task changed before admission');
-  };
+  const assertResumeReady = () => assertBoundResumeReady(task, state, input, { registry, observe });
   if (input.lane === 'development') {
     assert.ok(
       !task.frozen && ['developing', 'dev-validated', 'blocked'].includes(task.stage),

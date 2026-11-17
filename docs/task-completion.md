@@ -8,6 +8,8 @@
 
 ## 正常路径
 
+合并卡的并行候选准备使用 `task:entry -- --worktree <准确目录> complete prepare <task-id> <40位SHA>`，仅在真实委托的 preparation scope 中执行。它完成原冻结、发布及首次完整 PR CI 后返回，不进入最终 main 队列，不合并、交接或结项；普通 deliver/final-handoff/settle 仍须唯一 final scope。准备证明和 scope 交接见[持续委托与动态任务调度](engineering/dynamic-task-dispatch.md)。
+
 独立任务获得准确“任务完成”授权后，首选 `npm run task:completion -- deliver <batch-id> <准确任务40位SHA>`。该入口绑定准确 task/owner/Worktree 并冻结实际源码；核对保护、备份与健康，推送并完成初始 PR CI，再进入 FIFO 正式交付队列。队列内刷新 main、按原始冻结与受信主线组合，在该准确组合候选自己的源码中执行本地就绪检查，必要运行验证使用当前任务独占的临时端口，不抢占正在展示其他任务的5175；变化候选重新推送和验证后才准确合并，随后完成本地 main 同步、main CI、最终交接和 settle；每个阶段直接await前一阶段，不靠人工休眠轮询再接命令。只有刚创建事件尚未出现时有限等待查询，绝不dispatch或重跑CI；多个候选、失败、重跑、主线变化或保护不符均停止。源码修改不授权调用deliver；PR创建输出URL后仍须由调用方附加到当前对话。
 
 有真实外部周期验收的工程任务，可由可信宿主显式传 `completionOptions.deferSettle: true`；私有 `task-completion-progress-cli.mjs` 输入对应顶层布尔 `deferSettle: true`。默认是 false，普通交付仍完整 settle。该选项只有准确 main CI 与 `main:final` 运行交接的成功原记录齐全后才返回 `status=deferred`、`formalDeliveryComplete=false`、原因“外部周期验收待完成”；不执行保全/清理/关闭，也不生成 `delivery_complete`。原 main FIFO 票据以 waiting 加 deferred 明细保留 id、owner、冻结身份及顺序，正常释放本次 main 临界租约；集成交接自身在返回前释放其临界租约。任务归属与执行层交付票据仍保留，不用伪造失败或提前 done 来结束当前命令。

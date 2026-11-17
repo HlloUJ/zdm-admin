@@ -8,6 +8,16 @@ import { withTaskRegistryWriteLock } from './task-registry.mjs';
 import { captureQueueProgress } from './task-delivery-status-sync.mjs';
 import { executionBinding, assertTaskExecutor } from './task-execution-binding.mjs';
 import { queuedProjectReference } from './task-board-intake.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
+import {
+  validateDynamicState,
+  registerDynamicAuthority,
+  reserveDynamicDecision,
+  consumeDynamicDecision,
+  finishDynamicPreparation,
+  cancelDynamicDecision,
+  assertDynamicAdmission,
+} from './delivery-repairs/task-dynamic-model.mjs';
 
 export const EXECUTION_LANES = ['development', 'delivery'];
 const occupied = new Set(['running', 'blocked']);
@@ -127,14 +137,15 @@ function validate(state) {
               e.task === ticket.task &&
               e.owner === ticket.owner &&
               e.admission === ticket.admission,
-          ),
+          ) ||
+          state.dynamicDecisions?.some((d) => d.id === ticket.dynamicDecisionId && d.admission === ticket.admission),
         'Derived admission changed without an explicit resume',
       );
     }
   }
   for (const lane of EXECUTION_LANES)
     assert.ok(
-      state.tickets.filter((t) => t.lane === lane && occupied.has(t.status)).length <=
+      state.tickets.filter((t) => t.lane === lane && occupied.has(t.status) && !t.dynamicDecisionId).length <=
         (state.paused ? retainedLimit(state, lane) : laneLimit(state, lane)),
       'Capacity invariant violated',
     );
@@ -154,11 +165,17 @@ function validate(state) {
       state.events.some(
         (e) =>
           JSON.stringify(e.request) === JSON.stringify(scoped.request) &&
-          ((e.action === 'resume-only' &&
-            e.lane === scoped.lane &&
+          ((e.action === 'dispatch-applied' &&
+            e.decisionId === scoped.decisionId &&
             e.task === scoped.task &&
+            e.lane === scoped.lane &&
             e.owner === scoped.owner &&
             e.admission === scoped.admission) ||
+            (e.action === 'resume-only' &&
+              e.lane === scoped.lane &&
+              e.task === scoped.task &&
+              e.owner === scoped.owner &&
+              e.admission === scoped.admission) ||
             (e.action === 'promote-delivery' &&
               scoped.lane === 'delivery' &&
               e.task === scoped.task &&
@@ -176,7 +193,13 @@ function validate(state) {
       'Scoped admission lacks its exact user direction',
     );
   }
-  assert.ok(scopes.filter((s) => s.lane === 'delivery').length <= 1, 'Delivery must remain serial');
+  for (const scope of scopes)
+    if (scope.phase !== undefined) assert.ok(scope.decisionId, 'Preparation phase needs a verified dispatch decision');
+  validateDynamicState(state);
+  assert.ok(
+    scopes.filter((s) => s.lane === 'delivery' && s.phase !== 'preparation').length <= 1,
+    'Delivery must remain serial',
+  );
   return state;
 }
 const scopedFor = hasScopedAdmission;
@@ -321,11 +344,16 @@ export function createExecutionOrder(commonDir) {
   function reserveNativeCreation({ task, owner, request, capacity, coordinatorThreadId }) {
     requireNativeIntake(commonDir, { taskId: task, rootThreadId: owner, request, coordinatorThreadId });
     assert.ok(capacity && Number.isSafeInteger(capacity.limit) && capacity.limit > 0);
+    assert.ok(Number.isSafeInteger(capacity.activePreparation ?? 0) && (capacity.activePreparation ?? 0) >= 0);
     for (const key of ['activeDevelopment', 'activeDelivery', 'activeOther'])
       assert.ok(Number.isSafeInteger(capacity[key]) && capacity[key] >= 0);
     assert.ok(
       capacity.activeDelivery <= 1 &&
-        capacity.activeDevelopment + capacity.activeDelivery + capacity.activeOther <= capacity.limit,
+        capacity.activeDevelopment +
+          capacity.activeDelivery +
+          (capacity.activePreparation ?? 0) +
+          capacity.activeOther <=
+          capacity.limit,
     );
     return update((state) => {
       const current = state.tickets.find((t) => t.lane === 'development' && t.task === task);
@@ -335,8 +363,21 @@ export function createExecutionOrder(commonDir) {
       if (current.nativeLaunchReserved) return structuredClone(current);
       assert.equal(current.awaitingNativeWorker, true);
       const reservations = state.tickets.filter((t) => t.status === 'queued' && t.nativeLaunchReserved).length;
+      const dynamic = (state.dynamicDecisions ?? []).filter((d) => d.status === 'reserved');
       assert.ok(
-        capacity.activeDevelopment + reservations + 1 <= capacity.limit - capacity.activeOther - 1,
+        (capacity.activePreparation ?? 0) >= scopedAdmissions(state).filter((s) => s.phase === 'preparation').length,
+        'Capacity omits preparation',
+      );
+      assert.ok(
+        capacity.activeDevelopment +
+          (capacity.activePreparation ?? 0) +
+          capacity.activeDelivery +
+          capacity.activeOther +
+          reservations +
+          dynamic.length +
+          1 +
+          (capacity.activeDelivery || dynamic.some((d) => d.input.phase === 'final') ? 0 : 1) <=
+          capacity.limit,
         'Reserve one executor for delivery, including outstanding native launches',
       );
       const active = state.paused
@@ -414,13 +455,28 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(current);
     });
   }
-  function assertAdmission({ lane, task, owner, admission }) {
+  function assertAdmission({ lane, task, owner, admission, effect = 'final' }) {
     const state = read();
     if (!state) return { active: false };
     const current = ticket(state, lane, task, owner);
+    assert.ok(
+      !(state.dynamicDecisions ?? []).some(
+        (d) => d.status === 'reserved' && d.input.task === task && d.input.lane === lane,
+      ),
+      'A reserved dispatch fences the previous admission',
+    );
     assert.ok(!state.paused || scopedFor(state, current), 'All execution launches paused');
     assert.equal(current.status, 'running', 'Task is not admitted; no automatic resume');
     assert.ok(text(admission) && admission === current.admission, 'Exact current admission required');
+    if (current.dynamicDecisionId) {
+      const scope = scopedAdmissions(state).find((s) => s.task === task && s.lane === lane);
+      assert.ok(
+        scope?.decisionId === current.dynamicDecisionId,
+        'Dynamic admission is fenced; an explicit current decision is required',
+      );
+      const registered = JSON.parse(readFileSync(path.join(commonDir, 'task-registry/tasks', task + '.json')));
+      assertDynamicAdmission(state, scope, effect, registered, readTaskCoordination(commonDir));
+    }
     return { active: true, ticket: structuredClone(current) };
   }
   function block({ lane, task, owner, reason }) {
@@ -583,11 +639,16 @@ export function createExecutionOrder(commonDir) {
           capacity && Number.isSafeInteger(capacity.limit) && capacity.limit > 0,
           'Actual executor capacity required',
         );
+        assert.ok(Number.isSafeInteger(capacity.activePreparation ?? 0) && (capacity.activePreparation ?? 0) >= 0);
         for (const key of ['activeDevelopment', 'activeDelivery', 'activeOther'])
           assert.ok(Number.isSafeInteger(capacity[key]) && capacity[key] >= 0);
         assert.ok(capacity.activeDelivery <= 1, 'Delivery must remain serial');
         assert.ok(
-          capacity.activeDevelopment + capacity.activeDelivery + capacity.activeOther <= capacity.limit,
+          capacity.activeDevelopment +
+            capacity.activeDelivery +
+            (capacity.activePreparation ?? 0) +
+            capacity.activeOther <=
+            capacity.limit,
           'Invalid capacity snapshot',
         );
         const existingScopes = [
@@ -599,8 +660,13 @@ export function createExecutionOrder(commonDir) {
           'Capacity omits current development',
         );
         assert.ok(
-          capacity.activeDelivery >= existingScopes.filter((s) => s.lane === 'delivery').length,
+          capacity.activeDelivery >=
+            existingScopes.filter((s) => s.lane === 'delivery' && s.phase !== 'preparation').length,
           'Capacity omits current delivery',
+        );
+        assert.ok(
+          (capacity.activePreparation ?? 0) >= existingScopes.filter((s) => s.phase === 'preparation').length,
+          'Capacity omits preparation',
         );
         const targets = members.map((m) => {
           assert.equal(
@@ -609,6 +675,12 @@ export function createExecutionOrder(commonDir) {
             'Selected restore only admits development; final delivery remains serial',
           );
           const current = ticket(state, m.lane, m.task, m.owner);
+          assert.ok(
+            !(state.dynamicDecisions ?? []).some(
+              (d) => d.status === 'reserved' && d.input.task === m.task && d.input.lane === m.lane,
+            ),
+            'Task has a reserved dispatch decision',
+          );
           assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
           if (m.kind !== undefined) {
             assert.ok(['business', 'infrastructure', 'maintenance'].includes(m.kind), 'Unknown task kind');
@@ -622,7 +694,17 @@ export function createExecutionOrder(commonDir) {
         });
         const additions = targets.filter(({ current }) => !scopedFor(state, current));
         assert.ok(
-          capacity.activeDevelopment + additions.length <= capacity.limit - capacity.activeOther - 1,
+          capacity.activeDevelopment +
+            (capacity.activePreparation ?? 0) +
+            additions.length +
+            state.tickets.filter(
+              (t) =>
+                t.status === 'queued' &&
+                t.nativeLaunchReserved &&
+                !members.some((m) => m.task === t.task && m.lane === t.lane),
+            ).length +
+            (state.dynamicDecisions ?? []).filter((d) => d.status === 'reserved').length <=
+            capacity.limit - capacity.activeOther - 1,
           'Reserve one executor slot for delivery',
         );
         assert.ok(
@@ -661,6 +743,12 @@ export function createExecutionOrder(commonDir) {
           'Another scoped direction remains active',
         );
         const current = ticket(state, lane, task, owner);
+        assert.ok(
+          !(state.dynamicDecisions ?? []).some(
+            (d) => d.status === 'reserved' && d.input.task === task && d.input.lane === lane,
+          ),
+          'Task has a reserved dispatch decision',
+        );
         assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
         assert.ok(
           ['queued', 'blocked'].includes(current.status) || (bindingRef && current.status === 'running'),
@@ -783,6 +871,12 @@ export function createExecutionOrder(commonDir) {
       const current = ticket(state, lane, task, owner);
       assert.equal(current.status, 'running', 'Blocked task must await explicit user decision');
       assert.equal(current.admission, admission);
+      if (current.dynamicDecisionId) {
+        const scope = scopedAdmissions(state).find((item) => item.task === task && item.lane === lane);
+        assert.ok(scope?.decisionId === current.dynamicDecisionId, 'Dynamic admission is fenced');
+        const registered = JSON.parse(readFileSync(path.join(commonDir, 'task-registry/tasks', task + '.json')));
+        assertDynamicAdmission(state, scope, 'final', registered, readTaskCoordination(commonDir));
+      }
       assert.equal(verify(structuredClone(current), evidence), true, 'Stage completion evidence not proven');
       current.status = 'completed';
       if (scopedFor(state, current)) removeScope(state, current);
@@ -892,6 +986,11 @@ export function createExecutionOrder(commonDir) {
     });
   }
   return {
+    registerDelegation: (input, verify) => update((state) => registerDynamicAuthority(state, input, verify)),
+    reserveDecision: (input, verify) => update((state) => reserveDynamicDecision(state, input, verify)),
+    consumeDecision: (input, verify) => update((state) => consumeDynamicDecision(state, input, verify)),
+    finishPreparation: (input, verify) => update((state) => finishDynamicPreparation(state, input, verify)),
+    cancelDecision: (input, verify) => update((state) => cancelDynamicDecision(state, input, verify)),
     commonDir,
     read,
     initialize,
