@@ -7,7 +7,8 @@ import { createBoardIntake } from './task-board-intake.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { receiveCodexTask, startIndependentCodexTask } from './task-codex-host.mjs';
 import { advanceTaskThread } from './task-thread-host-bridge.mjs';
-import { syncCodexCycle } from './task-codex-cycle.mjs';
+import { createProgressOutbox } from './task-progress-outbox.mjs';
+import { syncCodexCycle, planCycleThreadTitle } from './task-codex-cycle.mjs';
 import {
   TASK_THREAD_MODE,
   threadTitle,
@@ -433,4 +434,26 @@ test('policy activation never enrolls an existing unreceipted historical queue t
   await assert.rejects(receiveCodexTask(f.input, f.host), /Historical queued task/);
   assert.equal(f.counts().creates, 0);
   assert.equal(f.store.get(f.input.taskId), null);
+});
+
+test('native title plan never hides an unsent receipt or reports cycle confirmation', async (t) => {
+  const f = fixture(t);
+  await prepared(f);
+  const directory = path.join(f.commonDir, 'unsent');
+  createProgressOutbox(directory).enqueue(f.input.taskId, 'fixture-fact', {
+    event: 'completed',
+    observed_at: new Date().toISOString(),
+    action: { id: 'check', label: 'fixture check' },
+    evidence_refs: ['fixture:check'],
+    next: { kind: 'wait', label: 'wait' },
+  });
+  const progress = await syncCodexCycle({ task: f.input.taskId, directories: [directory] }, async () => {
+    throw Error('offline');
+  });
+  assert.equal(progress.status, 'needs-attention');
+  const planned = await planCycleThreadTitle(progress, f.store, f.host.readTask);
+  assert.equal(planned.status, 'needs-attention');
+  assert.equal(planned.threadTitle.status, 'native-readback-required');
+  assert.equal(planned.outboxes[0].remaining, 1);
+  assert.equal(createProgressOutbox(directory).read().pending.length, 1);
 });

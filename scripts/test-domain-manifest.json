@@ -968,7 +968,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "d8d6e088ab0fdedbc684119225aa63cc26e170b21120bfc803a05b478d047eca",
+      "digest": "233328679e982a24e50c45d6b75fe6bba2991cb82a02c2379c8a3760339ce772",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -2097,12 +2097,12 @@
       "dynamicImports": 0
     },
     "scripts/task-codex-cycle-cli.mjs": {
-      "digest": "7af701e2085a536c372d4332f6c169af24ea8a46f8298faae04c0af308fc87ce",
+      "digest": "6732630b5ac81be8fb7940d02d54b25804817b4c6e823a7d2ba787cb839ec273",
       "imports": ["scripts/task-codex-cycle.mjs", "scripts/task-thread-titles.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-codex-cycle.mjs": {
-      "digest": "19325ecb811d5be6fe313d3ad0c8d3163b648aec27b898d546f5557139081ec9",
+      "digest": "e67a404ce8e875bb9b8d7c2e2808dec7b2b1a1b129cf50bc612bfca3c4f07ade",
       "imports": ["scripts/task-progress-outbox.mjs"],
       "dynamicImports": 0
     },
@@ -2742,12 +2742,13 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-titles.test.mjs": {
-      "digest": "dc39835c41f2ff16c6646e8a311d6d7330df72a46fcad8819bafc4758918eb24",
+      "digest": "13c613de55466dc9e1ebba2546d8c587cdb2b5203a508670c2f28a134abf824c",
       "imports": [
         "scripts/task-board-intake.mjs",
         "scripts/task-codex-cycle.mjs",
         "scripts/task-codex-host.mjs",
         "scripts/task-execution-order.mjs",
+        "scripts/task-progress-outbox.mjs",
         "scripts/task-thread-host-bridge.mjs",
         "scripts/task-thread-titles.mjs"
       ],

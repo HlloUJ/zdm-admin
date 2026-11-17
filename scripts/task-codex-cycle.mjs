@@ -40,3 +40,13 @@ export async function syncCodexCycle({ task, directories, threadTitles }, call) 
     ...(title ? { threadTitle: title } : {}),
   };
 }
+
+// A native plan is a separate proof dimension; never hide unsent progress receipts.
+export async function planCycleThreadTitle(result, store, readTask) {
+  if (!store.get(result.task)) return result;
+  return {
+    ...result,
+    threadTitle: await store.plan(result.task, readTask),
+    status: result.status === 'confirmed' ? 'needs-native-title-readback' : result.status,
+  };
+}

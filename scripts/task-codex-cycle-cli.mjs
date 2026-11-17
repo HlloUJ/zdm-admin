@@ -3,7 +3,7 @@ import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import { createTaskThreadTitles } from './task-thread-titles.mjs';
-import { syncCodexCycle } from './task-codex-cycle.mjs';
+import { syncCodexCycle, planCycleThreadTitle } from './task-codex-cycle.mjs';
 
 // Credentials arrive through hidden stdin from the authenticated owner host, never argv or disk.
 assert.ok(process.stdin.isTTY, 'Use a private PTY for credential input');
@@ -50,14 +50,11 @@ process.stdin.on('data', async (chunk) => {
     };
     const commonDir = path.resolve(execFileSync('git', ['rev-parse', '--git-common-dir'], { encoding: 'utf8' }).trim());
     const titles = createTaskThreadTitles(commonDir);
-    const result = await syncCodexCycle(input, call);
-    if (titles.get(input.task)) {
-      result.threadTitle = await titles.plan(
-        input.task,
-        async (id) => (await call('get_task_progress_receipt', { id, receipt_id: 'title-sync-' + id })).task,
-      );
-      result.status = 'needs-native-title-readback';
-    }
+    const result = await planCycleThreadTitle(
+      await syncCodexCycle(input, call),
+      titles,
+      async (id) => (await call('get_task_progress_receipt', { id, receipt_id: 'title-sync-' + id })).task,
+    );
     const proof = { runId: input.runId, checkedAt: new Date().toISOString(), ...result };
     if (input.proofFile) writeFileSync(input.proofFile, JSON.stringify(proof) + '\n', { flag: 'wx', mode: 0o600 });
     console.log(JSON.stringify(proof));
