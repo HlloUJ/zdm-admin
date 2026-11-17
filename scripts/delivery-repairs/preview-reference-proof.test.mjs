@@ -20,6 +20,7 @@ import {
   assertStoppedPreviewRound,
   assertStoppedPreviewPair,
   referenceFrontendMetadata,
+  observedHostMountPath,
 } from './preview-reference-proof-core.mjs';
 import {
   nativeOutputObjects,
@@ -32,6 +33,16 @@ import { inspectPreviewConsumers } from '../preview-consumers.mjs';
 
 const sha = 'a'.repeat(64),
   head = 'b'.repeat(40);
+test('Docker Desktop migration mount uses its actual macOS host path without changing Linux paths', () => {
+  assert.equal(observedHostMountPath('/host_mnt/private/task/migrations', 'darwin'), '/private/task/migrations');
+  assert.equal(observedHostMountPath('/private/task/migrations', 'darwin'), '/private/task/migrations');
+  assert.equal(
+    observedHostMountPath('/host_mnt/private/task/migrations', 'linux'),
+    '/host_mnt/private/task/migrations',
+  );
+  assert.throws(() => observedHostMountPath('relative/migrations', 'darwin'));
+  assert.throws(() => observedHostMountPath('/host_mnt/task/../migrations', 'darwin'));
+});
 function identity() {
   const backend = { id: 'c'.repeat(64), labels: { task: 'foreign' }, mounts: [{ Source: '/repo/foreign' }] };
   return {

@@ -10,6 +10,14 @@ const mentions = (value, token) => {
   return new RegExp('(?<![a-zA-Z0-9_-])' + escaped + '(?![a-zA-Z0-9_-])').test(value);
 };
 
+export function observedHostMountPath(value, platform) {
+  assert.ok(
+    typeof value === 'string' && path.isAbsolute(value) && path.normalize(value) === value,
+    'Unknown host mount path',
+  );
+  return platform === 'darwin' && value.startsWith('/host_mnt/') ? value.slice('/host_mnt'.length) : value;
+}
+
 // Mirror the published metadata/unknown policy. This proof observes other
 // frontends; it neither stops them nor adds a new nonce/ownership requirement.
 export function referenceFrontendMetadata(port, response, lease) {

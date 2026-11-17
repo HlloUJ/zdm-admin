@@ -786,12 +786,12 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof-core.mjs": {
-      "digest": "07935c030086ac8cbbdabad65496a35cc7473cd0eb0af1bf12b363641c674f40",
+      "digest": "2caf6e64e460ea1d5588c9d235053a6114b71f70c640dc03616a472137305742",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof.mjs": {
-      "digest": "dd5c605ca55caa226d6f795239227a03c24c3b9c230eccd784b3a1d87db90236",
+      "digest": "84223c60576b6945e7fd1bc8dfbd70937fbbd4476a990cf87513db29212df44d",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-cli.mjs",
@@ -812,7 +812,7 @@
       "dynamicImports": 1
     },
     "scripts/delivery-repairs/preview-reference-proof.test.mjs": {
-      "digest": "fb6b612e0ff58b276ee2d1f76dbdce1807896ab6f53153086a1352a8d46e951a",
+      "digest": "f271f0ba975395707b4750e5b57d807a45e8656b9b33ec1d32b29c67a17e39df",
       "imports": [
         "scripts/delivery-repairs/preview-reference-history.mjs",
         "scripts/delivery-repairs/preview-reference-proof-core.mjs",

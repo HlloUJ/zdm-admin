@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, writeFileSync, lstatSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
@@ -15,6 +15,7 @@ import {
   assertStoppedPreviewRound,
   assertStoppedPreviewPair,
   referenceFrontendMetadata,
+  observedHostMountPath,
 } from './preview-reference-proof-core.mjs';
 import {
   readNativePreviewHistory,
@@ -166,6 +167,17 @@ async function captureIdentity(scope, selector, core) {
   const container = JSON.parse(docker('inspect', ids[0]))[0];
   const migration = container.Mounts.find((m) => m.Destination === '/task-migrations');
   assert.ok(migration?.Source);
+  const observedMigrationPath = observedHostMountPath(migration.Source, process.platform);
+  assert.ok(existsSync(observedMigrationPath), 'Actual host migration directory is missing');
+  const observedMigrationStat = lstatSync(observedMigrationPath, { bigint: true });
+  assert.ok(
+    observedMigrationStat.isDirectory() && !observedMigrationStat.isSymbolicLink(),
+    'Unknown host migration source',
+  );
+  const migrationDirectory = realpathSync(observedMigrationPath);
+  const physicalMigrationStat = lstatSync(migrationDirectory, { bigint: true });
+  assert.equal(physicalMigrationStat.dev, observedMigrationStat.dev);
+  assert.equal(physicalMigrationStat.ino, observedMigrationStat.ino);
   const bindings = container.HostConfig.PortBindings?.['8080/tcp'];
   assert.equal(bindings?.length, 1);
   const backendPort = Number(bindings[0].HostPort);
@@ -174,7 +186,7 @@ async function captureIdentity(scope, selector, core) {
     root: task.worktree,
     project,
     backendPort,
-    migrationDirectory: migration.Source,
+    migrationDirectory,
     database: profile.database,
     username: profile.username,
     mediaVolume: profile.mediaVolume,
@@ -187,7 +199,7 @@ async function captureIdentity(scope, selector, core) {
   );
   assert.equal(
     previous.sourceIdentity,
-    runtime.taskBackendSourceIdentity({ root: task.worktree, migrationDirectory: migration.Source }),
+    runtime.taskBackendSourceIdentity({ root: task.worktree, migrationDirectory }),
     'Retained backend source changed',
   );
   const count = data.rootSql(
@@ -249,6 +261,15 @@ async function captureIdentity(scope, selector, core) {
       id: container.Id,
       recordDigest: referenceHash(backendRecord.bytes),
       containerIdentity,
+      mountedMigrationSource: migration.Source,
+      observedMigrationPath,
+      hostMigrationDirectory: migrationDirectory,
+      hostMigrationIdentity: {
+        device: String(physicalMigrationStat.dev),
+        inode: String(physicalMigrationStat.ino),
+        mtimeNs: String(physicalMigrationStat.mtimeNs),
+        ctimeNs: String(physicalMigrationStat.ctimeNs),
+      },
       inventory: { id: container.Id, labels: container.Config.Labels, mounts: container.Mounts },
     },
   };
