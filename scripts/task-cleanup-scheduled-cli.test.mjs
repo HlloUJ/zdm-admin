@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, realpathSync, mkdirSync, writeFileSync, readFileSync, rmSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { runScheduledCleanup } from './task-cleanup-scheduled-cli.mjs';
 function fixture(t, policyPatch = {}) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'cleanup-cycle-')));
@@ -93,4 +94,24 @@ test('missing fixed-channel transport stays notification-unknown rather than com
   const r = await runScheduledCleanup(f.root, { ...f.dependencies, notify: async () => ({ status: 'unknown' }) });
   assert.equal(r.status, 'notification-unknown');
   assert.equal(f.state().firstFailure.notification, 'unknown');
+});
+test('a claimed running slot without matching archived ended-owner proof is never blindly replayed', async (t) => {
+  const f = fixture(t),
+    now = Date.parse('2026-11-17T01:00:00+08:00');
+  writeFileSync(
+    path.join(f.commonDir, 'task-cleanup/scheduler-state.json'),
+    JSON.stringify({
+      version: 1,
+      slot: new Date(now).toISOString(),
+      status: 'running',
+      sourceHead: 'a'.repeat(40),
+      lockToken: randomUUID(),
+      recent: [],
+    }),
+    { mode: 0o600 },
+  );
+  const result = await runScheduledCleanup(f.root, { ...f.dependencies, now });
+  assert.equal(result.status, 'unknown');
+  assert.equal(f.calls.length, 0);
+  assert.match(result.reason, /no exact ended-owner/);
 });

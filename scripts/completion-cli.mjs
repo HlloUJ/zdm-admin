@@ -1,5 +1,6 @@
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
 import { handoffAuditedDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
+import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
 import { assertCleanupUnreferenced } from './task-cleanup-cli.mjs';
 import { captureCiProgress } from './task-delivery-status-sync.mjs';
 import { drainProgressHost } from './task-progress-host.mjs';
@@ -91,8 +92,11 @@ async function completionCommandLocked(
     verifyEvidence = verifyCompletionEvidence,
     previewControl = createCompletionPreviewControl({ execute }),
     runtimeReferences = taskRuntimeReferences,
+    deferSettle = false,
   },
 ) {
+  assert.equal(typeof deferSettle, 'boolean');
+  assert.ok(!deferSettle || args[0] === 'deliver', 'deferSettle only applies to deliver');
   const limits = {
     begin: [0, 1],
     freeze: [0, 0],
@@ -290,6 +294,8 @@ async function completionCommandLocked(
       common,
       inventoryAssets,
       previewControl,
+      deferSettle,
+      readState: () => openCompletion(directory, batch.id, { formal: false }),
       dispatch: (cwd, args) =>
         completionCommandLocked(cwd, args, {
           preserveAssets,
@@ -818,7 +824,33 @@ export async function completionCommand(root, args, options = {}) {
         recoverInterrupted(openCompletion(directory, task.id, { formal: false }), directory);
         return true;
       });
-      return leases.run('task-delivery-' + task.id, task.owner, () => completionCommandLocked(root, args, options));
+      return leases.run('task-delivery-' + task.id, task.owner, async () => {
+        const queue = createTaskDeliveryQueue(registry.commonDir),
+          ticket =
+            args[0] === 'settle'
+              ? queue.inspect().tickets.find((item) => item.task === task.id && item.deferred)
+              : null;
+        if (!ticket) return completionCommandLocked(root, args, options);
+        assert.equal(ticket.owner, task.owner);
+        assert.equal(ticket.accepted, task.frozen?.accepted);
+        assert.equal(ticket.deferred.head, task.recordedHead);
+        assert.equal(ticket.deferred.main, args[2]);
+        assert.equal(ticket.deferred.runId, args[3]);
+        const turn = await queue.wait(ticket);
+        try {
+          const result = await completionCommandLocked(root, args, options);
+          assert.equal(
+            result.deliveryStatus?.formalDeliveryComplete,
+            true,
+            'Deferred settlement did not close formal delivery',
+          );
+          await queue.finish(turn, { success: true });
+          return result;
+        } catch (error) {
+          await queue.finish(turn, { success: false, error });
+          throw error;
+        }
+      });
     });
   }
   if (!['begin', 'freeze', 'deliver', 'final-handoff', 'settle', 'measure'].includes(args[0]))

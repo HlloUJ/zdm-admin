@@ -1,15 +1,6 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import {
-  existsSync,
-  lstatSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  renameSync,
-  unlinkSync,
-  rmdirSync,
-} from 'node:fs';
+import { existsSync, lstatSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanupCommand, loadCleanupPolicy } from './task-cleanup-cli.mjs';
@@ -17,6 +8,7 @@ import { cleanupSlot, CLEANUP_TIMEZONE } from './task-cleanup-schedule.mjs';
 import { createCleanupQueue, safePath } from './task-cleanup-queue.mjs';
 import { verifyCleanupRuntime } from './task-cleanup-runtime.mjs';
 import { flushCleanupNotifications } from './task-cleanup-notification.mjs';
+import { acquireCleanupLock, readRecoveredCleanupLock } from './task-cleanup-lock.mjs';
 
 const save = (file, record) => {
   safePath(file);
@@ -52,11 +44,7 @@ export async function runScheduledCleanup(
   assert.ok(policy.scheduler, 'Explicit scheduler history and summary budgets required');
   const queue = createCleanupQueue(manifest.commonDir),
     base = queue.base;
-  const lock = path.join(base, 'scheduler.lock');
-  safePath(lock);
-  mkdirSync(lock, { mode: 0o700 });
-  const owner = { pid: process.pid, token: randomUUID() };
-  save(path.join(lock, 'owner.json'), owner);
+  const lease = acquireCleanupLock(base, 'scheduler.lock', { source: manifest.sourceHead });
   const file = path.join(base, 'scheduler-state.json'),
     slot = cleanupSlot(now).scheduledAt;
   try {
@@ -73,17 +61,46 @@ export async function runScheduledCleanup(
         'Unknown prior scheduler state',
       );
     }
-    if (state.slot && Date.parse(state.slot) >= Date.parse(slot))
+    let recovered = null;
+    if (state.status === 'running' && state.lockToken) {
+      recovered = readRecoveredCleanupLock(base, 'scheduler.lock', state.lockToken, manifest.sourceHead);
+      if (recovered) {
+        const original = path.join(recovered.archive, 'scheduler-state.interrupted.json');
+        if (existsSync(original)) assert.deepEqual(read(original), state, 'Interrupted scheduler state differs');
+        else save(original, state);
+        state.firstFailure ??= {
+          slot: state.slot,
+          sourceHead: state.sourceHead,
+          status: 'interrupted',
+          startedAt: state.startedAt,
+          observedAt: new Date(now).toISOString(),
+          evidence: recovered.archive,
+        };
+      }
+    }
+    if (
+      state.slot &&
+      (Date.parse(state.slot) > Date.parse(slot) || (state.slot === slot && !(state.status === 'running' && recovered)))
+    )
       return {
         status: state.status === 'running' ? 'unknown' : 'already-ran',
         slot,
-        reason: 'Latest slot already claimed; no duplicate or historical backlog execution',
+        reason:
+          state.status === 'running'
+            ? 'Claimed slot has no exact ended-owner recovery proof; preserve unknown state'
+            : 'Latest slot already claimed; no duplicate or historical backlog execution',
       };
-    const started = { slot, sourceHead: manifest.sourceHead, startedAt: new Date(now).toISOString() };
+    const started = {
+      slot,
+      sourceHead: manifest.sourceHead,
+      startedAt: new Date(now).toISOString(),
+      lockToken: lease.owner.token,
+      ...(recovered ? { recoveredFrom: recovered.archive, interruptedStartedAt: state.startedAt } : {}),
+    };
     save(file, { ...state, ...started, status: 'running' });
     let summary;
     try {
-      const result = await runCleanup(manifest.root, ['run']);
+      const result = await lease.scope(() => runCleanup(manifest.root, ['run']));
       const notices = await notify(queue, { ...adapter, destination: policy.notification?.destination });
       const metadata = policy.metadata
         ? queue.compact({
@@ -129,9 +146,7 @@ export async function runScheduledCleanup(
     save(file, next);
     return summary;
   } finally {
-    assert.deepEqual(read(path.join(lock, 'owner.json')), owner, 'Scheduler lock owner changed; retain');
-    unlinkSync(path.join(lock, 'owner.json'));
-    rmdirSync(lock);
+    lease.release();
   }
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
