@@ -63,7 +63,7 @@ export function retainedDirectoryKeys(round, identity) {
       assert.equal(fd.directory, true);
       assert.equal(fd.vnodeType, 2);
       assert.equal(fd.fileType, 1);
-      assert.equal(fd.openFlags, 1);
+      assert.ok([1, 0x8001].includes(fd.openFlags));
       assert.equal(fd.guardFlags, 0);
       assert.equal(String(fd.device), proof.sourceDevice);
       assert.ok(Number.isSafeInteger(fd.inode) && fd.inode > 0);

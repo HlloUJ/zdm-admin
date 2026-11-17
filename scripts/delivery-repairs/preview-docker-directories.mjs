@@ -130,7 +130,8 @@ export function collectRetainedDockerDirectories(identity, inventory, record) {
       assert.equal(fd.directory, true);
       assert.equal(fd.vnodeType, 2);
       assert.equal(fd.fileType, 1);
-      assert.equal(fd.openFlags, 1, 'Directory handle is not exclusively read-only');
+      // Native SDK FREAD, optionally O_EVTONLY. Neither grants write access.
+      assert.ok([1, 0x8001].includes(fd.openFlags), 'Directory handle is not exclusively read-only');
       assert.equal(fd.guardFlags, 0);
       const observed = details.filter((f) => f.pid === pid && f.descriptor === target.descriptor);
       assert.equal(observed.length, 1);

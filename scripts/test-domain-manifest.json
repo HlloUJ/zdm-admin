@@ -781,7 +781,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-docker-directories.mjs": {
-      "digest": "f1b44f34728337d1110bdde6dd9460327b2b001d3624f2ff948933515d40226c",
+      "digest": "f879a5d3f3aeab0ba43ffd6a992ca2eccb1539eda1991bacad0435aa99f96faf",
       "imports": [
         "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
@@ -800,7 +800,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof-core.mjs": {
-      "digest": "e3d37ad31035acc6ecde641334e53291c3c8a7932178c874d6d0242850cf4fce",
+      "digest": "fb3fc77addc19ddcec8ea1142c36799c47a17fc7aaad856516ca6f1bb00f2e72",
       "imports": [],
       "dynamicImports": 0
     },
@@ -828,7 +828,7 @@
       "dynamicImports": 1
     },
     "scripts/delivery-repairs/preview-reference-proof.test.mjs": {
-      "digest": "f45f2dcd4e569a5d4e8083f24b1790f58a455a24f9e9ecfdccf65ff911568a7b",
+      "digest": "5f2da354d5febe9a9eb6fc51de38592733d99d26e42d7d70ea21e1374e838128",
       "imports": [
         "scripts/delivery-repairs/preview-docker-directories.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",

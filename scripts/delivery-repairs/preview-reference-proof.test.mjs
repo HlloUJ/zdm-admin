@@ -230,6 +230,8 @@ test('retained signed Docker service directory references are preserved and gran
   assertStoppedPreviewRound(r, i, 950);
   assert.equal(fd.nlink, 2);
   assert.equal(r.retainedDirectoryReferences.cleanupAuthorized, false);
+  fd.openFlags = 0x8001; // Actual macOS FREAD | O_EVTONLY watcher flags.
+  assertStoppedPreviewRound(r, i, 950);
 });
 for (const [name, mutate] of [
   ['wrong endpoint', (p) => (p.endpoint.path = '/remote.sock')],
@@ -247,6 +249,7 @@ for (const [name, mutate] of [
   ['not a directory', (p) => (p.services[1].fds[0].directory = false)],
   ['wrong vnode type', (p) => (p.services[1].fds[0].vnodeType = 1)],
   ['writable handle', (p) => (p.services[1].fds[0].openFlags = 3)],
+  ['unknown handle flags', (p) => (p.services[1].fds[0].openFlags = 0x4001)],
   ['unknown kernel result', (p) => (p.services[1].fds[0].returnedSize = 0)],
   ['inode path changed', (p) => p.services[1].fds[0].pathInode++],
   ['unmapped path', (p) => (p.services[1].fds[0].path = '/elsewhere')],
