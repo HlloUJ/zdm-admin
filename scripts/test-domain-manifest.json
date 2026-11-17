@@ -2687,7 +2687,7 @@
       "dynamicImports": 0
     },
     "scripts/task-rebinding.mjs": {
-      "digest": "56706e9dffea86e1531524478b4fec4766fac6407522bb10359fe01d337353a1",
+      "digest": "b00acee03059baf0e867c20cf3dc55f697024daec4556460040700eec3d41ab2",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/task-cancellation-proof.mjs",
@@ -2700,7 +2700,7 @@
       "dynamicImports": 0
     },
     "scripts/task-rebinding.test.mjs": {
-      "digest": "f12d6256325a730af334dca7f84c9d10a29013189c54f811cb10c8c1578e36e8",
+      "digest": "69ba8a7ba3beeb57fd60d838a7084fe8a6481a55455759da582ff47b584fa26a",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/task-board-intake.mjs",
