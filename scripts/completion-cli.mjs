@@ -1,3 +1,16 @@
+import { assertTaskExecutor } from './task-execution-binding.mjs';
+import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
+import { handoffAuditedDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
+import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
+import { assertCleanupUnreferenced } from './task-cleanup-cli.mjs';
+import { captureCiProgress } from './task-delivery-status-sync.mjs';
+import { drainProgressHost } from './task-progress-host.mjs';
+import {
+  handoffBuiltDist,
+  handoffPreservedReportCopies,
+  recordCloseoutCleanupInventory,
+} from './task-cleanup-handoff.mjs';
+import { createExecutionOrder } from './task-execution-order.mjs';
 import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
 import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
@@ -80,8 +93,11 @@ async function completionCommandLocked(
     verifyEvidence = verifyCompletionEvidence,
     previewControl = createCompletionPreviewControl({ execute }),
     runtimeReferences = taskRuntimeReferences,
+    deferSettle = false,
   },
 ) {
+  assert.equal(typeof deferSettle, 'boolean');
+  assert.ok(!deferSettle || args[0] === 'deliver', 'deferSettle only applies to deliver');
   const limits = {
     begin: [0, 1],
     freeze: [0, 0],
@@ -279,6 +295,8 @@ async function completionCommandLocked(
       common,
       inventoryAssets,
       previewControl,
+      deferSettle,
+      readState: () => openCompletion(directory, batch.id, { formal: false }),
       dispatch: (cwd, args) =>
         completionCommandLocked(cwd, args, {
           preserveAssets,
@@ -386,7 +404,19 @@ async function completionCommandLocked(
       ).result;
     }
     const result = (
-      await completionStage(state, 'ci', `${head}:${runId}`, () => waitQuality(root, runId, head), { save })
+      await completionStage(
+        state,
+        'ci',
+        `${head}:${runId}`,
+        () =>
+          waitQuality(root, runId, head, {
+            onProgress: async (progress) => {
+              captureCiProgress(common, batch.id, progress);
+              await drainProgressHost();
+            },
+          }),
+        { save },
+      )
     ).result;
     return {
       runId: result.runId,
@@ -525,9 +555,151 @@ async function completionCommandLocked(
               common,
               main: expectedMain,
             });
-          return existsSync(batch.worktree)
-            ? preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id))
-            : preserved.result;
+          if (!existsSync(batch.worktree)) return preserved.result;
+          const cleanupHandoff =
+            batch.taskRegistryVersion === 2
+              ? await handoffBuiltDist({
+                  root: batch.worktree,
+                  common,
+                  task: batch.id,
+                  proof: {
+                    worktree: batch.worktree,
+                    head: batch.recordedHead,
+                    accepted: readAcceptance(anchor, batch.id).commit,
+                    main: expectedMain,
+                  },
+                  assertUnreferenced: async () => {
+                    const task = createTaskRegistry(anchor).readTask(batch.id);
+                    const references = await runtimeReferences(task);
+                    assert.equal(references.owned.length, 0, 'Task frontend still references generated output');
+                    assert.equal(references.backendPorts.length, 0, 'Task backend still references generated output');
+                    if (previewControl.assertCleanupSafe)
+                      await previewControl.assertCleanupSafe({
+                        anchor,
+                        task: batch.worktree,
+                        preview,
+                        common,
+                        main: expectedMain,
+                      });
+                  },
+                })
+              : { state: 'retained', reason: 'Legacy task outputs remain protected' };
+          const createdHandoffs =
+            batch.taskRegistryVersion === 2
+              ? await handoffCreatedArtifacts({
+                  root: batch.worktree,
+                  common,
+                  task: batch.id,
+                  proof: {
+                    worktree: batch.worktree,
+                    head: batch.recordedHead,
+                    accepted: readAcceptance(anchor, batch.id).commit,
+                    main: expectedMain,
+                  },
+                  assertUnreferenced: async (record) => {
+                    const current = createTaskRegistry(anchor).readTask(batch.id),
+                      references = await runtimeReferences(current);
+                    assert.equal(references.owned.length, 0, 'Task frontend still references created artifacts');
+                    assert.equal(references.backendPorts.length, 0, 'Task backend still references created artifacts');
+                    if (previewControl.assertCleanupSafe)
+                      await previewControl.assertCleanupSafe({
+                        anchor,
+                        task: batch.worktree,
+                        preview,
+                        common,
+                        main: expectedMain,
+                      });
+                    assertCleanupUnreferenced(record);
+                  },
+                })
+              : { registered: false, handedOff: [], protected: [] };
+          const dependencyHandoffs =
+            batch.taskRegistryVersion === 2
+              ? await handoffAuditedDependencies({
+                  root: batch.worktree,
+                  common,
+                  task: batch.id,
+                  proof: {
+                    worktree: batch.worktree,
+                    head: batch.recordedHead,
+                    accepted: readAcceptance(anchor, batch.id).commit,
+                    main: expectedMain,
+                  },
+                  assertUnreferenced: async (record) => {
+                    const current = createTaskRegistry(anchor).readTask(batch.id),
+                      references = await runtimeReferences(current);
+                    assert.equal(references.owned.length, 0, 'Task frontend still references private dependencies');
+                    assert.equal(
+                      references.backendPorts.length,
+                      0,
+                      'Task backend still references private dependencies',
+                    );
+                    if (previewControl.assertCleanupSafe)
+                      await previewControl.assertCleanupSafe({
+                        anchor,
+                        task: batch.worktree,
+                        preview,
+                        common,
+                        main: expectedMain,
+                      });
+                    assertCleanupUnreferenced(record);
+                  },
+                })
+              : { registered: false, handedOff: [], protected: [] };
+          const preservedAssets = preserveAssets(batch.worktree, path.join(common, 'task-assets', batch.id));
+          const reportHandoffs =
+            batch.taskRegistryVersion === 2
+              ? await handoffPreservedReportCopies({
+                  root: batch.worktree,
+                  common,
+                  task: batch.id,
+                  proof: {
+                    worktree: batch.worktree,
+                    head: batch.recordedHead,
+                    accepted: readAcceptance(anchor, batch.id).commit,
+                    main: expectedMain,
+                  },
+                  preserved: preservedAssets,
+                  assertUnreferenced: async () => {
+                    const task = createTaskRegistry(anchor).readTask(batch.id);
+                    const references = await runtimeReferences(task);
+                    assert.equal(references.owned.length, 0, 'Task frontend still references reports');
+                    assert.equal(references.backendPorts.length, 0, 'Task backend still references reports');
+                    if (previewControl.assertCleanupSafe)
+                      await previewControl.assertCleanupSafe({
+                        anchor,
+                        task: batch.worktree,
+                        preview,
+                        common,
+                        main: expectedMain,
+                      });
+                  },
+                })
+              : [];
+          const cleanupInventory = recordCloseoutCleanupInventory({
+            root: batch.worktree,
+            common,
+            task: batch.id,
+            proof: {
+              worktree: batch.worktree,
+              head: batch.recordedHead,
+              accepted: readAcceptance(anchor, batch.id).commit,
+              main: expectedMain,
+            },
+            preserved: preservedAssets,
+            distHandoff: cleanupHandoff,
+            reportHandoffs,
+            createdHandoffs,
+            dependencyHandoffs,
+          });
+          return {
+            ...preservedAssets,
+            cleanupHandoff,
+            reportHandoffs,
+            createdHandoffs,
+            dependencyHandoffs,
+            cleanupInventory,
+          };
         },
       },
       cleanup: {
@@ -617,14 +789,33 @@ export async function completionCommand(root, args, options = {}) {
     ? args[1]
     : null;
   const task = explicit ? registry.readTask(explicit) : selectedTaskBatch(root);
+  const orderReadOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
+  // Before private-lease recovery, freeze, automatic session restoration, or any external effect.
+  // Even legacy/unregistered mutation is denied when the explicit policy is active.
+  const executionOrder = createExecutionOrder(registry.commonDir);
+  if (task && !orderReadOnly)
+    assertTaskExecutor(
+      task,
+      options.owner ?? process.env.CODEX_THREAD_ID,
+      'Completion must belong to the exact current chat/task',
+    );
+  if (!orderReadOnly && executionOrder.read()) {
+    assert.ok(task, 'No registered execution-order task; do not adopt legacy work');
+    executionOrder.assertAdmission({
+      lane: 'delivery',
+      task: task.id,
+      owner: task.owner,
+      admission: process.env.ZDM_EXECUTION_ADMISSION,
+    });
+  }
   if (task) {
     assert.ok(!task.previewOnly, 'Temporary combined previews cannot enter formal completion');
     assert.ok(!task.compatibility?.readOnly, 'Legacy frozen task remains on its reviewed recovery path');
     const readOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
     if (!readOnly)
-      assert.equal(
+      assertTaskExecutor(
+        task,
         options.owner ?? process.env.CODEX_THREAD_ID,
-        task.owner,
         'Completion must belong to the exact current chat/task',
       );
     return withTaskContext({ id: task.id, commonDir: registry.commonDir, owner: task.owner }, async () => {
@@ -640,7 +831,33 @@ export async function completionCommand(root, args, options = {}) {
         recoverInterrupted(openCompletion(directory, task.id, { formal: false }), directory);
         return true;
       });
-      return leases.run('task-delivery-' + task.id, task.owner, () => completionCommandLocked(root, args, options));
+      return leases.run('task-delivery-' + task.id, task.owner, async () => {
+        const queue = createTaskDeliveryQueue(registry.commonDir),
+          ticket =
+            args[0] === 'settle'
+              ? queue.inspect().tickets.find((item) => item.task === task.id && item.deferred)
+              : null;
+        if (!ticket) return completionCommandLocked(root, args, options);
+        assert.equal(ticket.owner, task.owner);
+        assert.equal(ticket.accepted, task.frozen?.accepted);
+        assert.equal(ticket.deferred.head, task.recordedHead);
+        assert.equal(ticket.deferred.main, args[2]);
+        assert.equal(ticket.deferred.runId, args[3]);
+        const turn = await queue.wait(ticket);
+        try {
+          const result = await completionCommandLocked(root, args, options);
+          assert.equal(
+            result.deliveryStatus?.formalDeliveryComplete,
+            true,
+            'Deferred settlement did not close formal delivery',
+          );
+          await queue.finish(turn, { success: true });
+          return result;
+        } catch (error) {
+          await queue.finish(turn, { success: false, error });
+          throw error;
+        }
+      });
     });
   }
   if (!['begin', 'freeze', 'deliver', 'final-handoff', 'settle', 'measure'].includes(args[0]))

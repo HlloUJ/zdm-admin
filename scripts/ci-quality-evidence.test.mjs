@@ -1,3 +1,4 @@
+import { deliveryStandardPlan } from './delivery-standard.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { spawnSync } from 'node:child_process';
@@ -344,6 +345,12 @@ function scopeFixture(files = ['README.md']) {
       identity,
       files,
       classification: classifyChangedFiles(files, { engineeringProof }),
+      standard: deliveryStandardPlan({
+        files,
+        impact: classifyChangedFiles(files, { engineeringProof }),
+        candidate: identity.candidateSha,
+        base: identity.baseSha,
+      }),
       proof: 'verified',
       problem: null,
     },
@@ -407,6 +414,12 @@ test('applicable domains and fallback scopes cannot turn missing execution into 
   };
   assert.throws(() => domainApplicable(needs, scope, 'frontend', identity));
   const fallback = { ...scope, proof: 'fallback', files: [], classification: classifyChangedFiles([]) };
+  fallback.standard = deliveryStandardPlan({
+    files: [],
+    impact: fallback.classification,
+    candidate: identity.candidateSha,
+    base: identity.baseSha,
+  });
   assert.throws(() => domainApplicable(needs, fallback, 'frontend', identity));
 });
 
@@ -517,6 +530,12 @@ test('engineering forwarding CLI checks actual checkout, run, producer and repor
   const event = { after: candidate, before: identity.baseSha };
   Object.assign(identity, { candidateSha: candidate, sourceHeadSha: candidate, treeSha: tree });
   scope.identity = identity;
+  scope.standard = deliveryStandardPlan({
+    files: scope.files,
+    impact: scope.classification,
+    candidate: identity.candidateSha,
+    base: identity.baseSha,
+  });
   const files = scriptTestFiles(process.cwd(), 'engineering');
   const metadata = {
     ...identity,

@@ -9,10 +9,6 @@ import { Writable } from 'node:stream';
 import { fileURLToPath } from 'node:url';
 import { captureIdentity, captureArtifacts, captureSource, verificationAttempts } from './verification-evidence.mjs';
 import { createVerificationReporter, runVerificationTask } from './verification-runner.mjs';
-import { createAdmissionBroker } from './task-resource-broker.mjs';
-import { initialSchedulerState } from './task-resource-scheduler.mjs';
-import { createScheduledVerification } from './task-resource-verification.mjs';
-import { schedulerNotices } from './task-resource-event-link.mjs';
 import { collectDeliveryChanges, createVerificationPlan, executeVerification } from './verify.mjs';
 
 function fixture(t) {
@@ -662,12 +658,12 @@ test('format failure stops early; runtime is sequential; two pipelines preserve 
       ...silent,
       run: async (step) => {
         calls.push(step.name);
-        return { exitCode: 1 };
+        return { exitCode: step.name === 'format check' ? 1 : 0 };
       },
     }),
     1,
   );
-  assert.deepEqual(calls, ['format check']);
+  assert.deepEqual(calls, ['delivery input contracts', 'format check']);
   calls.length = 0;
   const code = await executeVerification(plan, {
     ...silent,
@@ -677,7 +673,8 @@ test('format failure stops early; runtime is sequential; two pipelines preserve 
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(calls.slice(0, 4), [
+  assert.deepEqual(calls.slice(0, 5), [
+    'delivery input contracts',
     'format check',
     'backend test discovery',
     'CI reuse contract preflight',
@@ -820,8 +817,9 @@ test('a real scoped command failure stays blocked after an unrelated candidate c
   assert.equal(record(forced).firstFailure.attemptId, failed.attemptId);
 });
 
-test('failed CI contract preflight prevents expensive checks and runtime actions', async () => {
-  const plan = createVerificationPlan({ root: '/fixture', runtime: true });
+test('failed CI contract preflight prevents expensive checks and runtime actions', async (t) => {
+  const { root } = fixture(t);
+  const plan = createVerificationPlan({ root, runtime: true });
   const called = [];
   const code = await executeVerification(plan, {
     capture: () => ({ digest: 'fixed', baseline: 'base', mergeBase: 'base', mutationStamp: 'fixed' }),
@@ -832,8 +830,13 @@ test('failed CI contract preflight prevents expensive checks and runtime actions
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(called, ['format check', 'backend test discovery', 'CI reuse contract preflight']);
-  const ordinary = createVerificationPlan({ root: '/fixture', affected: true, files: ['src/views/ExampleView.vue'] });
+  assert.deepEqual(called, [
+    'delivery input contracts',
+    'format check',
+    'backend test discovery',
+    'CI reuse contract preflight',
+  ]);
+  const ordinary = createVerificationPlan({ root, affected: true, files: ['src/views/ExampleView.vue'] });
   assert.equal(ordinary.contractPreflight, null);
 });
 
@@ -925,48 +928,6 @@ test('advisory spawn observer only sees real execution; reuse and first-failure 
   assert.equal(second.executed, false);
   assert.equal(started.length, 2);
 });
-
-test('real lightweight verifier spawn flows through admission broker to one start event', async (t) => {
-  const { root } = fixture(t);
-  let saved = initialSchedulerState(),
-    clock = 0;
-  const G = 1024 ** 3;
-  const broker = createAdmissionBroker({
-    store: {
-      read: () => structuredClone(saved),
-      write: (s) => {
-        saved = structuredClone(s);
-      },
-    },
-    budget: () => ({ macPeakBytes: G, dockerPeakBytes: 0 }),
-    validateEvidence: (r) => r.exitCode === 0 && !!r.evidence,
-    now: () => clock,
-  });
-  const run = createScheduledVerification({ taskId: 'isolated-921', broker });
-  const pending = run(task(root, 'setTimeout(() => process.exit(0), 150)'), silent);
-  await new Promise((resolve) => setImmediate(resolve));
-  const sample = () => ({
-    at: clock,
-    macAvailableBytes: 10 * G,
-    dockerAvailableBytes: 6 * G,
-    diskAvailableBytes: 20 * G,
-    cpuBusyPercent: 10,
-    memoryPressure: false,
-    swapGrowing: false,
-    ioCongested: false,
-  });
-  broker.tick(sample());
-  clock = 60000;
-  broker.tick(sample());
-  const result = await pending;
-  assert.equal(result.exitCode, 0);
-  assert.equal(result.spawnObservationError, undefined);
-  const notices = schedulerNotices(broker.snapshot(), () => ({ stableId: 'isolated-921', label: '921 test' }));
-  assert.equal(notices.length, 1);
-  assert.equal(saved.jobs[0].status, 'done');
-  assert.ok(saved.jobs[0].spawnProof.startTime);
-});
-
 test('engineering outer proof tracks the same full Git configuration as inner diagnostics without bypassing failure history', async (t) => {
   const { root, git } = fixture(t);
   const command = task(root, failFirstScript);

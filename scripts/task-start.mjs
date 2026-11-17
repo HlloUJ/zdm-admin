@@ -1,4 +1,13 @@
 import { observeBinding, observeEntry } from './parallel-task-timing.mjs';
+import { createBoardIntake } from './task-board-intake.mjs';
+import './task-network.mjs';
+import { assertTaskExecutor, executionBinding } from './task-execution-binding.mjs';
+import { createExecutionOrder } from './task-execution-order.mjs';
+import {
+  requireStartMonitoring,
+  verifyStartMonitoringReadback,
+  verifyMonitoringInstruction,
+} from './task-monitor-registration.mjs';
 import { prepareTaskArtifacts } from './task-artifacts.mjs';
 import { tmpdir } from 'node:os';
 import assert from 'node:assert/strict';
@@ -32,10 +41,17 @@ export function parseTaskStart(args) {
       options.resume = true;
       continue;
     }
-    const key = { '--slug': 'slug', '--kind': 'kind', '--owner': 'owner', '--task-parent': 'taskParent' }[value];
+    const key = {
+      '--slug': 'slug',
+      '--kind': 'kind',
+      '--owner': 'owner',
+      '--task-parent': 'taskParent',
+      '--monitor-context': 'monitorContext',
+    }[value];
     assert.ok(key && args[i + 1] && !args[i + 1].startsWith('--'), 'Unknown task option or missing value: ' + value);
     options[key] = args[++i];
   }
+  if (options.monitorContext !== undefined) options.monitorContext = JSON.parse(options.monitorContext);
   if (options.slug) {
     assert.match(options.slug, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     assert.ok(options.slug.length <= 64, 'Task id too long');
@@ -55,7 +71,15 @@ export function startParallelTask(
 ) {
   root = realpathSync(root);
   const owner = options.owner || process.env.CODEX_THREAD_ID;
+  const registered = options.slug ? registry.readTask(options.slug) : registry.resolve({ worktree: root });
+  const binding = registered && executionBinding(registered);
+  if (binding) {
+    assertTaskExecutor(registered);
+    assert.equal(owner, binding.executor, 'Start must name the actual bound executor');
+    assert.deepEqual(options.monitorContext, binding.monitoring, 'Exact current execution monitoring required');
+  }
   function ready(result) {
+    result.task = verifyStartMonitoringReadback(registry, result.task, options.monitorContext);
     result.artifacts = observeEntry(
       { command: 'measure', originalArgs: ['dependencies'], cwd: result.task.worktree },
       registry,
@@ -79,19 +103,36 @@ export function startParallelTask(
     typeof owner === 'string' && owner.trim(),
     'Explicit task owner required when execution identity is unavailable',
   );
+  if (!binding && ['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface))
+    createBoardIntake(registry.commonDir).require(options.monitorContext, options.slug, owner);
+  // The explicit root-thread receipt/claim precedes worktree creation or restoration.
+  const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;
+  const admission = createExecutionOrder(registry.commonDir).assertAdmission({
+    lane: 'development',
+    task: orderedTask,
+    owner: binding ? registered.owner : owner,
+    admission: process.env.ZDM_EXECUTION_ADMISSION,
+  });
+  if (admission.ticket?.executionKind !== undefined)
+    assert.equal(options.kind, admission.ticket.executionKind, 'Start kind differs from the authorized task');
   if (!options.slug) {
     const task = registry.resolve({ worktree: root });
-    assert.equal(task.owner, owner, 'Another owner controls this task');
+    assertTaskExecutor(task, owner, 'Another owner controls this task');
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   const existing = registry.readTask(options.slug);
   if (existing) {
-    assert.equal(existing.owner, owner, 'Another owner controls this task');
+    assertTaskExecutor(existing, owner, 'Another owner controls this task');
     assert.equal(existing.kind, options.kind, 'Task kind differs');
     const task = registry.resolve({ id: options.slug });
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   assert.ok(!options.resume, 'Task is not registered; do not adopt an unknown branch or worktree');
+  requireStartMonitoring(owner, options.slug, options.monitorContext); // Before any resource or worktree mutation.
+  if (admission.active) {
+    verifyMonitoringInstruction(options.monitorContext, admission.ticket);
+    assert.ok(admission.ticket.monitorContext, 'New task admission lacks monitoring binding; inspect original claim');
+  }
   const entries = registeredTaskWorktrees(root),
     mains = entries.filter((x) => x.branch === 'main');
   assert.equal(mains.length, 1, 'Exact main anchor required');
@@ -156,7 +197,13 @@ export function startParallelTask(
     git(anchor, 'worktree', 'add', '-b', branch, target, base);
     record.state = 'worktree-created';
     writeFileSync(intent, JSON.stringify(record, null, 2) + '\n');
-    const task = registry.register({ id: options.slug, worktree: target, owner, kind: options.kind });
+    const task = registry.register({
+      id: options.slug,
+      worktree: target,
+      owner,
+      kind: options.kind,
+      monitorContext: options.monitorContext,
+    });
     record.state = 'registered';
     writeFileSync(intent, JSON.stringify(record, null, 2) + '\n');
     result = { task, resumed: false, previewSwitched: false, remoteFetched: true, remoteMain: base };
@@ -169,7 +216,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseTaskStart(args);
   if (options.help) {
     console.log(
-      'Usage: task:start -- --slug <task-id> --owner <owner> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services.',
+      'Usage: task:start -- --slug <task-id> --owner <owner> --monitor-context <json> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services.',
     );
     return;
   }

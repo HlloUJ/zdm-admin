@@ -1,3 +1,4 @@
+import { deliveryStandardRule, deliveryStandardAvailable } from './delivery-standard.mjs';
 import { businessImpact } from './business-regression.mjs';
 import { isRuntimeFile } from './runtime-file-scope.mjs';
 import { engineeringOnlyProof } from './engineering-impact.mjs';
@@ -24,25 +25,51 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
     reasons: [],
   };
   const engineeringScope = engineeringOnlyProof(root, files);
-  let docs = false;
-  const full = (reason, runtime) => {
+  let docs = false,
+    controlDocument = false;
+  const full = (reason, runtime, uncertainty = null) => {
     result.frontend = result.backend = result.engineering = result.full = true;
     result.runtime ||= runtime;
     result.reasons.push(reason);
+    if (uncertainty) {
+      result.scopeUncertainty ??= [];
+      result.scopeUncertainty.push({ code: uncertainty, reason });
+    }
   };
+  if (!deliveryStandardAvailable) {
+    full('Unified standard unavailable; complete fallback required.', false, 'standard-unavailable');
+    return result;
+  }
   if (!Array.isArray(files) || files.length === 0) {
-    full('无法证明有效变更范围，执行前后端完整门禁。', false);
+    full('无法证明有效变更范围，执行前后端完整门禁。', false, 'diff-scope-unproven');
     return result;
   }
   if (businessImpact(root, files).length) full('实际反向调用链关联商品跨端业务契约。', false);
   for (const original of [...new Set(files)]) {
     if (typeof original !== 'string' || !original || /^(?:\/|[A-Za-z]:)|(?:^|[/\\])\.\.(?:[/\\]|$)/.test(original)) {
-      full('路径不明确，执行前后端完整门禁。', false);
+      full('路径不明确，执行前后端完整门禁。', false, 'invalid-path');
       continue;
     }
     const file = original.replaceAll('\\', '/').replace(/^\.\//, '');
     if (DOC.test(file)) {
       docs = true;
+      const rule = deliveryStandardRule(file);
+      if (rule.level !== 'R0') {
+        controlDocument = true;
+        if (rule.id === 'security-and-important-data' || !rule.domains?.length)
+          full(
+            'Rule document with sensitive or unknown consumers: ' + file,
+            false,
+            rule.id === 'security-and-important-data' ? null : 'document-consumers-unproven',
+          );
+        else for (const domain of rule.domains) result[domain] = true;
+        result.engineering ||= rule.engineering === true;
+        result.reasons.push('Consumed rule document: ' + file);
+      }
+      continue;
+    }
+    if (/\.(?:css|scss|less)$/.test(file) && deliveryStandardRule(file, { root }).id === 'unknown') {
+      full('Stylesheet consumer scope is unproven: ' + file, false, 'stylesheet-consumers-unproven');
       continue;
     }
     const runtime = isRuntimeFile(file);
@@ -80,10 +107,10 @@ export function classifyChangedFiles(files, { engineeringProof = { proven: false
     } else if (FRONTEND_CONFIG.test(file) || file === 'index.html') {
       full(`前端执行配置：${file}`, false);
     } else {
-      full(`依赖、CI、验证工具或未知路径：${file}；未据此推断重挂运行环境。`, false);
+      full(`依赖、CI、验证工具或未知路径：${file}；未据此推断重挂运行环境。`, false, 'transitive-impact-unproven');
     }
   }
-  result.docsOnly = docs && !result.frontend && !result.backend && !engineeringScope.proven;
+  result.docsOnly = docs && !controlDocument && !result.frontend && !result.backend && !engineeringScope.proven;
   if (result.docsOnly) result.reasons.push('仅文档及明确的文档资产；执行格式检查。');
   return result;
 }

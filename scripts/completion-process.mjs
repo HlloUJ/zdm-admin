@@ -38,7 +38,14 @@ catch (error) {
   record.status = 'exited'; record.exitCode = 1; record.signal = null;
   publish(); process.stderr.write(error.message + '\\n'); process.exit(1);
 }
-child.once('spawn', () => { publish(); });
+child.once('spawn', () => {
+  publish();
+  // Notification is advisory: the parent may disappear between this check and send.
+  // The callback consumes asynchronous IPC errors; catch covers synchronous ones.
+  if (process.send && process.connected) {
+    try { process.send({ token, childPid: child.pid }, () => {}); } catch {}
+  }
+});
 child.once('error', (error) => { process.stderr.write(error.message + '\\n'); });
 child.once('close', (code, signal) => {
   record.status = 'exited'; record.exitCode = code ?? 1; record.signal = signal;
@@ -70,6 +77,7 @@ export function runCompletionProcess(command, args, options = {}) {
 }
 export function startCompletionProcess(command, args, options = {}) {
   assert.ok(!options.timeout && !options.signal, 'Owned group processes must be stopped through stopCompletionProcess');
+  const { onCommandSpawn, ...spawnOptions } = options;
   const current = scope.getStore();
   assert.ok(current, 'Long-lived validation process requires its exact completion stage');
   const { state, event, save } = current,
@@ -84,10 +92,24 @@ export function startCompletionProcess(command, args, options = {}) {
     process.execPath,
     ['--input-type=module', '-e', supervisor, file, token, 'group', command, ...args],
     {
-      ...options,
+      ...spawnOptions,
+      ...(onCommandSpawn ? { stdio: [...(spawnOptions.stdio ?? ['pipe', 'pipe', 'pipe']), 'ipc'] } : {}),
       detached: true,
     },
   );
+  if (onCommandSpawn) {
+    let observed = false;
+    child.on('message', (message) => {
+      if (observed || message?.token !== token || !Number.isSafeInteger(message.childPid) || message.childPid <= 1)
+        return;
+      observed = true;
+      try {
+        Promise.resolve(onCommandSpawn({ pid: message.childPid })).catch(() => {});
+      } catch {
+        /* Advisory observers cannot change command results. */
+      }
+    });
+  }
   child.completionProof = { directory, token, file };
   return child;
 }

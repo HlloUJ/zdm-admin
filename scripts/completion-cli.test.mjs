@@ -442,9 +442,8 @@ test('pending integration push resumes only the exact owned local commit without
   assert.equal(f.git(f.integration, 'rev-parse', 'origin/codex/integration-current'), head);
   assert.equal(f.launches(), 1);
 });
-test('authorized delivery chain directly awaits CI and finishes handoff/cleanup without an extra watcher', async (t) => {
-  const f = fixture(t),
-    execute = f.options.execute;
+function configureDeliveryFlow(f) {
+  const execute = f.options.execute;
   const waits = [];
   const pull = {
     number: 7,
@@ -485,6 +484,11 @@ test('authorized delivery chain directly awaits CI and finishes handoff/cleanup 
       branch: run === '41' ? 'codex/task' : 'main',
     };
   };
+  return waits;
+}
+test('authorized delivery chain directly awaits CI and finishes handoff/cleanup without an extra watcher', async (t) => {
+  const f = fixture(t),
+    waits = configureDeliveryFlow(f);
   const result = await completionCommand(f.task, ['deliver', 'example', f.head], f.options);
   assert.deepEqual(waits, ['41', '42']);
   assert.equal(result.results.cleanup.result.worktreeRemoved, true);
@@ -494,6 +498,64 @@ test('authorized delivery chain directly awaits CI and finishes handoff/cleanup 
   );
 });
 
+test('explicit defer returns after exact main CI and handoff, then existing settle closes without rerunning them', async (t) => {
+  const f = fixture(t),
+    waits = configureDeliveryFlow(f);
+  f.options.deferSettle = true;
+  const deferred = await completionCommand(f.task, ['deliver', 'example', f.head], f.options);
+  assert.equal(deferred.status, 'deferred');
+  assert.equal(deferred.formalDeliveryComplete, false);
+  assert.equal(deferred.reason, '外部周期验收待完成');
+  assert.deepEqual(waits, ['41', '42']);
+  assert.ok(existsSync(f.task));
+  assert.ok(readActiveBatch(f.task));
+  const file = path.join(f.common, 'task-delivery/example/completion-session.json'),
+    before = JSON.parse(readFileSync(file));
+  assert.equal(before.closedAt, undefined);
+  assert.ok(!before.events.some((e) => ['preserve', 'cleanup', 'close'].includes(e.name)));
+  assert.equal(
+    (await completionCommand(f.task, ['status', 'example'], { ...f.options, deferSettle: false }))
+      .formalDeliveryComplete,
+    false,
+  );
+  const finalHandoffs = before.events.filter((e) => e.name === 'handoff' && e.key === f.main + ':final').length;
+  const settled = await completionCommand(f.task, ['settle', 'example', f.main, '42'], {
+    ...f.options,
+    deferSettle: false,
+  });
+  assert.equal(settled.deliveryStatus.formalDeliveryComplete, true);
+  assert.deepEqual(waits, ['41', '42']);
+  const after = JSON.parse(readFileSync(file));
+  assert.equal(after.events.filter((e) => e.name === 'handoff' && e.key === f.main + ':final').length, finalHandoffs);
+});
+for (const failure of ['main-ci', 'handoff'])
+  test('defer cannot return through failed ' + failure, async (t) => {
+    const f = fixture(t);
+    configureDeliveryFlow(f);
+    f.options.deferSettle = true;
+    if (failure === 'main-ci') {
+      const wait = f.options.waitQuality;
+      f.options.waitQuality = async (...args) => {
+        if (args[1] === '42') throw Error('main CI failed');
+        return wait(...args);
+      };
+    } else {
+      const check = f.options.checkRuntime;
+      let calls = 0;
+      f.options.checkRuntime = async (...args) => {
+        if (++calls > 1) throw Error('handoff failed');
+        return check(...args);
+      };
+    }
+    await assert.rejects(
+      completionCommand(f.task, ['deliver', 'example', f.head], f.options),
+      /main CI failed|handoff failed/,
+    );
+    const state = JSON.parse(readFileSync(path.join(f.common, 'task-delivery/example/completion-session.json')));
+    assert.equal(state.deferredSettlement, undefined);
+    assert.equal(state.closedAt, undefined);
+    assert.ok(existsSync(f.task));
+  });
 test('closed registry can reconstruct receipt when the close-stage completion write was interrupted', async (t) => {
   const f = fixture(t);
   await prepare(f);
