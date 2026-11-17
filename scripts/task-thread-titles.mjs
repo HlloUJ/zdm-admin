@@ -50,6 +50,42 @@ export function threadTitle(board) {
   assert.match(number ?? '', /^\d{3}$/, 'Board-generated current or historical number required');
   return `${number}｜${board.title}`;
 }
+// Validate the original native creation event without rewriting it as a user message.
+export function verifyNativeCreation(record, actual) {
+  assert.match(record.threadId, THREAD_ID);
+  assert.match(record.rootThreadId, THREAD_ID);
+  assert.notEqual(record.threadId, record.rootThreadId);
+  assert.equal(actual.thread.id, record.threadId, 'Exact native creation thread required');
+  assert.ok(text(record.creationPrompt) && text(record.createRequestId));
+  assert.ok(
+    record.creationPrompt.includes(`创建标识：${record.createRequestId}\n`),
+    'Durable creation nonce must match the original prompt',
+  );
+  const provenance = actual.turns
+    ?.flatMap((turn) => turn.items ?? [])
+    .find((item) => {
+      if (!item.id) return false;
+      if (item.type === 'userMessage')
+        return item.content?.some(
+          (part) =>
+            part.type === 'text' && (part.text === record.creationPrompt || part.text === record.creationPrompt + '\n'),
+        );
+      if (
+        item.type !== 'functionCallOutput' ||
+        item.namespace !== 'codex_app' ||
+        item.name !== 'create_thread' ||
+        item.output?.truncated !== false ||
+        typeof item.output.text !== 'string'
+      )
+        return false;
+      const delegation = item.output.text.match(
+        /^<codex_delegation>\n {2}<source_thread_id>([^<]+)<\/source_thread_id>\n {2}<input>([\s\S]*)<\/input>\n<\/codex_delegation>$/,
+      );
+      return delegation?.[1] === record.rootThreadId && delegation[2] === record.creationPrompt;
+    });
+  assert.ok(provenance?.id, 'Native thread must read back this exact task creation instruction');
+  return provenance;
+}
 export function taskThreadPolicy(commonDir) {
   const file = path.join(commonDir, 'task-thread-titles', 'policy.json');
   safe(file);
@@ -273,19 +309,7 @@ export function createTaskThreadTitles(commonDir) {
       );
       assert.notEqual(record.threadId, record.rootThreadId, 'Task cannot rename or adopt the coordinator');
       const actual = await host.readThread(record.threadId);
-      assert.equal(actual.thread.id, record.threadId);
-      const provenance = actual.turns
-        ?.flatMap((turn) => turn.items ?? [])
-        .find(
-          (item) =>
-            item.type === 'userMessage' &&
-            item.content?.some(
-              (part) =>
-                part.type === 'text' &&
-                (part.text === record.creationPrompt || part.text === record.creationPrompt + '\n'),
-            ),
-        );
-      assert.ok(provenance?.id, 'Native thread must read back this exact task creation instruction');
+      const provenance = verifyNativeCreation(record, actual);
       const execution = existingExecution(input.taskId);
       if (execution?.ticket?.awaitingNativeWorker) assertPending(input, execution);
       else if (execution) {

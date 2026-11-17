@@ -10,6 +10,7 @@ import { advanceTaskThread } from './task-thread-host-bridge.mjs';
 import { createProgressOutbox } from './task-progress-outbox.mjs';
 import { syncCodexCycle, planCycleThreadTitle } from './task-codex-cycle.mjs';
 import {
+  verifyNativeCreation,
   TASK_THREAD_MODE,
   threadTitle,
   taskThreadPolicy,
@@ -456,4 +457,99 @@ test('native title plan never hides an unsent receipt or reports cycle confirmat
   assert.equal(planned.threadTitle.status, 'native-readback-required');
   assert.equal(planned.outboxes[0].remaining, 1);
   assert.equal(createProgressOutbox(directory).read().pending.length, 1);
+});
+
+function nativeCreation(record) {
+  return {
+    thread: { id: record.threadId },
+    turns: [
+      {
+        items: [
+          {
+            type: 'functionCallOutput',
+            id: 'fco-real-create',
+            namespace: 'codex_app',
+            name: 'create_thread',
+            output: {
+              text: `<codex_delegation>\n  <source_thread_id>${record.rootThreadId}</source_thread_id>\n  <input>${record.creationPrompt}</input>\n</codex_delegation>`,
+              truncated: false,
+            },
+          },
+        ],
+      },
+    ],
+  };
+}
+test('native create delegation binds and starts through the existing host flow, preserving raw provenance', async (t) => {
+  const f = fixture(t);
+  const create = f.host.createThread;
+  f.host.createThread = async (plan) => {
+    const result = await create(plan);
+    f.actual().turns = nativeCreation({
+      threadId: worker,
+      rootThreadId: coordinator,
+      creationPrompt: plan.prompt,
+    }).turns;
+    return result;
+  };
+  const result = await prepared(f);
+  const record = f.store.get(f.input.taskId);
+  assert.deepEqual(record.creationObservation, f.actual().turns[0].items[0]);
+  assert.equal(record.creationObservation.type, 'functionCallOutput');
+  assert.equal(record.creationMessageId, 'fco-real-create');
+  process.env.CODEX_THREAD_ID = worker;
+  assert.equal((await startIndependentCodexTask(result.workerInput, f.host)).task.owner, worker);
+  assert.deepEqual(f.counts(), { creates: 1, renames: 0, starts: 1 });
+});
+test('native creation verification rejects wrong identity, missing marker, nonce, truncation and dispatch-only events', () => {
+  const record = {
+    threadId: worker,
+    rootThreadId: coordinator,
+    createRequestId: 'original-nonce',
+    creationPrompt: 'exact original\n创建标识：original-nonce\nwait',
+  };
+  const actual = nativeCreation(record);
+  assert.equal(verifyNativeCreation(record, actual), actual.turns[0].items[0]);
+  const mutations = [
+    (x) => {
+      x.thread.id = coordinator;
+    },
+    (x) => {
+      x.turns[0].items[0].namespace = 'other';
+    },
+    (x) => {
+      x.turns[0].items[0].name = 'send_message_to_thread';
+    },
+    (x) => {
+      x.turns[0].items[0].output.truncated = true;
+    },
+    (x) => {
+      delete x.turns[0].items[0].output.truncated;
+    },
+    (x) => {
+      x.turns[0].items[0].output.text = record.creationPrompt;
+    },
+    (x) => {
+      x.turns[0].items[0].output.text = x.turns[0].items[0].output.text.replace(coordinator, worker);
+    },
+    (x) => {
+      x.turns[0].items[0].output.text = x.turns[0].items[0].output.text.replace('original-nonce', 'foreign-nonce');
+    },
+    (x) => {
+      x.turns[0].items[0].output.text = x.turns[0].items[0].output.text.replace('创建标识：original-nonce', '');
+    },
+    (x) => {
+      x.turns[0].items[0].output.text += '\n';
+    },
+    (x) => {
+      x.turns[0].items = [];
+      x.thread.preview = record.creationPrompt;
+    },
+  ];
+  for (const mutate of mutations) {
+    const bad = structuredClone(actual);
+    mutate(bad);
+    assert.throws(() => verifyNativeCreation(record, bad));
+  }
+  assert.throws(() => verifyNativeCreation({ ...record, createRequestId: 'foreign-nonce' }, actual));
 });
