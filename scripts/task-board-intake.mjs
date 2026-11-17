@@ -1,4 +1,11 @@
-import { TASK_THREAD_MODE, taskThreadPolicy, createTaskThreadTitles } from './task-thread-titles.mjs';
+import {
+  TASK_THREAD_MODE,
+  taskThreadPolicy,
+  createTaskThreadTitles,
+  verifyNativeCreation,
+} from './task-thread-titles.mjs';
+import { verifyCoordinatorSource } from './task-execution-binding.mjs';
+import { requireTaskCoordinator } from './task-coordination.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, rmdirSync, writeFileSync } from 'node:fs';
@@ -45,20 +52,15 @@ export function createBoardIntake(commonDir) {
     return taskThreadPolicy(commonDir).enabled ? TASK_THREAD_MODE : undefined;
   }
   async function accept(input, { readTask, createTask, readThread, now = Date.now() }) {
+    requireTaskCoordinator(commonDir, input.rootThreadId);
     const automaticMode = modeFor(input.taskId);
     if (input.threadMode === undefined && automaticMode) input = { ...input, threadMode: automaticMode };
-    assert.equal(input.request.roomId, input.rootThreadId);
     assert.equal(input.owner, input.rootThreadId, 'Board intake belongs to the actual coordinator');
     assert.ok(
       input.threadMode === undefined || input.threadMode === TASK_THREAD_MODE,
       'Unknown native task/thread mode',
     );
-    const source = await readThread(input.rootThreadId);
-    assert.equal(source.thread.id, input.rootThreadId);
-    assert.ok(
-      source.turns.some((t) => t.items?.some((i) => i.type === 'userMessage' && i.id === input.request.messageId)),
-      'Original execution message must be read from native host',
-    );
+    await verifyCoordinatorSource(input, readThread);
     const target = file(input.taskId);
     safe(target);
     mkdirSync(directory, { recursive: true, mode: 0o700 });
@@ -127,6 +129,8 @@ export function createBoardIntake(commonDir) {
       } else validate(board, input);
       board = await readTask(input.taskId); // Mandatory independent readback, never trust create response.
       validate(board, input);
+      if (previous?.state === 'accepted')
+        assert.equal(board.task_number, previous.number, 'Original task number changed');
       const receipt = {
         version: input.threadMode === TASK_THREAD_MODE ? 2 : 1,
         ...(input.threadMode ? { threadMode: input.threadMode } : {}),
@@ -134,12 +138,15 @@ export function createBoardIntake(commonDir) {
         taskId: input.taskId,
         owner: input.owner,
         rootThreadId: input.rootThreadId,
+        sourceRoomId: input.request.roomId,
         messageId: input.request.messageId,
         number: board.task_number,
         title: board.title,
         revision: board.revision,
         card: 'active',
         observedAt: now,
+        initialObservedAt: previous?.initialObservedAt ?? previous?.observedAt ?? now,
+        ...(previous?.refreshHistory ? { refreshHistory: previous.refreshHistory } : {}),
       };
       save(target, receipt);
       const bytes = readFileSync(target, 'utf8');
@@ -150,6 +157,7 @@ export function createBoardIntake(commonDir) {
     }
   }
   function require(context, task, owner, { now = Date.now(), fresh = true } = {}) {
+    requireTaskCoordinator(commonDir, context.coordinatorThreadId ?? context.rootThreadId);
     const target = file(task);
     safe(target);
     assert.ok(existsSync(target), 'Board intake missing: register and read back before investigation or start');
@@ -164,6 +172,7 @@ export function createBoardIntake(commonDir) {
       createTaskThreadTitles(commonDir).requireBinding(context, task, owner);
     }
     assert.equal(r.rootThreadId, context.rootThreadId);
+    if (r.sourceRoomId && r.sourceRoomId !== r.rootThreadId) assert.equal(r.sourceRoomId, context.roomId);
     assert.equal(r.messageId, context.authorizationRef);
     if (r.version === 1) {
       assert.equal(r.number, context.taskNumber);
@@ -175,5 +184,86 @@ export function createBoardIntake(commonDir) {
     if (fresh) assert.ok(now - r.observedAt <= 300000, 'Intake readback expired; re-read exact task, do not recreate');
     return r;
   }
-  return { commonDir, modeFor, accept, require };
+  async function refreshForStart(input, { readTask, readThread, verifyQueued, now = Date.now() }) {
+    requireTaskCoordinator(commonDir, input.coordinatorThreadId ?? input.rootThreadId);
+    assert.equal(process.env.CODEX_THREAD_ID, input.owner, 'Actual worker runtime required for intake refresh');
+    assert.equal(typeof verifyQueued, 'function', 'Exact queued instruction must be independently checked');
+    verifyQueued();
+    await verifyCoordinatorSource(
+      { ...input, rootThreadId: input.coordinatorThreadId ?? input.rootThreadId },
+      readThread,
+    );
+    const target = file(input.taskId);
+    safe(target);
+    assert.ok(existsSync(target), 'Only an existing accepted receipt may refresh; never receive or create here');
+    const lock = target + '.lock';
+    mkdirSync(lock, { mode: 0o700 });
+    try {
+      const previous = JSON.parse(readFileSync(target, 'utf8'));
+      assert.ok(
+        [1, 2].includes(previous.version) && previous.state === 'accepted',
+        'Accepted original receipt required',
+      );
+      assert.equal(previous.taskId, input.taskId);
+      assert.equal(previous.rootThreadId, input.rootThreadId, 'Original intake coordinator is provenance');
+      assert.equal(previous.messageId, input.request.messageId);
+      assert.equal(previous.sourceRoomId ?? previous.rootThreadId, input.request.roomId);
+      assert.equal(previous.owner, previous.version === 2 ? input.rootThreadId : input.owner);
+      const first = await readTask(input.taskId);
+      validate(first, input);
+      assert.equal(first.task_number, previous.number, 'Original task number changed');
+      assert.equal(first.title, previous.title, 'Original task identity changed');
+      if (previous.version === 2) {
+        const titles = createTaskThreadTitles(commonDir),
+          binding = titles.get(input.taskId);
+        assert.ok(binding?.state === 'bound', 'Original native binding required');
+        const context = {
+          rootThreadId: input.rootThreadId,
+          authorizationRef: input.request.messageId,
+          worker: input.owner,
+          taskNumber: first.task_number,
+          taskName: first.title,
+          ...(input.coordinatorThreadId ? { coordinatorThreadId: input.coordinatorThreadId } : {}),
+        };
+        titles.requireBinding(context, input.taskId, input.owner);
+        verifyNativeCreation(binding, await readThread(input.owner));
+      } else {
+        assert.equal(input.owner, input.rootThreadId, 'Legacy refresh cannot transfer executors');
+        assert.equal(
+          input.coordinatorThreadId ?? input.rootThreadId,
+          input.rootThreadId,
+          'Legacy refresh needs a formal historical binding',
+        );
+      }
+      const second = await readTask(input.taskId);
+      validate(second, input);
+      assert.deepEqual(second, first, 'Board changed during independent refresh; re-read without rebasing');
+      verifyQueued();
+      if (previous.revision === second.revision && now >= previous.observedAt && now - previous.observedAt <= 300000)
+        return previous;
+      assert.ok(Number.isFinite(previous.observedAt) && previous.observedAt <= now, 'Invalid original receipt clock');
+      const receipt = {
+        ...previous,
+        revision: second.revision,
+        observedAt: now,
+        initialObservedAt: previous.initialObservedAt ?? previous.observedAt,
+        refreshHistory: [
+          ...(previous.refreshHistory ?? []),
+          {
+            previousDigest: hash(previous),
+            observedAt: now,
+            executor: input.owner,
+            coordinator: input.coordinatorThreadId ?? input.rootThreadId,
+            boardRevision: second.revision,
+          },
+        ],
+      };
+      save(target, receipt);
+      assert.deepEqual(JSON.parse(readFileSync(target, 'utf8')), receipt);
+      return receipt;
+    } finally {
+      rmdirSync(lock);
+    }
+  }
+  return { commonDir, modeFor, accept, require, refreshForStart };
 }

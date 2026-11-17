@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { boardHttpFailureCategory } from './task-network.mjs';
 import { writeFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
@@ -31,18 +32,21 @@ process.stdin.on('data', async (chunk) => {
         signal: AbortSignal.timeout(30000),
       }).catch((cause) => {
         const error = Error('Board transport failed');
+        error.category = 'network';
         const code = String(cause.cause?.code ?? cause.name ?? 'unavailable').toLowerCase();
         error.code = /^[a-z0-9_-]{1,60}$/.test(code) ? 'transport_' + code : 'transport_unavailable';
         throw error;
       });
       if (!response.headers.get('content-type')?.includes('application/json')) {
-        const error = Error('Board returned non-JSON');
+        const category = boardHttpFailureCategory(response.status, '<html>');
+        const error = Error('Board returned non-JSON (' + category + ', HTTP ' + response.status + ')');
         error.code = 'transport_http_' + response.status;
         throw error;
       }
       const body = await response.json();
       if (!response.ok || body.error) {
-        const error = Error('Board receipt operation failed');
+        const category = response.ok ? 'service-response' : boardHttpFailureCategory(response.status);
+        const error = Error('Board receipt operation failed (' + category + ', HTTP ' + response.status + ')');
         error.code = body.code ?? 'transport-unavailable';
         throw error;
       }

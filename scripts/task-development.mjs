@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { assertTaskExecutor } from './task-execution-binding.mjs';
 import { existsSync, readFileSync } from 'node:fs';
 import { readAcceptance, assertAcceptedSource } from './accepted-source.mjs';
 import { historicalCommitEvidence } from './task-commit-ownership.mjs';
@@ -14,7 +15,7 @@ const git = (root, ...args) =>
   execFileSync('git', ['--no-replace-objects', '-C', root, ...args], { encoding: 'utf8' }).trim();
 
 function owned(task, owner) {
-  assert.equal(task.owner, owner, 'Current chat must own this exact task');
+  assertTaskExecutor(task, owner);
   assert.ok(
     ['developing', 'dev-validated', 'blocked'].includes(task.stage),
     'Formal delivery source is frozen; development cannot reset it',
@@ -28,7 +29,7 @@ function owned(task, owner) {
 export function taskWorkStatus(root, { id, owner }) {
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id, worktree: root });
-  assert.equal(task.owner, owner, 'Current chat must own this exact task');
+  assertTaskExecutor(task, owner);
   const currentHead = git(root, 'rev-parse', 'HEAD');
   return {
     task: id,
@@ -65,7 +66,7 @@ export function checkpointTask(root, { id, owner, commit, verification }) {
 export function checkpointFrozenHistory(root, args) {
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id: args.id, worktree: root });
-  assert.equal(task.owner, args.owner, 'Current chat must own this exact task');
+  assertTaskExecutor(task, args.owner);
   const leases = createResourceLeases(registry.commonDir);
   const lease = leases.acquire('task-delivery-' + task.id, task.owner);
   try {
@@ -77,7 +78,7 @@ export function checkpointFrozenHistory(root, args) {
 function checkpointFrozenHistoryLocked(root, { id, owner, review }) {
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id, worktree: root });
-  assert.equal(task.owner, owner, 'Current chat must own this exact task');
+  assertTaskExecutor(task, owner);
   assert.ok(
     ['frozen', 'blocked'].includes(task.stage) && task.frozen,
     'Only an unmerged frozen task may repair historical ownership',

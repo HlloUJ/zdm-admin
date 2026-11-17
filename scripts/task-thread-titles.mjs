@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { requireTaskCoordinator } from './task-coordination.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -137,6 +138,7 @@ export function activatePublishedTaskThreads(commonDir, { head, remoteHead, bran
   return enableTaskThreadPolicy(commonDir, { sourceHead: head });
 }
 export function requireNativeIntake(commonDir, { taskId, rootThreadId, request }) {
+  requireTaskCoordinator(commonDir, rootThreadId);
   assert.match(taskId, TASK_ID);
   assert.match(rootThreadId, THREAD_ID);
   const receipt = privateRead(path.join(commonDir, 'task-board-intake', taskId + '.json'));
@@ -147,7 +149,7 @@ export function requireNativeIntake(commonDir, { taskId, rootThreadId, request }
   assert.equal(receipt.owner, rootThreadId);
   assert.equal(receipt.rootThreadId, rootThreadId);
   assert.equal(receipt.messageId, request.messageId);
-  assert.equal(request.roomId, rootThreadId);
+  assert.equal(request.roomId, receipt.sourceRoomId ?? rootThreadId);
   return receipt;
 }
 export function createTaskThreadTitles(commonDir) {
@@ -457,6 +459,7 @@ export function createTaskThreadTitles(commonDir) {
     });
   }
   function requireBinding(context, taskId, owner) {
+    requireTaskCoordinator(commonDir, context.coordinatorThreadId ?? context.rootThreadId);
     const record = get(taskId);
     assert.ok(record, 'New task native thread binding missing');
     assert.equal(record.state, 'bound');
