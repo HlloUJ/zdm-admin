@@ -276,6 +276,68 @@ test('releasing capacity stays distinct from a later genuine pause', (t) => {
   );
 });
 
+test('enrolling a verified delivery phase leaves the review card alone until an actual newer pause', (t) => {
+  const root = fixture(t);
+  const fence = { messageId: 'prior-fence', sequence: 10, authorId: 'same-user' };
+  const delegation = { messageId: 'delivery-delegation', sequence: 20, authorId: 'same-user' };
+  const ticket = {
+    task: 'fixture-task',
+    owner: 'original-worker',
+    lane: 'delivery',
+    status: 'queued',
+    admission: null,
+    order: 1,
+    request: { messageId: 'original-development', sequence: 1, authorId: 'same-user' },
+    phaseOrigin: {
+      phaseId: 'delivery-phase',
+      authorityId: 'delegated-delivery',
+      developmentEvidenceDigest: 'verified',
+    },
+  };
+  const enrollment = {
+    action: 'delivery-phase-enrolled',
+    task: ticket.task,
+    owner: ticket.owner,
+    phaseId: ticket.phaseOrigin.phaseId,
+    authorityId: ticket.phaseOrigin.authorityId,
+    order: ticket.order,
+    developmentEvidenceDigest: ticket.phaseOrigin.developmentEvidenceDigest,
+    request: delegation,
+  };
+  const before = {
+    revision: 1,
+    paused: true,
+    events: [{ action: 'initialize', request: fence }],
+    tickets: [],
+    dynamicAuthorities: [{ id: enrollment.authorityId, request: delegation }],
+  };
+  const enrolled = { ...before, revision: 2, events: [...before.events, enrollment], tickets: [ticket] };
+  const box = createProgressOutbox(path.join(root, 'task-progress', ticket.task));
+  captureQueueProgress(root, enrolled, before);
+  assert.deepEqual(box.read().pending, []);
+  const unchanged = { ...enrolled, revision: 3 };
+  captureQueueProgress(root, unchanged, enrolled);
+  assert.deepEqual(box.read().pending, []);
+  const paused = {
+    ...unchanged,
+    revision: 4,
+    events: [...enrolled.events, { action: 'pause-all', request: { ...fence, messageId: 'new-pause', sequence: 21 } }],
+  };
+  captureQueueProgress(root, paused, unchanged);
+  captureQueueProgress(root, { ...paused, revision: 5 }, paused);
+  assert.deepEqual(
+    box.read().pending.map((entry) => [entry.receipt.event, entry.receipt.next.label]),
+    [['paused', '等待恢复指令']],
+  );
+  for (const event of [null, { ...enrollment, owner: 'wrong-worker' }, { ...enrollment, request: fence }]) {
+    const isolated = fixture(t);
+    captureQueueProgress(isolated, { ...enrolled, events: [...before.events, ...(event ? [event] : [])] }, before);
+    assert.equal(
+      createProgressOutbox(path.join(isolated, 'task-progress', ticket.task)).read().pending[0].receipt.event,
+      'paused',
+    );
+  }
+});
 test('global pause never generates paused progress for terminal tickets', (t) => {
   const root = fixture(t);
   for (const status of ['completed', 'cancelled']) {

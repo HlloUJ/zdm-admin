@@ -2548,7 +2548,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.mjs": {
-      "digest": "f49395d12d82e52c4af54a20b978aa10f56ebabf075220265a77c84e62c00026",
+      "digest": "04e41f79ba0c4ba2f47a5357671b27e55286d7bcbef9c0fb1bc949c8748baab9",
       "imports": [
         "scripts/task-execution-scope.mjs",
         "scripts/task-progress-host.mjs",
@@ -2557,7 +2557,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.test.mjs": {
-      "digest": "b0c99cb4accec7a12511d3903f2309f7e66811098c9b0d372d6be0bd7a585bf0",
+      "digest": "4d48a55f838f0f9d07dda1414769ce39b447f7e4ba319ce91bf40b278aec7d4a",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/task-delivery-status-sync.mjs",

@@ -59,13 +59,31 @@ export function captureCompletionProgress(directory, state, previous) {
     bestEffortProgress(outboxDirectory, state.batch, `completion:${event.id}:${event.status}`, payload);
   }
 }
-function finishedPreparationRequest(state, ticket) {
+function deliveryWaitRequest(state, ticket) {
   if (ticket.lane !== 'delivery' || !['queued', 'blocked'].includes(ticket.status)) return null;
   const event = state.events?.findLast(
     (item) =>
       item.task === ticket.task &&
-      (item.action === 'preparation-finished' || (item.action === 'dispatch-applied' && item.lane === ticket.lane)),
+      (['delivery-phase-enrolled', 'preparation-finished'].includes(item.action) ||
+        (item.action === 'dispatch-applied' && item.lane === ticket.lane)),
   );
+  if (event?.action === 'delivery-phase-enrolled') {
+    const origin = ticket.phaseOrigin;
+    if (
+      ticket.status !== 'queued' ||
+      ticket.admission !== null ||
+      !origin?.phaseId ||
+      !origin.authorityId ||
+      event.phaseId !== origin.phaseId ||
+      event.authorityId !== origin.authorityId ||
+      event.owner !== ticket.owner ||
+      event.order !== ticket.order ||
+      event.developmentEvidenceDigest !== origin.developmentEvidenceDigest
+    )
+      return null;
+    const grant = state.dynamicAuthorities?.find((item) => item.id === origin.authorityId);
+    return grant && isDeepStrictEqual(event.request, grant.request) ? grant.request : null;
+  }
   if (event?.action !== 'preparation-finished') return null;
   const decision = state.dynamicDecisions?.find((item) => item.id === event.decisionId);
   if (
@@ -105,9 +123,9 @@ export function captureQueueProgress(commonDir, state, previous) {
     const request =
       ticket.status === 'queued' && pendingNative && ticket.admission === null
         ? ticket.request
-        : finishedPreparationRequest(current, ticket);
-    // Preparing and handing back capacity does not replace the original
-    // ticket or confer admission. Only its verified delegation informs this projection.
+        : deliveryWaitRequest(current, ticket);
+    // Enrollment and preparation preserve the original ticket. Use the
+    // verified delegation only for progress projection.
     return !(
       Number.isSafeInteger(fence?.sequence) &&
       typeof fence.authorId === 'string' &&
@@ -131,6 +149,8 @@ export function captureQueueProgress(commonDir, state, previous) {
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
     // Admission is NOT proof of actual action start. No synthetic started event on claim.
     const paused = parked || pausedFor(state, ticket);
+    // Phase enrollment is internal metadata. Leave the existing review progress as-is.
+    if (!before && ticket.phaseOrigin && !paused) continue;
     const changed = parked || !before || before.status !== ticket.status || paused !== pausedFor(previous, before);
     if (!changed || (!['queued', 'blocked'].includes(ticket.status) && !paused)) continue;
     const event = paused ? 'paused' : ticket.status;
