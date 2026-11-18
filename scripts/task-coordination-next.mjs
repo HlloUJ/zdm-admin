@@ -1,3 +1,4 @@
+import { executionPausedFor, scopedAdmissions } from './task-execution-scope.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
 import { TASK_ACTIONS } from './task-action-dependencies.mjs';
@@ -13,6 +14,23 @@ function compare(a, b) {
     a.task.localeCompare(b.task) ||
     TASK_ACTIONS.indexOf(a.action) - TASK_ACTIONS.indexOf(b.action)
   );
+}
+
+export function coordinationOccupancy(state) {
+  const busyResources = new Set();
+  const retainedFinal = [];
+  let finalHeld = false;
+  for (const ticket of state.tickets) {
+    const isRunning = ticket.status === 'running' && !executionPausedFor(state, ticket);
+    if (isRunning) busyResources.add('task:' + ticket.task);
+    if (ticket.lane !== 'delivery') continue;
+    const scope = scopedAdmissions(state).find((item) => item.task === ticket.task && item.lane === ticket.lane);
+    const prior = state.dynamicDecisions?.find((item) => item.id === ticket.dynamicDecisionId);
+    if ((scope?.phase ?? prior?.input.phase) === 'preparation') continue;
+    if (isRunning) finalHeld = true;
+    else if (ticket.status === 'blocked') retainedFinal.push(ticket.task);
+  }
+  return { busyResources, finalHeld, retainedFinal };
 }
 
 export function planNextActions(candidates, capacity) {
@@ -64,6 +82,8 @@ export function planNextActions(candidates, capacity) {
     )
       reason = 'Actual executor and resource capacity is unknown';
     else if (final && finalHeld) reason = 'Final main/shared runtime is occupied';
+    else if (final && capacity.retainedFinal?.length && !capacity.retainedFinal.includes(task))
+      reason = 'An earlier blocked final action retains its position until proven safe to release';
     else if (
       selected.some((other) => other.task === task || other.executor === executor) ||
       resources.some((name) => held.has(name))

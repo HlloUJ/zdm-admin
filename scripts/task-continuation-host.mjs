@@ -7,7 +7,7 @@ import { requireTaskCoordinator, readTaskCoordination } from './task-coordinatio
 import { taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
 import { capacityReleaseProof } from './task-capacity-release.mjs';
 import { continuationPlan } from './task-continuation-plan.mjs';
-import { pendingCoordinationEvents, planNextActions } from './task-coordination-next.mjs';
+import { coordinationOccupancy, pendingCoordinationEvents, planNextActions } from './task-coordination-next.mjs';
 
 export const CONTINUATION_HOST_ACTIONS = Object.freeze([
   'continuation-plan',
@@ -62,16 +62,8 @@ export async function continuationHostAction(action, input, host, { registry, ro
     const candidates = [];
     const omitted = [];
     const enrollment = [];
-    const busyResources = new Set();
-    let finalHeld = false;
-    for (const ticket of state.tickets) {
-      if (!['running', 'blocked'].includes(ticket.status)) continue;
-      const scope = [state.scopedAdmission, ...(state.scopedAdmissions ?? [])].find(
-        (item) => item?.task === ticket.task && item.lane === ticket.lane,
-      );
-      if (ticket.status === 'running') busyResources.add('task:' + ticket.task);
-      if (ticket.lane === 'delivery' && scope?.phase !== 'preparation') finalHeld = true;
-    }
+    const occupancy = coordinationOccupancy(state);
+    const { busyResources } = occupancy;
     for (const entry of grant.source.tasks) {
       try {
         const task = member(entry.task);
@@ -155,7 +147,8 @@ export async function continuationHostAction(action, input, host, { registry, ro
     const reservations = (state.dynamicDecisions ?? []).filter((item) => item.status === 'reserved');
     const creations = state.tickets.filter((item) => item.status === 'queued' && item.nativeLaunchReserved).length;
     for (const decision of reservations) busyResources.add('task:' + decision.input.task);
-    finalHeld ||= capacity.activeDelivery > 0 || reservations.some((item) => item.input.phase === 'final');
+    const finalHeld =
+      occupancy.finalHeld || capacity.activeDelivery > 0 || reservations.some((item) => item.input.phase === 'final');
     const plan = planNextActions(candidates, {
       free: Math.max(
         0,
@@ -163,6 +156,7 @@ export async function continuationHostAction(action, input, host, { registry, ro
       ),
       busyResources: [...busyResources],
       finalHeld,
+      retainedFinal: occupancy.retainedFinal,
     });
     assert.deepEqual(queue.read(), state, 'Queue changed while preparing coordination plan');
     grantIsCurrent(state);

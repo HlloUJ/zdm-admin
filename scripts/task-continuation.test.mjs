@@ -3,6 +3,7 @@ import { test } from 'node:test';
 import { collectActionDependencies, requireActionDependencies } from './task-action-dependencies.mjs';
 import { assertParkedContinuation, releaseIdleCapacity, validateReleasedCapacity } from './task-capacity-release.mjs';
 import {
+  coordinationOccupancy,
   pendingCoordinationEvents,
   planNextActions,
   recordCoordinationObservation,
@@ -193,4 +194,27 @@ test('an already closed delivery clears only its original coordination event', (
     ['still-working'],
   );
   assert.deepEqual(state.tickets[0], ticket);
+});
+
+test('a fenced legacy running ticket does not claim live capacity and a blocked final retains its own place', () => {
+  const state = {
+    paused: true,
+    tickets: [
+      { task: 'legacy', lane: 'development', status: 'running' },
+      { task: 'own-final', lane: 'delivery', status: 'blocked' },
+    ],
+  };
+  const { busyResources, finalHeld, retainedFinal } = coordinationOccupancy(state);
+  assert.deepEqual([...busyResources], []);
+  assert.equal(finalHeld, false);
+  assert.deepEqual(retainedFinal, ['own-final']);
+  const result = planNextActions(
+    [action('other-final', 'final', 1), action('legacy', 'development', 2), action('own-final', 'final', 3)],
+    { free: 3, finalHeld, retainedFinal, busyResources: [...busyResources] },
+  );
+  assert.deepEqual(
+    result.selected.map(({ task }) => task),
+    ['legacy', 'own-final'],
+  );
+  assert.equal(result.waiting[0].task, 'other-final');
 });

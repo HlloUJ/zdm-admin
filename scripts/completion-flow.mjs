@@ -407,8 +407,8 @@ export async function runCompletionFlow(
       );
       // Stop this task's mounted watchers before changing its source. Another
       // selected task remains healthy and untouched.
-      await previewControl.prepareComposition(worktreePlan(latest));
       assertDeliveredDependencies(root, batch, 'combination');
+      await previewControl.prepareComposition(worktreePlan(latest));
       const composed = applyTaskComposition(root, batch.id, latest);
       batch = readActiveBatch(root);
       const changed = composed.recordedHead !== head;

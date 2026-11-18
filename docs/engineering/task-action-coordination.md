@@ -5,7 +5,7 @@
 ## 动作与依赖
 
 - 动作包括 `development`、`preparation`、`combination`、`runtime` 和 `final`。旧 `dependsOn` 保留原正式交付依赖语义，不能通过新字段取消。
-- 已获授权的任务执行者可在冻结前通过 `task:entry -- --worktree <准确目录> registry action-dependencies --task <ID> --expected-revision <登记版本> --requirements <JSON数组>` 登记动作依赖。每条记录声明 `task`、`actions` 和 `evidence`。源码与运行证据另需固定 `head`。正式交付依赖核对关闭、完整回执与主线祖先。源码依赖核对已登记的干净自有 checkpoint。运行依赖复用独立预览租约、API 健康与独立数据来源校验。
+- 已获授权的任务执行者可在冻结前通过 `task:entry -- --worktree <准确目录> registry action-dependencies --task <ID> --expected-revision <登记版本> --requirements <JSON数组>` 登记动作依赖。每条记录声明 `task`、`actions` 和 `evidence`。源码与运行证据另需固定 `head`。正式交付依赖核对关闭、完整回执与主线祖先。源码依赖核对已登记的干净自有 checkpoint。进入组合时，还要证明固定提交属于组合输入的实际历史。运行依赖复用独立预览租约、API 健康与独立数据来源校验。
 - 单独准备无关的开发与 PR 时，联合源码与运行依赖不阻断准备。涉及依赖的实际动作重新核验对应证据。动作与职责变化由真实授权覆盖；登记动作依赖不会扩大执行或交付授权。
 
 ## 只读接续

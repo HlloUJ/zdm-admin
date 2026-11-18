@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -45,4 +46,5 @@ for (const lease of known) {
 }
 assert.deepEqual(read(), known, 'Dependency runtime ownership changed');
 assert.deepEqual(registry.readTask(id), task, 'Dependency registration changed');
-console.log(JSON.stringify({ head, runtimeReady: true, ports: known.map(({ port }) => port) }));
+const leaseIdentity = createHash('sha256').update(JSON.stringify(known)).digest('hex');
+console.log(JSON.stringify({ head, runtimeReady: true, ports: known.map(({ port }) => port), leaseIdentity }));

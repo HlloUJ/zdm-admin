@@ -6,7 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSy
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
-import { selectedTaskBatch, withTaskContext } from './task-context.mjs';
+import { selectedTaskBatch, taskActionDependencies, withTaskContext } from './task-context.mjs';
 import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 import { completionCommand } from './completion-cli.mjs';
 import { readAcceptance, assertAcceptedSource } from './accepted-source.mjs';
@@ -264,4 +264,25 @@ test('a protected delete/modify conflict is visible before PR or final compositi
       .reasons.some((reason) => reason.includes('Protected delete/modify conflict')),
   );
   assert.equal(f.git(f.main, 'count-objects'), before);
+});
+
+test('a pinned source can prepare independently but must be present in exact combination ancestry', (t) => {
+  const f = fixture(t);
+  const provider = f.registry.readTask('a');
+  const consumer = f.registry.readTask('b');
+  const declared = f.registry.revise('b', consumer.revision, (task) => {
+    task.actionDependencies = [
+      { task: 'a', actions: ['preparation', 'combination'], evidence: 'source', head: provider.recordedHead },
+    ];
+  });
+  assert.equal(taskActionDependencies(f.main, declared, 'preparation').ready, true);
+  const missing = taskActionDependencies(f.main, declared, 'combination').dependencies[0];
+  assert.equal(missing.ready, false);
+  assert.match(missing.reason, /absent from the actual combination inputs/);
+  assert.equal(
+    taskActionDependencies(f.main, declared, 'combination', { candidate: provider.recordedHead }).ready,
+    true,
+  );
+  f.git(f.main, 'update-ref', 'refs/remotes/origin/main', provider.recordedHead);
+  assert.equal(taskActionDependencies(f.main, declared, 'combination').ready, true);
 });

@@ -121,7 +121,7 @@ function readDependencyRuntime(task, source) {
     throw new Error('Pinned dependency preview has no current health, API and data identity proof');
   }
 }
-export function taskActionDependencies(root, batch, action, { runtime = readDependencyRuntime } = {}) {
+export function taskActionDependencies(root, batch, action, { runtime = readDependencyRuntime, candidate } = {}) {
   if (!(batch.dependsOn ?? []).length && !(batch.actionDependencies ?? []).length)
     return collectActionDependencies(batch, action, {});
   const registry = createTaskRegistry(root);
@@ -172,7 +172,27 @@ export function taskActionDependencies(root, batch, action, { runtime = readDepe
     return { task: id, main: dependency.main.local, closedAt: dependency.closedAt };
   }
   return collectActionDependencies(batch, action, {
-    source: checkpoint,
+    source(dependency) {
+      const proof = checkpoint(dependency);
+      if (['combination', 'final'].includes(action)) {
+        // An available checkpoint is useful for preparation. A combination
+        // must also carry that input in its exact ancestry.
+        const heads = candidate ? [candidate] : [batch.recordedHead, git(root, 'rev-parse', 'origin/main')];
+        assert.ok(
+          heads.some((head) => {
+            if (!head) return false;
+            try {
+              git(root, 'merge-base', '--is-ancestor', proof.head, head);
+              return true;
+            } catch {
+              return false;
+            }
+          }),
+          'Pinned source is absent from the actual combination inputs',
+        );
+      }
+      return proof;
+    },
     runtime(dependency) {
       const source = checkpoint(dependency);
       assert.equal(typeof runtime, 'function', 'Current runtime identity must be verified by the action entry');
