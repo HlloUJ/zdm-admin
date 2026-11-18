@@ -20,6 +20,17 @@
 
 真实消息投递需持久去重与回执；结果未知先核对，不盲目重发。告警不是恢复成功，不暗中调用 worker 续接或原业务执行工具。登记模块本身不发送消息，也不安装或修改周期调度。
 
+## 已启动旧任务补登记（195）
+
+现有请求/接受入口继续使用；不创建另一套扫描器，不启动全局检测。接受后的权威结果是任务 registry 的 `monitoring`，这是现有 `task-progress-collector` / `task-continuity-cli --once` 实际读取的位置。兼容 `bindings.candidate.json` 仍追加观察绑定，但只写旧 binding 不再算完成。
+
+- 请求使用 v2，读取原 registry、准确干净工作区与已保存 HEAD、原 completion、策略和当前执行队列快照。已有 `registered` 不覆盖；仅排队未开工或已取消的条目不补登。无历史队列的正式旧任务仍可申请，不强制迁移到队列。
+- 原 root 独立核验平台原执行者、准确看板稳定 ID/编号/名称、原 room、授权、实际正式开工、当前暂停事实；v2 平台回执必须绑定这些字段，以及 `worktree`、`head`、`formalStartVerified=true`、布尔 `paused`、`pauseEvidenceRef`。本地调用者填写 JSON 不是平台身份或实际开工的证据。
+- 现有 monitoring 明确暂停、队列全局暂停或 completion 未恢复暂停时，补登不得清除暂停。其余暂停由 root 最新用户消息及平台证据确定，不能把 `blocked` 或没有进程猜成暂停/失败。补登只写监测元数据，不改变任务阶段、执行队列、owner 或实际运行状态。
+- 接受先完整快照核验，持久保存 admission 事务，通过 registry `revise` 的 revision CAS 写 monitoring 并读回，再发布兼容 binding，最后持久保存包含 monitoring 的 v2 回执。返回成功证明两个结果均已读回，不表示定时检测已经启用。
+- 重复成功请求只读回既有 monitoring 与 binding，不重复改 revision。若任一写入后失败或回执丢失，保留原锁和事务，报结果待核验，禁止盲目重试、清锁或另起业务执行；已写入的 monitoring 可能已被观察器读取。人工核验必须对照原 request、事务、当前 registry 与 binding，不将旧 v1 回执当作新成功证明。
+- 测试仅使用临时隔离仓库，覆盖真实 collector 读取、旧无 monitoring / pending-context、主动暂停静默、已登记不覆盖、仅排队排除、错绑拒绝、CAS 后兼容写失败和丢回执不重放。正式发布前，不用候选入口修改真实旧任务。
+
 ## 验证与限制
 
 定向测试覆盖原身份与授权错绑、策略/绑定/日志/工作区快照变化、重复成功接纳、遗留锁、缺凭据和观察绑定不带执行能力。测试不依赖普通开发恢复模块，不修改真实任务或暂停状态。
@@ -30,6 +41,24 @@
 
 新任务 `task-entry start` 调用 registry.register 时同一记录原子写入 `monitoring`，不回填或批量关联旧任务。根线程创建看板任务并分派原 worker 后，将实际上下文传入 `--monitor-context '<JSON>'`：`taskNumber`、`taskName`、`taskStableId`、`worker`、`rootThreadId`、`roomId`、`authorizationRef`。原 worker 的真实 `CODEX_THREAD_ID` 必须等于 registry owner，字段缺失在创建工作区前拒绝。
 
-兼容旧调用无上下文时登记为 `pending-context`，明确缺少准确通知条件，不声称覆盖；新任务编排路径应始终传入完整参数。宿主并不自动提供看板编号或 native worker 路径，本地文件不能冒充平台身份验证。根线程每次投递前仍须核对用户最新暂停指令、准确对象、原执行者及观察时效。
+正式新任务不再允许省略上下文：`execution-order claim` 对尚未登记的新开发项，在占位前验证 `monitorContext`；已发布 `task-entry start` 与实际 `task-start` 在创建工作区/资源前再次验证。缺失、格式错误、真实 owner 不符或任务错绑均拒绝，不能用占位字符串冒充真实来源。已有登记恢复不批量回填监测；底层 registry 保留历史和隔离测试兼容，不是正式新开工入口。宿主并不自动提供看板编号或 native worker 路径，本地文件不能冒充平台身份验证。根线程每次投递前仍须核对用户最新暂停指令、准确对象、原执行者及观察时效。
 
 `monitoring.paused=false` 仅表示新任务登记时的初始状态，不证明用户此后未暂停；正式阶段 pause 记录和根线程当前用户暂停指令优先。正常完成、主动暂停、机器断线、未记录执行、模型推理中无本地进程均不得因此判定任务中断。
+
+### 新任务开工读回门槛
+
+根线程先从真实用户执行消息、任务总览已保存的任务及已分派的原 worker 获取上述字段，核验准确任务、owner、通知会话与授权，再向 claim 传 `monitorContext`，向 start 传相同 `--monitor-context`。正式 claim 将已验证上下文随原 admission 保存；通知会话和授权引用须等于原队列请求，start 核对同一 admission 绑定的全部上下文，不能换 worker 或通知对象。缺字段或来源不可核实则不 claim、不开工，不猜编号、worker 或授权。当前正式新任务 `taskStableId` 与登记 slug 一致；已登记历史接续保持原映射，不自动改写。
+
+任务登记和 monitoring 在同一记录写入后，start 必须读回准确 id、owner、worktree、branch、revision 和完整 monitoring 并核对，才返回就绪并准备任务产物。写入/读回结果未知时保留现场，先 `registry resolve` 核对已保存记录、工作区与启动 intent；不重新 enqueue、claim 或新建任务，也不自动清锁。既有记录核实后沿原入口恢复，不重复创建分支/工作区。读回不成功不得派发实际开发。
+
+这只是新任务登记门槛，不修改观察器、全局检测日程、暂停状态或旧任务覆盖范围；平台 worker 身份仍由根线程核验，登记成功不等于监测调度已运行。
+
+## 普通对话受理门禁
+
+原防漏规范要求的是收到执行指令后先登记、固定ID读回，然后才做任务核查。460只解决正式开工监测，不负责从对话中自动发现新任务；417的状态回执也不能发现完全未登记的工作。因此不能以监测或卡片接口已发布，推断受理规范已经在所有平台工具上强制生效。
+
+普通对话宿主使用 `receiveCodexTask`：先核对原生用户消息，再按永久ID查询；只有明确不存在才创建。创建结果不算读回，必须独立读取任务并核对编号、标题、有效卡片、revision和归档状态。查询失败、错绑和结果不明拒绝核查/领位/开工，保留原状态。受理回执写入 git-common-dir/task-board-intake/<id>.json，先持久化再放行；新任务开工前五分钟内重新核对，过期只更新读回，不重建卡片。
+
+`startCodexTask`、正式claim、development的resume-only，以及task-entry/task-start原生新开工读取相同回执。单任务例外必须持久携带已核对的monitorContext，避免先领位后丢失监测绑定。一次明确“执行本项、其他暂停”的原指令可以先pause-all、再resume-only同一项；其他动作或错绑重放仍拒绝，重复事件不改revision。
+
+正式task-entry的registry register只允许核对已有登记，不允许新建任务绕过start。低层Git、直接模块导入和普通编辑器不受独立权限隔离；拥有本地写权限的人仍能改本地回执，所以它是程序一致性门禁，不是不可伪造的平台授权或全局工具沙箱。收到指令到进入宿主函数之前，必须由项目AGENTS和Git Skill限制为任务识别/查重，不得先做工程排查。不能声称纯仓库代码已经拦截全部普通对话工具。

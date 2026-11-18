@@ -22,6 +22,7 @@ import {
   validateProvenance,
   validateReusedMetadata,
   tryReuse,
+  equivalenceDifferencePaths,
 } from './ci-equivalence.mjs';
 import { environmentProofFromSnapshot, validateEnvironmentProof } from './ci-equivalence-environment.mjs';
 import { verifyFrontendEvidence } from './ci-quality-evidence.mjs';
@@ -487,6 +488,8 @@ for (const scenario of [
     } else {
       assert.equal(actual.workflowRunId, current.workflowRunId);
       assert.equal(actual.reusedFrom, undefined);
+      assert.equal(actual.reuseDecision.state, 'miss');
+      if (scenario === 'changed-environment') assert.deepEqual(actual.reuseDecision.mismatchPaths, ['/inputs']);
     }
     assert.equal(readFileSync(env.GITHUB_OUTPUT, 'utf8'), `reused=${reused}\n`);
   });
@@ -900,4 +903,14 @@ test('static provenance matches every real workflow phase and rejects missing or
     altered.original.phases[i].command.push('--skip');
     assert.throws(() => validateProvenance(altered), /Unexpected static command/);
   }
+});
+
+test('equivalence diagnostics report exact paths without values and never equate differing kernels', () => {
+  const previous = { kernel: '7.0.0-1014-aws', secret: 'old-secret', nested: { digest: 'a' } },
+    current = { kernel: '7.0.0-1017-azure', secret: 'new-secret', nested: { digest: 'b' } };
+  const paths = equivalenceDifferencePaths(previous, current);
+  assert.deepEqual(paths, ['/kernel', '/nested/digest', '/secret']);
+  assert.ok(!JSON.stringify(paths).includes('secret-value'));
+  assert.deepEqual(equivalenceDifferencePaths({ a: 1 }, { a: 1 }), []);
+  assert.equal(equivalenceDifferencePaths(previous, current, 1).length, 1);
 });

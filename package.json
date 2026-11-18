@@ -23,7 +23,7 @@
     "integration:status": "node scripts/run-integration.mjs dev:status",
     "integration:verify": "node scripts/run-integration.mjs verify:local",
     "build": "npm run typecheck && npm run build:app",
-    "build:app": "vite build --configLoader runner",
+    "build:app": "node scripts/build-task-app.mjs",
     "preview": "vite preview --configLoader runner --host 127.0.0.1",
     "typecheck": "vue-tsc --noEmit",
     "typecheck:cached": "vue-tsc --noEmit --incremental --tsBuildInfoFile .task-runtime/cache/vue-tsc.tsbuildinfo",
@@ -127,6 +127,7 @@
     "stylelint-config-standard": "^40.0.0",
     "stylelint-config-standard-vue": "^1.0.0",
     "typescript-eslint": "^8.65.0",
+    "undici": "7.29.0",
     "vitest": "^4.1.10"
   }
 }

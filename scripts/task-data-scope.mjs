@@ -1,3 +1,4 @@
+import { assertTaskExecutor } from './task-execution-binding.mjs';
 import { assertCombinationRuntime } from './task-preview-combination.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -12,7 +13,7 @@ import { deliveryStatus } from './completion-status.mjs';
 export async function isolateTaskData(root, { id, owner, apply = false }, dependencies = {}) {
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id });
-  assert.equal(task.owner, owner, 'Exact task owner required for isolated data preparation');
+  assertTaskExecutor(task, owner, 'Exact task owner required for isolated data preparation');
   assertCombinationRuntime(root, task);
   assert.ok(!task.recovery?.runtimeBlocked, 'Historical recovery is not verified; data preparation remains blocked');
   assert.ok(
@@ -95,7 +96,7 @@ export async function preparePublishedData(root, { id, owner, apply = false }, d
     task && !task.compatibility?.readOnly && ['infrastructure', 'maintenance'].includes(task.kind),
     'Published data setup requires the exact authorized infrastructure task',
   );
-  assert.equal(task.owner, owner, 'Exact task owner required for published data preparation');
+  assertTaskExecutor(task, owner, 'Exact task owner required for published data preparation');
   if (task.stage === 'closed')
     assert.equal(
       deliveryStatus(path.join(registry.commonDir, 'task-delivery', task.id), task.id, task).formalDeliveryComplete,

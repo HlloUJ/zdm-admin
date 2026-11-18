@@ -8,9 +8,17 @@
 
 ## 正常路径
 
+合并卡的并行候选准备使用 `task:entry -- --worktree <准确目录> complete prepare <task-id> <40位SHA>`，仅在真实委托的 preparation scope 中执行。它完成原冻结、发布及首次完整 PR CI 后返回，不进入最终 main 队列，不合并、交接或结项；普通 deliver/final-handoff/settle 仍须唯一 final scope。准备证明和 scope 交接见[持续委托与动态任务调度](engineering/dynamic-task-dispatch.md)。
+
 独立任务获得准确“任务完成”授权后，首选 `npm run task:completion -- deliver <batch-id> <准确任务40位SHA>`。该入口绑定准确 task/owner/Worktree 并冻结实际源码；核对保护、备份与健康，推送并完成初始 PR CI，再进入 FIFO 正式交付队列。队列内刷新 main、按原始冻结与受信主线组合，在该准确组合候选自己的源码中执行本地就绪检查，必要运行验证使用当前任务独占的临时端口，不抢占正在展示其他任务的5175；变化候选重新推送和验证后才准确合并，随后完成本地 main 同步、main CI、最终交接和 settle；每个阶段直接await前一阶段，不靠人工休眠轮询再接命令。只有刚创建事件尚未出现时有限等待查询，绝不dispatch或重跑CI；多个候选、失败、重跑、主线变化或保护不符均停止。源码修改不授权调用deliver；PR创建输出URL后仍须由调用方附加到当前对话。
 
+有真实外部周期验收的工程任务，可由可信宿主显式传 `completionOptions.deferSettle: true`；私有 `task-completion-progress-cli.mjs` 输入对应顶层布尔 `deferSettle: true`。默认是 false，普通交付仍完整 settle。该选项只有准确 main CI 与 `main:final` 运行交接的成功原记录齐全后才返回 `status=deferred`、`formalDeliveryComplete=false`、原因“外部周期验收待完成”；不执行保全/清理/关闭，也不生成 `delivery_complete`。原 main FIFO 票据以 waiting 加 deferred 明细保留 id、owner、冻结身份及顺序，正常释放本次 main 临界租约；集成交接自身在返回前释放其临界租约。任务归属与执行层交付票据仍保留，不用伪造失败或提前 done 来结束当前命令。
+
+可信宿主拿到真实周期、通知送达等所需外部证明后，只使用默认 `deferSettle=false` 调用既有 `settle <batch-id> <原main-sha> <原run-id>`。该入口按原 deferred 票据重新取得临界位，核对原候选/main/run 身份并完成现有收尾；不重新等待 CI 或调用 final-handoff。输入变化、健康或来源证明失效仍由原保护拒绝，不能凭 deferred 跳过。普通阶段回执只显示下一步等待，不作为任务完成事实；正常进程返回也不等于正式交付成功。外部证明由准确任务的可信宿主在 settle 前核验，这个本地布尔接口本身不构成不可绕过的验收保护。
+
 调用方直接等待同一进程（可恢复终端会话），进度变化由它输出；不要另开watch、查询相同API或用45秒固定sleep轮询日志。若进程中断，从原准确参数恢复，已通过检查只核验原运行。数据库高风险保护锁仍走原受保护入口，不被普通自动链接管。首次自升级从已审查的准确本地候选进入PR流程，运行交接与清理仍只由已发布且main CI通过的版本承担。
+
+首次工程自升级如被另一任务的旧关闭前端租约阻断，可按[只读运行引用证明](engineering/readonly-preview-reference-proof.md)通过公开 `reference-proof` 入口采集真实原生历史和两轮宿主证明。宿主核对准确候选及真实证明后，`deliver`/`settle` 可显式附加 `--reference-proof <当前任务私有证明文件>`；每个引用边界仍重新独立核验。此入口只证明准确旧前端的当前引用状态，不恢复或释放另一任务租约，不跳过 unknown、冻结、CI、主线及交接保护。
 
 1. 只有用户已授权准确批次正式交付时，立即执行 `npm run task:completion -- begin [请求的准确ISO时间]`，再执行 `plan` 一次核对模块、差异、验证缺口和独立资产。`begin` 同时保全原始源码冻结和本仓库私有阶段索引；`plan` 仍只读，不联网、不启动服务，也不是通过证明。没有请求时间时明确以首个正式收尾命令为计时起点，不补造此前耗时。
 2. 按影响补必要本地检查并复用有效证据。验证工具/契约变化先 `npm run test:ci-reuse`：覆盖真实执行成功、严格复用成功、无法复用后原执行、真实执行失败四种路径，经过采集、路径选择、两份报告上传及最终汇总。源文件、报告缺失/损坏或未知模式均须阻断。定向通过后冻结准确候选，由可靠CI承担一次完整适用门禁，不先叠加本地相同全套。

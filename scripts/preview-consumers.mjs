@@ -89,7 +89,16 @@ export async function inspectPreviewConsumers(
             closing.pid === lease.pid &&
             closing.token === lease.token,
         );
-      assert.ok(ownStopped, `Preview consumer state is unknown on leased port ${item.port}; retain source and backend`);
+      let stoppedReference = null;
+      if (!ownStopped && item.closed && process.env.ZDM_CLOSED_PREVIEW_REFERENCE) {
+        const { verifyClosedPreviewReference } = await import('./delivery-repairs/preview-reference-proof.mjs');
+        stoppedReference = await verifyClosedPreviewReference({ worktree, taskId, lease });
+      }
+      assert.ok(
+        ownStopped || stoppedReference,
+        `Preview consumer state is unknown on leased port ${item.port}; retain source and backend`,
+      );
+      if (stoppedReference) item.stoppedReference = stoppedReference;
     } else
       assert.ok(
         item.closed || (item.port >= 5177 && item.responding),

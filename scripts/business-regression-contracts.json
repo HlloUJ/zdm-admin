@@ -431,35 +431,42 @@
         "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionApiTest.java"
       ],
       "protectedTests": {
-        "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
-        "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+        "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
+        "tests/e2e/accessory-permissions.spec.ts": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
+        "tests/e2e/admin-foundation.spec.ts": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
+        "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
+        "tests/e2e/feedback-foundation.spec.ts": "cad6465de30701955cff10f92344f4f0ab32d20fa3c4d0e6f51555c9ca4f816a",
+        "tests/e2e/finished-stock-permissions.spec.ts": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
+        "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+        "tests/e2e/login.spec.ts": "dad16c7d553f9645a821bf9fd79c7f08a3e944ccc5b02b10e8f97964bc81722c",
+        "tests/e2e/markup-configuration.spec.ts": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
+        "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
+        "tests/e2e/permission-center.spec.ts": "8f1a8204a784cc57bbd836094ec721f446c3dd1c0232a0d49a4925613a45f442",
+        "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
+        "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
         "tests/e2e/slab-collaboration.spec.ts": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
-        "tests/e2e/store-finished-stock.spec.ts": "73f5125a48c61b0fec0b1629364c066b0101cf47a7ffa9c4057d0c0dc95871cf",
+        "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
+        "tests/e2e/slab-publish-layout.spec.ts": "83fae189da20ab3113dbb2f7eb7a4b6aa19d3b10140aec002c7a90c77ccd06f3",
         "tests/e2e/store-accessory-management.spec.ts": "c3d66e8e0832358a40ba33a6b583d857fc8f395b8ab1bb888f8dc130631bc1e3",
+        "tests/e2e/store-finished-stock.spec.ts": "73f5125a48c61b0fec0b1629364c066b0101cf47a7ffa9c4057d0c0dc95871cf",
+        "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
+        "tests/e2e/pagination-responsive.spec.ts": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
+        "tests/e2e/store-order-prototype.spec.ts": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+        "tests/e2e/product-all-view.spec.ts": "07f044f812c8f688cd4a9be44f716db6b3478776bc3e6265f90d7c54bca97d14",
+        "tests/e2e/operations-batch-shelf.spec.ts": "74533ffdc10b350e969cd17581c19acdc313946aefb236785b6422d512f7248d",
+        "tests/e2e/terminal-all-batch-shelf.spec.ts": "c5af2cb0cba0cbde25b83e0ccd0e03747e388dada25fd15444efb2d525b9588f",
+        "tests/e2e/store-price-rules.spec.ts": "1e57f57f0538aee643a104f3831f88f87eac8bfa4e0417d7b9ebb0980129c567",
+        "tests/e2e/product-batch-delete.spec.ts": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
+        "tests/e2e/customer-management.spec.ts": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
+        "tests/e2e/store-recycle-selection.spec.ts": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
+        "tests/e2e/list-batch-selection.spec.ts": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "480ec0600c494a8b4649fcb29291ab87ed018638052c479ebbd405a6ba5236a4",
         "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "1f91cf7db291864add3fe7bc99e3dee804e5b113a6cab112ca24cd4d72faea1c",
         "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "ab2bf51107e11ab923741563bcd779848f09a91aab5bdaaded68d57fba3ae6bb",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
-        "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
-        "tests/e2e/accessory-permissions.spec.ts": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
-        "tests/e2e/admin-foundation.spec.ts": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
-        "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
-        "tests/e2e/feedback-foundation.spec.ts": "cad6465de30701955cff10f92344f4f0ab32d20fa3c4d0e6f51555c9ca4f816a",
-        "tests/e2e/finished-stock-permissions.spec.ts": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
-        "tests/e2e/login.spec.ts": "dad16c7d553f9645a821bf9fd79c7f08a3e944ccc5b02b10e8f97964bc81722c",
-        "tests/e2e/markup-configuration.spec.ts": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
-        "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
-        "tests/e2e/permission-center.spec.ts": "8f1a8204a784cc57bbd836094ec721f446c3dd1c0232a0d49a4925613a45f442",
-        "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
-        "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
-        "tests/e2e/slab-publish-layout.spec.ts": "83fae189da20ab3113dbb2f7eb7a4b6aa19d3b10140aec002c7a90c77ccd06f3",
-        "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
-        "tests/e2e/admin-api-mocks.ts": "22b59209f855b495a9cdf09b8fc1bf2fd1709b2002693cc818589c5af23c7aed",
-        "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
-        "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156",
         "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java": "f245b9dd1fc458b657a2ffdbb0679ed97547e8f74d6e6a895fa1e986cdb3aff9",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java": "24637bff45722355d31fd78e75a37e5533b7c8411a9ed94f4558a30a8e62dca7",
@@ -468,33 +475,38 @@
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
-        "tests/e2e/accessory-api-mocks.ts": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
-        "tests/e2e/pagination-responsive.spec.ts": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
-        "tests/e2e/store-order-prototype.spec.ts": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "2933e0202a0088396c118d4324137fd5ef20145c6996bf8ea90199554495e5e3",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "07f044f812c8f688cd4a9be44f716db6b3478776bc3e6265f90d7c54bca97d14",
-        "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "526e0763c610edcef5b6592006dd8eeb556ba170ebe0182fb03541799cd42a36",
         "backend/src/test/java/com/zdm/platform/security/EffectivePermissionResolverTest.java": "244db8e06b91f8ca411a8e91f55c4efafd2561a90b035528de6d75e8ddb37e0b",
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java": "9f3dee717ec95bff55c0351f718cdfe956e98324849bec98dd0e2da014836018",
         "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java": "b5c2589b50e90976401dba166539890aff278f434fcde20a62b2d5ffa7879f52",
-        "tests/e2e/operations-batch-shelf.spec.ts": "74533ffdc10b350e969cd17581c19acdc313946aefb236785b6422d512f7248d",
         "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java": "b684174cd2ad5b88f766b2d5ed692817be2d3add9140bcfc49cf92a2ca1cd482",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "6cfceece42727cd0ac7d0499c9f62592ed65aef52b19384d2487061432306204",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java": "4d8b280890870833713fede0af7ce8efb6811bf13db596d5e0552b5661e6f8ec",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java": "2e597d98526786b6070e1b94ff9c87c04ac94785d1843db6aa3456c3aa0368a4",
+        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java": "14f84fbce6075e6b7ae87d86da56d5247d7a9a05c79184ce383aab561641d6a0",
+        "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java": "3e5698da75d970c3e7ee82fb93965a086876a9d771c5e44a687213be853ef90a",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java": "8f4a40ce5c9d7b76b6c2b11a5afaea0554d45a4907cafd6f19c31412a97effff",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java": "a2ea4de0623f1b0338db2d0cf2bd9c9b27c64bce5c64fdbceeb5c6df393ee1f9",
+        "backend/src/test/java/com/zdm/platform/customer/CustomerApiTest.java": "780f04ab359cc37f12f6d0deeca2c4f6e7ee5b4cb67d98f3b6a9f3545dff8557",
+        "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionCenterTest.java": "722cb12a301375e70c2cd46a399f2d4e7dc7e68efbfd70f5e0960472a9df88b6",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionApiTest.java": "8b10bc93b445d27db8ba34198a37bce2377e22a7fd7923f632d42f4fb66ccdeb",
+        "tests/e2e/admin-api-mocks.ts": "22b59209f855b495a9cdf09b8fc1bf2fd1709b2002693cc818589c5af23c7aed",
+        "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156",
+        "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
+        "tests/e2e/accessory-api-mocks.ts": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
+        "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "src/services/operationsBatchShelf.test.ts": "c81d751b9c25d2106c04b2a315622be7e4361fc4f9aa990bac20859c843fa055",
         "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
         "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7",
-        "tests/e2e/terminal-all-batch-shelf.spec.ts": "c5af2cb0cba0cbde25b83e0ccd0e03747e388dada25fd15444efb2d525b9588f",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "6cfceece42727cd0ac7d0499c9f62592ed65aef52b19384d2487061432306204",
         "src/services/terminalAllBatchShelf.test.ts": "828b4696e37f842f0aff071949dd6efeac4c55e142f668a3429727ee14da7b33",
         "src/services/productGlobalPermissions.test.ts": "33c5bd661539ed7c04f9cc22ec0ee98ef186748314c28fce95aee0140e24673f",
         "src/services/functionCatalog.test.ts": "1c6c9e5b6d7c0924af68258f8e7b57c5e86734829380b2da8ad91c7bad26d158",
         "src/components/WarehouseEntryInformation.test.ts": "f3adf3ec76f669c060b743ca193fabac68bbb9d3f6c56b0872963eed91cc32c7",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java": "4d8b280890870833713fede0af7ce8efb6811bf13db596d5e0552b5661e6f8ec",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java": "2e597d98526786b6070e1b94ff9c87c04ac94785d1843db6aa3456c3aa0368a4",
-        "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java": "14f84fbce6075e6b7ae87d86da56d5247d7a9a05c79184ce383aab561641d6a0",
         "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java": "c6ae4a64986bfffa142ea231f8641ebd178bbbbb13a43624902c0b7922326478",
         "tests/e2e/product-attribute-version-fixture.ts": "e0712713a226d51ed9e9e818ea891f2be494a6c09e103b7745b58ea13068d913",
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
@@ -504,26 +516,13 @@
         "tests/e2e/store-batch-sale-price-cases.ts": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
         "src/components/DecimalInput.test.ts": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
         "src/utils/numericInput.test.ts": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
-        "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java": "3e5698da75d970c3e7ee82fb93965a086876a9d771c5e44a687213be853ef90a",
         "src/utils/numericInputValidation.test.ts": "3b7a3a3dcd4fcb8f06923dbe341e0e870e9e2791c772d8496ef8e11cbea66a26",
-        "tests/e2e/store-price-rules.spec.ts": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
-        "tests/e2e/decimal-editing.ts": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73",
         "tests/e2e/price-table-feedback.ts": "a401cadec86d637c44d068ef8e4fc3400411c4549607ca32292d82aca7df8ebc",
         "src/pages/finished-stock/shared/guidePriceSource.test.ts": "78b7b219cb169c86b10590cef5faaf1394ec3c00e27101c4b784001e224f2fad",
-        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java": "8f4a40ce5c9d7b76b6c2b11a5afaea0554d45a4907cafd6f19c31412a97effff",
-        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java": "a2ea4de0623f1b0338db2d0cf2bd9c9b27c64bce5c64fdbceeb5c6df393ee1f9",
-        "tests/e2e/product-batch-delete.spec.ts": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
-        "backend/src/test/java/com/zdm/platform/customer/CustomerApiTest.java": "780f04ab359cc37f12f6d0deeca2c4f6e7ee5b4cb67d98f3b6a9f3545dff8557",
-        "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
         "src/services/batchActionPermissions.test.ts": "f4ed67b265dc6f436c0ed4ddddf80ccf55eb3a1517b28d35eaafbed783ab9751",
         "src/services/customerCatalog.test.ts": "e9e75039913cba436a051ab9f8ab4fea31cc757f4699140c5e15b116d4a1753b",
-        "tests/e2e/customer-management.spec.ts": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
-        "tests/e2e/store-recycle-selection.spec.ts": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
-        "tests/e2e/list-batch-selection.spec.ts": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
         "tests/e2e/form-options-mock.ts": "5222586ea7707540bac57fdcbae795d5e214b3d6d0b3e482d85e1a75ec640b21",
-        "tests/e2e/dialog-confirmation.ts": "6930b04183b6d72ec7b7d1467939a4df5603609cca980666e53d2988e8584bb7",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionCenterTest.java": "722cb12a301375e70c2cd46a399f2d4e7dc7e68efbfd70f5e0960472a9df88b6",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionApiTest.java": "8b10bc93b445d27db8ba34198a37bce2377e22a7fd7923f632d42f4fb66ccdeb"
+        "tests/e2e/dialog-confirmation.ts": "6930b04183b6d72ec7b7d1467939a4df5603609cca980666e53d2988e8584bb7"
       },
       "testChanges": [
         {
@@ -2344,18 +2343,6 @@
           "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
         },
         {
-          "file": "tests/e2e/finished-stock.spec.ts",
-          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
-          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
-          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
-        },
-        {
-          "file": "tests/e2e/accessory-management.spec.ts",
-          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
-          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
-          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
-        },
-        {
           "file": "tests/e2e/price-table-feedback.ts",
           "before": "e55d185bd12712863333f5ce14ac12ff6ac4a7320dfb90d86c41b5442f257fa8",
           "after": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
@@ -2365,18 +2352,6 @@
           "file": "tests/e2e/store-batch-sale-price-cases.ts",
           "before": "f9fdecb7003c46d8eaf8aa7de9a0f95075ef316c8d894228c608478fa0fac4f4",
           "after": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
-          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
-        },
-        {
-          "file": "tests/e2e/finished-stock.spec.ts",
-          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
-          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
-          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
-        },
-        {
-          "file": "tests/e2e/accessory-management.spec.ts",
-          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
-          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
           "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
         },
         {
@@ -2716,6 +2691,12 @@
           "reason": "正式本地门禁09a0c62e-d89b-49c9-a81b-07369dde4e6c确认导航销毁旧文档的选项聚合RPC；只将该旧请求abort，其他错误原样抛出，不重试，保持原业务断言及动态集合覆盖，并新增两个确定性导航和一个错误传播回归。"
         },
         {
+          "file": "tests/e2e/product-batch-delete.spec.ts",
+          "before": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
+          "after": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
+          "reason": "parallel-environment-final 技术收尾：CI 42612230860 的 Validation scope 因漏登已审查测试同步修复而失败。保留原批量删除35条用例及全部业务断言；仅在弹窗入场完成后确认、并发观察POST响应并显式传播form-options等待失败；不增加超时、重试或修改业务。对应原修复 b6ae13f8cf6dfa74fcdadb2900f18a4340a1f6b9、f0d018ace3e1c3a5cb969ba1a0ea0ce2c8b438c1。"
+        },
+        {
           "file": "tests/e2e/store-order-prototype.spec.ts",
           "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
           "after": "f99fa8dcbb38af2513a1de56bd63c4fb15ebc9221097a7cf95af9226c45baebf",
@@ -2750,6 +2731,18 @@
           "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
           "after": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
           "reason": "款项配置改由真实API供给：保留分页、数量和订单回归全部断言，移除旧本地group夹具，补充并发删除后刷新且保留输入验证。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+          "after": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
+          "reason": "520 CI44178271178: Chrome158将flex-end序列化为flow-end；与同浏览器独立显式flex-end参照严格比较，并新增容器右边缘几何断言。保留所有间距、宽度及其他业务断言，不修改业务样式、不增加重试。"
+        },
+        {
+          "file": "tests/e2e/store-price-rules.spec.ts",
+          "before": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
+          "after": "1e57f57f0538aee643a104f3831f88f87eac8bfa4e0417d7b9ebb0980129c567",
+          "reason": "520 CI44178271178: Chrome158 flex-end/flow-end别名序列化；保留查询重置、草稿、失焦及混合保存全部断言，严格比较独立标准flex-end参照并新增按钮右边缘几何断言。无业务修改、无重试。"
         },
         {
           "file": "tests/e2e/feedback-foundation.spec.ts",
@@ -2942,12 +2935,6 @@
           "before": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
           "after": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
           "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
-        },
-        {
-          "file": "tests/e2e/product-batch-delete.spec.ts",
-          "before": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
-          "after": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
-          "reason": "parallel-environment-final 技术收尾：CI 42612230860 的 Validation scope 因漏登已审查测试同步修复而失败。保留原批量删除35条用例及全部业务断言；仅在弹窗入场完成后确认、并发观察POST响应并显式传播form-options等待失败；不增加超时、重试或修改业务。对应原修复 b6ae13f8cf6dfa74fcdadb2900f18a4340a1f6b9、f0d018ace3e1c3a5cb969ba1a0ea0ce2c8b438c1。"
         },
         {
           "file": "tests/e2e/permission-center.spec.ts",
@@ -3670,7 +3657,7 @@
         "tests/e2e/store-exit.spec.ts": "40ccc3d52c2e6b3ee78c9e654b5e1fbcb69eea8bd018c877f04fc9d7f3851bf9",
         "tests/e2e/store-order-prototype.spec.ts": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
         "tests/e2e/pagination-responsive.spec.ts": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
-        "tests/e2e/admin-foundation.spec.ts": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+        "tests/e2e/admin-foundation.spec.ts": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
         "tests/e2e/feedback-foundation.spec.ts": "cad6465de30701955cff10f92344f4f0ab32d20fa3c4d0e6f51555c9ca4f816a",
         "tests/e2e/login.spec.ts": "dad16c7d553f9645a821bf9fd79c7f08a3e944ccc5b02b10e8f97964bc81722c",
         "tests/e2e/permission-center.spec.ts": "8f1a8204a784cc57bbd836094ec721f446c3dd1c0232a0d49a4925613a45f442",
@@ -3679,13 +3666,13 @@
         "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java": "6809305e39b45188d1cfd572fae900457673dc02e61d5059e09abcb0dce5c0ad",
         "backend/src/test/java/com/zdm/platform/storeexit/StoreExitRemoteLedgerTest.java": "ec03cc12e15fd6abf6cd12cd8139a8e5c73a4bdb01085afeb191de2d1a585fb6",
         "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+        "backend/src/test/java/com/zdm/platform/storeexit/StoreCacheExitControllerTest.java": "091cacfb9f1cee3be151a86f5d85ec6615a48eaf07dae9c165d5b5bb1c3c0cad",
+        "backend/src/test/java/com/zdm/platform/security/SecurityAuditFilterTest.java": "2fe6aca87f39ffb67636aec5a614fe1d2e53b3139f67fc76fb1de169d21b6a2d",
         "src/services/storeScopeValidity.test.ts": "796d13d822d30cddcfaaf81b2beb9b5811f9e1bd713e1f9d3dfbba6f02744444",
         "tests/e2e/admin-api-mocks.ts": "22b59209f855b495a9cdf09b8fc1bf2fd1709b2002693cc818589c5af23c7aed",
         "tests/e2e/accessory-api-mocks.ts": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
-        "backend/src/test/java/com/zdm/platform/storeexit/StoreCacheExitControllerTest.java": "091cacfb9f1cee3be151a86f5d85ec6615a48eaf07dae9c165d5b5bb1c3c0cad",
         "src/services/storeCacheCleanup.test.ts": "7c2fa0912fc06d22191a9adbc3a66cd31b74b8c3e8d00ca34f07fd0adf8f1f21",
-        "infrastructure/store-exit-ledger/server.mjs": "22d69165149a6b4acc9116c185e0680821b59b2a27c215fe9987a6d7b0e324d5",
-        "backend/src/test/java/com/zdm/platform/security/SecurityAuditFilterTest.java": "2fe6aca87f39ffb67636aec5a614fe1d2e53b3139f67fc76fb1de169d21b6a2d"
+        "infrastructure/store-exit-ledger/server.mjs": "22d69165149a6b4acc9116c185e0680821b59b2a27c215fe9987a6d7b0e324d5"
       },
       "testChanges": [
         {
@@ -3927,6 +3914,12 @@
           "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
           "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
           "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+          "after": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
+          "reason": "Preserve main commit 2ffca9bea: compare Chrome flex alias serialization with independent reference and verify pagination right-edge geometry; original remaining assertions are retained."
         }
       ]
     }

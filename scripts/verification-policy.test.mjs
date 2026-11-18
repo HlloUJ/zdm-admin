@@ -155,8 +155,9 @@ test('real verifier plus npm entry points run each diagnostic once, and light fa
     });
     assert.equal(plan.earlyChecks.length, 1);
     assert.ok(!plan.frontend.some((task) => task.args.includes('lint:changed')));
-    const result = await executeVerification(plan, { report: () => {} });
-    assert.equal(result, failure ? 1 : 0);
+    const messages = [];
+    const result = await executeVerification(plan, { report: (message) => messages.push(message) });
+    assert.equal(result, failure ? 1 : 0, messages.join('\n'));
     assert.equal(readFileSync(path.join(root, '.task-verification/light'), 'utf8'), 'called\n');
     const calls = path.join(root, '.task-verification/calls');
     if (failure) assert.equal(existsSync(calls), false, 'diagnostics and targeted consumers must not start');
@@ -199,4 +200,32 @@ test('real verifier plus npm entry points run each diagnostic once, and light fa
     assert.equal(badScope.status, 1);
     assert.match(badScope.stderr, /different candidateSha/);
   }
+});
+
+test('CI fallback records the exact failed capability stage without retaining sensitive errors', () => {
+  const repository = { nameWithOwner: 'owner/repo' };
+  const protection = {
+    enforce_admins: { enabled: true },
+    required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+  };
+  const workflow = { id: 1, state: 'active', path: '.github/workflows/quality.yml' };
+  for (const [index, stage] of ['repository-identity', 'main-protection', 'quality-workflow'].entries()) {
+    let call = 0;
+    const result = deliveryCiCapability('.', () => {
+      if (call++ === index) throw Error('secret-token-123');
+      return JSON.stringify([repository, protection, workflow][call - 1]);
+    });
+    assert.equal(result.verified, false);
+    assert.equal(result.stage, stage);
+    assert.equal(result.failure, 'query-unavailable-or-invalid');
+    assert.ok(!JSON.stringify(result).includes('secret-token-123'));
+  }
+  const plan = createVerificationPlan({
+    root: process.cwd(),
+    affected: true,
+    files: ['src/pages/Example.vue'],
+    ciCapability: { verified: false, stage: 'main-protection', failure: 'contract-not-proven' },
+  });
+  assert.equal(plan.ciFallback, true);
+  assert.equal(plan.ciCapability.stage, 'main-protection');
 });

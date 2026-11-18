@@ -202,3 +202,25 @@ test('queue cannot replace the frozen task, finish another ticket or release a c
   );
   await queue.finish(running, { success: true });
 });
+test('deferred settlement releases the critical lease but keeps the exact FIFO ticket for later settle', async (t) => {
+  const queue = fixture(t),
+    original = await queue.enqueue(source('a'));
+  let turn = await queue.wait(original);
+  const deferred = { head: source('a').head, main: 'c'.repeat(40), runId: '42', deferredAt: new Date().toISOString() };
+  await assert.rejects(queue.deferSettlement(turn, deferred), /main mutation/);
+  await queue.markMainMutation(turn);
+  const originalLease = turn.lease.token;
+  const retained = await queue.deferSettlement(turn, deferred);
+  assert.equal(retained.id, original.id);
+  assert.equal(retained.owner, original.owner);
+  assert.equal(retained.accepted, original.accepted);
+  assert.equal(retained.status, 'waiting');
+  assert.equal(retained.lease, undefined);
+  assert.deepEqual(retained.deferred, { ...deferred, reason: '外部周期验收待完成' });
+  turn = await queue.wait(retained);
+  assert.equal(turn.id, original.id);
+  assert.notEqual(turn.lease.token, originalLease);
+  assert.equal(turn.mainMutationStarted, true);
+  await queue.finish(turn, { success: true });
+  assert.equal(queue.inspect().tickets.length, 0);
+});
