@@ -81,6 +81,14 @@ export function saveCompletion(directory, state) {
       };
       state.events = merge(disk.events, state.events, (e) => e.id ?? `${e.name}:${e.key}:${e.startedAt}`);
       state.repairs = merge(disk.repairs, state.repairs, (r) => r.id);
+      if (disk.historicalCiDiagnoses || state.historicalCiDiagnoses) {
+        const diagnoses = new Map((disk.historicalCiDiagnoses ?? []).map((item) => [item.failureRun, item]));
+        for (const item of state.historicalCiDiagnoses ?? []) {
+          if (diagnoses.has(item.failureRun)) assert.deepEqual(diagnoses.get(item.failureRun), item);
+          else diagnoses.set(item.failureRun, item);
+        }
+        state.historicalCiDiagnoses = [...diagnoses.values()];
+      }
       state.pauses = merge(disk.pauses ?? [], state.pauses ?? [], (p) => p.id);
       state.pauseTrackingSince = disk.pauseTrackingSince ?? state.pauseTrackingSince;
       if (disk.startedAt !== null) {
@@ -312,8 +320,14 @@ export function completionSummary(state, now = Date.now()) {
       : 'observed-wait-windows',
     pauses: (state.pauses ?? []).map((p) => ({ ...p, durationMs: (p.finishedAt ?? end) - p.startedAt })),
     unrecordedFailedRuns: state.events
-      .filter((e) => e.failure?.ci && !state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)))
+      .filter(
+        (e) =>
+          e.failure?.ci &&
+          !state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)) &&
+          !state.historicalCiDiagnoses?.some((r) => r.failureEventId === e.id),
+      )
       .map((e) => e.failure.ci.runId),
+    ...(state.historicalCiDiagnoses ? { historicalCiDiagnoses: state.historicalCiDiagnoses } : {}),
     gaps: completionGaps(state, end),
     networkObservations: state.events.flatMap(
       (e) => e.result?.networkObservations ?? e.failure?.networkObservations ?? [],

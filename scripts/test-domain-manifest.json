@@ -486,7 +486,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "e820e65ed69001c3260558a567bddd54ad08d26daab89631214c59a2cc60ee2c",
+      "digest": "9305e5130d4a5cd789fbef4bde62e3e4bfb5b81683aa3afb3f1f371efe6fc492",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -499,6 +499,7 @@
         "scripts/completion-recovery.mjs",
         "scripts/completion-session.mjs",
         "scripts/completion-status.mjs",
+        "scripts/delivery-repairs/completion-ci-diagnosis.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/delivery-repairs/preview-reference-source.mjs",
         "scripts/delivery-repairs/task-cleanup-npm.mjs",
@@ -577,7 +578,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "e7b1da1090da832ec65f7c76d03c0fcaa02e00c70e158f4c19ffd3482f8ef8d5",
+      "digest": "927b2844e8b63c5dcadbcdc261d2b29f7e04c081d366241f210c350b4cf96256",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -593,6 +594,7 @@
         "scripts/task-batch.mjs",
         "scripts/task-composition.mjs",
         "scripts/task-delivery-queue.mjs",
+        "scripts/task-execution-order.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-registry.mjs",
         "scripts/verification-evidence.mjs"
@@ -658,7 +660,7 @@
       "dynamicImports": 1
     },
     "scripts/completion-session.mjs": {
-      "digest": "402f8c8d70236c3cd8c8ee2fdf4c041a5519f7fb5b4fbf90b1313857baf79e26",
+      "digest": "22bb7d048cb5c55dd9db711023d55faa077abed8de7eb211dff3197aaa9646da",
       "imports": [
         "scripts/completion-process.mjs",
         "scripts/task-delivery-status-sync.mjs",
@@ -755,6 +757,16 @@
         "scripts/delivery-repairs/batch-timing-io.mjs"
       ],
       "dynamicImports": 1
+    },
+    "scripts/delivery-repairs/completion-ci-diagnosis.mjs": {
+      "digest": "19176189c5c540b0997eee215e80957177f680503250631c341811f3d5478918",
+      "imports": ["scripts/completion-ci-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/completion-ci-diagnosis.test.mjs": {
+      "digest": "69afbf04d649b3dd76b5c8cd9de082a73aba005e13994cdcdd91ea6f402093b2",
+      "imports": ["scripts/completion-session.mjs", "scripts/delivery-repairs/completion-ci-diagnosis.mjs"],
+      "dynamicImports": 0
     },
     "scripts/delivery-repairs/fixtures/timing-v1/batch-timing-core.mjs.txt": {
       "digest": "95b3ea09b3b24ed2bd0bc4d7ac1eeff648cad58ea676762c757f8661aa2b50fe",
@@ -2337,7 +2349,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "90662d29e8cfd9bb2d385ff56daac8bdca9fff472c3fef36986c9c4bcf4e88c2",
+      "digest": "1a3fc9dfe0d94f11e9f2f5174f82400a2f74e888709bbc738e01d1844185f0a8",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",
