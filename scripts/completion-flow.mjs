@@ -410,6 +410,10 @@ export async function runCompletionFlow(
       batch = readActiveBatch(root);
       const changed = composed.recordedHead !== head;
       head = composed.recordedHead;
+      if (process.env.ZDM_CLOSED_PREVIEW_REFERENCE) {
+        const { assertReferenceProofCurrent } = await import('./delivery-repairs/preview-reference-proof.mjs');
+        assertReferenceProofCurrent(root);
+      }
       // Development proof and the initial exact PR CI precede this turn. Run
       // final local readiness from the composed candidate's own immutable tools.
       pull = await publishCandidate({ readiness: true });

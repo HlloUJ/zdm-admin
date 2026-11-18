@@ -791,9 +791,12 @@ export function verifyPreservation(file, directory) {
 
 export async function completionCommand(root, args, options = {}) {
   if (args[0] === 'reference-proof') {
-    assert.equal(args.length, 3, 'Expected reference-proof <foreign-task-id> <exact-native-history-file>');
+    const { parseReferenceProofArguments } = await import('./delivery-repairs/preview-reference-source.mjs');
+    const selected = parseReferenceProofArguments(args.slice(1));
     const { collectPreviewReferenceProof } = await import('./delivery-repairs/preview-reference-proof.mjs');
-    return collectPreviewReferenceProof(root, args[1], args[2]);
+    return collectPreviewReferenceProof(root, selected.foreignTask, selected.historyFile, {
+      publishedBaseline: selected.publishedBaseline,
+    });
   }
   const proofFlag = args.indexOf('--reference-proof');
   if (proofFlag >= 0) {

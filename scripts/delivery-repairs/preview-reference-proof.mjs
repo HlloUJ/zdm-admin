@@ -26,24 +26,25 @@ import {
   referenceFileStat,
   verifyPublishedReferenceSnapshot,
 } from './preview-reference-history.mjs';
+import {
+  referenceLoadedFiles,
+  referenceCollectorPublication,
+  assertReferenceCollectorPublication,
+  referencePublishedBaseline,
+  assertReferenceHistoricalBaseline,
+  assertReferenceConsumerCandidate,
+  referenceConsumerSnapshot,
+} from './preview-reference-source.mjs';
 
 const VARIABLE = 'ZDM_CLOSED_PREVIEW_REFERENCE';
-const contract = 'native-history-live-readonly-preview-reference-v1';
+const contract = 'native-history-live-readonly-preview-reference-v2';
 const hash = (value) => referenceHash(JSON.stringify(value));
 const run = (command, args) =>
   execFileSync(command, args, { encoding: 'utf8', timeout: 15000, maxBuffer: 64 * 1024 * 1024 }).trim();
 const git = (root, ...args) => run('git', ['--no-optional-locks', '-C', root, ...args]);
 const docker = (...args) => run('docker', args);
-const sourceFiles = [
-  'scripts/preview-consumers.mjs',
-  'scripts/completion-cli.mjs',
-  'scripts/task-completion.mjs',
-  'scripts/delivery-repairs/preview-reference-proof.mjs',
-  'scripts/delivery-repairs/preview-reference-proof-core.mjs',
-  'scripts/delivery-repairs/preview-reference-history.mjs',
-  'scripts/delivery-repairs/preview-docker-directories.mjs',
-  'scripts/delivery-repairs/preview-docker-vnode-source.mjs',
-];
+const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const loadedCollectorFiles = referenceLoadedFiles(moduleRoot);
 const publishedFiles = [
   'scripts/task-cancellation-proof.mjs',
   'scripts/task-runtime-state.mjs',
@@ -135,16 +136,15 @@ function consumerScope(root, id = null) {
   return { registry, task, accepted, anchor };
 }
 
-function checkCollectorSource(anchor, candidate) {
-  const moduleRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-  for (const file of sourceFiles) {
-    const expected = execFileSync('git', ['-C', anchor, 'show', `${candidate}:${file}`]);
-    assert.deepEqual(
-      regularReferenceFile(path.join(moduleRoot, file)).bytes,
-      expected,
-      'Collector source differs from exact reviewed candidate: ' + file,
-    );
-  }
+function currentCollector(scope, candidate) {
+  return referenceCollectorPublication({
+    anchor: scope.anchor,
+    common: scope.registry.commonDir,
+    task: scope.task,
+    candidate,
+    moduleRoot,
+    loadedFiles: loadedCollectorFiles,
+  });
 }
 
 async function publishedCore(scope, baseline) {
@@ -290,11 +290,7 @@ async function captureIdentity(scope, selector, core, record) {
     anchor: anchor,
     head,
   });
-  assert.equal(
-    git(anchor, 'rev-parse', `main@{${new Date(history.checkedAt).toISOString()}}`),
-    selector.publishedBaseline,
-    'Historical check did not use the selected published main',
-  );
+  history.publishedMain = assertReferenceHistoricalBaseline(anchor, selector.publishedBaseline, history.checkedAt);
   const identity = {
     task: task.id,
     executor: taskExecutor(task),
@@ -430,27 +426,34 @@ async function liveProof(scope, selector, expected = null) {
   }
 }
 
-export async function collectPreviewReferenceProof(root, foreignTask, historyFile) {
+export async function collectPreviewReferenceProof(root, foreignTask, historyFile, options = {}) {
+  assert.ok(
+    Object.keys(options).every((key) => key === 'publishedBaseline'),
+    'No collector/observation adapters',
+  );
   const scope = consumerScope(root);
-  const candidate = git(scope.task.worktree, 'rev-parse', 'HEAD');
+  const consumerSource = referenceConsumerSnapshot(scope.task.worktree);
+  const candidate = consumerSource.candidate;
   assert.equal(
     git(scope.task.worktree, 'status', '--porcelain'),
     '',
     'Commit the complete reviewed collector candidate first',
   );
-  checkCollectorSource(scope.anchor, candidate);
+  const collector = currentCollector(scope, candidate);
   const selector = {
     foreignTask,
     historyFile: path.resolve(historyFile),
-    publishedBaseline: git(scope.anchor, 'rev-parse', 'HEAD'),
-    collectorCandidate: candidate,
+    publishedBaseline: referencePublishedBaseline(scope.anchor, options.publishedBaseline),
+    collectorCandidate: collector.commit,
   };
   const trusted = await publishedCore(scope, selector.publishedBaseline);
   trusted['scripts/accepted-source.mjs'].assertAcceptedSource(scope.task.worktree, scope.task.id, candidate);
   const live = await liveProof(scope, selector);
+  assert.deepEqual(currentCollector(scope, candidate), collector, 'Collector source changed during real observation');
   const packet = {
-    version: 1,
+    version: 2,
     contract,
+    collector,
     consumer: {
       task: scope.task.id,
       executor: taskExecutor(scope.task),
@@ -458,7 +461,7 @@ export async function collectPreviewReferenceProof(root, foreignTask, historyFil
       common: scope.registry.commonDir,
       candidate,
       recordedHeadAtCapture: scope.task.recordedHead,
-      tree: git(root, 'rev-parse', candidate + '^{tree}'),
+      tree: consumerSource.tree,
       accepted: scope.accepted.commit,
     },
     selector,
@@ -501,6 +504,7 @@ function loadSelection(root, file) {
   assert.equal(stat.mode & 0o077, 0, 'Proof must be private');
   const packet = JSON.parse(bytes);
   assert.deepEqual(Object.keys(packet).sort(), [
+    'collector',
     'collectorPid',
     'consumer',
     'contract',
@@ -513,7 +517,7 @@ function loadSelection(root, file) {
     'selector',
     'version',
   ]);
-  assert.equal(packet.version, 1);
+  assert.equal(packet.version, 2);
   assert.equal(packet.contract, contract);
   assert.deepEqual(Object.keys(packet.consumer).sort(), [
     'accepted',
@@ -531,7 +535,7 @@ function loadSelection(root, file) {
     'historyFile',
     'publishedBaseline',
   ]);
-  assert.equal(packet.selector.collectorCandidate, packet.consumer.candidate);
+  assert.equal(packet.selector.collectorCandidate, packet.collector.commit);
   assertStoppedPreviewIdentity(packet.identity);
   assert.ok(Number.isFinite(packet.finishedAt) && packet.finishedAt <= Date.now());
   assert.equal(packet.observedHost, os.hostname());
@@ -541,6 +545,7 @@ function loadSelection(root, file) {
     assertStoppedPreviewRound(round, packet.identity, packet.finishedAt);
   }
   const scope = consumerScope(root, packet.consumer.task);
+  assertReferenceCollectorPublication(scope.anchor, packet.consumer, packet.collector);
   assert.equal(packet.consumer.executor, taskExecutor(scope.task));
   assert.equal(packet.consumer.common, scope.registry.commonDir);
   assert.equal(packet.consumer.worktree, scope.task.worktree);
@@ -550,8 +555,7 @@ function loadSelection(root, file) {
     'Consumer recorded source changed',
   );
   if (existsSync(scope.task.worktree)) {
-    assert.equal(git(scope.task.worktree, 'rev-parse', 'HEAD'), packet.consumer.candidate, 'Consumer candidate moved');
-    assert.equal(git(scope.task.worktree, 'status', '--porcelain'), '', 'Consumer candidate became dirty');
+    assertReferenceConsumerCandidate(scope.task.worktree, packet.consumer.candidate, packet.consumer.tree);
   }
   assert.equal(git(root, 'rev-parse', packet.consumer.candidate + '^{tree}'), packet.consumer.tree);
   assert.ok(
@@ -559,8 +563,27 @@ function loadSelection(root, file) {
       .resolve(file)
       .startsWith(path.join(scope.registry.commonDir, 'task-delivery', scope.task.id, 'reference-proofs') + path.sep),
   );
-  checkCollectorSource(scope.anchor, packet.consumer.candidate);
-  return { scope, packet, digest: referenceHash(bytes), file: path.resolve(file) };
+  const collector = currentCollector(scope, packet.consumer.candidate);
+  return { scope, packet, collector, digest: referenceHash(bytes), file: path.resolve(file) };
+}
+
+// Composition may change a candidate, never the meaning of its old packet.
+// Refuse before merge; the same public collector creates a distinct new proof
+// for the new HEAD, after which the caller resumes the existing delivery.
+export function assertReferenceProofCurrent(root) {
+  if (!process.env[VARIABLE]) return null;
+  const selection = JSON.parse(process.env[VARIABLE]);
+  if (path.resolve(root) !== selection.consumerWorktree) return null;
+  assert.match(selection.consumerCandidate ?? '', /^[a-f0-9]{40}$/);
+  assertReferenceConsumerCandidate(
+    root,
+    selection.consumerCandidate,
+    git(root, 'rev-parse', selection.consumerCandidate + '^{tree}'),
+  );
+  const loaded = loadSelection(root, selection.file);
+  assert.equal(loaded.digest, selection.digest);
+  assert.equal(loaded.scope.task.id, selection.consumerTask);
+  return { candidate: loaded.packet.consumer.candidate, collector: loaded.collector };
 }
 
 // The environment contains a selector, not a safe flag or caller observations.
@@ -574,6 +597,7 @@ export async function withPreviewReferenceProof(root, file, action) {
     digest: loaded.digest,
     consumerTask: loaded.scope.task.id,
     consumerWorktree: loaded.scope.task.worktree,
+    consumerCandidate: loaded.packet.consumer.candidate,
     foreignTask: loaded.packet.selector.foreignTask,
   });
   try {
@@ -588,6 +612,7 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease }) 
   if (!process.env[VARIABLE]) return null;
   const selection = JSON.parse(process.env[VARIABLE]);
   assert.deepEqual(Object.keys(selection).sort(), [
+    'consumerCandidate',
     'consumerTask',
     'consumerWorktree',
     'digest',
@@ -605,6 +630,7 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease }) 
   const loaded = loadSelection(worktree, selection.file);
   assert.equal(loaded.digest, selection.digest, 'Reference selector changed');
   assert.equal(loaded.scope.task.id, selection.consumerTask);
+  assert.equal(loaded.packet.consumer.candidate, selection.consumerCandidate);
   assert.equal(path.resolve(worktree), loaded.scope.task.worktree, 'Foreign proof consumer');
   if (taskId !== undefined) assert.equal(taskId, loaded.scope.task.id);
   assert.equal(lease.task, loaded.packet.selector.foreignTask, 'Unreviewed stopped lease');
@@ -612,12 +638,23 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease }) 
   assert.equal(port, loaded.packet.identity.port);
   assert.deepEqual(original, loaded.packet.identity.lease);
   const live = await liveProof(loaded.scope, loaded.packet.selector, loaded.packet.identity);
-  assert.equal(loadSelection(worktree, selection.file).digest, loaded.digest, 'Selection changed during live proof');
+  const after = loadSelection(worktree, selection.file);
+  assert.equal(after.digest, loaded.digest, 'Selection changed during live proof');
+  assert.deepEqual(after.collector, loaded.collector, 'Actual collector changed during live proof');
   const evidence = path.join(path.dirname(loaded.file), 'live-' + randomUUID() + '.json');
   writeFileSync(
     evidence,
-    JSON.stringify({ contract, consumer: loaded.packet.consumer, selectionDigest: loaded.digest, ...live }, null, 2) +
-      '\n',
+    JSON.stringify(
+      {
+        contract,
+        consumer: loaded.packet.consumer,
+        collector: loaded.collector,
+        selectionDigest: loaded.digest,
+        ...live,
+      },
+      null,
+      2,
+    ) + '\n',
     { flag: 'wx', mode: 0o600 },
   );
   return {

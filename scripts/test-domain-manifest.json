@@ -486,7 +486,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "c6f8f900f961ab415e1b09b3e2fb198c0dca8ba723311f03e8983fdb94a32070",
+      "digest": "e820e65ed69001c3260558a567bddd54ad08d26daab89631214c59a2cc60ee2c",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -500,6 +500,7 @@
         "scripts/completion-session.mjs",
         "scripts/completion-status.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
+        "scripts/delivery-repairs/preview-reference-source.mjs",
         "scripts/delivery-repairs/task-cleanup-npm.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
@@ -521,7 +522,7 @@
         "scripts/task-runtime-references.mjs",
         "scripts/wait-quality.mjs"
       ],
-      "dynamicImports": 2
+      "dynamicImports": 3
     },
     "scripts/completion-cli.test.mjs": {
       "digest": "bc3c5ccbc3cc3cde71cefcc735d04f45b6dff586b90b327ce7f0e54dcc46089a",
@@ -545,11 +546,12 @@
       "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
-      "digest": "7228de8b3e8244f7bbdd29e7a8e5b4c22ee354138a488401fe1dfd0dc64d5b6a",
+      "digest": "e45e366707a017fb7c2f8a05c3bd00c7bfbb85ceeec77e4ef67ae90bd845334a",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-session.mjs",
+        "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/resource-lease.mjs",
         "scripts/task-batch.mjs",
@@ -559,7 +561,7 @@
         "scripts/task-registry.mjs",
         "scripts/verify.mjs"
       ],
-      "dynamicImports": 0
+      "dynamicImports": 1
     },
     "scripts/completion-handoff.mjs": {
       "digest": "69e993cda81d680efe9eea7a208481c6db3f180d6778a0166982108f3086e81d",
@@ -575,7 +577,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "461b1448e4b2f6ba0ff4da6c6f8908f92512b1791256922a7af2c9404c625299",
+      "digest": "e7b1da1090da832ec65f7c76d03c0fcaa02e00c70e158f4c19ffd3482f8ef8d5",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -805,20 +807,17 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof.mjs": {
-      "digest": "8e61f7bd5f54218382fc3b0bcbcb41482f854aad7db614eb2734f8820af2e1f2",
+      "digest": "8aac8e86d00bcfc53aa85553b2c2f2b16580b9e2c96f36795600181143b07b8d",
       "imports": [
         "scripts/accepted-source.mjs",
-        "scripts/completion-cli.mjs",
         "scripts/delivery-repairs/preview-docker-directories.mjs",
-        "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
         "scripts/delivery-repairs/preview-reference-proof-core.mjs",
-        "scripts/delivery-repairs/preview-reference-proof.mjs",
+        "scripts/delivery-repairs/preview-reference-source.mjs",
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/preview-consumers.mjs",
         "scripts/task-cancellation-proof.mjs",
-        "scripts/task-completion.mjs",
         "scripts/task-data-environment.mjs",
         "scripts/task-execution-binding.mjs",
         "scripts/task-execution-order.mjs",
@@ -836,6 +835,29 @@
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/preview-consumers.mjs",
         "scripts/task-completion.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/preview-reference-source.mjs": {
+      "digest": "d48c8c57d3baf2d5d8517e9e6e5e7c43b7f8f20e118240f89cfa600aaad8e4fb",
+      "imports": [
+        "scripts/completion-cli.mjs",
+        "scripts/delivery-repairs/preview-docker-directories.mjs",
+        "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
+        "scripts/delivery-repairs/preview-reference-history.mjs",
+        "scripts/delivery-repairs/preview-reference-proof-core.mjs",
+        "scripts/delivery-repairs/preview-reference-proof.mjs",
+        "scripts/delivery-repairs/preview-reference-source.mjs",
+        "scripts/preview-consumers.mjs",
+        "scripts/task-completion.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/preview-reference-source.test.mjs": {
+      "digest": "0be9889b1a8030643368deb7ba462b7711af46017f24117b0b0f01062556f89b",
+      "imports": [
+        "scripts/delivery-repairs/preview-reference-history.mjs",
+        "scripts/delivery-repairs/preview-reference-source.mjs"
       ],
       "dynamicImports": 0
     },
@@ -2306,7 +2328,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "467c2cce41fd94e185a1fe85cdb74bd537537da082c195498b906c0ff72b1321",
+      "digest": "90662d29e8cfd9bb2d385ff56daac8bdca9fff472c3fef36986c9c4bcf4e88c2",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",
