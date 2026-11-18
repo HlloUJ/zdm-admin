@@ -131,7 +131,7 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source.mjs": {
-      "digest": "4e20e5403286b97b98b42b43ebbfa2bee4c6daba270e524f2c74f1aaca8c2b56",
+      "digest": "1ec5b06f528a4f1d70326ccd773465b9a8efa484839bee237b54d85c6b6ac455",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",

@@ -23,11 +23,12 @@ import {
   findReviewedMerge,
 } from './accepted-source-composition.mjs';
 export function acceptedGit(root, args, options = {}) {
-  const result = spawnSync('git', ['--no-replace-objects', ...args], {
+  const result = spawnSync('git', args, {
     cwd: root,
     encoding: 'utf8',
     maxBuffer: 32 * 1024 * 1024,
     ...options,
+    env: { ...(options.env ?? process.env), GIT_NO_REPLACE_OBJECTS: '1' },
   });
   assert.equal(result.status, 0, `Accepted-source Git operation failed: ${args[0]}: ${result.stderr ?? ''}`);
   return args.includes('-z') ? result.stdout : result.stdout.trim();
