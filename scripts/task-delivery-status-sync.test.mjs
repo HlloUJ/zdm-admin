@@ -197,7 +197,16 @@ test('new authorized pending-native intake is queued behind an older global fenc
   );
   assert.equal(box.read().pending[1].receipt.next.label, '等待恢复指令');
 });
-for (const scenario of ['old-request', 'foreign-user', 'bound-worker', 'occupied-admission', 'unknown-fence'])
+for (const scenario of [
+  'old-request',
+  'foreign-user',
+  'bound-worker',
+  'unreserved-bound',
+  'missing-binding-event',
+  'foreign-binding-event',
+  'occupied-admission',
+  'unknown-fence',
+])
   test('new intake projection keeps the real pause for ' + scenario, (t) => {
     const root = fixture(t),
       ticket = {
@@ -217,6 +226,19 @@ for (const scenario of ['old-request', 'foreign-user', 'bound-worker', 'occupied
     if (scenario === 'old-request') ticket.request.sequence = 9;
     if (scenario === 'foreign-user') ticket.request.authorId = 'other-user';
     if (scenario === 'bound-worker') ticket.awaitingNativeWorker = false;
+    if (['unreserved-bound', 'missing-binding-event', 'foreign-binding-event'].includes(scenario)) {
+      delete ticket.awaitingNativeWorker;
+      ticket.owner = 'actual-worker';
+      ticket.nativeCoordinatorOwner = 'actual-coordinator';
+      if (scenario !== 'unreserved-bound') ticket.nativeLaunchReserved = true;
+      if (scenario !== 'missing-binding-event')
+        state.events.push({
+          action: 'bind-native-worker',
+          task: ticket.task,
+          coordinatorOwner: ticket.nativeCoordinatorOwner,
+          workerOwner: scenario === 'foreign-binding-event' ? 'other-worker' : ticket.owner,
+        });
+    }
     if (scenario === 'occupied-admission') ticket.admission = 'existing-admission';
     if (scenario === 'unknown-fence') state.events = [];
     captureQueueProgress(root, state, null);

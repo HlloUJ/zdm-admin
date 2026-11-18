@@ -2475,7 +2475,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.mjs": {
-      "digest": "24159126a8d1612ff20e789844ea0e404df059b0205ff11669d9b08af36b12ac",
+      "digest": "73484616246d9324b2d8cd2bbc0f26044e04aa158e864ca6e9ebb7f460dbfd15",
       "imports": [
         "scripts/task-execution-scope.mjs",
         "scripts/task-progress-host.mjs",
@@ -2484,7 +2484,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.test.mjs": {
-      "digest": "84397e8a9e92b27261ca1108f9b94e7bd3ebc845f952094845e0e18018bae118",
+      "digest": "751e3e90492865ba6a2eb007f54e66a229d83bfbef15995eb988d40ecd43acc3",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/task-delivery-status-sync.mjs",
@@ -2982,7 +2982,7 @@
       "dynamicImports": 1
     },
     "scripts/task-thread-titles.test.mjs": {
-      "digest": "4b638fdd2342f82b231dc37ff1b14c0e33b2e9b069deeeabad5b0980e1a4ac67",
+      "digest": "eaa760ff4145d6052a5a86867ba67a9b53da41a0435bec96c05cb2dfa572ac9a",
       "imports": [
         "scripts/task-board-intake.mjs",
         "scripts/task-codex-cycle.mjs",

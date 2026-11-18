@@ -62,11 +62,25 @@ export function captureQueueProgress(commonDir, state, previous) {
   const pausedFor = (current, ticket) => {
     if (!executionPausedFor(current, ticket)) return false;
     const fence = current.events?.findLast((event) => ['initialize', 'pause-all'].includes(event.action))?.request;
-    // A newly authorized pending native task is queued behind the fence. It
-    // has not been explicitly paused by the user and has not started either.
+    // Binding a reserved new native worker does not start it or revoke its
+    // newer user instruction. A subsequent real pause still wins below.
+    const pendingNative =
+      ticket.awaitingNativeWorker === true ||
+      (ticket.lane === 'development' &&
+        ticket.nativeLaunchReserved === true &&
+        typeof ticket.nativeCoordinatorOwner === 'string' &&
+        ticket.nativeCoordinatorOwner.trim() &&
+        ticket.nativeCoordinatorOwner !== ticket.owner &&
+        current.events?.some(
+          (event) =>
+            event.action === 'bind-native-worker' &&
+            event.task === ticket.task &&
+            event.coordinatorOwner === ticket.nativeCoordinatorOwner &&
+            event.workerOwner === ticket.owner,
+        ));
     return !(
       ticket.status === 'queued' &&
-      ticket.awaitingNativeWorker === true &&
+      pendingNative &&
       ticket.admission === null &&
       Number.isSafeInteger(fence?.sequence) &&
       typeof fence.authorId === 'string' &&
