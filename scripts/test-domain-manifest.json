@@ -2291,12 +2291,12 @@
       "dynamicImports": 0
     },
     "scripts/task-completion-placement.mjs": {
-      "digest": "4041dfa3ee1cda3ed0f958a73ca98acb99a04931954b9dda67496aceba0034fd",
+      "digest": "8e853d4c1433ca141006d193ca610b6bf8efc18b2850c10e0ea8473921ed8778",
       "imports": ["scripts/task-delivery-status-sync.mjs", "scripts/task-progress-outbox.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-completion-placement.test.mjs": {
-      "digest": "fa75c9c8343ee434d4640f76827a1715b856d1deb85e7efade576773017c2991",
+      "digest": "aa7e5051233b4c04f4b1a56b226dbb3ef92ddc1d2433f4b8c6ecf19753a27d84",
       "imports": [
         "scripts/task-completion-placement.mjs",
         "scripts/task-completion-progress.mjs",
