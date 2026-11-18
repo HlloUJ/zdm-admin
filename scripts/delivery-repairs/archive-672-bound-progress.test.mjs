@@ -4,7 +4,7 @@ import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { boardId, boundPolicy, runBound672, runtimeId } from './bound-672-progress.mjs';
+import { boardId, boundPolicy, runBound672, runtimeId } from './archive-672-bound-progress.mjs';
 
 const hash = (value) => createHash('sha256').update(value).digest('hex');
 const actor = 'fixture-coordinator';

@@ -711,6 +711,29 @@
       "imports": ["scripts/delivery-repairs/archive-039-delivery-pause.mjs"],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/archive-672-bound-progress-cli.mjs": {
+      "digest": "5042b8bc2c6b535849cb9445bae6844179003b378a9e0f1bf05502665ebfbc8f",
+      "imports": [
+        "scripts/delivery-repairs/archive-672-bound-progress-cli.mjs",
+        "scripts/delivery-repairs/archive-672-bound-progress.mjs",
+        "scripts/task-board-transport.mjs",
+        "scripts/task-context.mjs",
+        "scripts/task-coordination.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/archive-672-bound-progress.mjs": {
+      "digest": "7dcdbf7248e5763704b6d1e920643788b062133fd7ce6c58f9f036201cba6732",
+      "imports": ["scripts/task-execution-scope.mjs", "scripts/task-progress-outbox.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/archive-672-bound-progress.test.mjs": {
+      "digest": "6d816fdaba0776828f6d8aeecb144e02f8bbe1d728d6cbaca129f79ded78db94",
+      "imports": ["scripts/delivery-repairs/archive-672-bound-progress.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/batch-timing-io.mjs": {
       "digest": "c4a3225f7a412a7b3ed890366af56b3feba3e62e3588e160bb139bcc40d05ab6",
       "imports": [],
@@ -724,29 +747,6 @@
         "scripts/delivery-repairs/batch-timing-io.mjs"
       ],
       "dynamicImports": 1
-    },
-    "scripts/delivery-repairs/bound-672-progress-cli.mjs": {
-      "digest": "c56485a9ddee7321a0533c3a139e593fc3085f5d7eccbb57bba11c399c7a6a28",
-      "imports": [
-        "scripts/delivery-repairs/bound-672-progress-cli.mjs",
-        "scripts/delivery-repairs/bound-672-progress.mjs",
-        "scripts/task-board-transport.mjs",
-        "scripts/task-context.mjs",
-        "scripts/task-coordination.mjs",
-        "scripts/task-execution-order.mjs",
-        "scripts/task-registry.mjs"
-      ],
-      "dynamicImports": 0
-    },
-    "scripts/delivery-repairs/bound-672-progress.mjs": {
-      "digest": "7dcdbf7248e5763704b6d1e920643788b062133fd7ce6c58f9f036201cba6732",
-      "imports": ["scripts/task-execution-scope.mjs", "scripts/task-progress-outbox.mjs"],
-      "dynamicImports": 0
-    },
-    "scripts/delivery-repairs/bound-672-progress.test.mjs": {
-      "digest": "fd93f7987c82e179f50f5aa0a031999faae5f2940e929374f063defb6c160a1d",
-      "imports": ["scripts/delivery-repairs/bound-672-progress.mjs"],
-      "dynamicImports": 0
     },
     "scripts/delivery-repairs/fixtures/timing-v1/batch-timing-core.mjs.txt": {
       "digest": "95b3ea09b3b24ed2bd0bc4d7ac1eeff648cad58ea676762c757f8661aa2b50fe",

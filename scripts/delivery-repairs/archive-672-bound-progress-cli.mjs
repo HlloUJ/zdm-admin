@@ -8,7 +8,7 @@ import { createExecutionOrder } from '../task-execution-order.mjs';
 import { assertDeliveredDependencies } from '../task-context.mjs';
 import { readTaskCoordination } from '../task-coordination.mjs';
 import { createOwnerBoardCall } from '../task-board-transport.mjs';
-import { runBound672 } from './bound-672-progress.mjs';
+import { runBound672 } from './archive-672-bound-progress.mjs';
 
 assert.ok(
   process.stdin.isTTY && process.argv.length === 2,
@@ -32,7 +32,7 @@ process.stdin.on('data', async (chunk) => {
     const main = realpathSync(mains[0].worktree);
     assert.equal(
       realpathSync(fileURLToPath(import.meta.url)),
-      path.join(main, 'scripts/delivery-repairs/bound-672-progress-cli.mjs'),
+      path.join(main, 'scripts/delivery-repairs/archive-672-bound-progress-cli.mjs'),
       'Execute only from the published main anchor',
     );
     const git = (...args) =>
