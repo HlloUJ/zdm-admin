@@ -272,7 +272,7 @@ test('v2 published integration rejects an unpublished combination before changin
   assert.equal(readFileSync(path.join(integration, 'unpublished.txt'), 'utf8'), 'must be retained');
 });
 
-for (const [failure, deferSettle] of [
+for (const [failure, deferSettle, preparationOnly = false] of [
   [null, false],
   ['composed-ci', false],
   ['handoff', false],
@@ -280,12 +280,26 @@ for (const [failure, deferSettle] of [
   ['main-ci', true],
   ['handoff', true],
   ['missing-handoff-proof', true],
+  [null, false, true],
+  ['reference-refresh', false],
 ])
-  test(`parallel delivery controller preserves exact ordering and ownership: ${failure ?? 'success'} defer=${deferSettle}`, async (t) => {
+  test(`parallel delivery controller preserves exact ordering and ownership: ${failure ?? 'success'} defer=${deferSettle}${preparationOnly ? ' preparation=true' : ''}`, async (t) => {
     const f = fixture(t),
       events = [],
       state = { events: [] },
       beforeB = f.registry.readTask('b');
+    if (failure === 'reference-refresh') {
+      const previous = process.env.ZDM_CLOSED_PREVIEW_REFERENCE;
+      t.after(() => {
+        if (previous === undefined) delete process.env.ZDM_CLOSED_PREVIEW_REFERENCE;
+        else process.env.ZDM_CLOSED_PREVIEW_REFERENCE = previous;
+      });
+      process.env.ZDM_CLOSED_PREVIEW_REFERENCE = JSON.stringify({
+        consumerWorktree: f.a,
+        consumerCandidate: f.head,
+        file: path.join(f.registry.commonDir, 'old-selection-not-used-after-source-changes.json'),
+      });
+    }
     let pullState = 'OPEN',
       prWaits = 0,
       handoffFailed = false;
@@ -328,6 +342,7 @@ for (const [failure, deferSettle] of [
       save: () => {},
       common: f.registry.commonDir,
       deferSettle,
+      preparationOnly,
       inventoryAssets: () => [],
       candidateRuntime: async (_task, _head, action) => action({}),
       checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
@@ -348,7 +363,7 @@ for (const [failure, deferSettle] of [
             assert.equal(queue.inspect().tickets.length, prWaits === 1 ? 0 : 1);
             if (failure === 'composed-ci' && prWaits === 2) throw Error('composed CI failed');
           }
-          return (
+          const result = (
             await completionStage(state, 'ci', args[2] + ':42', async () => ({
               runId: 42,
               headSha: args[2],
@@ -363,6 +378,11 @@ for (const [failure, deferSettle] of [
               })),
             }))
           ).result;
+          // The public wait command returns a summary; the typed original CI
+          // record remains in the session and must be used for preparation.
+          return preparationOnly
+            ? { runId: result.runId, headSha: result.headSha, conclusion: result.conclusion }
+            : result;
         }
         if (args[0] === 'final-handoff') {
           assert.equal(f.registry.readTask('a').stage, 'main-verified');
@@ -391,11 +411,29 @@ for (const [failure, deferSettle] of [
               ? 'main CI failed'
               : failure === 'missing-handoff-proof'
                 ? 'Defer settlement requires'
-                : 'composed CI failed',
+                : failure === 'reference-refresh'
+                  ? 'collect a new public reference-proof'
+                  : 'composed CI failed',
         ),
       );
     else {
       const result = await run();
+      if (preparationOnly) {
+        assert.equal(result.status, 'prepared');
+        assert.equal(result.formalDeliveryComplete, false);
+        assert.equal(result.finalMainAdmissionRequired, true);
+        assert.equal(result.head, f.head);
+        assert.equal(result.accepted, f.accepted.commit);
+        assert.equal(result.runId, '42');
+        assert.equal(prWaits, 1);
+        assert.deepEqual(queue.inspect().tickets, []);
+        assert.deepEqual(f.registry.readTask('b'), beforeB);
+        assert.equal(f.git(f.main, 'rev-parse', 'HEAD'), f.latest);
+        assert.ok(!events.some((event) => ['merge', 'handoff', 'settle', 'quiesce-a-preserve-b'].includes(event)));
+        assert.equal(createResourceLeases(f.registry.commonDir).inspect('main-delivery'), null);
+        assert.equal(f.registry.readTask('a').frozen.accepted, f.accepted.commit);
+        return;
+      }
       if (deferSettle) {
         assert.equal(result.status, 'deferred');
         assert.equal(result.formalDeliveryComplete, false);
@@ -415,6 +453,18 @@ for (const [failure, deferSettle] of [
     assert.deepEqual(f.registry.readTask('b'), beforeB);
     assert.equal(readFileSync(path.join(f.b, 'unfinished.txt'), 'utf8'), 'unfinished B must survive');
     assert.equal(f.registry.readTask('a').frozen.accepted, f.accepted.commit);
+    if (failure === 'reference-refresh') {
+      assert.equal(prWaits, 1, 'Reference refresh is required before a new composed candidate is published');
+      assert.ok(!events.some((event) => ['merge', 'handoff', 'settle'].includes(event)));
+      assert.notEqual(
+        f.git(f.a, 'rev-parse', 'HEAD'),
+        f.head,
+        'Keep the proven composed candidate for explicit refresh',
+      );
+      assert.equal(f.git(f.main, 'rev-parse', 'HEAD'), f.latest);
+      assert.equal(queue.inspect().tickets.length, 0);
+      return;
+    }
     assert.equal(prWaits, 2, 'A changed merged candidate always receives new exact PR checks');
     if (failure === 'composed-ci') {
       assert.ok(!events.includes('merge'));

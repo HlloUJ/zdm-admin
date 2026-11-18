@@ -56,13 +56,22 @@ export async function codexMonitoringContext(
   return context;
 }
 
-export function developmentCapacity({ limit, activeDevelopment, activeDelivery, activeOther = 0 }) {
+export function developmentCapacity({
+  limit,
+  activeDevelopment,
+  activeDelivery,
+  activePreparation = 0,
+  activeOther = 0,
+}) {
   assert.ok(Number.isSafeInteger(limit) && limit > 0, 'Actual executor limit required');
-  for (const value of [activeDevelopment, activeDelivery, activeOther])
+  for (const value of [activeDevelopment, activeDelivery, activePreparation, activeOther])
     assert.ok(Number.isSafeInteger(value) && value >= 0);
   assert.ok(activeDelivery <= 1, 'Delivery must remain serial');
-  assert.ok(activeDevelopment + activeDelivery + activeOther <= limit, 'Invalid executor capacity snapshot');
-  return { available: activeDevelopment < limit - activeOther - 1, reservedDelivery: 1 };
+  assert.ok(
+    activeDevelopment + activeDelivery + activePreparation + activeOther <= limit,
+    'Invalid executor capacity snapshot',
+  );
+  return { available: activeDevelopment + activePreparation < limit - activeOther - 1, reservedDelivery: 1 };
 }
 
 // Coordinator intake is mandatory before preflight, queue work or task dispatch.

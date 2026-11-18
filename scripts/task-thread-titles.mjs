@@ -539,5 +539,29 @@ export function createTaskThreadTitles(commonDir) {
       return { status: 'confirmed', taskId, threadId: record.threadId, expectedTitle, boardRevision: board.revision };
     });
   }
-  return { get, enrolled, ensure, sync, rename, dispatch, requireBinding, plan, confirm, base, digest };
+  const retryCreation = async (input, host, adapters) => {
+    // Ordinary registry/intake reads keep their original lightweight closure.
+    // The authenticated recovery action alone loads OS/Git resource proof.
+    const { recoverFailedCreation } = await import('./delivery-repairs/task-failed-creation.mjs');
+    return recoverFailedCreation(
+      commonDir,
+      input,
+      host,
+      {
+        get,
+        exclusive,
+        file,
+        base,
+        privateRead,
+        save,
+        assertPending,
+        existingExecution,
+        assertReceipt,
+        verifyNativeCreation,
+        threadTitle,
+      },
+      adapters,
+    );
+  };
+  return { get, enrolled, ensure, sync, rename, dispatch, requireBinding, plan, confirm, retryCreation, base, digest };
 }

@@ -391,7 +391,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
         "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
         "tests/e2e/accessory-permissions.spec.ts": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
-        "tests/e2e/admin-foundation.spec.ts": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+        "tests/e2e/admin-foundation.spec.ts": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
         "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
         "tests/e2e/feedback-foundation.spec.ts": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
         "tests/e2e/finished-stock-permissions.spec.ts": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
@@ -452,7 +452,7 @@
         "src/utils/numericInput.test.ts": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
         "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java": "3e5698da75d970c3e7ee82fb93965a086876a9d771c5e44a687213be853ef90a",
         "src/utils/numericInputValidation.test.ts": "3b7a3a3dcd4fcb8f06923dbe341e0e870e9e2791c772d8496ef8e11cbea66a26",
-        "tests/e2e/store-price-rules.spec.ts": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
+        "tests/e2e/store-price-rules.spec.ts": "1e57f57f0538aee643a104f3831f88f87eac8bfa4e0417d7b9ebb0980129c567",
         "tests/e2e/decimal-editing.ts": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73",
         "tests/e2e/price-table-feedback.ts": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
         "src/pages/finished-stock/shared/guidePriceSource.test.ts": "78b7b219cb169c86b10590cef5faaf1394ec3c00e27101c4b784001e224f2fad",
@@ -2699,6 +2699,18 @@
           "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
           "after": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
           "reason": "款项配置改由真实API供给：保留分页、数量和订单回归全部断言，移除旧本地group夹具，补充并发删除后刷新且保留输入验证。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+          "after": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
+          "reason": "520 CI44178271178: Chrome158将flex-end序列化为flow-end；与同浏览器独立显式flex-end参照严格比较，并新增容器右边缘几何断言。保留所有间距、宽度及其他业务断言，不修改业务样式、不增加重试。"
+        },
+        {
+          "file": "tests/e2e/store-price-rules.spec.ts",
+          "before": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
+          "after": "1e57f57f0538aee643a104f3831f88f87eac8bfa4e0417d7b9ebb0980129c567",
+          "reason": "520 CI44178271178: Chrome158 flex-end/flow-end别名序列化；保留查询重置、草稿、失焦及混合保存全部断言，严格比较独立标准flex-end参照并新增按钮右边缘几何断言。无业务修改、无重试。"
         }
       ],
       "routes": [

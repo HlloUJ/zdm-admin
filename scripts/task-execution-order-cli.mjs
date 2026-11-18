@@ -13,7 +13,8 @@ import { verifyCancellation } from './task-cancellation-proof.mjs';
 import { deliveryStatus } from './completion-status.mjs';
 import { assertDeliveredDependencies } from './task-context.mjs';
 
-const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
+const git = (root, ...args) =>
+  execFileSync('git', ['--no-optional-locks', '-C', root, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
 export function verifyDevelopmentCompletion(task, evidence) {
   assert.equal(evidence?.task, task.id);
   assert.equal(evidence.owner, task.owner);

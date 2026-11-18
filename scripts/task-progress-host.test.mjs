@@ -28,6 +28,27 @@ function transport() {
     },
   };
 }
+test('one-receipt bounded native chunks finish readback before starting the next original fact', async (t) => {
+  const f = fixture(t),
+    adapter = transport(),
+    box = createProgressOutbox(f.directory);
+  const host = createProgressHost(adapter, { directory: f.directory, drainLimit: 1, drainTimeoutMs: 30000 });
+  const original = ['one', 'two', 'three'].map((key) => box.enqueue('fixture', key, { event: 'started' }).receipt_id);
+  await host.run(async () => {
+    host.notify(f.directory);
+    for (let i = 0; i < original.length; i++) {
+      await host.drain();
+      assert.deepEqual(
+        adapter.sent.map((receipt) => receipt.receipt_id),
+        original.slice(0, i + 1),
+      );
+      assert.equal(box.read().acknowledged.length, i + 1);
+      assert.equal(box.read().pending.length, original.length - i - 1);
+    }
+  });
+  for (const drainLimit of [0, -1, 1.5, 129]) assert.throws(() => createProgressHost(adapter, { drainLimit }));
+  assert.throws(() => createProgressHost(adapter, { drainLimit: 1, drainTimeoutMs: 30001 }));
+});
 test('injected stage drains started before synchronous work, preserving ordinary no-host operation', async (t) => {
   const f = fixture(t),
     adapter = transport(),
