@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import path from 'node:path';
+import { matchesStoppedOwnPreview } from '../preview-consumers.mjs';
 
 const under = (value, root) => {
   const normalized = value.replace(/^\/host_mnt\//, '/').replace(/ \(deleted\)$/, '');
@@ -140,6 +141,26 @@ export function referenceFrontendMetadata(port, response, lease) {
     'Unknown other frontend consumer',
   );
   return null;
+}
+
+export function referenceBackendConsumers(responses, leases, identity, taskId, ownClosures) {
+  for (const expected of ownClosures) {
+    const port = expected.port;
+    const lease = leases.find((item) => item.port === port);
+    const response = responses.find((item) => item.port === port)?.response;
+    assert.ok(
+      port !== identity.port && matchesStoppedOwnPreview(port, response, lease, taskId, [expected]),
+      'Owned validation preview changed during nested observation; retain the lease',
+    );
+  }
+  const backendConsumers = [];
+  for (const { port, response } of responses) {
+    if (port === identity.port || ownClosures.some((closure) => closure.port === port)) continue;
+    const lease = leases.find((item) => item.port === port);
+    const metadata = referenceFrontendMetadata(port, response, lease);
+    if (metadata?.apiTarget === `http://127.0.0.1:${identity.backendPort}`) backendConsumers.push({ port, metadata });
+  }
+  return backendConsumers;
 }
 
 // Pure checks are also exercised with hostile fixtures. Production obtains all

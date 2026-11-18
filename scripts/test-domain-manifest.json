@@ -806,12 +806,12 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof-core.mjs": {
-      "digest": "af198bb6ce3726b177b0df388fc293925ad67da671fe30aaa9110c82d903485a",
-      "imports": [],
+      "digest": "3dbd6b11fd38a451076b2c51bb84548110993912acb9b62545b05892f6df3d7a",
+      "imports": ["scripts/preview-consumers.mjs"],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof.mjs": {
-      "digest": "8aac8e86d00bcfc53aa85553b2c2f2b16580b9e2c96f36795600181143b07b8d",
+      "digest": "c739dd4ac32231b14da6af6e593d478e14f9310a52226a7c8c132f08f0f1b754",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/delivery-repairs/preview-docker-directories.mjs",
@@ -1687,18 +1687,20 @@
       "dynamicImports": 0
     },
     "scripts/preview-consumers.mjs": {
-      "digest": "fdbdecd27e6e04854e2aa0b9417e8c39890e938193ef53380e8c70d55424ff96",
+      "digest": "9ced321a58eb60703eb93fe2676a50d3c01f95ba528ffe06bccf2858fa61be27",
       "imports": ["scripts/delivery-repairs/preview-reference-proof.mjs", "scripts/resource-lease.mjs"],
       "dynamicImports": 1
     },
     "scripts/preview-consumers.test.mjs": {
-      "digest": "d08320d4efe5e6c6be860f51b3b22b1e8d34d6e27a8d7c7eb2b5d7a70df6d452",
+      "digest": "ab65e775b8a23c35b892ad122be0fa90bb89513c478c5d360908200bc5fd1165",
       "imports": [
+        "scripts/delivery-repairs/preview-reference-proof-core.mjs",
         "scripts/preview-consumers.mjs",
+        "scripts/resource-lease.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-runtime-references.mjs"
       ],
-      "dynamicImports": 0
+      "dynamicImports": 1
     },
     "scripts/preview-frozen-recovery.test.mjs": {
       "digest": "73340c926df2a919a35b69b2097ed0b821ca34556a5f87f674dacf999e2958d0",
