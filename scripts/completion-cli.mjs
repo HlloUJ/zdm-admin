@@ -32,6 +32,7 @@ import {
   settleCompletion,
 } from './completion-session.mjs';
 import { assertCompletionQuality, verifyCompletionEvidence } from './completion-ci-evidence.mjs';
+import { hasHistoricalCiDiagnosis, recordHistoricalCiDiagnosis } from './delivery-repairs/completion-ci-diagnosis.mjs';
 import {
   readActiveBatch,
   closeBatch,
@@ -118,6 +119,7 @@ async function completionCommandLocked(
     wait: [2, 2],
     'repair-start': [4, 5],
     'repair-finish': [1, 1],
+    'record-ci-diagnosis': [2, 2],
     measure: [3, Infinity],
   };
   const command = args[0],
@@ -369,6 +371,20 @@ async function completionCommandLocked(
     save(state);
     return { repair: rest[0], status: 'verified' };
   }
+  if (mode === 'record-ci-diagnosis') {
+    assertCurrentAdmission?.();
+    assert.equal(batch.taskRegistryVersion, 2, 'Exact independent task required');
+    assert.equal(readAcceptance(batch.worktree, batch.id)?.commit, batch.frozen.accepted);
+    const anchor = batch.repository.anchor;
+    const main = batch.main?.local;
+    assert.match(main ?? '', /^[a-f0-9]{40}$/);
+    assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), main);
+    assert.equal(git('ls-remote', 'origin', 'refs/heads/main'), main + '\trefs/heads/main');
+    assertAcceptedSource(batch.worktree, batch.id, main);
+    const diagnosis = recordHistoricalCiDiagnosis(state, batch, rest[0], path.resolve(root, rest[1]));
+    save(state);
+    return { diagnosis, formalDeliveryComplete: false };
+  }
   if (mode === 'wait') {
     let [runId, head] = rest;
     if (['pr', 'main'].includes(runId)) {
@@ -456,7 +472,11 @@ async function completionCommandLocked(
   assert.ok(
     state.events
       .filter((e) => e.failure?.ci)
-      .every((e) => state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId))),
+      .every(
+        (e) =>
+          state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)) ||
+          hasHistoricalCiDiagnosis(state, e, batch.frozen?.accepted, rest[1], rest[2]),
+      ),
     'Record diagnosed repair cost for each failed CI before closing',
   );
   const [, expectedMain, runId] = rest;

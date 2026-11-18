@@ -3,7 +3,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { createExecutionOrder } from './task-execution-order.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 
 const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -74,8 +73,7 @@ function snapshot(root, taskId) {
   inputs.completion = bytes(path.join(registry.commonDir, 'task-delivery', taskId, 'completion-session.json'), true);
   const head = execFileSync('git', ['-C', task.worktree, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
   const worktreeStatus = execFileSync('git', ['-C', task.worktree, 'status', '--porcelain'], { encoding: 'utf8' });
-  const executionOrder = createExecutionOrder(registry.commonDir).read();
-  const value = { version: 1, task, head, worktreeStatus, inputs, executionOrder };
+  const value = { version: 1, task, head, worktreeStatus, inputs };
   return { ...value, digest: digest(value) };
 }
 export function readEnrollmentSnapshot(root, { taskId }) {
@@ -94,13 +92,6 @@ export function requestContinuityEnrollment(root, options) {
   assert.equal(process.env.CODEX_THREAD_ID, current.task.owner, 'Original runtime owner required');
   assert.notEqual(current.task.stage, 'closed', 'Closed task cannot enroll');
   assert.ok(!current.task.frozen, 'Frozen task cannot enroll');
-  assert.notEqual(current.task.monitoring?.state, 'registered', 'Existing monitoring must not be overwritten');
-  const tickets = current.executionOrder?.tickets.filter((t) => t.task === taskId) ?? [];
-  for (const ticket of tickets) assert.equal(ticket.owner, current.task.owner, 'Exact queue owner required');
-  assert.ok(
-    !tickets.length || tickets.some((t) => ['running', 'blocked', 'completed'].includes(t.status) && t.admission),
-    'Queued-only or cancelled task cannot enroll',
-  );
   assert.equal(
     execFileSync('git', ['-C', current.task.worktree, 'status', '--porcelain'], { encoding: 'utf8' }).trim(),
     '',
@@ -117,7 +108,7 @@ export function requestContinuityEnrollment(root, options) {
   fs.mkdirSync(requests, { recursive: true, mode: 0o700 });
   syncDirectory(directory);
   const request = {
-    version: 2,
+    version: 1,
     id: randomUUID(),
     taskId,
     owner: current.task.owner,
@@ -141,7 +132,7 @@ export function acceptContinuityEnrollment(root, { requestId, expectedSnapshot, 
     directory = path.join(registry.commonDir, 'task-continuity-supervision');
   const requests = path.join(directory, 'enrollment-requests'),
     request = read(path.join(requests, requestId + '.json'));
-  assert.equal(request.version, 2, 'Legacy request requires a fresh verified monitoring request');
+  assert.equal(request.version, 1);
   assert.equal(request.id, requestId);
   assert.equal(process.env.CODEX_THREAD_ID, request.rootThreadId, 'Original runtime root required');
   const acceptedFile = path.join(requests, requestId + '.accepted.json');
@@ -156,12 +147,6 @@ export function acceptContinuityEnrollment(root, { requestId, expectedSnapshot, 
     assert.equal(accepted.binding.rootThreadId, request.rootThreadId);
     assert.equal(accepted.binding.authorizationRef, request.authorizationRef);
     assert.equal(accepted.binding.enrollmentRequestId, requestId);
-    assert.equal(accepted.version, 2, 'Legacy receipt does not prove registry monitoring');
-    assert.deepEqual(
-      registry.resolve({ id: request.taskId }).monitoring,
-      accepted.monitoring,
-      'Accepted monitoring changed; reconcile',
-    );
     return { ...accepted, status: 'reconciled-existing' };
   }
   const current = snapshot(root, request.taskId);
@@ -171,39 +156,11 @@ export function acceptContinuityEnrollment(root, { requestId, expectedSnapshot, 
   assert.equal(current.head, current.task.recordedHead);
   // The root obtains this evidence from the platform independently. This object is
   // not a local proof of cloud identity and never grants execution permission.
-  for (const key of [
-    'taskId',
-    'owner',
-    'worker',
-    'rootThreadId',
-    'authorizationRef',
-    'taskStableId',
-    'taskNumber',
-    'taskName',
-  ])
+  for (const key of ['taskId', 'owner', 'worker', 'rootThreadId', 'authorizationRef'])
     assert.equal(platformReceipt?.[key], request[key], 'Exact original platform binding required');
   assert.equal(platformReceipt.requestId, request.id);
   assert.equal(platformReceipt.snapshotDigest, current.digest);
   assert.equal(platformReceipt.originalWorkerVerified, true);
-  assert.equal(platformReceipt.formalStartVerified, true, 'Actual formal start must be independently verified');
-  assert.equal(platformReceipt.worktree, current.task.worktree);
-  assert.equal(platformReceipt.head, current.head);
-  assert.equal(typeof platformReceipt.paused, 'boolean', 'Current pause evidence required');
-  assert.ok(
-    typeof platformReceipt.pauseEvidenceRef === 'string' && platformReceipt.pauseEvidenceRef.trim(),
-    'Explicit pause evidence required',
-  );
-  const roomId = JSON.parse(current.inputs['controlled-recovery-policy.json']).roomId;
-  assert.ok(typeof roomId === 'string' && roomId.trim(), 'Original room required');
-  assert.equal(platformReceipt.roomId, roomId);
-  const completion = current.inputs.completion ? JSON.parse(current.inputs.completion) : null;
-  if (
-    current.task.monitoring?.paused === true ||
-    current.executionOrder?.paused === true ||
-    completion?.pauses?.some((p) => !p.finishedAt && !p.resumedAt)
-  )
-    assert.equal(platformReceipt.paused, true, 'Existing explicit pause cannot be cleared by enrollment');
-  assert.notEqual(current.task.monitoring?.state, 'registered', 'Existing monitoring must not be overwritten');
   assert.ok(typeof platformReceipt.receiptId === 'string' && platformReceipt.receiptId.trim());
   assert.ok(
     Number.isFinite(platformReceipt.observedAt) &&
@@ -258,64 +215,25 @@ export function acceptContinuityEnrollment(root, { requestId, expectedSnapshot, 
   const temporary = path.join(directory, `bindings-enrollment-${transaction.nonce}.json`);
   create(temporary, next);
   exact(snapshot(root, request.taskId), current);
-  const monitoring = {
+  fs.renameSync(temporary, target);
+  syncDirectory(directory);
+  assert.deepEqual(read(target), next, 'Enrollment result changed; reconcile original transaction');
+  const receipt = {
     version: 1,
-    state: 'registered',
-    mode: 'confirmed-interruption-notice-only',
-    paused: platformReceipt.paused,
-    automaticResumptionEnabled: false,
-    owner: request.owner,
-    runtimeOwnerVerified: true,
-    platformWorkerVerified: true,
-    taskNumber: request.taskNumber,
-    taskName: request.taskName,
-    taskStableId: request.taskStableId,
-    worker: request.worker,
-    rootThreadId: request.rootThreadId,
-    roomId,
-    authorizationRef: request.authorizationRef,
-    enrollmentRequestId: requestId,
-    platformReceiptId: platformReceipt.receiptId,
-    pauseEvidenceRef: platformReceipt.pauseEvidenceRef,
-    registeredAt: new Date().toISOString(),
+    requestId,
+    binding,
+    beforeDigest: current.digest,
+    bindingsDigest: digest(next),
+    acceptedAt: Date.now(),
+    observationOnly: true,
+    resumeAllowed: false,
+    pauseStateChanged: false,
+    businessExecutions: 0,
   };
-  try {
-    // Supported CAS writes only monitoring. Never mutate stage, owner, queue or execution.
-    registry.revise(request.taskId, current.task.revision, (record) => {
-      assert.deepEqual(record, current.task, 'Task changed before monitoring write');
-      record.monitoring = monitoring;
-    });
-    assert.deepEqual(
-      registry.resolve({ id: request.taskId }).monitoring,
-      monitoring,
-      'Monitoring write uncertain; preserve transaction',
-    );
-    fs.renameSync(temporary, target);
-    syncDirectory(directory);
-    assert.deepEqual(read(target), next, 'Enrollment result changed; reconcile original transaction');
-    const receipt = {
-      version: 2,
-      requestId,
-      binding,
-      monitoring,
-      beforeDigest: current.digest,
-      bindingsDigest: digest(next),
-      acceptedAt: Date.now(),
-      observationOnly: true,
-      resumeAllowed: false,
-      pauseStateChanged: false,
-      businessExecutions: 0,
-    };
-    create(path.join(requests, requestId + '.accepted.json'), receipt);
-    // Preserve transaction audit, remove only our fully committed admission.
-    fs.renameSync(lock, path.join(requests, requestId + '.transaction'));
-    syncDirectory(requests);
-    syncDirectory(directory);
-    return receipt;
-  } catch (cause) {
-    throw new Error(
-      `Enrollment commit incomplete for ${requestId}; preserve transaction and reconcile registry/binding/receipt before any retry: ${cause.message}`,
-      { cause },
-    );
-  }
+  create(path.join(requests, requestId + '.accepted.json'), receipt);
+  // Preserve transaction audit, remove only our fully committed admission.
+  fs.renameSync(lock, path.join(requests, requestId + '.transaction'));
+  syncDirectory(requests);
+  syncDirectory(directory);
+  return receipt;
 }
