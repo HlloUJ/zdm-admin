@@ -1,3 +1,5 @@
+import { readTaskData } from './task-data-environment.mjs';
+import { validateTaskDependencies } from './task-dependencies.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
 import { createProgressOutbox } from './task-progress-outbox.mjs';
 import assert from 'node:assert/strict';
@@ -142,11 +144,16 @@ export function continuationPlan(root, id) {
       retired: outbox.retired?.length ?? 0,
     };
   });
+  const taskPackages = check(() => {
+    const proof = validateTaskDependencies(task.worktree);
+    assert.equal(proof.modules, path.join(task.worktree, 'node_modules'), 'Task packages point outside this worktree');
+    return { packagesChecked: proof.packagesChecked };
+  });
+  const taskData = check(() => ({ registered: Boolean(readTaskData(task.worktree)), liveDatabaseProven: false }));
   const environment = check(() => ({
     image: imageIdentity(readImageLock(task.worktree)),
     lockfileDigest: coordinationDigest(readFileSync(path.join(task.worktree, 'package-lock.json'), 'utf8')),
     runtimeBlocked: Boolean(task.recovery?.runtimeBlocked),
-    taskEnvironmentRegistered: existsSync(path.join(common, 'task-environments', task.id, 'environment.json')),
     integrationDatabaseLocked: Boolean(
       integration && existsSync(path.join(integration.worktree, 'backups/task-preview/active-database-task.json')),
     ),
@@ -266,6 +273,8 @@ export function continuationPlan(root, id) {
     deliverySession,
     progress,
     environment,
+    taskPackages,
+    taskData,
     resources,
     plannedSource,
     activeDispatch,

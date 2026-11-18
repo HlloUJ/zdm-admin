@@ -2265,7 +2265,7 @@
       "dynamicImports": 0
     },
     "scripts/task-continuation-plan.mjs": {
-      "digest": "c66291c16ea7c13360e63b08f256172159c38c0af404188834ea0d0823529793",
+      "digest": "df509c971e3f3f79959a344dc323f589458611f46101e847a5322bcdbb552442",
       "imports": [
         "scripts/accepted-source-policy.mjs",
         "scripts/accepted-source.mjs",
@@ -2277,7 +2277,9 @@
         "scripts/task-commit-ownership.mjs",
         "scripts/task-context.mjs",
         "scripts/task-coordination-next.mjs",
+        "scripts/task-data-environment.mjs",
         "scripts/task-delivery-queue.mjs",
+        "scripts/task-dependencies.mjs",
         "scripts/task-execution-binding.mjs",
         "scripts/task-execution-order.mjs",
         "scripts/task-progress-outbox.mjs",
