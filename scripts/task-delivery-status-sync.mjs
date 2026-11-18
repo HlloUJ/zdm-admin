@@ -60,12 +60,20 @@ export function captureCompletionProgress(directory, state, previous) {
 }
 export function captureQueueProgress(commonDir, state, previous) {
   const pausedFor = executionPausedFor;
+  const lastPause = (ledger) => ledger?.events?.findLast((event) => event.action === 'pause-all')?.request;
+  const pause = lastPause(state);
   for (const ticket of state.tickets) {
-    if (['completed', 'cancelled', 'parked'].includes(ticket.status)) continue;
+    if (['completed', 'cancelled'].includes(ticket.status)) continue;
+    const parked = ticket.status === 'parked';
+    if (
+      parked &&
+      !(pause?.sequence > ticket.capacityRelease?.pauseSequence && pause.messageId !== lastPause(previous)?.messageId)
+    )
+      continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
     // Admission is NOT proof of actual action start. No synthetic started event on claim.
-    const paused = pausedFor(state, ticket);
-    const changed = !before || before.status !== ticket.status || paused !== pausedFor(previous, before);
+    const paused = parked || pausedFor(state, ticket);
+    const changed = parked || !before || before.status !== ticket.status || paused !== pausedFor(previous, before);
     if (!changed || (!['queued', 'blocked'].includes(ticket.status) && !paused)) continue;
     const event = paused ? 'paused' : ticket.status;
     bestEffortProgress(

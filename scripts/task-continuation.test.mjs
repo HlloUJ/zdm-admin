@@ -2,7 +2,12 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { collectActionDependencies, requireActionDependencies } from './task-action-dependencies.mjs';
 import { assertParkedContinuation, releaseIdleCapacity, validateReleasedCapacity } from './task-capacity-release.mjs';
-import { planNextActions, recordCoordinationObservation, recordNextAction } from './task-coordination-next.mjs';
+import {
+  pendingCoordinationEvents,
+  planNextActions,
+  recordCoordinationObservation,
+  recordNextAction,
+} from './task-coordination-next.mjs';
 
 const head = 'a'.repeat(40);
 test('dependency evidence stops only declared actions while old task-wide dependencies keep their scope', () => {
@@ -158,4 +163,34 @@ test('observations and next decisions persist once per actual event without conf
       }),
     /durable dispatch reservation/,
   );
+});
+
+test('an already closed delivery clears only its original coordination event', () => {
+  const event = { action: 'complete', lane: 'delivery', task: 'done', evidenceDigest: 'retained-proof' };
+  const ticket = {
+    task: 'done',
+    lane: 'delivery',
+    status: 'completed',
+    completion: { digest: 'retained-proof', evidence: { main: head } },
+  };
+  const state = {
+    events: [event, { action: 'block', task: 'still-working', lane: 'development' }],
+    tickets: [ticket],
+    revision: 4,
+  };
+  const scope = ['done', 'still-working'];
+  assert.equal(pendingCoordinationEvents(state, scope).length, 2);
+  const input = {
+    sourceIndex: 0,
+    expectedQueueRevision: 4,
+    coordinator: 'root',
+    outcome: { kind: 'delivery-closed', main: head },
+  };
+  assert.throws(() => recordNextAction(state, { ...input, outcome: { ...input.outcome, main: 'unrelated' } }));
+  recordNextAction(state, input);
+  assert.deepEqual(
+    pendingCoordinationEvents(state, scope).map(({ task }) => task),
+    ['still-working'],
+  );
+  assert.deepEqual(state.tickets[0], ticket);
 });

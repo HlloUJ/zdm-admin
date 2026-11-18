@@ -1,3 +1,5 @@
+import { deliveryStatus } from './completion-status.mjs';
+import path from 'node:path';
 import { availableParallelism, freemem, loadavg } from 'node:os';
 import { statfsSync } from 'node:fs';
 import assert from 'node:assert/strict';
@@ -5,7 +7,7 @@ import { requireTaskCoordinator, readTaskCoordination } from './task-coordinatio
 import { taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
 import { capacityReleaseProof } from './task-capacity-release.mjs';
 import { continuationPlan } from './task-continuation-plan.mjs';
-import { coordinationDigest, planNextActions } from './task-coordination-next.mjs';
+import { pendingCoordinationEvents, planNextActions } from './task-coordination-next.mjs';
 
 export const CONTINUATION_HOST_ACTIONS = Object.freeze([
   'continuation-plan',
@@ -82,6 +84,17 @@ export async function continuationHostAction(action, input, host, { registry, ro
         const plan = continuationPlan(root, task.id);
         const development = state.tickets.find((ticket) => ticket.task === task.id && ticket.lane === 'development');
         const preparation = plan.actions.find((item) => item.action === 'preparation');
+        const inputFor = {
+          coordinatorThreadId: coordinator,
+          authorityId: grant.id,
+          task: task.id,
+          owner: task.owner,
+          executor: taskExecutor(task),
+          expectedQueueRevision: state.revision,
+          expectedTaskRevision: task.revision,
+          expectedCoordinationRevision: route.revision,
+          expectedBoardRevision: board.revision,
+        };
         const worker = await host.readThread(taskExecutor(task));
         const workerIdle =
           worker?.thread?.id === taskExecutor(task) && ['idle', 'error'].includes(worker.thread.status?.type);
@@ -96,7 +109,7 @@ export async function continuationHostAction(action, input, host, { registry, ro
             task: task.id,
             executor: taskExecutor(task),
             action: 'delivery-enroll',
-            developmentEvidenceDigest: development.completion.digest,
+            enrollmentInput: { ...inputFor, developmentEvidenceDigest: development.completion.digest },
             reasons: preparation.reasons.filter((reason) => reason !== 'Missing delivery phase ticket'),
           });
         }
@@ -112,6 +125,7 @@ export async function continuationHostAction(action, input, host, { registry, ro
             order: state.tickets.find((item) => item.lane === report.ticket.lane && item.task === task.id).request
               .sequence,
             resources: ['task:' + task.id],
+            dispatchInput: { ...inputFor, lane: report.ticket.lane, phase: report.action },
             dependencies: report.dependencies.map((item) => ({
               ...item,
               unlockAction:
@@ -152,26 +166,10 @@ export async function continuationHostAction(action, input, host, { registry, ro
     });
     assert.deepEqual(queue.read(), state, 'Queue changed while preparing coordination plan');
     grantIsCurrent(state);
-    const handled = new Set(
-      state.events.filter((item) => item.action === 'coordinator-next-action').map((item) => item.sourceDigest),
+    const pending = pendingCoordinationEvents(
+      state,
+      grant.source.tasks.map(({ task }) => task),
     );
-    const pending = state.events.flatMap((event, sourceIndex) => {
-      if (!grant.source.tasks.some((member) => member.task === event.task)) return [];
-      if (
-        ![
-          'block',
-          'complete',
-          'preparation-finished',
-          'capacity-released',
-          'coordinator-observation',
-          'delivery-phase-enrolled',
-        ].includes(event.action)
-      )
-        return [];
-      return handled.has(coordinationDigest({ sourceIndex, source: event }))
-        ? []
-        : [{ sourceIndex, task: event.task, event: event.action }];
-    });
     return {
       revision: state.revision,
       authorityId: grant.id,
@@ -198,7 +196,16 @@ export async function continuationHostAction(action, input, host, { registry, ro
   if (action === 'coordination-record') {
     const event = state.events[input.sourceIndex];
     assert.ok(event?.task, 'Exact coordination source task required');
-    member(event.task);
+    const task = registry.readTask(event.task);
+    assert.ok(
+      task && grant.source.tasks.some((item) => item.task === task.id && item.owner === task.owner),
+      'Event is outside the preserved user delegation',
+    );
+    if (input.outcome?.kind === 'delivery-closed') {
+      const source = deliveryStatus(path.join(registry.commonDir, 'task-delivery', task.id), task.id, task);
+      assert.equal(source.formalDeliveryComplete, true, 'Formal delivery does not have its exact closeout proof');
+      assert.equal(task.main.local, input.outcome.main);
+    }
     return queue.recordNextAction(
       {
         sourceIndex: input.sourceIndex,
@@ -217,6 +224,7 @@ export async function continuationHostAction(action, input, host, { registry, ro
     const report = continuationPlan(root, task.id);
     const observation = {
       candidate: report.source.value?.head ?? null,
+      deliveryStages: report.deliverySession.value?.events ?? [],
       dependencies: report.actions.map((item) => ({
         action: item.action,
         dependencies: item.dependencies.map(({ task, evidence, head, ready }) => ({ task, evidence, head, ready })),

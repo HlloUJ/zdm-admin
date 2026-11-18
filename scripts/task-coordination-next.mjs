@@ -78,6 +78,7 @@ export function planNextActions(candidates, capacity) {
         action,
         executor,
         unblocks,
+        ...(candidate.dispatchInput ? { dispatchInput: candidate.dispatchInput } : {}),
         reason: unblocks ? `Unblocks ${unblocks} dependent task(s)` : 'Ready; original receipt order breaks ties',
       });
       for (const resource of resources) held.add(resource);
@@ -88,26 +89,38 @@ export function planNextActions(candidates, capacity) {
 }
 
 const HANDLED_ACTION = 'coordinator-next-action';
+const COORDINATION_SOURCES = new Set([
+  'block',
+  'complete',
+  'preparation-finished',
+  'capacity-released',
+  'coordinator-observation',
+  'delivery-phase-enrolled',
+]);
+
+export function pendingCoordinationEvents(state, scope) {
+  const tasks = new Set(scope);
+  const handled = new Set(
+    state.events.filter((item) => item.action === HANDLED_ACTION).map((item) => item.sourceDigest),
+  );
+  return state.events.flatMap((source, sourceIndex) =>
+    tasks.has(source.task) &&
+    COORDINATION_SOURCES.has(source.action) &&
+    !handled.has(coordinationDigest({ sourceIndex, source }))
+      ? [{ sourceIndex, task: source.task, event: source.action, lane: source.lane ?? null }]
+      : [],
+  );
+}
+
 export function recordNextAction(state, { sourceIndex, outcome, coordinator, expectedQueueRevision }) {
   assert.equal(state.revision, expectedQueueRevision, 'Queue changed before recording next action');
   assert.ok(Number.isSafeInteger(sourceIndex) && sourceIndex >= 0, 'Exact original event index required');
   const source = state.events[sourceIndex];
-  assert.ok(
-    source &&
-      [
-        'block',
-        'complete',
-        'preparation-finished',
-        'capacity-released',
-        'coordinator-observation',
-        'delivery-phase-enrolled',
-      ].includes(source.action),
-    'Actual coordination event required',
-  );
+  assert.ok(COORDINATION_SOURCES.has(source?.action), 'Actual coordination event required');
   const eventDigest = coordinationDigest({ sourceIndex, source });
   const previous = state.events.find((event) => event.action === HANDLED_ACTION && event.sourceDigest === eventDigest);
   if (previous) return structuredClone(previous);
-  assert.ok(['dispatch-reserved', 'waiting'].includes(outcome.kind), 'Exact next decision or wait required');
+  assert.ok(['dispatch-reserved', 'waiting', 'delivery-closed'].includes(outcome.kind), 'Exact next decision required');
   if (outcome.kind === 'dispatch-reserved') {
     const decision = state.dynamicDecisions?.find((item) => item.id === outcome.decisionId);
     assert.ok(
@@ -117,6 +130,13 @@ export function recordNextAction(state, { sourceIndex, outcome, coordinator, exp
     assert.equal(decision.input.task, outcome.task);
     assert.equal(source.task, outcome.task, 'Decision must dispose of this event');
     assert.equal(decision.coordinator, coordinator);
+  } else if (outcome.kind === 'delivery-closed') {
+    assert.equal(source.action, 'complete');
+    assert.equal(source.lane, 'delivery');
+    const ticket = state.tickets.find((item) => item.task === source.task && item.lane === 'delivery');
+    assert.equal(ticket?.status, 'completed');
+    assert.equal(ticket.completion.digest, source.evidenceDigest);
+    assert.equal(ticket.completion.evidence.main, outcome.main);
   } else assert.ok(typeof outcome.reason === 'string' && outcome.reason.trim(), 'Specific wait reason required');
   const record = {
     action: HANDLED_ACTION,

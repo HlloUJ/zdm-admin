@@ -162,6 +162,35 @@ test('queue admission is never represented as actual started', (t) => {
   );
 });
 
+test('releasing capacity stays distinct from a later genuine pause', (t) => {
+  const root = fixture(t);
+  const before = {
+    revision: 1,
+    paused: true,
+    events: [],
+    tickets: [{ task: 'fixture-task', lane: 'development', status: 'blocked' }],
+  };
+  const released = {
+    ...before,
+    revision: 2,
+    tickets: [{ ...before.tickets[0], status: 'parked', capacityRelease: { pauseSequence: 2 } }],
+  };
+  captureQueueProgress(root, released, before);
+  const box = createProgressOutbox(path.join(root, 'task-progress', 'fixture-task'));
+  assert.deepEqual(box.read().pending, []);
+  const paused = {
+    ...released,
+    revision: 3,
+    events: [{ action: 'pause-all', request: { sequence: 3, messageId: 'new-user-pause' } }],
+  };
+  captureQueueProgress(root, paused, released);
+  captureQueueProgress(root, { ...paused, revision: 4 }, paused);
+  assert.deepEqual(
+    box.read().pending.map((entry) => entry.receipt.event),
+    ['paused'],
+  );
+});
+
 test('global pause never generates paused progress for terminal tickets', (t) => {
   const root = fixture(t);
   for (const status of ['completed', 'cancelled']) {
