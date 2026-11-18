@@ -2774,12 +2774,12 @@
       "dynamicImports": 0
     },
     "scripts/task-progress-host.mjs": {
-      "digest": "b388427138ef9e746331bdeead61e72e89071711331146f37b46056c0b416760",
+      "digest": "81e20af02ba0f2da394b874575378bed227cf13371aaa5a82871be8b522326fc",
       "imports": ["scripts/task-progress-outbox.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-progress-host.test.mjs": {
-      "digest": "d9ba15d2c5df63894e2de730ef00ca2ab45e58084e7de863a749309cd5dd1f0c",
+      "digest": "1df7d855a71295939a4b5ea9c221694361cce36d621c6a247ff20b25a7b2eb88",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/task-completion-progress.mjs",
