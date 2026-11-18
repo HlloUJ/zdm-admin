@@ -25,6 +25,17 @@ test.beforeEach(async ({ page }) => {
 test('keeps foundation pagination spacing consistent inside list layouts', async ({ page }) => {
   await page.goto(productWarehouseUrl('/product-attribute'));
 
+  // Chrome may serialize the flex-end alias as flow-end. Compare against the
+  // browser's computed value for an independent, explicitly end-aligned flex box.
+  const expectedFlexEnd = await page.evaluate(() => {
+    const reference = document.createElement('div');
+    reference.style.cssText = 'position: absolute; display: flex; justify-content: flex-end';
+    document.body.append(reference);
+    const value = getComputedStyle(reference).justifyContent;
+    reference.remove();
+    return value;
+  });
+
   const styles = await page.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
     const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination');
     if (!pagination) return null;
@@ -46,11 +57,24 @@ test('keeps foundation pagination spacing consistent inside list layouts', async
     hostMarginTop: '0px',
     hostPadding: '16px',
     paginationDisplay: 'flex',
-    paginationJustifyContent: 'flex-end',
+    paginationJustifyContent: expectedFlexEnd,
     paginationMarginTop: '0px',
     paginationWidth: styles?.hostWidth,
     hostWidth: styles?.hostWidth,
   });
+
+  const alignment = await page.locator('.zdm-admin-list-layout__pagination').evaluate((host) => {
+    const pagination = host.querySelector<HTMLElement>('.zdm-admin-pagination')!;
+    const hostStyle = getComputedStyle(host);
+    return {
+      actualRight: pagination.getBoundingClientRect().right,
+      expectedRight:
+        host.getBoundingClientRect().right -
+        parseFloat(hostStyle.borderRightWidth) -
+        parseFloat(hostStyle.paddingRight),
+    };
+  });
+  expect(alignment.actualRight).toBeCloseTo(alignment.expectedRight, 1);
 });
 
 test('uses the official TDesign pagination controls on routed list pages', async ({ page }) => {

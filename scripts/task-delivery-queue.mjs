@@ -247,5 +247,23 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
       return history;
     });
   }
-  return { inspect: read, enqueue, wait, markMainMutation, finish };
+  function deferSettlement(supplied, { head, main, runId, deferredAt }) {
+    assert.match(head, /^[a-f0-9]{40}$/);
+    assert.match(main, /^[a-f0-9]{40}$/);
+    assert.match(runId, /^\d+$/);
+    assert.ok(Number.isFinite(Date.parse(deferredAt)));
+    return update((state) => {
+      const ticket = ticketFor(state, supplied),
+        current = leases.inspect('main-delivery');
+      assert.equal(ticket.status, 'running');
+      assert.equal(ticket.mainMutationStarted, true, 'Only a completed main mutation may await external settlement');
+      assert.equal(current?.token, supplied.lease.token, 'Main delivery lease changed');
+      ticket.deferred = { head, main, runId, deferredAt, reason: '外部周期验收待完成' };
+      ticket.status = 'waiting';
+      delete ticket.lease;
+      leases.release(current);
+      return structuredClone(ticket);
+    });
+  }
+  return { inspect: read, enqueue, wait, markMainMutation, finish, deferSettlement };
 }

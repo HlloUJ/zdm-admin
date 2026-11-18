@@ -4,11 +4,15 @@ import test from 'node:test';
 import { classifyChangedFiles } from './verification-impact.mjs';
 
 const flags = (files, root) => {
-  const { reasons, ...scope } = classifyChangedFiles(files, {
+  const { reasons, scopeUncertainty, ...scope } = classifyChangedFiles(files, {
     engineeringProof: { proven: true },
     ...(root ? { root } : {}),
   });
   assert.ok(reasons.length);
+  assert.ok(
+    !scopeUncertainty ||
+      scopeUncertainty.every((item) => typeof item.code === 'string' && typeof item.reason === 'string'),
+  );
   return scope;
 };
 test('only known documents/assets omit both domains', () => {
@@ -184,4 +188,10 @@ test('changed audited preview dependencies preserve full gates instead of trusti
       runtime,
     });
   }
+});
+
+test('unproven transitive impact exposes a structured conservative reason', () => {
+  const result = classifyChangedFiles(['unknown/tool.bin'], { engineeringProof: { proven: true } });
+  assert.equal(result.full, true);
+  assert.equal(result.scopeUncertainty[0].code, 'transitive-impact-unproven');
 });

@@ -1,3 +1,6 @@
+import { createBoardIntake } from './task-board-intake.mjs';
+import './task-network.mjs';
+import { checkStartMonitoringArgs } from './task-monitor-registration.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
@@ -53,12 +56,41 @@ export function publishedTaskEntry(root, args) {
   const script = path.join(main, entries[command]);
   assert.ok(existsSync(script) && lstatSync(script).isFile() && !lstatSync(script).isSymbolicLink());
   git(main, 'cat-file', '-e', published + ':' + entries[command]);
+  if (command === 'start') {
+    checkStartMonitoringArgs(rest, targetRegistry);
+    const option = (flag) => {
+      const index = rest.indexOf(flag);
+      return index < 0 ? undefined : rest[index + 1];
+    };
+    const slug = option('--slug'),
+      raw = option('--monitor-context');
+    const context = raw === undefined ? undefined : JSON.parse(raw);
+    if (
+      slug &&
+      !targetRegistry.readTask(slug) &&
+      ['codex-thread', 'collaboration-agent'].includes(context?.executionSurface)
+    )
+      createBoardIntake(targetRegistry.commonDir).require(
+        context,
+        slug,
+        option('--owner') || process.env.CODEX_THREAD_ID,
+      );
+  }
+  if (command === 'registry' && rest[0] === 'register') {
+    const index = rest.indexOf('--task');
+    assert.ok(
+      index >= 0 && targetRegistry.readTask(rest[index + 1]),
+      'New task registration must use enrolled start; raw register is restore-only',
+    );
+  }
   const forwarded =
     command === 'check'
       ? ['--check', '--worktree', target, ...rest]
       : command === 'temporary'
         ? ['--worktree', target, '--temporary', ...rest]
-        : rest;
+        : command === 'registry' && rest[0] === 'register'
+          ? [...rest, '--worktree', target]
+          : rest;
   return { script, cwd: target, args: forwarded, published, source: main };
 }
 export function main(root = process.cwd(), args = process.argv.slice(2)) {

@@ -18,7 +18,16 @@ function fixture(t) {
   git('config', 'user.name', 'Fixture');
   git('config', 'user.email', 'test@example.invalid');
   const here = path.dirname(fileURLToPath(import.meta.url));
-  for (const name of ['task-entry.mjs', 'task-registry.mjs', 'task-monitor-registration.mjs'])
+  for (const name of [
+    'task-entry.mjs',
+    'task-registry.mjs',
+    'task-monitor-registration.mjs',
+    'task-board-intake.mjs',
+    'task-thread-titles.mjs',
+    'task-execution-binding.mjs',
+    'task-coordination.mjs',
+    'task-network.mjs',
+  ])
     copyFileSync(path.join(here, name), path.join(main, 'scripts', name));
   mkdirSync(path.join(main, '.codex'));
   writeFileSync(path.join(main, '.codex/zdm-project-workflow.yaml'), 'batch:\n  mode: parallel-independent\n');
@@ -28,7 +37,13 @@ function fixture(t) {
   const a = path.join(dir, 'a');
   git('worktree', 'add', '-b', 'codex/a', a);
   const run = (script = path.join(main, 'scripts/task-entry.mjs'), ...args) =>
-    spawnSync(process.execPath, [script, ...args], { cwd: a, encoding: 'utf8' });
+    spawnSync(process.execPath, [script, ...args], {
+      cwd: a,
+      encoding: 'utf8',
+      // These dependency-free Git/entry fixtures never access a network. The
+      // actual proxy-enabled Node 22/24 chain is covered by task-network tests.
+      env: { ...process.env, NODE_USE_ENV_PROXY: '0' },
+    });
   return { main, a, git, run };
 }
 test('published main entry reads exact old-task context without copying source over it', (t) => {
@@ -55,6 +70,14 @@ test('the published parallel mode disables old singleton creation even before th
   assert.throws(() => legacyStart({ slug: 'old-shared' }, { cwd: f.a }), /旧共享任务入口已停用/);
   assert.equal(createTaskRegistry(f.main).legacy(), null);
 });
+test('existing registry restoration receives only the already verified worktree', (t) => {
+  const f = fixture(t);
+  createTaskRegistry(f.main).register({ id: 'a', worktree: f.a, owner: 'chat-a' });
+  const result = f.run(undefined, '--worktree', f.a, 'registry', 'register', '--task', 'a', '--owner', 'chat-a');
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(JSON.parse(result.stdout).worktree, realpathSync(f.a));
+  assert.equal(createTaskRegistry(f.main).readTask('a').owner, 'chat-a');
+});
 test('forwarded or repeated worktree flags cannot change the already verified task identity', (t) => {
   const f = fixture(t);
   createTaskRegistry(f.main).register({ id: 'a', worktree: f.a, owner: 'chat-a' });
@@ -78,3 +101,66 @@ test('retired scheduler entry cannot launch work', (t) => {
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /task:entry/);
 });
+
+test('canonical entry refuses missing new-task monitoring before starting a subprocess', (t) => {
+  const f = fixture(t);
+  copyFileSync(new URL('./task-start.mjs', import.meta.url), path.join(f.main, 'scripts/task-start.mjs'));
+  f.git('add', '.');
+  f.git('commit', '-m', 'published start');
+  f.git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  const before = f.git('worktree', 'list', '--porcelain');
+  const result = f.run(undefined, 'start', '--slug', 'new-task', '--owner', 'fixture-owner');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /requires --monitor-context/);
+  assert.equal(f.git('worktree', 'list', '--porcelain'), before);
+});
+
+test('raw register cannot create a new task outside the enrolled start path', (t) => {
+  const f = fixture(t);
+  const result = f.run(undefined, '--worktree', f.a, 'registry', 'register', '--task', 'a', '--owner', 'chat-a');
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /raw register is restore-only/);
+  assert.equal(createTaskRegistry(f.main).readTask('a'), null);
+});
+
+for (const surface of ['codex-thread', 'collaboration-agent'])
+  test(`canonical ${surface} start blocks missing intake before any child process is spawned`, (t) => {
+    const f = fixture(t),
+      owner = '11111111-1111-4111-8111-111111111111';
+    writeFileSync(
+      path.join(f.main, 'scripts/task-start.mjs'),
+      "import {writeFileSync} from 'node:fs';writeFileSync('child-started','unsafe');",
+    );
+    f.git('add', '.');
+    f.git('commit', '-m', 'isolated start marker');
+    f.git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+    const context = {
+      executionSurface: surface,
+      taskNumber: '638',
+      taskName: 'isolated native',
+      taskStableId: 'native-new',
+      worker: surface === 'codex-thread' ? owner : '/root/delivery_987',
+      rootThreadId: owner,
+      roomId: owner,
+      authorizationRef: 'fixture-execute',
+    };
+    const before = f.git('worktree', 'list', '--porcelain');
+    const result = spawnSync(
+      process.execPath,
+      [
+        path.join(f.main, 'scripts/task-entry.mjs'),
+        'start',
+        '--slug',
+        'native-new',
+        '--owner',
+        owner,
+        '--monitor-context',
+        JSON.stringify(context),
+      ],
+      { cwd: f.a, env: { ...process.env, CODEX_THREAD_ID: owner }, encoding: 'utf8' },
+    );
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /Board intake missing/);
+    assert.equal(f.git('worktree', 'list', '--porcelain'), before);
+    assert.throws(() => readFileSync(path.join(f.a, 'child-started')), { code: 'ENOENT' });
+  });
