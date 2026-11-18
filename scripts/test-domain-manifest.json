@@ -861,6 +861,30 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/task-410-initial-pause-correction.mjs": {
+      "digest": "cbab2a973ab1ff9e704cf4b555f8ce39246b2a623f396c618824491f309a8812",
+      "imports": [
+        "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
+        "scripts/task-coordination.mjs",
+        "scripts/task-execution-scope.mjs",
+        "scripts/task-progress-outbox.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/task-410-initial-pause-correction.test.mjs": {
+      "digest": "40d4e9b2274aa3c65761768169374adce4c13a863b47521cf67474f1af1c9c02",
+      "imports": [
+        "scripts/delivery-repairs/task-410-initial-pause-correction.mjs",
+        "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
+        "scripts/task-progress-outbox.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs": {
+      "digest": "f07c3355038be5b111a6b2e7a2ec73a433b24951e0cc84e0ae4c4a2db8ff3839",
+      "imports": ["scripts/task-thread-titles.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/task-cleanup-npm-archive.py": {
       "digest": "c871dca802fdc553c721fa55125ce1eb7b343e60f293f9d12ebe3ea3fced6d0f",
       "imports": [],
@@ -2799,8 +2823,12 @@
       "dynamicImports": 0
     },
     "scripts/task-progress-outbox.mjs": {
-      "digest": "0035c6d848b847baa4e3ae046cbf292714063e082a5e5b65a7713e361f78e4ab",
-      "imports": ["scripts/delivery-repairs/task-creation-progress.mjs", "scripts/task-progress-supersession.mjs"],
+      "digest": "3232038c25c68a0ce8d78aa31a0b4037ec820f9b440cb915666b03ebb9897e6d",
+      "imports": [
+        "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
+        "scripts/delivery-repairs/task-creation-progress.mjs",
+        "scripts/task-progress-supersession.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-progress-replay.mjs": {
@@ -2957,8 +2985,9 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-host-bridge.mjs": {
-      "digest": "a529cefca7838fdb4a4486dd9956f6b76cdf6d456c52532fc6429ce12d8f8b42",
+      "digest": "d9ecc0ad1abb9ae58a4b64ef4e90384cc3e521b0de945fad36ae30cb3a0a0990",
       "imports": [
+        "scripts/delivery-repairs/task-410-initial-pause-correction.mjs",
         "scripts/delivery-repairs/task-dynamic-host.mjs",
         "scripts/task-board-intake.mjs",
         "scripts/task-codex-host.mjs",
