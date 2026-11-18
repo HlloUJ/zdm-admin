@@ -155,7 +155,8 @@ export function validate039Board({ history, receipts }, board) {
     .sort((a, b) => a.revision - b.revision);
   rows.forEach((row, i) => assert.equal(row.revision, i + 1, 'Native history gap or duplicate'));
   assert.equal(rows[5].status, 'review');
-  const { board_column, ...overview } = board;
+  const overview = { ...board };
+  delete overview.board_column;
   assert.deepEqual(rows.at(-1), overview, 'Full history and exact current board disagree');
   assert.equal(receipts.length, receipts039.length);
   receipts.forEach((seen, i) => {
