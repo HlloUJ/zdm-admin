@@ -28,6 +28,7 @@ export function capacityReleaseProof(registry, ticket, task, { observe } = {}) {
       head,
       tree: git(task.worktree, 'rev-parse', head + '^{tree}'),
       revision: task.revision,
+      branch: task.branch,
       bindingRevision: task.executionBindings?.at(-1)?.revision ?? 0,
       executor: taskExecutor(task),
       accepted: task.frozen?.accepted ?? null,
@@ -127,7 +128,9 @@ export function assertParkedContinuation(state, ticket, proof, phase) {
       'The recorded dependency has no fresh proof for this action',
     );
   assert.equal(proof.sourceProof.head, checkpoint.head, 'Parked candidate changed');
-  assert.equal(proof.task.revision, checkpoint.revision, 'Parked registry checkpoint changed');
+  assert.equal(proof.task.recordedHead, checkpoint.head, 'Parked registry checkpoint changed');
+  assert.equal(proof.task.branch, checkpoint.branch, 'Parked branch changed');
+  assert.equal(proof.task.frozen?.accepted ?? null, checkpoint.accepted ?? null, 'Parked original freeze changed');
   assert.equal(proof.executor, checkpoint.executor, 'Parked executor changed');
   assert.equal(proof.bindingRevision, checkpoint.bindingRevision, 'Parked execution binding changed');
   const lastPause = state.events.findLast((event) => event.action === 'pause-all')?.request.sequence ?? 0;

@@ -1,3 +1,5 @@
+import { availableParallelism, freemem, loadavg } from 'node:os';
+import { statfsSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { requireTaskCoordinator, readTaskCoordination } from './task-coordination.mjs';
 import { taskExecutor, taskMonitoring } from './task-execution-binding.mjs';
@@ -176,6 +178,19 @@ export async function continuationHostAction(action, input, host, { registry, ro
       pending,
       omitted,
       enrollment,
+      hostResources: {
+        availableParallelism: availableParallelism(),
+        loadAverage: loadavg(),
+        freeMemoryBytes: freemem(),
+        availableProjectBytes: (() => {
+          try {
+            const fileSystem = statfsSync(root);
+            return fileSystem.bsize * fileSystem.bavail;
+          } catch {
+            return null;
+          }
+        })(),
+      },
       ...plan,
       startAuthorized: false,
     };
@@ -223,6 +238,7 @@ export async function continuationHostAction(action, input, host, { registry, ro
     );
   }
 
+  assert.equal(board.revision, input.expectedBoardRevision, 'Board changed before capacity release');
   const worker = await host.readThread(taskExecutor(task));
   assert.equal(worker?.thread?.id, taskExecutor(task));
   assert.equal(worker.thread.hostId, native.thread.hostId);

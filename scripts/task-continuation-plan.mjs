@@ -8,13 +8,15 @@ import { fileURLToPath } from 'node:url';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { taskExecutor } from './task-execution-binding.mjs';
-import { planTaskDelivery, taskDispatchDependencies } from './task-context.mjs';
+import { taskDispatchDependencies } from './task-context.mjs';
+import { assertTaskCommitOwnership } from './task-commit-ownership.mjs';
+import { isTechnicalPath } from './accepted-source-policy.mjs';
 import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { temporaryPreviewLeases } from './preview-consumers.mjs';
 import { imageIdentity, readImageLock } from './ci-browser-image.mjs';
 import { TASK_ACTIONS } from './task-action-dependencies.mjs';
-import { readAcceptance, assertAcceptedSource } from './accepted-source.mjs';
+import { readAcceptance, sourceDifference, sourceEntries } from './accepted-source.mjs';
 import { coordinationDigest } from './task-coordination-next.mjs';
 
 function git(cwd, ...args) {
@@ -112,8 +114,18 @@ export function continuationPlan(root, id) {
     }
     assert.equal(acceptance?.commit, task.frozen.accepted, 'Original accepted source differs');
     assert.equal(acceptance.tree, task.frozen.tree, 'Original accepted tree differs');
-    assertAcceptedSource(task.worktree, task.id, source.value?.head);
-    return { accepted: acceptance.commit, tree: acceptance.tree };
+    const composition = path.join(common, 'task-delivery', task.id, 'composition.json');
+    // Validation of an existing composition reconstructs Git objects. Keep this
+    // diagnostic read-only and have the actual protected entry reprove it.
+    if (existsSync(composition)) {
+      assert.ok(!lstatSync(composition).isSymbolicLink(), 'Existing composition proof is linked');
+      return { accepted: acceptance.commit, tree: acceptance.tree, compositionNeedsRecheck: true };
+    }
+    const entries = (tree) => sourceEntries(task.worktree, tree, false, acceptance.tree, acceptance.protectedPaths);
+    const changed = sourceDifference(entries(acceptance.tree), entries(source.value?.head));
+    assert.deepEqual(changed, [], 'Protected source differs from the original frozen tree');
+    assert.equal(existsSync(composition), false, 'Composition changed during the read-only freeze check');
+    return { accepted: acceptance.commit, tree: acceptance.tree, compositionNeedsRecheck: false };
   });
   const deliverySession = check(() => readSession(common, task, source.value?.head));
   const progress = check(() => {
@@ -158,7 +170,15 @@ export function continuationPlan(root, id) {
             git(root, 'diff', '--no-renames', '--name-only', '-z', base, head).split('\0').filter(Boolean);
           const mainPaths = new Set(names(main));
           const shared = names(source.value.head).filter((file) => mainPaths.has(file));
-          return { samePathChanges: shared, confirmsMergeability: false };
+          const declared = new Set(readAcceptance(task.worktree, task.id)?.protectedPaths ?? []);
+          const entry = (commit, file) => git(root, '--literal-pathspecs', 'ls-tree', commit, '--', file);
+          const protectedDeleteModify = shared.filter(
+            (file) =>
+              (declared.has(file) || !isTechnicalPath(file)) &&
+              entry(base, file) &&
+              Boolean(entry(main, file)) !== Boolean(entry(source.value.head, file)),
+          );
+          return { samePathChanges: shared, protectedDeleteModify, confirmsMergeability: false };
         })
       : null;
   const tickets = (queue?.tickets ?? []).filter((ticket) => ticket.task === task.id);
@@ -173,8 +193,9 @@ export function continuationPlan(root, id) {
   const plannedSource =
     source.ready && source.value.clean
       ? check(() => {
-          const plan = planTaskDelivery(root, task, { checkDependencies: false });
-          return { head: plan.head, originMain: plan.originMain, commits: plan.commits };
+          const carrier = registry.resolve({ id: task.id, worktree: task.worktree });
+          assert.equal(carrier.recordedHead, source.value.head, 'Checkpoint the exact current task head');
+          return assertTaskCommitOwnership(task.worktree, task, source.value.head);
         })
       : { ready: false, reason: 'A clean task checkpoint is required for delivery planning' };
 
@@ -211,6 +232,8 @@ export function continuationPlan(root, id) {
       if (resources.value?.previewPorts.length && action === 'final')
         reasons.push('Existing task preview lease requires exact release proof');
     }
+    if (['combination', 'final'].includes(action) && overlap?.value?.protectedDeleteModify.length)
+      reasons.push('Protected delete/modify conflict: ' + overlap.value.protectedDeleteModify.join(', '));
     if (action === 'final' && !progress.ready) reasons.push(progress.reason);
     if (action === 'final' && progress.value?.pending.some((entry) => entry.event === 'paused' || entry.knownFailure))
       reasons.push('A pending pause or failed receipt needs exact readback before board placement');

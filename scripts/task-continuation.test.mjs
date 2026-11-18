@@ -109,7 +109,12 @@ test('safe release preserves the old ticket and only a fresh matching checkpoint
   assert.equal(state.events.length, 3);
   releaseIdleCapacity(state, input, (_ticket, { replay }) => assert.equal(replay, true));
   assert.equal(state.events.length, 3);
-  const next = { task: { revision: 3 }, sourceProof: { head }, executor: 'worker', bindingRevision: 0 };
+  const next = {
+    task: { revision: 4, recordedHead: head },
+    sourceProof: { head },
+    executor: 'worker',
+    bindingRevision: 0,
+  };
   assertParkedContinuation(state, ticket, next, 'development');
   assert.throws(
     () => assertParkedContinuation(state, ticket, { ...next, sourceProof: { head: 'b'.repeat(40) } }, 'development'),

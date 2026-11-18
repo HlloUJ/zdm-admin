@@ -204,7 +204,7 @@ export function taskDispatchDependencies(root, task, phase) {
 export function assertDeliveredDependencies(root, batch, action = 'final', adapters) {
   return requireActionDependencies(taskActionDependencies(root, batch, action, adapters));
 }
-export function planTaskDelivery(root, batch, { action = 'final', checkDependencies = true } = {}) {
+export function planTaskDelivery(root, batch, { action = 'final' } = {}) {
   batch = validateTaskBatch(root, batch);
   const git = (...args) =>
     execFileSync('git', ['--no-replace-objects', '--no-optional-locks', '-C', batch.worktree, ...args], {
@@ -222,7 +222,7 @@ export function planTaskDelivery(root, batch, { action = 'final', checkDependenc
   const head = git('rev-parse', 'HEAD'),
     originMain = git('rev-parse', 'origin/main');
   assert.equal(head, batch.recordedHead, 'Checkpoint the exact current task head');
-  if (checkDependencies) assertDeliveredDependencies(root, batch, action);
+  assertDeliveredDependencies(root, batch, action);
   const commits = git('rev-list', '--reverse', batch.base + '..' + head, '--not', originMain)
     .split('\n')
     .filter(Boolean);

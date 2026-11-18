@@ -249,3 +249,19 @@ test('continuation plan reports independent action readiness and leaves source, 
   assert.equal(f.git(f.a, 'ls-files', '--stage'), index);
   assert.equal(existsSync(path.join(f.registry.commonDir, 'task-registry', 'execution-order')), false);
 });
+
+test('a protected delete/modify conflict is visible before PR or final composition without writing an object', (t) => {
+  const f = fixture(t);
+  f.git(f.main, 'rm', 'src/feature.js');
+  f.git(f.main, 'commit', '-m', 'publish delete');
+  f.git(f.main, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+  const before = f.git(f.main, 'count-objects');
+  const report = continuationPlan(f.main, 'a');
+  assert.deepEqual(report.overlap.value.protectedDeleteModify, ['src/feature.js']);
+  assert.ok(
+    report.actions
+      .find((item) => item.action === 'combination')
+      .reasons.some((reason) => reason.includes('Protected delete/modify conflict')),
+  );
+  assert.equal(f.git(f.main, 'count-objects'), before);
+});
