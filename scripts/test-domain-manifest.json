@@ -2548,7 +2548,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.mjs": {
-      "digest": "61117a06a3d5e76b45ffde14b59851fe52c8122b2d62aa19f7810d57276d237a",
+      "digest": "f49395d12d82e52c4af54a20b978aa10f56ebabf075220265a77c84e62c00026",
       "imports": [
         "scripts/task-execution-scope.mjs",
         "scripts/task-progress-host.mjs",
@@ -2931,7 +2931,7 @@
       "dynamicImports": 0
     },
     "scripts/task-rebinding.test.mjs": {
-      "digest": "c6207ff668300f765e83f1054eb3d9329330dce6a853ee88059463838ecdeb78",
+      "digest": "fe03655323503edf24a9e922d64fb73d86e4a3e47e998cd487c17ab6be6d9b1e",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-cli.mjs",
@@ -2948,6 +2948,7 @@
         "scripts/task-execution-order.mjs",
         "scripts/task-progress-collector.mjs",
         "scripts/task-progress-host.mjs",
+        "scripts/task-progress-outbox.mjs",
         "scripts/task-rebinding.mjs",
         "scripts/task-registry.mjs",
         "scripts/task-start.mjs",

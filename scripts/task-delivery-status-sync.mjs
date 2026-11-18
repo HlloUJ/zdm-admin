@@ -1,3 +1,4 @@
+import { isDeepStrictEqual } from 'node:util';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { executionPausedFor } from './task-execution-scope.mjs';
@@ -58,6 +59,29 @@ export function captureCompletionProgress(directory, state, previous) {
     bestEffortProgress(outboxDirectory, state.batch, `completion:${event.id}:${event.status}`, payload);
   }
 }
+function finishedPreparationRequest(state, ticket) {
+  if (ticket.lane !== 'delivery' || !['queued', 'blocked'].includes(ticket.status)) return null;
+  const event = state.events?.findLast(
+    (item) =>
+      item.task === ticket.task &&
+      (item.action === 'preparation-finished' || (item.action === 'dispatch-applied' && item.lane === ticket.lane)),
+  );
+  if (event?.action !== 'preparation-finished') return null;
+  const decision = state.dynamicDecisions?.find((item) => item.id === event.decisionId);
+  if (
+    decision?.status !== 'finished' ||
+    !decision.prepared ||
+    decision.input.phase !== 'preparation' ||
+    decision.input.lane !== ticket.lane ||
+    decision.input.task !== ticket.task ||
+    decision.input.owner !== ticket.owner ||
+    !isDeepStrictEqual(decision.ticketBefore, ticket)
+  )
+    return null;
+  const grant = state.dynamicAuthorities?.find((item) => item.id === decision.input.authorityId);
+  return grant && isDeepStrictEqual(event.request, grant.request) ? grant.request : null;
+}
+
 export function captureQueueProgress(commonDir, state, previous) {
   const pausedFor = (current, ticket) => {
     if (!executionPausedFor(current, ticket)) return false;
@@ -78,16 +102,20 @@ export function captureQueueProgress(commonDir, state, previous) {
             event.coordinatorOwner === ticket.nativeCoordinatorOwner &&
             event.workerOwner === ticket.owner,
         ));
+    const request =
+      ticket.status === 'queued' && pendingNative && ticket.admission === null
+        ? ticket.request
+        : finishedPreparationRequest(current, ticket);
+    // Preparing and handing back capacity does not replace the original
+    // ticket or confer admission. Only its verified delegation informs this projection.
     return !(
-      ticket.status === 'queued' &&
-      pendingNative &&
-      ticket.admission === null &&
       Number.isSafeInteger(fence?.sequence) &&
       typeof fence.authorId === 'string' &&
       fence.authorId.trim() &&
       fence.authorId === ticket.request?.authorId &&
-      Number.isSafeInteger(ticket.request?.sequence) &&
-      ticket.request.sequence > fence.sequence
+      fence.authorId === request?.authorId &&
+      Number.isSafeInteger(request?.sequence) &&
+      request.sequence > fence.sequence
     );
   };
   const lastPause = (ledger) => ledger?.events?.findLast((event) => event.action === 'pause-all')?.request;

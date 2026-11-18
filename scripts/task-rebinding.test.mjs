@@ -26,6 +26,7 @@ import { completionCommand } from './completion-cli.mjs';
 import { runCompletionWithProgress } from './task-completion-progress.mjs';
 import { prepareProgressStage, notifyProgressHost } from './task-progress-host.mjs';
 import { collectTaskProgress } from './task-progress-collector.mjs';
+import { createProgressOutbox } from './task-progress-outbox.mjs';
 import { authorizeTaskCoordinator, readTaskCoordination } from './task-coordination.mjs';
 import { advanceTaskThread, taskHandoffFailure } from './task-thread-host-bridge.mjs';
 import { dynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
@@ -187,7 +188,7 @@ function fixture(t, { collaboration = false } = {}) {
   return { dir, main, worktree, registry, queue, input, host, snapshots, observe, bind, task, board, git };
 }
 
-async function dynamicFrozenFixture(t) {
+async function dynamicFrozenFixture(t, { withOldPause = false } = {}) {
   const f = fixture(t, { collaboration: true });
   process.env.CODEX_THREAD_ID = old;
   const accepted = freezeAcceptedSource(f.worktree, readActiveBatch(f.worktree));
@@ -201,6 +202,11 @@ async function dynamicFrozenFixture(t) {
     owner: old,
     request: { ...f.input.request, messageId: 'original-delivery', sequence: 3 },
   });
+  if (withOldPause)
+    f.queue.direct({
+      action: 'pause-all',
+      request: { ...f.input.request, messageId: 'historical-pause', sequence: 4 },
+    });
   f.input.expectedRevision = f.registry.readTask('task').revision;
   f.input.queueRevision = f.queue.read().revision;
   f.board.status = 'merging';
@@ -635,8 +641,8 @@ test('683-shaped frozen carrier safely resumes after binding was already consume
   assert.equal(before.frozen.accepted, f.accepted.commit);
   assert.ok(state.dynamicDecisions.every((item) => item.ticketBefore.reason));
 });
-test('preparation finish verifies the original numeric PR run record and restores only its own original blocked ticket', async (t) => {
-  const f = await dynamicFrozenFixture(t);
+test('preparation finish verifies the original PR CI, restores its ticket and only a new pause projects paused', async (t) => {
+  const f = await dynamicFrozenFixture(t, { withOldPause: true });
   const head = f.git(f.worktree, 'rev-parse', 'HEAD');
   f.registry.revise('task', f.registry.readTask('task').revision, (record) => {
     record.recordedHead = head;
@@ -645,7 +651,7 @@ test('preparation finish verifies the original numeric PR run record and restore
   const input = f.decision('preparation');
   await f.call('dispatch', input);
   process.env.CODEX_THREAD_ID = worker;
-  await f.call('dispatch-start', {
+  const started = await f.call('dispatch-start', {
     decisionId: input.decisionId,
     coordinatorThreadId: root,
     task: 'task',
@@ -703,8 +709,49 @@ test('preparation finish verifies the original numeric PR run record and restore
     original,
   );
   const before = f.queue.read();
+  const outbox = createProgressOutbox(path.join(f.registry.commonDir, 'task-progress/task'));
+  const receipt = (revision) =>
+    outbox
+      .read()
+      .pending.find(({ receipt }) => receipt.evidence_refs.includes(`execution-order:${revision}:delivery:task`))
+      ?.receipt;
+  assert.equal(receipt(before.revision)?.event, 'blocked');
+  assert.equal(receipt(before.revision)?.reason, original.reason);
   await finish();
   assert.deepEqual(f.queue.read(), before);
+  assert.throws(
+    () =>
+      f.queue.assertAdmission({
+        task: 'task',
+        owner: old,
+        lane: 'delivery',
+        effect: 'preparation',
+        admission: started.decision.admission,
+      }),
+    /All execution launches paused/,
+  );
+  process.env.CODEX_THREAD_ID = root;
+  f.queue.enqueue({
+    lane: 'development',
+    task: 'unrelated',
+    owner: root,
+    request: { ...f.input.request, messageId: 'unrelated-development', sequence: 21 },
+  });
+  f.queue.direct({
+    action: 'reorder',
+    lane: 'development',
+    tasks: ['unrelated', 'task'],
+    request: { ...f.input.request, messageId: 'unrelated-development-order', sequence: 22 },
+  });
+  assert.equal(f.queue.read().events.at(-1).action, 'reorder');
+  assert.equal(receipt(f.queue.read().revision), undefined);
+  f.queue.direct({ action: 'pause-all', request: { ...f.input.request, messageId: 'actual-new-pause', sequence: 30 } });
+  assert.equal(receipt(f.queue.read().revision)?.event, 'paused');
+  assert.deepEqual(
+    f.queue.read().tickets.find((ticket) => ticket.lane === 'delivery'),
+    original,
+  );
+  await assert.rejects(() => f.call('dispatch', f.decision()), /delegation missing or revoked by pause/i);
 });
 test('preparation admission rejects final commands and generic measured shell effects before any session or main mutation', async (t) => {
   const f = await dynamicFrozenFixture(t),
