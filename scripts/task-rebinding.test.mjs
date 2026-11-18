@@ -32,6 +32,7 @@ import { dynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
 import { freezeAcceptedSource } from './accepted-source.mjs';
 import { readActiveBatch } from './task-batch.mjs';
 import { openCompletion, saveCompletion } from './completion-session.mjs';
+import { verifyDevelopmentCompletion } from './task-execution-order-cli.mjs';
 
 const old = '11111111-1111-4111-8111-111111111111';
 const root = '22222222-2222-4222-8222-222222222222';
@@ -363,6 +364,161 @@ test('133-shaped bound task resumes after legal registered checkpoints and block
     f.queue.block({ lane: 'development', task: 'task', owner: old, reason: 'Exact dependency still pending' });
   }
 });
+async function completedPhaseFixture(t) {
+  const f = await dynamicCheckpointFixture(t);
+  const reserved = await f.call('dispatch', f.decision());
+  process.env.CODEX_THREAD_ID = worker;
+  const started = await f.call('dispatch-start', {
+    ...reserved.workerInput,
+    expectedQueueRevision: f.queue.read().revision,
+  });
+  const reportDirectory = path.join(f.worktree, '.task-runtime');
+  mkdirSync(reportDirectory, { recursive: true });
+  const exclude = path.join(f.registry.commonDir, 'info/exclude');
+  writeFileSync(exclude, readFileSync(exclude, 'utf8') + '\n.task-runtime/\n');
+  const reportPath = '.task-runtime/original-development-fixture.json',
+    sourcePath = '.task-runtime/original-development-fixture.log';
+  const hash = (value) => createHash('sha256').update(value).digest('hex');
+  writeFileSync(path.join(f.worktree, sourcePath), 'isolated development evidence fixture\n');
+  writeFileSync(
+    path.join(f.worktree, reportPath),
+    JSON.stringify({
+      version: 1,
+      task: 'task',
+      head: f.head,
+      outcome: 'passed',
+      tests: 1,
+      skipped: 0,
+      retries: 0,
+      sourceReports: [{ path: sourcePath, sha256: hash(readFileSync(path.join(f.worktree, sourcePath))) }],
+    }),
+  );
+  const evidence = {
+    task: 'task',
+    owner: old,
+    head: f.head,
+    reports: [{ path: reportPath, sha256: hash(readFileSync(path.join(f.worktree, reportPath))) }],
+  };
+  f.queue.complete(
+    { lane: 'development', task: 'task', owner: old, admission: started.decision.admission, evidence },
+    () => verifyDevelopmentCompletion(f.registry.readTask('task'), evidence),
+  );
+  f.board.status = 'review';
+  process.env.CODEX_THREAD_ID = root;
+  const phase = () => ({
+    coordinatorThreadId: root,
+    authorityId: f.decision().authorityId,
+    phaseId: randomUUID(),
+    task: 'task',
+    owner: old,
+    executor: worker,
+    expectedTaskRevision: f.registry.readTask('task').revision,
+    expectedQueueRevision: f.queue.read().revision,
+    expectedCoordinationRevision: 1,
+    expectedBoardRevision: f.board.revision,
+    developmentEvidenceDigest: f.queue.read().tickets.find((t) => t.lane === 'development').completion.digest,
+  });
+  const delivery = (phase = 'preparation') => ({ ...f.decision(), lane: 'delivery', phase });
+  return { ...f, phase, delivery, reportPath, sourcePath };
+}
+test('completed original development with no delivery ticket enters preparation through the public native host route', async (t) => {
+  const f = await completedPhaseFixture(t),
+    input = f.phase(),
+    before = f.queue.read();
+  const binding = structuredClone(f.registry.readTask('task').executionBindings);
+  const result = await advanceTaskThread(
+    {
+      action: 'delivery-enroll',
+      task: input,
+      nativeObservations: [...f.snapshots.values()].map((snapshot) => ({
+        provider: 'codex-native-read_thread',
+        observedAt: new Date().toISOString(),
+        snapshot,
+      })),
+    },
+    {
+      commonDir: f.registry.commonDir,
+      registry: f.registry,
+      readTask: f.host.readTask,
+      dependenciesReady: f.host.dependenciesReady,
+      observe: () => {
+        throw Error('Phase enrollment must not stop or claim runtime resources');
+      },
+    },
+  );
+  assert.equal(result.result.startAuthorized, false);
+  const ticket = f.queue.read().tickets.find((ticket) => ticket.lane === 'delivery');
+  assert.equal(ticket.status, 'queued');
+  assert.equal(ticket.admission, null);
+  assert.deepEqual(
+    f.queue.read().tickets.find((t) => t.lane === 'development'),
+    before.tickets.find((t) => t.lane === 'development'),
+  );
+  assert.equal(f.queue.read().scopedAdmissions?.length ?? 0, 0);
+  assert.deepEqual(f.registry.readTask('task').executionBindings, binding);
+  assert.equal(f.registry.readTask('task').frozen, undefined);
+  const prepared = await f.call('dispatch', f.delivery());
+  assert.equal(prepared.decision.sourceProof.checkpoint.head, f.head);
+  process.env.CODEX_THREAD_ID = worker;
+  const consumed = await f.call('dispatch-start', {
+    ...prepared.workerInput,
+    expectedQueueRevision: f.queue.read().revision,
+  });
+  assert.doesNotThrow(() =>
+    f.queue.assertAdmission({
+      lane: 'delivery',
+      task: 'task',
+      owner: old,
+      admission: consumed.decision.admission,
+      effect: 'preparation',
+    }),
+  );
+  assert.throws(() =>
+    f.queue.assertAdmission({
+      lane: 'delivery',
+      task: 'task',
+      owner: old,
+      admission: consumed.decision.admission,
+      effect: 'final',
+    }),
+  );
+});
+for (const scenario of [
+  'dirty',
+  'report-changed',
+  'source-report-changed',
+  'unknown-commit',
+  'completed-head-changed',
+  'paused-board',
+  'old-coordinator',
+])
+  test(
+    'completed phase native host rejects ' + scenario + ' and preserves original development and queue',
+    async (t) => {
+      const f = await completedPhaseFixture(t),
+        input = f.phase();
+      if (scenario === 'dirty') writeFileSync(path.join(f.worktree, 'base.txt'), 'uncommitted drift');
+      if (scenario === 'report-changed') writeFileSync(path.join(f.worktree, f.reportPath), '{}');
+      if (scenario === 'source-report-changed')
+        writeFileSync(path.join(f.worktree, f.sourcePath), 'changed original output');
+      if (['unknown-commit', 'completed-head-changed'].includes(scenario)) {
+        writeFileSync(path.join(f.worktree, 'base.txt'), 'unverified later commit');
+        f.git(f.worktree, 'add', 'base.txt');
+        f.git(f.worktree, 'commit', '-m', 'Unverified later commit');
+        if (scenario === 'completed-head-changed')
+          f.registry.revise('task', f.registry.readTask('task').revision, (r) => {
+            r.recordedHead = f.git(f.worktree, 'rev-parse', 'HEAD');
+          });
+      }
+      if (scenario === 'paused-board') f.board.status = 'paused';
+      if (scenario === 'old-coordinator') process.env.CODEX_THREAD_ID = old;
+      const before = f.queue.read(),
+        task = f.registry.readTask('task');
+      await assert.rejects(f.call('delivery-enroll', input));
+      assert.deepEqual(f.queue.read(), before);
+      assert.deepEqual(f.registry.readTask('task'), task);
+    },
+  );
 for (const scenario of [
   'unregistered-head',
   'dirty',
@@ -400,6 +556,51 @@ for (const scenario of [
     } else await assert.rejects(f.call('dispatch', f.decision()));
     assert.deepEqual(f.queue.read(), q);
     assert.deepEqual(f.registry.readTask('task'), task);
+  });
+test('metadata phase enrollment does not turn retained or unknown runtime references into execution clearance', async (t) => {
+  const f = await completedPhaseFixture(t);
+  await f.call('delivery-enroll', f.phase());
+  const before = f.queue.read();
+  await assert.rejects(
+    dynamicHostAction('dispatch', f.delivery(), f.host, {
+      commonDir: f.registry.commonDir,
+      registry: f.registry,
+      queue: f.queue,
+      observe: () => ({
+        processes: [{ pid: process.pid, ppid: 1, command: 'native proof' }],
+        files: [{ pid: 123, name: f.worktree + '/backend', type: 'DIR' }],
+        containers: [],
+      }),
+    }),
+    /Task files\/cwd remain open/,
+  );
+  assert.deepEqual(f.queue.read(), before);
+  assert.equal(f.registry.readTask('task').frozen, undefined);
+});
+for (const route of ['generic-claim', 'generic-resume'])
+  test('derived queued phase rejects ' + route + ' without a new dispatch decision', async (t) => {
+    const f = await completedPhaseFixture(t);
+    await f.call('delivery-enroll', f.phase());
+    process.env.CODEX_THREAD_ID = worker;
+    const request = {
+      messageId: 'actual-later-fixture-user-event',
+      roomId: f.registry.readTask('task').executionBindings.at(-1).request.roomId,
+      authorId: 'human',
+      sequence: 30,
+    };
+    if (route === 'generic-claim') f.queue.direct({ action: 'resume-all', request });
+    const before = f.queue.read();
+    if (route === 'generic-claim')
+      assert.throws(
+        () => f.queue.claim({ lane: 'delivery', task: 'task', owner: old }, () => true),
+        /verified dispatch/,
+      );
+    else
+      assert.throws(
+        () => f.queue.direct({ action: 'resume-only', lane: 'delivery', task: 'task', owner: old, request }),
+        /verified dispatch/,
+      );
+    assert.deepEqual(f.queue.read(), before);
   });
 test('683-shaped frozen carrier safely resumes after binding was already consumed and blocked, using multiple decisions under one real delegation', async (t) => {
   const f = await dynamicFrozenFixture(t);

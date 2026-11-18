@@ -74,9 +74,141 @@ export function validateDynamicState(state) {
     assert.equal(ticket.admission, decision.admission);
     for (const key of ['task', 'lane', 'owner']) assert.equal(ticket[key], decision.input[key]);
   }
+  const phases = new Set();
+  for (const ticket of state.tickets.filter((item) => item.phaseOrigin)) {
+    const origin = ticket.phaseOrigin;
+    uuid(origin.phaseId);
+    assert.equal(origin.inputDigest, hash(origin.input));
+    assert.equal(origin.input.phaseId, origin.phaseId);
+    assert.ok(!phases.has(origin.phaseId), 'Duplicate delivery phase identity');
+    phases.add(origin.phaseId);
+    assert.equal(ticket.lane, 'delivery');
+    if (ticket.status === 'running')
+      assert.ok(
+        ticket.dynamicDecisionId &&
+          scopes(state).some(
+            (scope) =>
+              scope.task === ticket.task && scope.lane === 'delivery' && scope.decisionId === ticket.dynamicDecisionId,
+          ),
+        'Derived delivery phase needs a verified dispatch admission',
+      );
+    const development = completedDevelopment(state, ticket.task, ticket.owner);
+    assert.equal(origin.developmentTicketDigest, hash(development));
+    assert.equal(origin.developmentEvidenceDigest, development.completion.digest);
+    assert.deepEqual(ticket.request, development.request, 'Original development request must remain intact');
+    const grant = state.dynamicAuthorities?.find((item) => item.id === origin.authorityId);
+    assert.ok(grant?.source.tasks.some((item) => item.task === ticket.task && item.owner === ticket.owner));
+    assert.equal(grant.request.authorId, ticket.request.authorId);
+    assert.ok(
+      state.events.some(
+        (event) =>
+          event.action === 'delivery-phase-enrolled' &&
+          event.phaseId === origin.phaseId &&
+          event.task === ticket.task &&
+          event.owner === ticket.owner &&
+          event.developmentEvidenceDigest === development.completion.digest &&
+          event.order === development.order &&
+          hash(event.request) === hash(grant.request) &&
+          event.phaseDigest === hash(origin),
+      ),
+      'Derived preparation ticket lacks its exact phase event',
+    );
+  }
 }
 function authorityForHistory(state, decision) {
   return state.dynamicAuthorities.find((item) => item.id === decision.input.authorityId);
+}
+function completedDevelopment(state, task, owner) {
+  const development = state.tickets.find((item) => item.task === task && item.lane === 'development');
+  assert.equal(development?.status, 'completed', 'Original verified development must be completed');
+  assert.equal(development.owner, owner);
+  assert.equal(development.completion?.digest, hash(development.completion?.evidence));
+  assert.ok(
+    state.events.some(
+      (event) =>
+        event.action === 'complete' &&
+        event.lane === 'development' &&
+        event.task === task &&
+        event.evidenceDigest === development.completion.digest,
+    ),
+    'Original development completion event required',
+  );
+  return development;
+}
+
+// A phase transition retains real original request/order. It is neither a new
+// user event nor an admission, and cannot occupy preparation or final main.
+export function enrollDynamicDelivery(state, input, verify) {
+  assert.equal(state.paused, true);
+  for (const field of ['request', 'sequence', 'admission', 'lane', 'phase'])
+    assert.equal(input[field], undefined, 'Phase enrollment creates neither a user event nor an admission');
+  uuid(input.phaseId);
+  const proof = verify();
+  const grant = currentAuthority(state, input.authorityId, proof);
+  assert.equal(proof.actor, proof.coordinator, 'Actual current coordinator required');
+  const existing = state.tickets.find((item) => item.task === input.task && item.lane === 'delivery');
+  if (existing) {
+    assert.equal(existing.phaseOrigin?.phaseId, input.phaseId, 'Existing delivery instruction cannot be adopted');
+    assert.equal(existing.phaseOrigin.inputDigest, hash(input), 'Phase replay changed');
+    return structuredClone(existing);
+  }
+  assert.ok(!state.tickets.some((item) => item.phaseOrigin?.phaseId === input.phaseId), 'Phase ID already used');
+  assert.equal(state.revision, input.expectedQueueRevision, 'Queue revision changed');
+  assert.equal(proof.task.id, input.task);
+  assert.equal(proof.task.owner, input.owner);
+  assert.equal(proof.executor, input.executor);
+  assert.equal(proof.task.revision, input.expectedTaskRevision, 'Task revision changed');
+  assert.notEqual(proof.task.stage, 'closed');
+  assert.equal(proof.coordination.revision, input.expectedCoordinationRevision, 'Coordinator revision changed');
+  assert.equal(proof.boardRevision, input.expectedBoardRevision, 'Board revision changed');
+  assert.equal(proof.workerIdle, true);
+  assert.equal(proof.dependenciesReady, true);
+  assert.ok(
+    grant.source.tasks.some((item) => item.task === input.task && item.owner === input.owner),
+    'Task outside delegation',
+  );
+  const development = completedDevelopment(state, input.task, input.owner);
+  assert.equal(development.request.authorId, grant.request.authorId, 'Original user differs');
+  assert.equal(development.completion.digest, input.developmentEvidenceDigest, 'Development evidence changed');
+  assert.equal(proof.development?.verified, true, 'Current original development reports required');
+  assert.equal(proof.development.ticketDigest, hash(development));
+  assert.equal(proof.development.evidenceDigest, development.completion.digest);
+  assert.equal(proof.development.head, development.completion.evidence.head);
+  assert.equal(proof.development.head, proof.sourceProof.head, 'Completed source changed');
+  const ticket = {
+    lane: 'delivery',
+    task: input.task,
+    owner: input.owner,
+    request: structuredClone(development.request),
+    order: development.order,
+    status: 'queued',
+    admission: null,
+    phaseOrigin: {
+      phaseId: input.phaseId,
+      authorityId: grant.id,
+      inputDigest: hash(input),
+      input: structuredClone(input),
+      developmentTicketDigest: hash(development),
+      developmentEvidenceDigest: development.completion.digest,
+      sourceProof: structuredClone(proof.sourceProof),
+      bindingRevision: proof.bindingRevision,
+      coordinator: proof.coordinator,
+      coordinationRevision: proof.coordination.revision,
+    },
+  };
+  state.tickets.push(ticket);
+  state.events.push({
+    action: 'delivery-phase-enrolled',
+    phaseId: input.phaseId,
+    authorityId: grant.id,
+    task: input.task,
+    owner: input.owner,
+    order: development.order,
+    phaseDigest: hash(ticket.phaseOrigin),
+    developmentEvidenceDigest: development.completion.digest,
+    request: structuredClone(grant.request),
+  });
+  return structuredClone(ticket);
 }
 export function registerDynamicAuthority(state, input, verify) {
   const proof = verify();

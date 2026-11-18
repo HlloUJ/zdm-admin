@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { randomUUID, createHash } from 'node:crypto';
 import {
   registerDynamicAuthority,
   reserveDynamicDecision,
@@ -9,7 +9,175 @@ import {
   cancelDynamicDecision,
   assertDynamicAdmission,
   validateDynamicState,
+  enrollDynamicDelivery,
 } from './task-dynamic-model.mjs';
+const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+
+function phaseFixture() {
+  const f = fixture();
+  for (const task of ['a', 'b']) {
+    const development = f.state.tickets.find((item) => item.task === task);
+    development.lane = 'development';
+    development.status = 'completed';
+    const evidence = { task, owner: development.owner, head: task.repeat(40), reports: [{ path: 'original-report' }] };
+    development.completion = { evidence, digest: hash(evidence) };
+    f.state.events.push({
+      action: 'complete',
+      lane: 'development',
+      task,
+      evidenceDigest: development.completion.digest,
+    });
+  }
+  const phase = (task) => ({
+    coordinatorThreadId: f.coordinator,
+    authorityId: f.authorityId,
+    phaseId: randomUUID(),
+    task,
+    owner: 'worker-' + task,
+    executor: 'worker-' + task,
+    developmentEvidenceDigest: f.state.tickets.find((item) => item.task === task && item.lane === 'development')
+      .completion.digest,
+    expectedQueueRevision: 10,
+    expectedTaskRevision: 13,
+    expectedCoordinationRevision: 1,
+    expectedBoardRevision: 4,
+  });
+  const proof = (input) => {
+    const development = f.state.tickets.find((item) => item.task === input.task && item.lane === 'development');
+    return {
+      ...f.proof(input),
+      actor: f.coordinator,
+      sourceProof: { head: development.completion.evidence.head, digest: 'original-completed-source' },
+      development: {
+        verified: true,
+        ticketDigest: hash(development),
+        evidenceDigest: development.completion.digest,
+        head: development.completion.evidence.head,
+      },
+    };
+  };
+  return { ...f, phase, phaseProof: proof };
+}
+test('one preserved delegation enrolls two completed developments without claiming final, then prepares independently', () => {
+  const f = phaseFixture(),
+    final = f.input('c', 'final');
+  reserveDynamicDecision(f.state, final, () => f.proof(final));
+  consumeDynamicDecision(f.state, { decisionId: final.decisionId, expectedQueueRevision: 10 }, () => f.proof(final));
+  const scopes = structuredClone(f.state.scopedAdmissions);
+  const originalDevelopment = structuredClone(f.state.tickets.filter((t) => t.lane === 'development'));
+  const phases = ['a', 'b'].map(f.phase);
+  for (const input of phases) {
+    const ticket = enrollDynamicDelivery(f.state, input, () => f.phaseProof(input));
+    assert.equal(ticket.status, 'queued');
+    assert.equal(ticket.admission, null);
+    const development = originalDevelopment.find((t) => t.task === input.task);
+    assert.deepEqual(ticket.request, development.request);
+    assert.equal(ticket.order, development.order);
+    assert.deepEqual(f.state.scopedAdmissions, scopes);
+    const bytes = JSON.stringify(f.state);
+    assert.deepEqual(
+      enrollDynamicDelivery(f.state, input, () => f.phaseProof(input)),
+      ticket,
+    );
+    assert.equal(JSON.stringify(f.state), bytes);
+  }
+  assert.deepEqual(
+    f.state.tickets.filter((t) => t.lane === 'development'),
+    originalDevelopment,
+  );
+  for (const task of ['a', 'b']) {
+    const input = f.input(task);
+    reserveDynamicDecision(f.state, input, () => f.proof(input));
+    consumeDynamicDecision(f.state, { decisionId: input.decisionId, expectedQueueRevision: 10 }, () => f.proof(input));
+  }
+  assert.equal(f.state.scopedAdmissions.filter((s) => s.phase === 'preparation').length, 2);
+  assert.equal(f.state.scopedAdmissions.filter((s) => s.phase === 'final').length, 1);
+  const prep = f.state.dynamicDecisions.find((d) => d.input.task === 'a');
+  finishDynamicPreparation(f.state, { decisionId: prep.id, expectedQueueRevision: 10 }, () => ({
+    actor: prep.input.executor,
+    verified: true,
+    prepared: { head: 'a'.repeat(40), runId: '42' },
+  }));
+  assert.equal(f.state.tickets.find((t) => t.task === 'a' && t.lane === 'delivery').status, 'queued');
+  const compete = f.input('a', 'final');
+  assert.throws(() => reserveDynamicDecision(f.state, compete, () => f.proof(compete)), /exclusive/);
+  f.state.scopedAdmissions = f.state.scopedAdmissions.filter((s) => s.task !== 'c');
+  f.state.tickets.find((t) => t.task === 'c').status = 'completed';
+  reserveDynamicDecision(f.state, compete, () => f.proof(compete));
+  consumeDynamicDecision(f.state, { decisionId: compete.decisionId, expectedQueueRevision: 10 }, () =>
+    f.proof(compete),
+  );
+  assert.equal(f.state.scopedAdmissions.filter((s) => s.phase === 'final').length, 1);
+  validateDynamicState(f.state);
+  assert.deepEqual(
+    f.state.tickets.filter((t) => t.lane === 'development'),
+    originalDevelopment,
+  );
+  assert.ok(
+    f.state.events
+      .filter((e) => e.action === 'delivery-phase-enrolled')
+      .every((e) => e.request.messageId === f.request.messageId),
+  );
+});
+for (const scenario of [
+  'incomplete',
+  'missing-completion-event',
+  'wrong-user',
+  'stale-queue',
+  'stale-task',
+  'stale-board',
+  'foreign-task',
+  'old-coordinator',
+  'wrong-executor',
+  'active-worker',
+  'dependencies',
+  'unverified-reports',
+  'changed-source',
+  'changed-digest',
+  'pause',
+  'synthetic-user-event',
+  'direct-admission',
+])
+  test('phase enrollment refuses ' + scenario + ' without changing original tickets or granting any scope', () => {
+    const f = phaseFixture(),
+      input = f.phase('a'),
+      proof = f.phaseProof(input),
+      development = f.state.tickets.find((t) => t.task === 'a');
+    if (scenario === 'incomplete') development.status = 'blocked';
+    if (scenario === 'missing-completion-event') f.state.events = f.state.events.filter((e) => e.task !== 'a');
+    if (scenario === 'wrong-user') development.request.authorId = 'foreign';
+    if (scenario === 'stale-queue') input.expectedQueueRevision--;
+    if (scenario === 'stale-task') input.expectedTaskRevision--;
+    if (scenario === 'stale-board') input.expectedBoardRevision--;
+    if (scenario === 'foreign-task') input.task = 'outside';
+    if (scenario === 'old-coordinator') proof.coordinator = 'old';
+    if (scenario === 'wrong-executor') input.executor = 'foreign';
+    if (scenario === 'active-worker') proof.workerIdle = false;
+    if (scenario === 'dependencies') proof.dependenciesReady = false;
+    if (scenario === 'unverified-reports') proof.development.verified = false;
+    if (scenario === 'changed-source') proof.sourceProof.head = 'f'.repeat(40);
+    if (scenario === 'changed-digest') input.developmentEvidenceDigest = '0'.repeat(64);
+    if (scenario === 'pause') f.state.events.push({ action: 'pause-all', request: { ...f.request, sequence: 21 } });
+    if (scenario === 'synthetic-user-event') input.request = { ...f.request, messageId: 'invented' };
+    if (scenario === 'direct-admission') input.admission = randomUUID();
+    const before = JSON.stringify(f.state);
+    assert.throws(() => enrollDynamicDelivery(f.state, input, () => proof));
+    assert.equal(JSON.stringify(f.state), before);
+  });
+test('phase IDs cannot overwrite another ticket or be repurposed, including after terminal completion', () => {
+  const f = phaseFixture(),
+    input = f.phase('a');
+  enrollDynamicDelivery(f.state, input, () => f.phaseProof(input));
+  assert.throws(() => enrollDynamicDelivery(f.state, { ...input, phaseId: randomUUID() }, () => f.phaseProof(input)));
+  const second = f.phase('b');
+  second.phaseId = input.phaseId;
+  assert.throws(() => enrollDynamicDelivery(f.state, second, () => f.phaseProof(second)), /already used/);
+  const current = f.state.tickets.find((t) => t.lane === 'delivery' && t.task === 'a');
+  current.status = 'completed';
+  const bytes = JSON.stringify(f.state);
+  assert.equal(enrollDynamicDelivery(f.state, input, () => f.phaseProof(input)).status, 'completed');
+  assert.equal(JSON.stringify(f.state), bytes);
+});
 
 function fixture() {
   const coordinator = '22222222-2222-4222-8222-222222222222';

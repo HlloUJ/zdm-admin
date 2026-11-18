@@ -19,13 +19,24 @@ import { readAcceptance, assertAcceptedSource } from '../accepted-source.mjs';
 import { threadTitle } from '../task-thread-titles.mjs';
 import { assertCompletionQuality } from '../completion-ci-evidence.mjs';
 import { assertTaskCommitOwnership } from '../task-commit-ownership.mjs';
+import { verifyDevelopmentCompletion } from '../task-execution-order-cli.mjs';
 
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const git = (root, ...args) =>
-  execFileSync('git', ['--no-replace-objects', '-C', root, ...args], {
+  execFileSync('git', ['--no-replace-objects', '--no-optional-locks', '-C', root, ...args], {
     encoding: 'utf8',
     maxBuffer: 64 * 1024 * 1024,
   }).trim();
+function readOnlySource(root) {
+  const previous = process.env.GIT_OPTIONAL_LOCKS;
+  process.env.GIT_OPTIONAL_LOCKS = '0';
+  try {
+    return captureSource(root);
+  } finally {
+    if (previous === undefined) delete process.env.GIT_OPTIONAL_LOCKS;
+    else process.env.GIT_OPTIONAL_LOCKS = previous;
+  }
+}
 async function role(commonDir, input, host, actorIsCoordinator) {
   const coordination = readTaskCoordination(commonDir);
   assert.ok(coordination, 'Published current coordinator route required');
@@ -117,7 +128,32 @@ function registeredDevelopmentCheckpoint(task, state, registry, lane) {
     admission: ticket.admission,
   };
 }
-function sourceReady(task, state, registry, observe, request, lane) {
+function completedDevelopmentSource(task, state, registry) {
+  const development = state.tickets.find((item) => item.task === task.id && item.lane === 'development');
+  assert.equal(development?.owner, task.owner);
+  assert.equal(development.status, 'completed', 'Verified original development completion required');
+  assert.equal(development.completion?.digest, hash(development.completion?.evidence));
+  assert.equal(verifyDevelopmentCompletion(task, development.completion.evidence), true);
+  const head = git(task.worktree, 'rev-parse', 'HEAD');
+  assert.equal(head, task.recordedHead, 'Completed HEAD is not registered');
+  const ownership = assertTaskCommitOwnership(task.worktree, task, head);
+  const owned = new Set(ownership.commits);
+  assert.ok(
+    !registry
+      .list()
+      .some((other) => other.id !== task.id && other.checkpoints.some((entry) => owned.has(entry.commit))),
+    'Completed checkpoint has foreign ownership',
+  );
+  return {
+    verified: true,
+    ticketDigest: hash(development),
+    evidenceDigest: development.completion.digest,
+    head,
+    tree: git(task.worktree, 'rev-parse', head + '^{tree}'),
+    ownership,
+  };
+}
+function sourceReady(task, state, registry, observe, request, lane, enrollPhase) {
   const before = captureSource(task.worktree);
   assert.equal(git(task.worktree, 'branch', '--show-current'), task.branch);
   const binding = executionBinding(task);
@@ -137,7 +173,12 @@ function sourceReady(task, state, registry, observe, request, lane) {
           return true;
         },
         acceptRegisteredCheckpoint: () => {
-          checkpoint = registeredDevelopmentCheckpoint(task, state, registry, lane);
+          if (lane === 'delivery') {
+            const ticket = state.tickets.find((item) => item.task === task.id && item.lane === 'delivery');
+            assert.ok(enrollPhase || ticket?.phaseOrigin, 'Unfrozen delivery needs its exact completed phase');
+            completedDevelopmentSource(task, state, registry);
+            checkpoint = registeredDevelopmentCheckpoint(task, state, registry, 'development');
+          } else checkpoint = registeredDevelopmentCheckpoint(task, state, registry, lane);
           return true;
         },
       },
@@ -183,7 +224,17 @@ function sourceReady(task, state, registry, observe, request, lane) {
     readiness,
   };
 }
-async function taskProof(commonDir, input, host, registry, queue, asWorker, observe, requireDependencies = true) {
+async function taskProof(
+  commonDir,
+  input,
+  host,
+  registry,
+  queue,
+  asWorker,
+  observe,
+  requireDependencies = true,
+  enrollPhase = false,
+) {
   const roleProof = await role(commonDir, input, host, !asWorker);
   const task = registry.resolve({ id: input.task });
   assert.notEqual(task.stage, 'closed', 'Closed task cannot dispatch');
@@ -245,8 +296,34 @@ async function taskProof(commonDir, input, host, registry, queue, asWorker, obse
       closedAt: dependency?.closedAt ?? null,
     };
   });
-  const capacity = await host.readCapacity();
-  const source = sourceReady(task, state, registry, observe, grant.request, input.lane);
+  const phaseTicket = state.tickets.find((item) => item.task === task.id && item.lane === 'delivery');
+  const development =
+    enrollPhase || (input.lane === 'delivery' && phaseTicket?.phaseOrigin && !task.frozen)
+      ? completedDevelopmentSource(task, state, registry)
+      : null;
+  let source;
+  if (enrollPhase) {
+    // Enrollment only appends metadata. Runtime quiescence/capacity remain at
+    // dispatch and worker consumption; no source or process is adopted here.
+    const before = readOnlySource(task.worktree);
+    assert.equal(git(task.worktree, 'branch', '--show-current'), task.branch);
+    assert.deepEqual(completedDevelopmentSource(task, state, registry), development);
+    const accepted = task.frozen ? frozenCheckpoint(task) : null;
+    const after = readOnlySource(task.worktree);
+    assert.deepEqual(after, before, 'Completed source changed during phase enrollment');
+    source = {
+      sourceProof: {
+        kind: 'completed-development-enrollment-v1',
+        head: after.head,
+        digest: after.digest,
+        index: hash(git(task.worktree, 'ls-files', '--stage', '-z')),
+        accepted,
+        development,
+      },
+      readiness: { workNotStarted: true },
+    };
+  } else source = sourceReady(task, state, registry, observe, grant.request, input.lane, false);
+  const capacity = enrollPhase ? null : await host.readCapacity();
   const existing = [state.scopedAdmission, ...(state.scopedAdmissions ?? [])]
     .filter(Boolean)
     .find((scope) => scope.task === task.id && scope.lane === input.lane);
@@ -259,6 +336,7 @@ async function taskProof(commonDir, input, host, registry, queue, asWorker, obse
   return {
     ...roleProof,
     ...source,
+    development,
     task,
     executor,
     bindingRevision: binding?.revision ?? 0,
@@ -277,7 +355,11 @@ export async function dynamicHostAction(
   host,
   { commonDir, registry, queue, observe = observeCancellationHost },
 ) {
-  assert.ok(['delegate', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(action));
+  assert.ok(
+    ['delegate', 'delivery-enroll', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(
+      action,
+    ),
+  );
   if (action === 'delegate') {
     const current = await role(commonDir, input, host, true);
     const source = await verifyCoordinatorSource(
@@ -310,6 +392,35 @@ export async function dynamicHostAction(
       assert.deepEqual(readTaskCoordination(commonDir), current.coordination);
       return { ...current, message, taskScope };
     });
+  }
+  if (action === 'delivery-enroll') {
+    assert.ok(input.lane === undefined && input.phase === undefined, 'Phase enrollment grants no work admission');
+    const existing = queue.read().tickets.find((item) => item.task === input.task && item.lane === 'delivery');
+    if (existing) {
+      const current = await role(commonDir, input, host, true);
+      return {
+        ticket: queue.enrollDeliveryPhase(input, () => ({ ...current, actor: process.env.CODEX_THREAD_ID })),
+        startAuthorized: false,
+        replay: true,
+      };
+    }
+    const proof = await taskProof(
+      commonDir,
+      { ...input, lane: 'delivery', phase: 'preparation' },
+      host,
+      registry,
+      queue,
+      false,
+      observe,
+      true,
+      true,
+    );
+    const ticket = queue.enrollDeliveryPhase(input, () => {
+      assert.deepEqual(registry.readTask(input.task), proof.task);
+      assert.deepEqual(readTaskCoordination(commonDir), proof.coordination);
+      return proof;
+    });
+    return { ticket, startAuthorized: false, replay: false };
   }
   if (action === 'dispatch') {
     const prior = queue.read().dynamicDecisions?.find((item) => item.id === input.decisionId);

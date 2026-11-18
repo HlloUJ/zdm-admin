@@ -1,6 +1,6 @@
 # 持续委托与动态任务调度
 
-本入口只处理同一项目中已正式受理、登记且具有原票据的任务。不创造业务授权，不迁移 owner、不改变冻结，不代替来源证明、验证、数据保护或最终 main 互斥。
+本入口只处理同一项目中已正式受理、登记且具有原开发或交付票据的任务。不创造业务授权，不迁移 owner、不改变冻结，不代替来源证明、验证、数据保护或最终 main 互斥。
 
 ## 真实委托与独立决定
 
@@ -15,6 +15,14 @@
 - `expectedQueueRevision`、`expectedCoordinationRevision`：本次实际版本。
 
 原消息、范围、历史 owner 与摘要进入队列的 `dynamicAuthorities`。一条真实委托支持多个不同决定；后续不要求旧授权聊天永久可读，但每次仍核验 current.json 当前角色、同一用户及新鲜当前角色观察。旧协调者不能冒用新角色。更新的 pause 撤销旧委托，不按超时重新启用。
+
+## 开发完成后的交付阶段入队
+
+只有已完成开发票据、尚无 delivery 票据时，当前真实协调者先调用 `action: "delivery-enroll"`。`task` 输入使用 coordinatorThreadId、authorityId、唯一 phaseId、task、owner、executor、expectedQueueRevision、expectedTaskRevision、expectedCoordinationRevision、expectedBoardRevision，以及原 `completion.digest` 对应的 developmentEvidenceDigest；不提供 lane、phase、新 request 或新 sequence。
+
+入口重新核验已保存的真实持续委托、同一用户、当前角色与 worker、依赖、未暂停/终态看板，以及原完成事件、报告和源报告哈希、干净准确 HEAD、登记 checkpoint 与提交归属。原开发完成票据不变，新 delivery 票据使用其原 request 和 order，状态仅为 queued、admission 为 null。该派生票据不能经普通 claim 或 resume 绕过 dispatch 决定，即使全局恢复也不因此取得最终执行许可。phaseOrigin 和独立阶段事件保存原开发票据摘要、完成证据、准确来源、原顺位、真实委托及阶段 UUID；既有 delivery 票据不被接管，精确重放不重新授权工作，暂停后旧委托失效。多个任务可以引用同一真实委托，不伪造新用户消息或收件序号。
+
+该步骤只登记元数据，不启动、停止或清理环境，不预约准备容量或最终 main，不要求先 promote 再伪造 block。环境和数据仍完整保留；登记成功不表示旧运行环境可接管。之后仍走下节的 dispatch/dispatch-start，重新证明目标写入者空闲、资源、依赖和实际容量；未知或尚未安全恢复的运行引用仍会阻断实际准备。未冻结的完成源码仅在对应 phaseOrigin 和完整原开发完成来源一致时作为准备 checkpoint，worker 实际取得 preparation 准入后才由原 complete prepare 入口冻结业务并验证、推送及执行 PR CI。不会将已完成的开发 lane 重新改为运行。
 
 ## 预约与实际 worker 消费
 

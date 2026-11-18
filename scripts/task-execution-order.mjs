@@ -17,6 +17,7 @@ import {
   finishDynamicPreparation,
   cancelDynamicDecision,
   assertDynamicAdmission,
+  enrollDynamicDelivery,
 } from './delivery-repairs/task-dynamic-model.mjs';
 
 export const EXECUTION_LANES = ['development', 'delivery'];
@@ -421,6 +422,11 @@ export function createExecutionOrder(commonDir) {
     return update((state) => {
       const current = ticket(state, lane, task, owner);
       assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
+      if (current.phaseOrigin)
+        assert.ok(
+          current.dynamicDecisionId && scopedFor(state, current),
+          'Derived delivery phase requires its verified dispatch, not a generic claim',
+        );
       if (current.nativeCoordinatorOwner) createTaskThreadTitles(commonDir).requireBinding(monitorContext, task, owner);
       assert.ok(!state.paused || scopedFor(state, current), 'All execution launches paused');
       if (current.status === 'running') {
@@ -467,6 +473,7 @@ export function createExecutionOrder(commonDir) {
     );
     assert.ok(!state.paused || scopedFor(state, current), 'All execution launches paused');
     assert.equal(current.status, 'running', 'Task is not admitted; no automatic resume');
+    if (current.phaseOrigin) assert.ok(current.dynamicDecisionId, 'Derived delivery requires a verified dispatch');
     assert.ok(text(admission) && admission === current.admission, 'Exact current admission required');
     if (current.dynamicDecisionId) {
       const scope = scopedAdmissions(state).find((s) => s.task === task && s.lane === lane);
@@ -986,6 +993,7 @@ export function createExecutionOrder(commonDir) {
     });
   }
   return {
+    enrollDeliveryPhase: (input, verify) => update((state) => enrollDynamicDelivery(state, input, verify)),
     registerDelegation: (input, verify) => update((state) => registerDynamicAuthority(state, input, verify)),
     reserveDecision: (input, verify) => update((state) => reserveDynamicDecision(state, input, verify)),
     consumeDecision: (input, verify) => update((state) => consumeDynamicDecision(state, input, verify)),

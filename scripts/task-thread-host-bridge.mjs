@@ -103,6 +103,7 @@ export async function advanceTaskThread(
       'resume',
       'coordinate',
       'delegate',
+      'delivery-enroll',
       'dispatch',
       'dispatch-start',
       'dispatch-cancel',
@@ -218,7 +219,11 @@ export async function advanceTaskThread(
     },
   };
   let result;
-  if (['delegate', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(input.action)) {
+  if (
+    ['delegate', 'delivery-enroll', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(
+      input.action,
+    )
+  ) {
     assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
     result = await dynamicHostAction(input.action, input.task, host, {
       commonDir,
