@@ -7,9 +7,10 @@ const context = new AsyncLocalStorage();
 // In-process injection only. No service, credentials, task reexecution or platform API emulation.
 export function createProgressHost(
   adapter,
-  { onError = console.error, directory = null, drainTimeoutMs = 5000, beforeStage = null } = {},
+  { onError = console.error, directory = null, drainTimeoutMs = 5000, drainLimit = 32, beforeStage = null } = {},
 ) {
   assert.ok(Number.isSafeInteger(drainTimeoutMs) && drainTimeoutMs > 0 && drainTimeoutMs <= 30000);
+  assert.ok(Number.isSafeInteger(drainLimit) && drainLimit > 0 && drainLimit <= 128);
   const pending = new Set();
   let protectedTurns = 0,
     scheduled = null,
@@ -46,12 +47,16 @@ export function createProgressHost(
         };
         try {
           const box = createProgressOutbox(target);
-          await flushProgress(box, {
-            read: (...args) => bounded('read', ...args),
-            apply: (...args) => bounded('apply', ...args),
-            ...(adapter.readRejection ? { readRejection: (...args) => bounded('readRejection', ...args) } : {}),
-            ...(adapter.history ? { history: (...args) => bounded('history', ...args) } : {}),
-          });
+          await flushProgress(
+            box,
+            {
+              read: (...args) => bounded('read', ...args),
+              apply: (...args) => bounded('apply', ...args),
+              ...(adapter.readRejection ? { readRejection: (...args) => bounded('readRejection', ...args) } : {}),
+              ...(adapter.history ? { history: (...args) => bounded('history', ...args) } : {}),
+            },
+            { limit: drainLimit },
+          );
           if (box.read().pending.length) pending.add(target);
         } catch (error) {
           pending.add(target);

@@ -59,7 +59,37 @@ export function captureCompletionProgress(directory, state, previous) {
   }
 }
 export function captureQueueProgress(commonDir, state, previous) {
-  const pausedFor = executionPausedFor;
+  const pausedFor = (current, ticket) => {
+    if (!executionPausedFor(current, ticket)) return false;
+    const fence = current.events?.findLast((event) => ['initialize', 'pause-all'].includes(event.action))?.request;
+    // Binding a reserved new native worker does not start it or revoke its
+    // newer user instruction. A subsequent real pause still wins below.
+    const pendingNative =
+      ticket.awaitingNativeWorker === true ||
+      (ticket.lane === 'development' &&
+        ticket.nativeLaunchReserved === true &&
+        typeof ticket.nativeCoordinatorOwner === 'string' &&
+        ticket.nativeCoordinatorOwner.trim() &&
+        ticket.nativeCoordinatorOwner !== ticket.owner &&
+        current.events?.some(
+          (event) =>
+            event.action === 'bind-native-worker' &&
+            event.task === ticket.task &&
+            event.coordinatorOwner === ticket.nativeCoordinatorOwner &&
+            event.workerOwner === ticket.owner,
+        ));
+    return !(
+      ticket.status === 'queued' &&
+      pendingNative &&
+      ticket.admission === null &&
+      Number.isSafeInteger(fence?.sequence) &&
+      typeof fence.authorId === 'string' &&
+      fence.authorId.trim() &&
+      fence.authorId === ticket.request?.authorId &&
+      Number.isSafeInteger(ticket.request?.sequence) &&
+      ticket.request.sequence > fence.sequence
+    );
+  };
   for (const ticket of state.tickets) {
     if (['completed', 'cancelled'].includes(ticket.status)) continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
