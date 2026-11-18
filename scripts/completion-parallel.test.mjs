@@ -12,9 +12,7 @@ import { applyTaskComposition } from './task-composition.mjs';
 import { captureSource } from './verification-evidence.mjs';
 import { runCompletionFlow } from './completion-flow.mjs';
 import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
-import { createProgressHost } from './task-progress-host.mjs';
-import { createProgressOutbox } from './task-progress-outbox.mjs';
-import { completionStage, openCompletion, saveCompletion } from './completion-session.mjs';
+import { completionStage } from './completion-session.mjs';
 import { frozenRestoreArgs } from './task-preview-service.mjs';
 import { assertFrozenValidationStart } from './dev-task.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
@@ -214,9 +212,8 @@ test('v2 published integration rejects an unpublished combination before changin
   assert.equal(readFileSync(path.join(integration, 'unpublished.txt'), 'utf8'), 'must be retained');
 });
 
-for (const scenario of [null, 'composed-ci', 'handoff', 'board-offline'])
-  test(`parallel delivery controller preserves exact ordering and ownership: ${scenario ?? 'success'}`, async (t) => {
-    const failure = scenario === 'board-offline' ? null : scenario;
+for (const failure of [null, 'composed-ci', 'handoff'])
+  test(`parallel delivery controller preserves exact ordering and ownership: ${failure ?? 'success'}`, async (t) => {
     const f = fixture(t),
       events = [],
       state = { events: [] },
@@ -225,38 +222,6 @@ for (const scenario of [null, 'composed-ci', 'handoff', 'board-offline'])
       prWaits = 0,
       handoffFailed = false;
     const queue = createTaskDeliveryQueue(f.registry.commonDir);
-    const progressDirectory = path.join(f.registry.commonDir, 'task-progress', 'a');
-    const completionDirectory = path.join(f.registry.commonDir, 'task-delivery', 'a');
-    let offline = true,
-      boardCalls = 0,
-      unstall;
-    const stalled = new Promise((resolve) => {
-      unstall = resolve;
-    });
-    const applied = new Map();
-    const host = createProgressHost({
-      read: async (id, receiptId) => {
-        assert.equal(queue.inspect().tickets.length, 0, 'Board transport must not execute inside protected turn');
-        boardCalls++;
-        if (offline) {
-          await stalled;
-          throw Error('board offline');
-        }
-        return applied.get(receiptId) ?? { status: 'not_found', revision: applied.size + 1 };
-      },
-      apply: async ({ receipt }) => {
-        assert.equal(queue.inspect().tickets.length, 0);
-        applied.set(receipt.receipt_id, {
-          status: 'applied',
-          receipt_id: receipt.receipt_id,
-          task_id: receipt.task_id,
-          revision: applied.size + 2,
-          applied_revision: applied.size + 2,
-          receipt,
-        });
-      },
-    });
-    if (scenario === 'board-offline') Object.assign(state, openCompletion(completionDirectory, 'a'));
     const execute = (cwd, command, args) => {
       if (command === 'git') return f.git(cwd, ...args);
       if (command === process.execPath) {
@@ -292,9 +257,7 @@ for (const scenario of [null, 'composed-ci', 'handoff', 'board-offline'])
     const options = {
       execute,
       state,
-      save: () => {
-        if (scenario === 'board-offline') saveCompletion(completionDirectory, state);
-      },
+      save: () => {},
       common: f.registry.commonDir,
       inventoryAssets: () => [],
       candidateRuntime: async (_task, _head, action) => action({}),
@@ -346,36 +309,10 @@ for (const scenario of [null, 'composed-ci', 'handoff', 'board-offline'])
         return { settled: true };
       },
     };
-    const run = () =>
-      scenario === 'board-offline'
-        ? host.run(() => runCompletionFlow(f.a, readActiveBatch(f.a), f.head, options))
-        : runCompletionFlow(f.a, readActiveBatch(f.a), f.head, options);
+    const run = () => runCompletionFlow(f.a, readActiveBatch(f.a), f.head, options);
     if (failure)
       await assert.rejects(run(), new RegExp(failure === 'handoff' ? 'handoff failed' : 'composed CI failed'));
     else assert.equal((await run()).settled, true);
-    if (scenario === 'board-offline') {
-      assert.equal(queue.inspect().tickets.length, 0, 'Terminal delivery releases turn without waiting for board');
-      assert.ok(events.includes('settle'));
-      await new Promise((resolve) => setImmediate(resolve));
-      assert.equal(boardCalls, 1, 'Stalled read starts only after delivery released its turn');
-      const box = createProgressOutbox(progressDirectory);
-      const originalIds = box.read().pending.map((entry) => entry.receipt_id);
-      assert.ok(originalIds.length > 0);
-      const originalActions = [...events];
-      unstall();
-      await host.settled();
-      assert.deepEqual(
-        box.read().pending.map((entry) => entry.receipt_id),
-        originalIds,
-      );
-      offline = false;
-      host.transportReady();
-      await host.settled();
-      assert.equal(box.read().pending.length, 0);
-      assert.deepEqual([...applied.keys()], originalIds);
-      assert.deepEqual(events, originalActions, 'Recovery does not replay any development, CI, handoff or settle');
-      assert.equal(queue.inspect().tickets.length, 0);
-    }
     assert.deepEqual(f.registry.readTask('b'), beforeB);
     assert.equal(readFileSync(path.join(f.b, 'unfinished.txt'), 'utf8'), 'unfinished B must survive');
     assert.equal(f.registry.readTask('a').frozen.accepted, f.accepted.commit);

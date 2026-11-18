@@ -1,4 +1,3 @@
-import { holdProgressTransport } from './task-progress-host.mjs';
 import { assertAcceptedSource, publishAcceptance, readAcceptance } from './accepted-source.mjs';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -282,42 +281,35 @@ export async function runCompletionFlow(
     accepted: readAcceptance(root, batch.id).commit,
     head,
   });
-  const releaseProgress = holdProgressTransport();
+  const turn = await phase('queue', ticket.id, () => queue.wait(ticket));
   try {
-    const turn = await phase('queue', ticket.id, () => queue.wait(ticket));
-    try {
-      git(root, 'fetch', 'origin');
-      const latest = git(root, 'rev-parse', 'origin/main');
-      const current = JSON.parse(
-        execute(root, 'gh', ['pr', 'view', String(pull.number), '--json', 'state,headRefOid']),
+    git(root, 'fetch', 'origin');
+    const latest = git(root, 'rev-parse', 'origin/main');
+    const current = JSON.parse(execute(root, 'gh', ['pr', 'view', String(pull.number), '--json', 'state,headRefOid']));
+    assert.equal(current.headRefOid, head);
+    if (current.state === 'OPEN') {
+      assert.equal(
+        typeof previewControl.prepareComposition,
+        'function',
+        'Protected task composition runtime control required',
       );
-      assert.equal(current.headRefOid, head);
-      if (current.state === 'OPEN') {
-        assert.equal(
-          typeof previewControl.prepareComposition,
-          'function',
-          'Protected task composition runtime control required',
-        );
-        // Stop this task's mounted watchers before changing its source. Another
-        // selected task remains healthy and untouched.
-        await previewControl.prepareComposition(worktreePlan(latest));
-        const composed = applyTaskComposition(root, batch.id, latest);
-        batch = readActiveBatch(root);
-        const changed = composed.recordedHead !== head;
-        head = composed.recordedHead;
-        // Development proof and the initial exact PR CI precede this turn. Run
-        // final local readiness from the composed candidate's own immutable tools.
-        pull = await publishCandidate({ readiness: true });
-        if (changed) await awaitRun('pr', head);
-      } else assert.equal(current.state, 'MERGED');
-      const result = await complete(turn, queue);
-      await queue.finish(turn, { success: true });
-      return result;
-    } catch (error) {
-      await queue.finish(turn, { success: false, error });
-      throw error;
-    }
-  } finally {
-    releaseProgress();
+      // Stop this task's mounted watchers before changing its source. Another
+      // selected task remains healthy and untouched.
+      await previewControl.prepareComposition(worktreePlan(latest));
+      const composed = applyTaskComposition(root, batch.id, latest);
+      batch = readActiveBatch(root);
+      const changed = composed.recordedHead !== head;
+      head = composed.recordedHead;
+      // Development proof and the initial exact PR CI precede this turn. Run
+      // final local readiness from the composed candidate's own immutable tools.
+      pull = await publishCandidate({ readiness: true });
+      if (changed) await awaitRun('pr', head);
+    } else assert.equal(current.state, 'MERGED');
+    const result = await complete(turn, queue);
+    await queue.finish(turn, { success: true });
+    return result;
+  } catch (error) {
+    await queue.finish(turn, { success: false, error });
+    throw error;
   }
 }
