@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from 'node:fs';
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { EventEmitter } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { tmpdir, hostname } from 'node:os';
@@ -11,7 +11,35 @@ import {
   stopCompletionProcess,
   runCompletionProcess,
   assertProcessesGone,
+  completionPermission,
+  processScope,
 } from './completion-process.mjs';
+
+test('revoked current admission blocks both command launch modes before recording or spawning any new child', (t) => {
+  const directory = mkdtempSync(path.join(tmpdir(), 'candidate-permission-'));
+  t.after(() => rmSync(directory, { recursive: true, force: true }));
+  const state = openCompletion(directory, 'permission-fence', { formal: false });
+  const event = { processTracking: 1, processes: [] };
+  Object.defineProperty(state, completionPermission, {
+    value: () => {
+      throw Error('Coordinator changed; dispatch fenced');
+    },
+  });
+  const sentinel = path.join(directory, 'must-not-execute');
+  const args = ['-e', `require('node:fs').writeFileSync(${JSON.stringify(sentinel)},'wrong')`];
+  processScope(
+    state,
+    event,
+    () => assert.fail('Must not publish a launch intent'),
+    () => {
+      assert.throws(() => runCompletionProcess(process.execPath, args), /dispatch fenced/);
+      assert.throws(() => startCompletionProcess(process.execPath, args), /dispatch fenced/);
+    },
+  );
+  assert.deepEqual(event.processes, []);
+  assert.equal(existsSync(sentinel), false);
+  assert.equal(readdirSync(directory).filter((file) => file.startsWith('process-')).length, 0);
+});
 
 test('long-lived candidate processes publish original group proof and stop all foreground descendants before stage success', async (t) => {
   const directory = mkdtempSync(path.join(tmpdir(), 'candidate-process-'));

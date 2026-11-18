@@ -1,6 +1,15 @@
 import { assertProcessesGone } from './completion-process.mjs';
 import assert from 'node:assert/strict';
-import { existsSync, lstatSync, readFileSync, writeFileSync, mkdirSync, renameSync, unlinkSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readdirSync,
+  writeFileSync,
+  mkdirSync,
+  renameSync,
+  unlinkSync,
+} from 'node:fs';
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import os from 'node:os';
@@ -30,6 +39,12 @@ export function recoverWriter(directory, options) {
   unlinkSync(file); // Only the proven-dead writer's private index lock, never a database/runtime lock.
 }
 export function recoverInterrupted(state, directory, options = {}) {
+  const references = state.events.flatMap((event) => event.processes ?? []).map((child) => child.token);
+  assert.equal(new Set(references).size, references.length, 'Duplicate subprocess session reference; preserve state');
+  for (const file of readdirSync(directory).filter((name) => /^process-.*\.json$/.test(name))) {
+    const token = file.slice('process-'.length, -'.json'.length);
+    assert.ok(references.includes(token), 'Unreferenced subprocess journal; preserve state');
+  }
   for (const e of state.events.filter((event) => event.processTracking === 1))
     assertProcessesGone(e, directory, options);
   for (const e of state.events.filter((event) => event.status === 'running')) {

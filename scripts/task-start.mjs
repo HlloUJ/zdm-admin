@@ -1,3 +1,6 @@
+import { createBoardIntake } from './task-board-intake.mjs';
+import './task-network.mjs';
+import { assertTaskExecutor, executionBinding } from './task-execution-binding.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import {
   requireStartMonitoring,
@@ -14,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
 import { bindBatchTiming } from './batch-timing-store.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
 const runGit = (cwd, ...args) =>
   execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 const safe = (file) => {
@@ -67,6 +71,13 @@ export function startParallelTask(
 ) {
   root = realpathSync(root);
   const owner = options.owner || process.env.CODEX_THREAD_ID;
+  const registered = options.slug ? registry.readTask(options.slug) : registry.resolve({ worktree: root });
+  const binding = registered && executionBinding(registered);
+  if (binding) {
+    assertTaskExecutor(registered);
+    assert.equal(owner, binding.executor, 'Start must name the actual bound executor');
+    assert.deepEqual(options.monitorContext, binding.monitoring, 'Exact current execution monitoring required');
+  }
   function ready(result) {
     result.task = verifyStartMonitoringReadback(registry, result.task, options.monitorContext);
     result.artifacts = prepare(result.task);
@@ -87,22 +98,44 @@ export function startParallelTask(
     typeof owner === 'string' && owner.trim(),
     'Explicit task owner required when execution identity is unavailable',
   );
+  const nativeIntake =
+    !binding && ['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface);
+  const delegatedContinuation = Boolean(
+    registered &&
+    createExecutionOrder(registry.commonDir)
+      .read()
+      ?.tickets.find((ticket) => ticket.task === registered.id && ticket.lane === 'development')?.dynamicDecisionId,
+  );
+  if (nativeIntake && !delegatedContinuation)
+    createBoardIntake(registry.commonDir).require(options.monitorContext, options.slug, owner);
   // The explicit root-thread receipt/claim precedes worktree creation or restoration.
   const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;
   const admission = createExecutionOrder(registry.commonDir).assertAdmission({
     lane: 'development',
     task: orderedTask,
-    owner,
+    owner: binding ? registered.owner : owner,
     admission: process.env.ZDM_EXECUTION_ADMISSION,
   });
+  if (nativeIntake && delegatedContinuation) {
+    assert.ok(admission.ticket?.dynamicDecisionId, 'Consumed current continuation decision required');
+    const context = {
+      ...options.monitorContext,
+      coordinatorThreadId: readTaskCoordination(registry.commonDir).current.rootThreadId,
+    };
+    // Only an already enrolled task with a consumed current decision can use
+    // historical intake evidence; new starts retain the freshness requirement.
+    createBoardIntake(registry.commonDir).require(context, options.slug, owner, { fresh: false });
+  }
+  if (admission.ticket?.executionKind !== undefined)
+    assert.equal(options.kind, admission.ticket.executionKind, 'Start kind differs from the authorized task');
   if (!options.slug) {
     const task = registry.resolve({ worktree: root });
-    assert.equal(task.owner, owner, 'Another owner controls this task');
+    assertTaskExecutor(task, owner, 'Another owner controls this task');
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   const existing = registry.readTask(options.slug);
   if (existing) {
-    assert.equal(existing.owner, owner, 'Another owner controls this task');
+    assertTaskExecutor(existing, owner, 'Another owner controls this task');
     assert.equal(existing.kind, options.kind, 'Task kind differs');
     const task = registry.resolve({ id: options.slug });
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });

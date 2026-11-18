@@ -1,3 +1,4 @@
+import { createBoardIntake } from './task-board-intake.mjs';
 import { collectTaskProgress } from './task-progress-collector.mjs';
 import { executionOrderCommand } from './task-execution-order-cli.mjs';
 import assert from 'node:assert/strict';
@@ -8,6 +9,9 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { startParallelTask, parseTaskStart } from './task-start.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
+import { createExecutionOrder } from './task-execution-order.mjs';
+import { authorizeTaskCoordinator } from './task-coordination.mjs';
+import { randomUUID } from 'node:crypto';
 function fixture(t) {
   const priorOwner = process.env.CODEX_THREAD_ID;
   process.env.CODEX_THREAD_ID = priorOwner ?? 'isolated-start-fixture';
@@ -59,6 +63,163 @@ const options = (slug, parent) => ({
   monitorContext: context(slug),
   taskParent: parent,
   resume: false,
+});
+test('native top-level thread creates real isolated worktree, persists exact monitoring and remains observable', async (t) => {
+  const f = fixture(t);
+  const owner = '11111111-1111-4111-8111-111111111111';
+  process.env.CODEX_THREAD_ID = owner;
+  const opts = options('native-task', f.parent);
+  opts.owner = owner;
+  opts.monitorContext = { ...context('native-task'), executionSurface: 'codex-thread', worker: owner };
+  opts.monitorContext.rootThreadId = owner;
+  opts.monitorContext.roomId = owner;
+  await createBoardIntake(f.registry.commonDir).accept(
+    {
+      taskId: 'native-task',
+      title: opts.monitorContext.taskName,
+      owner,
+      rootThreadId: owner,
+      request: { roomId: owner, messageId: opts.monitorContext.authorizationRef },
+    },
+    {
+      readThread: async () => ({
+        thread: { id: owner },
+        turns: [{ items: [{ type: 'userMessage', id: opts.monitorContext.authorizationRef }] }],
+      }),
+      readTask: async () => ({
+        id: 'native-task',
+        title: opts.monitorContext.taskName,
+        task_number: opts.monitorContext.taskNumber,
+        status: 'active',
+        revision: 1,
+      }),
+    },
+  );
+  const result = startParallelTask(opts, { root: f.root });
+  assert.equal(result.task.monitoring.executionSurface, 'codex-thread');
+  assert.equal(result.task.monitoring.worker, owner);
+  assert.equal(f.registry.resolve({ id: 'native-task' }).monitoring.executionSurface, 'codex-thread');
+  assert.equal(collectTaskProgress(f.root)[0].monitoring.executionSurface, 'codex-thread');
+  assert.equal(result.previewSwitched, false);
+  assert.equal(f.git(result.task.worktree, 'branch', '--show-current'), 'codex/native-task');
+});
+test('consumed development dispatch resumes an enrolled native task with its unchanged expired intake; fresh starts and stale admissions still fail', async (t) => {
+  const f = fixture(t),
+    owner = '11111111-1111-4111-8111-111111111111';
+  process.env.CODEX_THREAD_ID = owner;
+  const opts = options('native-continuation', f.parent);
+  opts.owner = owner;
+  opts.monitorContext = {
+    ...context(opts.slug),
+    executionSurface: 'codex-thread',
+    worker: owner,
+    rootThreadId: owner,
+    roomId: owner,
+  };
+  const request = {
+    roomId: owner,
+    messageId: opts.monitorContext.authorizationRef,
+    authorId: 'same-user',
+    sequence: 1,
+  };
+  const readThread = async () => ({
+    thread: { id: owner },
+    turns: [{ items: [{ type: 'userMessage', id: request.messageId }] }],
+  });
+  await createBoardIntake(f.registry.commonDir).accept(
+    { taskId: opts.slug, title: opts.monitorContext.taskName, owner, rootThreadId: owner, request },
+    {
+      readThread,
+      readTask: async () => ({
+        id: opts.slug,
+        title: opts.monitorContext.taskName,
+        task_number: opts.monitorContext.taskNumber,
+        status: 'active',
+        revision: 1,
+      }),
+    },
+  );
+  const started = startParallelTask(opts, { root: f.root });
+  const intakeFile = path.join(f.registry.commonDir, 'task-board-intake', opts.slug + '.json'),
+    original = readFileSync(intakeFile);
+  const realNow = Date.now,
+    priorAdmission = process.env.ZDM_EXECUTION_ADMISSION;
+  const later = realNow() + 600001;
+  Date.now = () => later;
+  t.after(() => {
+    Date.now = realNow;
+    if (priorAdmission === undefined) delete process.env.ZDM_EXECUTION_ADMISSION;
+    else process.env.ZDM_EXECUTION_ADMISSION = priorAdmission;
+  });
+  assert.throws(() => startParallelTask({ ...opts, resume: true }, { root: f.root }), /Intake readback expired/);
+  const coordination = await authorizeTaskCoordinator(
+    f.registry.commonDir,
+    { rootThreadId: owner, request, expectedRevision: 0 },
+    { readThread },
+  );
+  const queue = createExecutionOrder(f.registry.commonDir);
+  queue.initialize(request);
+  queue.enqueue({ lane: 'development', task: opts.slug, owner, request });
+  const authorityId = randomUUID(),
+    grant = { ...request, messageId: 'actual-continuation-delegation', sequence: 2 };
+  queue.registerDelegation(
+    {
+      authorityId,
+      request: grant,
+      taskIds: [opts.slug],
+      expectedQueueRevision: queue.read().revision,
+      expectedCoordinationRevision: 1,
+    },
+    () => ({
+      coordinator: owner,
+      coordination,
+      message: { id: grant.messageId, type: 'userMessage' },
+      taskScope: [{ task: opts.slug, owner }],
+    }),
+  );
+  const task = f.registry.readTask(opts.slug),
+    input = {
+      decisionId: randomUUID(),
+      authorityId,
+      task: opts.slug,
+      owner,
+      executor: owner,
+      lane: 'development',
+      phase: 'development',
+      expectedTaskRevision: task.revision,
+      expectedQueueRevision: queue.read().revision,
+      expectedCoordinationRevision: 1,
+      expectedBoardRevision: 1,
+    };
+  const proof = () => ({
+    coordinator: owner,
+    coordination,
+    task,
+    executor: owner,
+    actor: owner,
+    workerIdle: true,
+    dependenciesReady: true,
+    bindingRevision: 0,
+    boardRevision: 1,
+    sourceProof: { digest: 'fixed-enrolled-source' },
+    capacity: { limit: 5, activeDevelopment: 0, activeDelivery: 0, activeOther: 0 },
+  });
+  queue.reserveDecision(input, proof);
+  const decision = queue.consumeDecision(
+    { decisionId: input.decisionId, expectedQueueRevision: queue.read().revision },
+    proof,
+  );
+  process.env.ZDM_EXECUTION_ADMISSION = decision.admission;
+  const resumed = startParallelTask(
+    { ...opts, resume: true },
+    { root: f.root, git: () => assert.fail('No Git mutation during enrolled continuation') },
+  );
+  assert.equal(resumed.resumed, true);
+  assert.equal(resumed.task.worktree, started.task.worktree);
+  assert.deepEqual(readFileSync(intakeFile), original);
+  process.env.ZDM_EXECUTION_ADMISSION = 'stale-admission';
+  assert.throws(() => startParallelTask({ ...opts, resume: true }, { root: f.root }), /Exact current admission/);
+  assert.deepEqual(readFileSync(intakeFile), original);
 });
 test('two task starts create independent worktrees without switching preview or blocking unfinished A', (t) => {
   const f = fixture(t),
@@ -298,4 +459,35 @@ test('existing registered carrier preserves its explicit different board stable 
   assert.equal(resumed.resumed, true);
   assert.equal(resumed.task.worktree, result.task.worktree);
   assert.equal(resumed.task.monitoring.taskStableId, 'original-board-task');
+});
+
+test('native missing intake refuses before worktree, branch, registry or artifacts exist', (t) => {
+  const f = fixture(t),
+    owner = '11111111-1111-4111-8111-111111111111';
+  process.env.CODEX_THREAD_ID = owner;
+  const opts = options('unregistered-native', f.parent);
+  opts.owner = owner;
+  opts.monitorContext = { ...context('unregistered-native'), executionSurface: 'codex-thread', worker: owner };
+  assert.throws(() => startParallelTask(opts, { root: f.root }), /Board intake missing/);
+  assert.equal(existsSync(path.join(f.parent, 'unregistered-native')), false);
+  assert.equal(f.registry.readTask('unregistered-native'), null);
+  assert.equal(f.git(f.root, 'branch', '--list', 'codex/unregistered-native'), '');
+});
+
+test('collaboration surface cannot bypass native board enrollment before creating its carrier', (t) => {
+  const f = fixture(t),
+    owner = '11111111-1111-4111-8111-111111111111';
+  process.env.CODEX_THREAD_ID = owner;
+  const opts = options('collaboration-new', f.parent);
+  opts.owner = owner;
+  opts.monitorContext = {
+    ...context('collaboration-new'),
+    executionSurface: 'collaboration-agent',
+    worker: '/root/delivery_987',
+    rootThreadId: owner,
+  };
+  assert.throws(() => startParallelTask(opts, { root: f.root }), /Board intake missing/);
+  assert.equal(existsSync(path.join(f.parent, 'collaboration-new')), false);
+  assert.equal(f.registry.readTask('collaboration-new'), null);
+  assert.equal(f.git(f.root, 'branch', '--list', 'codex/collaboration-new'), '');
 });

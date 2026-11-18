@@ -24,6 +24,72 @@ const enqueue = (queue, n, lane = 'development') =>
   queue.enqueue({ lane, task: `task-${n}`, owner: `owner-${n}`, request: event(n + 10) });
 const claim = (queue, n, lane = 'development') => queue.claim({ lane, task: `task-${n}`, owner: `owner-${n}` });
 const input = (ticket) => ({ lane: ticket.lane, task: ticket.task, owner: ticket.owner, admission: ticket.admission });
+test('explicit resume-only admits one exact task while preserving global pause and every other ticket', (t) => {
+  const { queue } = fixture(t);
+  for (const lane of ['development', 'delivery']) for (let n = 1; n <= 3; n++) enqueue(queue, n, lane);
+  const held = claim(queue, 1, 'delivery');
+  queue.direct({ action: 'pause-all', request: event(90) });
+  const before = queue.read();
+  const direction = { action: 'resume-only', lane: 'delivery', task: 'task-3', owner: 'owner-3', request: event(100) };
+  queue.direct(direction);
+  const after = queue.read(),
+    target = after.tickets.find((t) => t.lane === 'delivery' && t.task === 'task-3');
+  assert.equal(after.paused, true);
+  assert.deepEqual(
+    after.tickets.filter((t) => t !== target),
+    before.tickets.filter((t) => !(t.lane === 'delivery' && t.task === 'task-3')),
+  );
+  assert.equal(queue.assertAdmission(input(target)).active, true);
+  assert.throws(() => queue.assertAdmission(input(held)), /paused/);
+  assert.throws(() => claim(queue, 2, 'delivery'), /paused/);
+  assert.throws(() => claim(queue, 1, 'development'), /paused/);
+  queue.direct(direction);
+  assert.equal(queue.read().scopedAdmission.admission, target.admission);
+  queue.direct({ action: 'pause-all', request: event(101) });
+  assert.throws(() => queue.assertAdmission(input(target)), /paused/);
+  queue.direct(direction); // replay is not a new user authorization
+  assert.throws(() => queue.assertAdmission(input(target)), /paused/);
+});
+test('resume-only refuses wrong provenance, full capacity, unpaused queues and a second scoped task', (t) => {
+  const { queue } = fixture(t);
+  for (let n = 1; n <= 4; n++) enqueue(queue, n);
+  const direction = {
+    action: 'resume-only',
+    lane: 'development',
+    task: 'task-4',
+    owner: 'owner-4',
+    request: event(100),
+  };
+  assert.throws(() => queue.direct(direction), /ordinary FIFO/);
+  for (let n = 1; n <= 3; n++) claim(queue, n);
+  queue.direct({ action: 'pause-all', request: event(90) });
+  const before = queue.read();
+  assert.throws(() => queue.direct({ ...direction, owner: 'wrong' }), /owner/);
+  assert.throws(() => queue.direct({ ...direction, request: { ...event(100), authorId: 'wrong' } }), /Original user/);
+  assert.throws(() => queue.direct({ ...direction, request: { ...event(100), roomId: 'wrong' } }), /conversation/);
+  assert.throws(() => queue.direct(direction), /occupied/);
+  assert.deepEqual(queue.read(), before);
+  queue.block({ lane: 'development', task: 'task-1', owner: 'owner-1', reason: 'fixture explicit blocker' });
+  queue.direct({ ...direction, task: 'task-1', owner: 'owner-1' });
+  assert.throws(() => queue.direct({ ...direction, request: event(101) }), /Another scoped/);
+});
+test('scoped completion clears only its exception; corrupted exception fails closed', (t) => {
+  const { root, queue } = fixture(t);
+  enqueue(queue, 1);
+  enqueue(queue, 2);
+  queue.direct({ action: 'pause-all', request: event(90) });
+  queue.direct({ action: 'resume-only', lane: 'development', task: 'task-2', owner: 'owner-2', request: event(100) });
+  const target = queue.read().tickets[1];
+  queue.complete({ ...input(target), evidence: { ok: true } }, () => true);
+  assert.equal(queue.read().paused, true);
+  assert.equal(queue.read().scopedAdmission, undefined);
+  assert.throws(() => claim(queue, 1), /paused/);
+  const file = path.join(root, 'task-registry/execution-order/state.json'),
+    state = queue.read();
+  state.scopedAdmission = { ...input(target), request: event(100) };
+  writeFileSync(file, JSON.stringify(state));
+  assert.throws(() => queue.read());
+});
 test('explicit activation starts paused and never launches work', (t) => {
   const root = mkdtempSync(path.join(realpathSync(tmpdir()), 'execution-order-inactive-'));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -34,6 +100,84 @@ test('explicit activation starts paused and never launches work', (t) => {
   enqueue(queue, 1);
   assert.throws(() => claim(queue, 1), /paused/);
   assert.equal(queue.read().tickets[0].status, 'queued');
+});
+test('explicit lane limits keep three developers but serialize delivery without releasing a blocked slot', (t) => {
+  const { queue } = fixture(t);
+  queue.direct({ action: 'set-limits', limits: { development: 3, delivery: 1 }, request: event(3) });
+  for (const lane of ['development', 'delivery']) for (let n = 1; n <= 3; n++) enqueue(queue, n, lane);
+  for (let n = 1; n <= 3; n++) claim(queue, n, 'development');
+  const first = claim(queue, 1, 'delivery');
+  assert.throws(() => claim(queue, 2, 'delivery'), /occupied/);
+  queue.block({ ...input(first), reason: 'fixture blocked delivery' });
+  assert.throws(() => claim(queue, 2, 'delivery'), /occupied/);
+});
+test('serial delivery can resume only one exact task while preserving a different paused historical holder', (t) => {
+  const { queue } = fixture(t);
+  enqueue(queue, 1, 'delivery');
+  enqueue(queue, 2, 'delivery');
+  const holder = claim(queue, 1, 'delivery');
+  queue.direct({ action: 'pause-all', request: event(90) });
+  queue.direct({ action: 'set-limits', limits: { development: 3, delivery: 1 }, request: event(91) });
+  queue.direct({ action: 'resume-only', lane: 'delivery', task: 'task-2', owner: 'owner-2', request: event(100) });
+  assert.equal(queue.read().paused, true);
+  assert.throws(() => queue.assertAdmission(input(holder)), /paused/);
+  assert.throws(() => queue.direct({ action: 'resume-all', request: event(101) }), /Capacity/);
+  const current = queue.read().tickets[1];
+  queue.complete({ ...input(current), evidence: { ok: true } }, () => true);
+  assert.equal(queue.read().paused, true);
+  assert.deepEqual(queue.read().tickets[0], holder);
+  assert.deepEqual(queue.read().limits, { development: 3, delivery: 1 });
+  const before = queue.read();
+  assert.throws(() =>
+    queue.direct({ action: 'set-limits', limits: { development: 4, delivery: 1 }, request: event(102) }),
+  );
+  assert.deepEqual(queue.read(), before);
+});
+test('explicit unbounded development admits beyond the legacy fixed limit while delivery stays serial', (t) => {
+  const { queue } = fixture(t);
+  queue.direct({ action: 'set-limits', limits: { development: null, delivery: 1 }, request: event(3) });
+  for (let n = 1; n <= 7; n++) enqueue(queue, n);
+  for (let n = 1; n <= 7; n++) claim(queue, n);
+  assert.equal(queue.read().tickets.filter((t) => t.status === 'running').length, 7);
+  assert.equal(queue.read().limits.development, null);
+  for (let n = 1; n <= 2; n++) enqueue(queue, n, 'delivery');
+  claim(queue, 1, 'delivery');
+  assert.throws(() => claim(queue, 2, 'delivery'), /occupied/);
+});
+test('dependency-aware delivery keeps original order, waits without a slot, and admits the earliest ready prerequisite', (t) => {
+  const { queue } = fixture(t);
+  queue.direct({
+    action: 'set-limits',
+    limits: { development: null, delivery: 1 },
+    dependenciesFirst: true,
+    request: event(3),
+  });
+  for (let n = 1; n <= 3; n++) enqueue(queue, n, 'delivery');
+  const before = queue.read(),
+    ready = (t) => t.task === 'task-2';
+  assert.throws(() => claim(queue, 1, 'delivery'), /Trusted dependency/);
+  assert.throws(() => queue.claim({ lane: 'delivery', task: 'task-1', owner: 'owner-1' }, ready), /dependencies/);
+  assert.deepEqual(queue.read(), before);
+  const prerequisite = queue.claim({ lane: 'delivery', task: 'task-2', owner: 'owner-2' }, ready);
+  assert.equal(queue.read().tickets[0].status, 'queued');
+  queue.complete({ ...input(prerequisite), evidence: { verified: true } }, () => true);
+  assert.equal(queue.claim({ lane: 'delivery', task: 'task-1', owner: 'owner-1' }, () => true).status, 'running');
+  assert.deepEqual(
+    queue.read().tickets.map((t) => t.order),
+    before.tickets.map((t) => t.order),
+  );
+});
+test('scoped admission is not reported as paused or started; a new pause records its revocation', (t) => {
+  const { root, queue } = fixture(t);
+  enqueue(queue, 1, 'delivery');
+  queue.direct({ action: 'pause-all', request: event(90) });
+  const file = path.join(root, 'task-progress/task-1/outbox.json');
+  const before = JSON.parse(readFileSync(file));
+  queue.direct({ action: 'resume-only', lane: 'delivery', task: 'task-1', owner: 'owner-1', request: event(100) });
+  assert.deepEqual(JSON.parse(readFileSync(file)), before);
+  queue.direct({ action: 'pause-all', request: event(101) });
+  assert.equal(JSON.parse(readFileSync(file)).pending.at(-1).receipt.event, 'paused');
+  assert.equal(JSON.parse(readFileSync(file)).pending.length, before.pending.length + 1);
 });
 test('two independent FIFO lanes admit three each, never a fourth', (t) => {
   const { queue } = fixture(t);
@@ -126,7 +270,7 @@ test('linked state cannot redirect writes', (t) => {
 });
 test('development formal start refuses missing admission before any git/prepare effect', (t) => {
   const { root } = fixture(t);
-  const registry = { commonDir: root, resolve: () => ({ id: 'task-1' }) };
+  const registry = { commonDir: root, readTask: () => null, resolve: () => ({ id: 'task-1' }) };
   let calls = 0;
   assert.throws(
     () =>
@@ -228,4 +372,26 @@ test('explicit reorder cannot release blocked slots, change owner, or affect the
   assert.equal(queue.read().tickets[0].status, 'blocked');
   assert.equal(queue.read().tickets[0].owner, 'owner-1');
   assert.throws(() => claim(queue, 2, 'delivery'), /FIFO/);
+});
+
+test('one exact instruction can pause others then resume only its named task, preserving monitoring binding', (t) => {
+  const { queue } = fixture(t);
+  const request = event(100);
+  queue.direct({ action: 'pause-all', request });
+  queue.enqueue({ lane: 'development', task: 'repair', owner: 'owner-1', request });
+  const monitorContext = { taskStableId: 'repair', authorizationRef: request.messageId };
+  const direction = {
+    action: 'resume-only',
+    lane: 'development',
+    task: 'repair',
+    owner: 'owner-1',
+    request,
+    monitorContext,
+  };
+  const after = queue.direct(direction);
+  assert.equal(after.paused, true);
+  assert.deepEqual(after.tickets[0].monitorContext, monitorContext);
+  assert.deepEqual(queue.direct(direction), after);
+  assert.throws(() => queue.direct({ ...direction, monitorContext: { taskStableId: 'wrong' } }));
+  assert.throws(() => queue.direct({ action: 'resume-all', request }));
 });

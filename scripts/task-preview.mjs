@@ -1,3 +1,4 @@
+import { assertTaskExecutor } from './task-execution-binding.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -70,7 +71,7 @@ export async function taskPreview(root, args, dependencies = {}) {
   const registry = system.registry(root);
   const task = registry.resolve(values['--task'] ? { id: values['--task'] } : { worktree: root });
   const owner = values['--owner'] ?? system.owner;
-  assert.equal(owner, task.owner, 'Current chat must own the selected task');
+  assertTaskExecutor(task, owner);
   previewDescriptor('development', { task });
   const current = await system.readStatus(system.paths);
   assert.equal(
@@ -86,7 +87,7 @@ export async function taskPreview(root, args, dependencies = {}) {
     timeoutMs: 300_000,
     payload: {
       task: task.id,
-      owner,
+      owner: task.owner,
       worktree: task.worktree,
       taskArgs: ['--mode', 'full'],
       expected: previewOwner(current),

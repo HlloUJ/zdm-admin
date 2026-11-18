@@ -126,7 +126,21 @@ export function observeCancellationHost(exec = run, env = process.env) {
     assert.equal(values[1], true);
     return { id, labels: values[2], mounts: values[3] };
   });
-  return { processes, files, containers, dockerEndpoint: endpoint };
+  const worktrees = exec('git', ['worktree', 'list', '--porcelain', '-z'])
+    .split('\0\0')
+    .filter(Boolean)
+    .map((block) => {
+      const rows = block.split('\0');
+      const worktree = rows.find((row) => row.startsWith('worktree '))?.slice(9);
+      const branch = rows.find((row) => row.startsWith('branch refs/heads/'))?.slice(18);
+      assert.ok(
+        worktree && path.isAbsolute(worktree) && path.normalize(worktree) === worktree,
+        'Unknown Git worktree inventory',
+      );
+      return { worktree, branch };
+    });
+  assert.ok(worktrees.length, 'Missing Git worktree ownership inventory');
+  return { processes, files, containers, worktrees, dockerEndpoint: endpoint };
 }
 function under(value, root) {
   if (typeof value !== 'string') return false;
@@ -137,7 +151,58 @@ function references(value, token) {
   const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   return new RegExp('(?<![a-zA-Z0-9_-])' + escaped + '(?![a-zA-Z0-9_-])').test(value);
 }
-function assertHostIdle(snapshot, task) {
+function otherWorktreeTestProcess(process, snapshot, task) {
+  // ps command text alone is ambiguous. A path argument is evidence of another
+  // test only with a unique OS cwd, live Git registration and a same-worktree
+  // Node --test ancestor. Unknown ownership retains the original refusal.
+  const ownership = (pid) => {
+    const cwd = snapshot.files.filter((file) => file.pid === pid && file.descriptor === 'cwd' && file.type === 'DIR');
+    if (
+      cwd.length !== 1 ||
+      typeof cwd[0].name !== 'string' ||
+      !path.isAbsolute(cwd[0].name) ||
+      path.normalize(cwd[0].name) !== cwd[0].name ||
+      cwd[0].name.endsWith(' (deleted)')
+    )
+      return null;
+    const owners = (snapshot.worktrees ?? []).filter(
+      (entry) =>
+        typeof entry.worktree === 'string' &&
+        path.isAbsolute(entry.worktree) &&
+        path.normalize(entry.worktree) === entry.worktree &&
+        entry.worktree !== task.worktree &&
+        typeof entry.branch === 'string' &&
+        entry.branch.startsWith('codex/') &&
+        entry.branch !== task.branch &&
+        under(cwd[0].name, entry.worktree),
+    );
+    return owners.length === 1 ? owners[0].worktree : null;
+  };
+  const argv = (command) =>
+    typeof command === 'string' && !/["'`\\\r\n]/.test(command) ? command.trim().split(/\s+/) : [];
+  const root = ownership(process.pid),
+    args = argv(process.command);
+  if (!root || path.basename(args[0] ?? '') !== 'node') return false;
+  const matches = args.slice(1).filter((arg) => references(arg, task.id));
+  if (
+    !matches.length ||
+    !matches.every((arg) => path.isAbsolute(arg) && path.normalize(arg) === arg && under(arg, root))
+  )
+    return false;
+  const seen = new Set();
+  let current = process;
+  for (let depth = 0; current && depth < 32; depth++) {
+    if (seen.has(current.pid) || ownership(current.pid) !== root) return false;
+    seen.add(current.pid);
+    const command = argv(current.command);
+    if (path.basename(command[0] ?? '') !== 'node') return false;
+    if (command.includes('--test')) return true;
+    if (!Number.isSafeInteger(current.ppid) || current.ppid <= 1) return false;
+    current = snapshot.processes.find((parent) => parent.pid === current.ppid);
+  }
+  return false;
+}
+export function assertHostIdle(snapshot, task) {
   assert.ok(
     Array.isArray(snapshot.processes) &&
       snapshot.processes.length &&
@@ -159,7 +224,8 @@ function assertHostIdle(snapshot, task) {
     assert.ok(Number.isSafeInteger(p.pid) && typeof p.command === 'string');
     if (!ignored.has(p.pid))
       assert.ok(
-        !references(p.command, task.worktree) && !references(p.command, task.id),
+        !references(p.command, task.worktree) &&
+          (!references(p.command, task.id) || otherWorktreeTestProcess(p, snapshot, task)),
         'Task process or unresolved task command remains active',
       );
   }

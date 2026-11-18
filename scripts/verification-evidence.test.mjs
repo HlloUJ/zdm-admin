@@ -658,12 +658,12 @@ test('format failure stops early; runtime is sequential; two pipelines preserve 
       ...silent,
       run: async (step) => {
         calls.push(step.name);
-        return { exitCode: 1 };
+        return { exitCode: step.name === 'format check' ? 1 : 0 };
       },
     }),
     1,
   );
-  assert.deepEqual(calls, ['format check']);
+  assert.deepEqual(calls, ['delivery input contracts', 'format check']);
   calls.length = 0;
   const code = await executeVerification(plan, {
     ...silent,
@@ -673,7 +673,8 @@ test('format failure stops early; runtime is sequential; two pipelines preserve 
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(calls.slice(0, 4), [
+  assert.deepEqual(calls.slice(0, 5), [
+    'delivery input contracts',
     'format check',
     'backend test discovery',
     'CI reuse contract preflight',
@@ -816,8 +817,9 @@ test('a real scoped command failure stays blocked after an unrelated candidate c
   assert.equal(record(forced).firstFailure.attemptId, failed.attemptId);
 });
 
-test('failed CI contract preflight prevents expensive checks and runtime actions', async () => {
-  const plan = createVerificationPlan({ root: '/fixture', runtime: true });
+test('failed CI contract preflight prevents expensive checks and runtime actions', async (t) => {
+  const { root } = fixture(t);
+  const plan = createVerificationPlan({ root, runtime: true });
   const called = [];
   const code = await executeVerification(plan, {
     capture: () => ({ digest: 'fixed', baseline: 'base', mergeBase: 'base', mutationStamp: 'fixed' }),
@@ -828,8 +830,13 @@ test('failed CI contract preflight prevents expensive checks and runtime actions
     },
   });
   assert.equal(code, 1);
-  assert.deepEqual(called, ['format check', 'backend test discovery', 'CI reuse contract preflight']);
-  const ordinary = createVerificationPlan({ root: '/fixture', affected: true, files: ['src/views/ExampleView.vue'] });
+  assert.deepEqual(called, [
+    'delivery input contracts',
+    'format check',
+    'backend test discovery',
+    'CI reuse contract preflight',
+  ]);
+  const ordinary = createVerificationPlan({ root, affected: true, files: ['src/views/ExampleView.vue'] });
   assert.equal(ordinary.contractPreflight, null);
 });
 
