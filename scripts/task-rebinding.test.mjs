@@ -26,6 +26,7 @@ import { completionCommand } from './completion-cli.mjs';
 import { runCompletionWithProgress } from './task-completion-progress.mjs';
 import { prepareProgressStage, notifyProgressHost } from './task-progress-host.mjs';
 import { collectTaskProgress } from './task-progress-collector.mjs';
+import { createProgressOutbox } from './task-progress-outbox.mjs';
 import { authorizeTaskCoordinator, readTaskCoordination } from './task-coordination.mjs';
 import { advanceTaskThread, taskHandoffFailure } from './task-thread-host-bridge.mjs';
 import { dynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
@@ -187,7 +188,7 @@ function fixture(t, { collaboration = false } = {}) {
   return { dir, main, worktree, registry, queue, input, host, snapshots, observe, bind, task, board, git };
 }
 
-async function dynamicFrozenFixture(t) {
+async function dynamicFrozenFixture(t, { previousPause = false, originalStatus = 'blocked' } = {}) {
   const f = fixture(t, { collaboration: true });
   process.env.CODEX_THREAD_ID = old;
   const accepted = freezeAcceptedSource(f.worktree, readActiveBatch(f.worktree));
@@ -201,6 +202,11 @@ async function dynamicFrozenFixture(t) {
     owner: old,
     request: { ...f.input.request, messageId: 'original-delivery', sequence: 3 },
   });
+  if (previousPause)
+    f.queue.direct({
+      action: 'pause-all',
+      request: { ...f.input.request, messageId: 'older-fence', sequence: 4 },
+    });
   f.input.expectedRevision = f.registry.readTask('task').revision;
   f.input.queueRevision = f.queue.read().revision;
   f.board.status = 'merging';
@@ -213,23 +219,25 @@ async function dynamicFrozenFixture(t) {
   );
   const plan = await f.bind({ historicalRecovery: { mode: 'preserved-project-state' } }, { planOnly: true });
   await f.bind({ historicalRecovery: { mode: 'preserved-project-state', digest: plan.historicalRecoveryDigest } });
-  process.env.CODEX_THREAD_ID = worker;
-  await resumeBoundTask(
-    {
-      ...f.input,
-      taskRevision: f.registry.readTask('task').revision,
-      queueRevision: f.queue.read().revision,
+  if (originalStatus === 'blocked') {
+    process.env.CODEX_THREAD_ID = worker;
+    await resumeBoundTask(
+      {
+        ...f.input,
+        taskRevision: f.registry.readTask('task').revision,
+        queueRevision: f.queue.read().revision,
+        lane: 'delivery',
+      },
+      f.host,
+      { registry: f.registry, queue: f.queue },
+    );
+    f.queue.block({
       lane: 'delivery',
-    },
-    f.host,
-    { registry: f.registry, queue: f.queue },
-  );
-  f.queue.block({
-    lane: 'delivery',
-    task: 'task',
-    owner: old,
-    reason: 'Original 683-compatible exact failure retained',
-  });
+      task: 'task',
+      owner: old,
+      reason: 'Original 683-compatible exact failure retained',
+    });
+  }
   const request = { messageId: 'actual-standing-delegation', roomId: root, authorId: 'human', sequence: 20 };
   f.snapshots.get(root).turns[0].items.push({
     type: 'userMessage',
@@ -450,6 +458,16 @@ test('completed original development with no delivery ticket enters preparation 
   const ticket = f.queue.read().tickets.find((ticket) => ticket.lane === 'delivery');
   assert.equal(ticket.status, 'queued');
   assert.equal(ticket.admission, null);
+  const outbox = createProgressOutbox(path.join(f.registry.commonDir, 'task-progress/task'));
+  assert.equal(
+    outbox
+      .read()
+      .pending.some(({ receipt }) =>
+        receipt.evidence_refs.includes(`execution-order:${f.queue.read().revision}:delivery:task`),
+      ),
+    false,
+    'Enrollment must leave the review card progress intact',
+  );
   assert.deepEqual(
     f.queue.read().tickets.find((t) => t.lane === 'development'),
     before.tickets.find((t) => t.lane === 'development'),
@@ -635,8 +653,8 @@ test('683-shaped frozen carrier safely resumes after binding was already consume
   assert.equal(before.frozen.accepted, f.accepted.commit);
   assert.ok(state.dynamicDecisions.every((item) => item.ticketBefore.reason));
 });
-test('preparation finish verifies the original numeric PR run record and restores only its own original blocked ticket', async (t) => {
-  const f = await dynamicFrozenFixture(t);
+async function verifyPreparationProjection(t, originalStatus) {
+  const f = await dynamicFrozenFixture(t, { previousPause: true, originalStatus });
   const head = f.git(f.worktree, 'rev-parse', 'HEAD');
   f.registry.revise('task', f.registry.readTask('task').revision, (record) => {
     record.recordedHead = head;
@@ -703,9 +721,30 @@ test('preparation finish verifies the original numeric PR run record and restore
     original,
   );
   const before = f.queue.read();
+  const box = createProgressOutbox(path.join(f.registry.commonDir, 'task-progress/task'));
+  const receiptFor = (revision) =>
+    box
+      .read()
+      .pending.find(({ receipt }) => receipt.evidence_refs.includes(`execution-order:${revision}:delivery:task`))
+      ?.receipt;
+  assert.equal(receiptFor(before.revision)?.event, originalStatus);
+  assert.equal(receiptFor(before.revision)?.reason, original.reason);
   await finish();
   assert.deepEqual(f.queue.read(), before);
-});
+  process.env.CODEX_THREAD_ID = root;
+  f.queue.direct({
+    action: 'pause-all',
+    request: { ...f.input.request, messageId: 'next-explicit-pause', sequence: 30 },
+  });
+  assert.equal(receiptFor(f.queue.read().revision)?.event, 'paused');
+  assert.deepEqual(
+    f.queue.read().tickets.find((ticket) => ticket.lane === 'delivery'),
+    original,
+  );
+}
+for (const originalStatus of ['queued', 'blocked'])
+  test(`preparation finish verifies original PR CI and restores the historical ${originalStatus} projection`, (t) =>
+    verifyPreparationProjection(t, originalStatus));
 test('preparation admission rejects final commands and generic measured shell effects before any session or main mutation', async (t) => {
   const f = await dynamicFrozenFixture(t),
     before = f.registry.readTask('task');

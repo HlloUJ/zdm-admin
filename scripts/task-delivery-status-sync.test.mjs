@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -247,6 +248,59 @@ for (const scenario of [
       'paused',
     );
   });
+test('delivery enrollment projects only a verified phase and never invents an action start', (t) => {
+  const request = { messageId: 'standing-delegation', roomId: 'coordinator', authorId: 'human', sequence: 20 };
+  const phaseOrigin = {
+    phaseId: 'phase-a',
+    authorityId: 'delegate-a',
+    developmentEvidenceDigest: 'd'.repeat(64),
+  };
+  const ticket = {
+    task: 'fixture-task',
+    lane: 'delivery',
+    owner: 'original-owner',
+    request: { ...request, messageId: 'original-development', sequence: 5 },
+    order: 5,
+    status: 'queued',
+    admission: null,
+    phaseOrigin,
+  };
+  const enrollment = {
+    action: 'delivery-phase-enrolled',
+    task: ticket.task,
+    owner: ticket.owner,
+    order: ticket.order,
+    ...phaseOrigin,
+    phaseDigest: createHash('sha256').update(JSON.stringify(phaseOrigin)).digest('hex'),
+    request,
+  };
+  const previous = {
+    revision: 1,
+    paused: true,
+    events: [{ action: 'pause-all', request: { ...request, messageId: 'old-pause', sequence: 10 } }],
+    tickets: [],
+    dynamicAuthorities: [{ id: phaseOrigin.authorityId, request }],
+  };
+  for (const [event, expected] of [
+    [enrollment, []],
+    [{ ...enrollment, phaseDigest: '0'.repeat(64) }, ['paused']],
+    [{ ...enrollment, order: ticket.order + 1 }, ['paused']],
+    [{ ...enrollment, request: { ...request, roomId: 'other' } }, ['paused']],
+    [{ ...enrollment, request: { ...request, authorId: 'other' } }, ['paused']],
+  ]) {
+    const root = fixture(t);
+    const after = { ...previous, revision: 2, events: [...previous.events, event], tickets: [ticket] };
+    const original = structuredClone(after);
+    captureQueueProgress(root, after, previous);
+    assert.deepEqual(after, original);
+    assert.deepEqual(
+      createProgressOutbox(path.join(root, 'task-progress', ticket.task))
+        .read()
+        .pending.map(({ receipt }) => receipt.event),
+      expected,
+    );
+  }
+});
 test('global pause never generates paused progress for terminal tickets', (t) => {
   const root = fixture(t);
   for (const status of ['completed', 'cancelled']) {
