@@ -11,7 +11,13 @@ import {
   recordCloseoutCleanupInventory,
 } from './task-cleanup-handoff.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
-import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
+import {
+  freezeAcceptedSource,
+  assertAcceptedSource,
+  readAcceptance,
+  verifyRemoteAcceptance,
+} from './accepted-source.mjs';
+import { applyTaskComposition } from './task-composition.mjs';
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
 import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs';
@@ -105,6 +111,7 @@ async function completionCommandLocked(
     begin: [0, 1],
     freeze: [0, 0],
     'check-source': [1, 1],
+    'compose-reviewed': [2, 2],
     deliver: [2, 2],
     recover: [0, 0],
     status: [1, 1],
@@ -280,6 +287,59 @@ async function completionCommandLocked(
   if (mode === 'deliver' && resumeCompletion(state)) save(state);
   if (['recover', 'deliver'].includes(mode)) recoverInterrupted(state, directory);
   trackStageRestoration(state, directory);
+  if (mode === 'compose-reviewed') {
+    assert.equal(batch.taskRegistryVersion, 2, 'Exact registered task required');
+    assert.equal(path.resolve(root), path.resolve(batch.worktree), 'Use the owned task worktree');
+    assert.ok(
+      state.startedAt !== null && !state.closedAt && !state.deferredSettlement,
+      'Active formal delivery required',
+    );
+    const [main, candidate] = rest;
+    for (const commit of [main, candidate]) assert.match(commit, /^[a-f0-9]{40}$/);
+    assert.equal(git('rev-parse', 'origin/main'), main, 'Use the exact published origin/main');
+    assert.equal(git('rev-parse', 'HEAD'), batch.recordedHead, 'Exact checkpointed task parent required');
+    assert.equal(git('status', '--porcelain'), '', 'Composition requires a clean owned task');
+    const acceptance = readAcceptance(root, batch.id);
+    assert.ok(acceptance, 'Original task freeze required');
+    const verified = verifyRemoteAcceptance(root, {
+      candidate,
+      accepted: acceptance.commit,
+      branch: batch.branch,
+      trustedMain: main,
+    });
+    assert.equal(verified.reviewedMerge?.commit, candidate, 'Exact reviewed merge commit required');
+    assert.equal(verified.reviewedMerge.main, main, 'Reviewed merge must use the exact published main parent');
+    assert.equal(verified.reviewedMerge.taskHead, batch.recordedHead, 'Exact checkpointed task parent required');
+    return (
+      await completionStage(
+        state,
+        'prepare',
+        'reviewed-composition:' + main + ':' + candidate,
+        async () => {
+          assertCurrentAdmission?.();
+          const worktrees = parseWorktreePorcelain(git('worktree', 'list', '--porcelain'));
+          await previewControl.prepareComposition({
+            anchor: batch.repository.anchor,
+            task: batch.worktree,
+            preview: worktrees.find((entry) => entry.branch === 'codex/preview-current')?.path,
+            common,
+            main,
+            taskRegistryVersion: 2,
+          });
+          assertCurrentAdmission?.();
+          const composed = applyTaskComposition(root, batch.id, main, { reviewedCandidate: candidate });
+          return {
+            task: batch.id,
+            head: composed.recordedHead,
+            accepted: acceptance.commit,
+            main,
+            review: verified.review,
+          };
+        },
+        { save },
+      )
+    ).result;
+  }
   if (mode === 'recover') return { batch: batch.id, summary: completionSummary(state) };
   if (['begin', 'deliver'].includes(mode) && !state.previewFingerprint) {
     const profile = path.join(common, 'preview-environment/environment.json');
@@ -836,7 +896,7 @@ export async function completionCommand(root, args, options = {}) {
   if (!orderReadOnly && executionOrder.read()) {
     assert.ok(task, 'No registered execution-order task; do not adopt legacy work');
     const preparationCommand =
-      ['prepare', 'freeze', 'begin', 'repair-start', 'repair-finish'].includes(args[0]) ||
+      ['prepare', 'freeze', 'begin', 'repair-start', 'repair-finish', 'compose-reviewed'].includes(args[0]) ||
       (args[0] === 'wait' && args[1] === 'pr' && args[2] === task.recordedHead);
     effect = preparationCommand ? 'preparation' : 'final';
     executionOrder.assertAdmission({

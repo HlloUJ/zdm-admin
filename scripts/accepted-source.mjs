@@ -15,13 +15,20 @@ import {
 const digest = (bytes) => createHash('sha256').update(bytes).digest('hex');
 const oid = /^[a-f0-9]{40}$/;
 import {
-  acceptedCompositionTree,
+  acceptedComposition,
   candidateCompositionTree,
   readAcceptedComposition,
   writeAcceptedComposition,
+  assertReviewedMergeParents,
+  findReviewedMerge,
 } from './accepted-source-composition.mjs';
 export function acceptedGit(root, args, options = {}) {
-  const result = spawnSync('git', args, { cwd: root, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024, ...options });
+  const result = spawnSync('git', ['--no-replace-objects', ...args], {
+    cwd: root,
+    encoding: 'utf8',
+    maxBuffer: 32 * 1024 * 1024,
+    ...options,
+  });
   assert.equal(result.status, 0, `Accepted-source Git operation failed: ${args[0]}: ${result.stderr ?? ''}`);
   return args.includes('-z') ? result.stdout : result.stdout.trim();
 }
@@ -203,30 +210,40 @@ export function assertAcceptedSource(root, batch, candidate) {
     ...(composition ? { composition } : {}),
   };
 }
-export function prepareAcceptedComposition(root, batch, main) {
+function assertComposedSource(root, record, expected, candidate, label) {
+  const changed = sourceDifference(
+    sourceEntries(root, expected, false, record.tree, record.protectedPaths),
+    sourceEntries(root, candidate, false, record.tree, record.protectedPaths),
+  );
+  assert.deepEqual(changed, [], label + ': ' + changed.join(', '));
+}
+
+export function prepareAcceptedComposition(root, batch, main, candidateCommit) {
   const record = readAcceptance(root, batch);
   assert.ok(record, 'Original accepted source required');
   const head = acceptedGit(root, ['rev-parse', 'HEAD']);
   assertAcceptedSource(root, batch, head);
-  const candidateTree = acceptedGit(root, [
-    '-c',
-    'merge.renames=false',
-    'merge-tree',
-    '--write-tree',
+  const expected = acceptedComposition(root, record.commit, main);
+  if (candidateCommit !== undefined) {
+    assert.ok(expected.review, 'No protected conflict has a trusted review');
+    assertReviewedMergeParents(root, candidateCommit, main, expected.frozenParent, head);
+  }
+  const candidateTree = candidateCompositionTree(root, candidateCommit ?? head, main);
+  assertComposedSource(
+    root,
+    record,
+    expected.tree,
+    candidateTree,
+    'Composed candidate changes frozen business content beyond published main',
+  );
+  return writeAcceptedComposition(root, {
+    batch,
+    accepted: record.commit,
     main,
-    head,
-  ]).split('\n')[0];
-  const expectedTree = acceptedCompositionTree(root, record.commit, main);
-  const changed = sourceDifference(
-    sourceEntries(root, expectedTree, false, record.tree, record.protectedPaths),
-    sourceEntries(root, candidateTree, false, record.tree, record.protectedPaths),
-  );
-  assert.deepEqual(
-    changed,
-    [],
-    'Composed candidate changes frozen business content beyond published main: ' + changed.join(', '),
-  );
-  return writeAcceptedComposition(root, { batch, accepted: record.commit, main, taskHead: head, candidateTree });
+    taskHead: head,
+    candidateTree,
+    candidateCommit,
+  });
 }
 export function publishAcceptance(root, batch) {
   const record = readAcceptance(root, batch);
@@ -264,18 +281,27 @@ export function verifyRemoteAcceptance(root, { candidate, accepted, branch, trus
     assert.ok(all.has(file), 'Declared protected source absent from snapshot');
   }
   const compose = trustedMain && metadata.taskRegistryVersion === 2;
-  const expectedTree = compose ? acceptedCompositionTree(root, accepted, trustedMain) : metadata.tree;
+  const expected = compose ? acceptedComposition(root, accepted, trustedMain) : { tree: metadata.tree };
   const candidateTree = compose ? candidateCompositionTree(root, candidate, trustedMain) : candidate;
-  const changed = sourceDifference(
-    sourceEntries(root, expectedTree, false, metadata.tree, metadata.protectedPaths),
-    sourceEntries(root, candidateTree, false, metadata.tree, metadata.protectedPaths),
+  assertComposedSource(
+    root,
+    metadata,
+    expected.tree,
+    candidateTree,
+    'Candidate changed accepted business/control-plane content',
   );
-  assert.deepEqual(changed, [], 'Candidate changed accepted business/control-plane content: ' + changed.join(', '));
+  let reviewedMerge;
+  if (expected.review) {
+    const { tree, ...merge } = findReviewedMerge(root, candidate, trustedMain, accepted, expected);
+    assertComposedSource(root, metadata, tree, merge.commit, 'Reviewed merge changed protected content');
+    reviewedMerge = merge;
+  }
   return {
     candidate,
     accepted,
     batch,
     businessDigest: digest(JSON.stringify(sourceEntries(root, metadata.tree))),
-    ...(compose ? { trustedMain, composedTree: expectedTree, candidateMergeTree: candidateTree } : {}),
+    ...(compose ? { trustedMain, composedTree: expected.tree, candidateMergeTree: candidateTree } : {}),
+    ...(reviewedMerge ? { reviewedMerge, review: expected.review } : {}),
   };
 }
