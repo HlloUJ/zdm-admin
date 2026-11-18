@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import path from 'node:path';
 import { readTaskCoordination } from '../task-coordination.mjs';
 import { scopedAdmissions } from '../task-execution-scope.mjs';
+import { verifyDevelopmentCompletion } from '../task-execution-order-cli.mjs';
 import { createProgressOutbox } from '../task-progress-outbox.mjs';
 import {
   coordinator410,
@@ -51,6 +52,14 @@ export async function correct410InitialPause(input, host, registry, { now = Date
     const readRecord = (...paths) =>
       JSON.parse(readPrivateCorrectionFile(path.join(commonDir, ...paths, task410 + '.json')));
     const state = host.queue.read();
+    const tickets = state.tickets.filter((item) => item.task === task410);
+    const ticket = tickets.find((item) => item.lane === 'development');
+    const scopes = scopedAdmissions(state).filter((item) => item.task === task410);
+    const originalBinding = (event) => event.action === 'bind-native-worker' && event.task === task410;
+    const originalDirection = (event) =>
+      event.action === 'resume-selected' && event.members?.some((member) => member.task === task410);
+    const developmentCompleted = (event) =>
+      event.action === 'complete' && event.task === task410 && event.lane === 'development';
     return {
       coordinator: readTaskCoordination(commonDir),
       intake: readRecord('task-board-intake'),
@@ -60,26 +69,47 @@ export async function correct410InitialPause(input, host, registry, { now = Date
       queue: {
         revision: state.revision,
         paused: state.paused,
-        ticket: state.tickets.find((ticket) => ticket.task === task410 && ticket.lane === 'development'),
-        scope: scopedAdmissions(state).find((scope) => scope.task === task410 && scope.lane === 'development'),
+        ticket,
+        scope: scopes.find((scope) => scope.lane === 'development'),
         pauseFences: state.events.filter((event) => ['initialize', 'pause-all'].includes(event.action)),
-        bindingEvent: state.events.find((event) => event.action === 'bind-native-worker' && event.task === task410),
-        direction: state.events.findLast(
-          (event) => event.action === 'resume-selected' && event.members?.some((member) => member.task === task410),
-        ),
+        bindingEvent: state.events.find(originalBinding),
+        direction: state.events.findLast(originalDirection),
+        ...(ticket?.status === 'completed'
+          ? {
+              completed: {
+                scopes,
+                otherTickets: tickets.filter((item) => item !== ticket),
+                reservations: (state.dynamicDecisions ?? []).filter(
+                  (item) => item.input.task === task410 && ['reserved', 'consumed'].includes(item.status),
+                ),
+                history: state.events.filter(
+                  (event) => originalBinding(event) || originalDirection(event) || developmentCompleted(event),
+                ),
+              },
+            }
+          : {}),
       },
     };
   }
+  const verifyCompletion = ({ registry: target, queue: { ticket } }) => {
+    if (ticket.status === 'completed')
+      assert.equal(verifyDevelopmentCompletion(target, ticket.completion.evidence), true);
+  };
   const local = readLocal();
   const source = { root, worker, ...local };
   validateInitialPauseSource(source, commonDir);
+  verifyCompletion(local);
   const { nativeObservations: observations } = await host.readCreationProgress(
     task410,
     pending.pending.map((entry) => entry.receipt_id),
   );
   const board = await host.readTask(task410);
   const checkedAt = new Date(now()).toISOString();
-  const recheck = () => assert.deepEqual(readLocal(), local, '410 source changed during correction; retain the outbox');
+  const recheck = () => {
+    const current = readLocal();
+    assert.deepEqual(current, local, '410 source changed during correction; retain the outbox');
+    verifyCompletion(current);
+  };
   return host.queue.guard(() =>
     box.retire410InitialPause(raw, { clientTransport, source, board, observations, checkedAt }, recheck),
   );

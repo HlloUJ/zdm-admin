@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -296,6 +297,152 @@ test('seals the original bytes and first error, preserves the other packets, and
     readFileSync(result.audit, 'utf8').replace('incorrect-global-pause-projection', 'tampered'),
   );
   await assert.rejects(f.run(), /archive changed/);
+});
+
+function completeDevelopment(f) {
+  const { worktree } = f.registered;
+  mkdirSync(worktree);
+  const git = (...args) => execFileSync('git', args, { cwd: worktree, encoding: 'utf8' }).trim();
+  git('init', '-b', 'main');
+  git('config', 'user.name', 'Isolated 410');
+  git('config', 'user.email', 'fixture@example.invalid');
+  writeFileSync(path.join(worktree, '.gitignore'), '.task-verification/\n');
+  writeFileSync(path.join(worktree, 'source.txt'), 'completed source\n');
+  git('add', '.gitignore', 'source.txt');
+  git('commit', '-m', 'Complete isolated development');
+  const head = git('rev-parse', 'HEAD');
+  f.registered.recordedHead = head;
+  const sourcePath = '.task-verification/run.json';
+  const reportPath = '.task-verification/development.json';
+  const source = Buffer.from('{"tests":1,"passed":1}\n');
+  mkdirSync(path.join(worktree, '.task-verification'));
+  writeFileSync(path.join(worktree, sourcePath), source);
+  const report = Buffer.from(
+    JSON.stringify({
+      version: 1,
+      task: task410,
+      head,
+      outcome: 'passed',
+      tests: 1,
+      skipped: 0,
+      retries: 0,
+      sourceReports: [{ path: sourcePath, sha256: correctionHash(source) }],
+    }),
+  );
+  writeFileSync(path.join(worktree, reportPath), report);
+  const ticket = f.state.tickets[0];
+  const evidence = {
+    task: task410,
+    owner: worker410,
+    head,
+    reports: [{ path: reportPath, sha256: correctionHash(report) }],
+  };
+  const digest = correctionHash(JSON.stringify(evidence));
+  ticket.status = 'completed';
+  ticket.completion = { digest, evidence };
+  f.state.scopedAdmissions = [];
+  const event = { action: 'complete', lane: 'development', task: task410, evidenceDigest: digest };
+  f.state.events.push(event);
+  return { ticket, event, sourcePath: path.join(worktree, sourcePath) };
+}
+
+test('corrects the same completed development ticket with original evidence and no live occupancy', async (t) => {
+  const f = fixture(t);
+  const { ticket, event } = completeDevelopment(f);
+  const queueBefore = structuredClone(f.state);
+  const result = await f.run();
+  const { archive } = readClosedInitialPause(result.audit, f.directory, result.auditDigest);
+  assert.equal(result.state, retiredInitialPause);
+  assert.deepEqual(f.state, queueBefore);
+  assert.deepEqual(archive.source.queue.ticket, ticket);
+  assert.deepEqual(archive.source.queue.completed.history.at(-1), event);
+  assert.deepEqual(f.box.read().pending, f.initial.pending.slice(1));
+  assert.deepEqual(await f.run(), { ...result, replay: true });
+});
+
+test('keeps the original packet when completion evidence or the released slot cannot be proved', async (t) => {
+  for (const [name, change, error] of [
+    [
+      'false completion digest',
+      (_f, p) => {
+        p.ticket.completion.digest = '0'.repeat(64);
+      },
+      /completion digest/i,
+    ],
+    [
+      'missing original event',
+      (f) => {
+        f.state.events.pop();
+      },
+      /original development history/i,
+    ],
+    [
+      'completion event does not match',
+      (_f, p) => {
+        p.event.evidenceDigest = '0'.repeat(64);
+      },
+      /evidenceDigest/,
+    ],
+    [
+      'unrelated completed candidate',
+      (_f, p) => {
+        const completion = p.ticket.completion;
+        completion.evidence.head = '0'.repeat(40);
+        completion.digest = correctionHash(JSON.stringify(completion.evidence));
+        p.event.evidenceDigest = completion.digest;
+      },
+      /410 evidence field: head/,
+    ],
+    [
+      'actual source report changed',
+      (_f, p) => {
+        writeFileSync(p.sourcePath, 'changed report');
+      },
+      /Expected values/,
+    ],
+    [
+      'remaining development scope',
+      (f, p) => {
+        f.state.scopedAdmissions.push({
+          lane: 'development',
+          task: task410,
+          owner: worker410,
+          admission: p.ticket.admission,
+        });
+      },
+      /released all task scopes/,
+    ],
+    [
+      'another ticket occupies the task',
+      (f) => {
+        f.state.tickets.push({ lane: 'delivery', task: task410, owner: worker410, status: 'queued' });
+      },
+      /other ticket/,
+    ],
+    [
+      'new reserved decision',
+      (f) => {
+        f.state.dynamicDecisions = [{ input: { task: task410 }, status: 'reserved' }];
+      },
+      /dispatch decision/,
+    ],
+    [
+      'later user pause',
+      (f, p) => {
+        f.state.events.push({ action: 'pause-all', request: { sequence: p.ticket.request.sequence + 1 } });
+      },
+      /requires its own recovery/,
+    ],
+  ]) {
+    await t.test(name, async (st) => {
+      const f = fixture(st);
+      const proof = completeDevelopment(f);
+      const raw = readFileSync(f.file);
+      change(f, proof);
+      await assert.rejects(f.run(), error);
+      assert.deepEqual(readFileSync(f.file), raw);
+    });
+  }
 });
 
 test('fails closed for another identity, missing formal release, mismatched native source, or an actual pause', async (t) => {

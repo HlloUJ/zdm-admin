@@ -862,17 +862,18 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-410-initial-pause-correction.mjs": {
-      "digest": "cbab2a973ab1ff9e704cf4b555f8ce39246b2a623f396c618824491f309a8812",
+      "digest": "67323195fe9a73cfef5840c79f811fdce91f031871a833ad0be6e0b72a078df5",
       "imports": [
         "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
         "scripts/task-coordination.mjs",
+        "scripts/task-execution-order-cli.mjs",
         "scripts/task-execution-scope.mjs",
         "scripts/task-progress-outbox.mjs"
       ],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-410-initial-pause-correction.test.mjs": {
-      "digest": "40d4e9b2274aa3c65761768169374adce4c13a863b47521cf67474f1af1c9c02",
+      "digest": "9e09a7b11046e95d7c9e0b2456e77776269be220e8f413796b4b5641e7a1cf64",
       "imports": [
         "scripts/delivery-repairs/task-410-initial-pause-correction.mjs",
         "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
@@ -881,7 +882,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs": {
-      "digest": "f07c3355038be5b111a6b2e7a2ec73a433b24951e0cc84e0ae4c4a2db8ff3839",
+      "digest": "de41f214e0c905caebfb069bfc201a9bfcf714ad9757b2a9d5f0e6e1a28c6205",
       "imports": ["scripts/task-thread-titles.mjs"],
       "dynamicImports": 0
     },

@@ -32,7 +32,7 @@
 
 ## 410 原始错误暂停回执
 
-`correct-410-initial-pause` 是 039 发布的一次性纠正。旧主线 `153a1904` 在队列版本 121 将 410 的初始待绑定状态投影为暂停。实际受理、原生创建与绑定、独立工作区登记和开发准入均可读回。该回执序号为 1，原始客户端仍未 prepare。
+`correct-410-initial-pause` 是 039 发布的一次性纠正。旧主线 `153a1904` 在队列版本 121 将 410 的初始待绑定状态投影为暂停。实际受理、原生创建与绑定、独立工作区登记和开发准入均可读回。该回执序号为 1，原始客户端仍未 prepare。原开发票据处于运行中时核对它的有效 scope。票据已经正式完成时，保留原 admission 作为历史来源，核对原绑定、原方向及相符的完成事件、完成摘要和当前干净源码的原验证报告，且没有新的 410 scope、票据、调度预约或交付冻结。两种路径均受最新真实暂停围栏约束。
 
 039 正式关闭且关闭提交属于当前主线后，由 410 原总协调在干净、已发布的主线运行 `node scripts/task-thread-host-bridge-cli.mjs`，沿已有隐藏 PTY 传 `action: "correct-410-initial-pause"` 和 `task: { taskId: "execution-efficiency-dynamic-orchestration", receiptId: "a7e0ad857d59341ed698b033d9f5d64652bc9204aee74193c4d2e19c8cfc99c0" }`。同次输入提供总协调原授权与 410 原生创建事件的最新 `nativeObservations`，以及 `progressNativeObservations` 中本任务完整 `task_history` 和四条原始回执的逐条 `get_task_progress_receipt` 原始工具结果。桥另读认证概览以核对当前版本。总协调按原客户端轨迹提供 `task.clientTransport`，其中 `outcome: "never-prepared-no-unknown-write"` 和 `outboxSha256` 绑定未投递判断和准确原始字节。任何手工或外部投递结果未知时应保留现场。准备记录、失败、未知传输字段、已应用回执、真实新暂停、证据过期或并发变化都会保留出箱并阻断。
 

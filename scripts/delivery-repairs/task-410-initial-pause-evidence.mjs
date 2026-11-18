@@ -80,6 +80,38 @@ function assertTaskFields(record, fields) {
     assert.deepEqual(record?.[key], value, '410 evidence field: ' + key);
 }
 
+function validateCompletedDevelopment(queue, registry) {
+  const { ticket, scope, completed } = queue;
+  assert.ok(completed, 'Original completed development evidence required');
+  assert.equal(scope, undefined, 'Completed development must have released all task scopes');
+  assert.deepEqual(completed.scopes, [], 'Completed development must have released all task scopes');
+  assert.deepEqual(completed.otherTickets, [], 'Another ticket may not occupy completed development');
+  assert.deepEqual(completed.reservations, [], 'A new dispatch decision may not occupy completed development');
+  assert.equal(registry.frozen, undefined, 'Completed development must remain before delivery freeze');
+
+  const { digest, evidence } = ticket.completion ?? {};
+  assert.match(digest ?? '', /^[a-f0-9]{64}$/, 'Exact development completion digest required');
+  assert.equal(jsonHash(evidence), digest, 'Development completion digest differs');
+  assert.match(registry.recordedHead ?? '', /^[a-f0-9]{40}$/);
+  assertTaskFields(evidence, { task: task410, owner: worker410, head: registry.recordedHead });
+  assert.ok(Array.isArray(evidence.reports) && evidence.reports.length > 0, 'Original development reports required');
+  assert.ok(
+    Array.isArray(completed.history) && completed.history.length === 3,
+    'Original development history required',
+  );
+  assert.deepEqual(
+    completed.history.slice(0, 2),
+    [queue.bindingEvent, queue.direction],
+    'Original development history changed',
+  );
+  assertTaskFields(completed.history[2], {
+    action: 'complete',
+    lane: 'development',
+    task: task410,
+    evidenceDigest: digest,
+  });
+}
+
 export function validateInitialPauseSource(source, commonDir) {
   const { coordinator, root, worker, intake, binding, registry, start, queue } = source;
   assert.equal(coordinator.current.rootThreadId, coordinator410);
@@ -163,7 +195,6 @@ export function validateInitialPauseSource(source, commonDir) {
     nativeCoordinatorOwner: coordinator410,
     executionKind: 'infrastructure',
     nativeLaunchReserved: true,
-    status: 'running',
   });
   assert.ok(ticket.admission && !ticket.awaitingNativeWorker && !ticket.failure && !ticket.reason);
   assertTaskFields(ticket.request, {
@@ -172,13 +203,17 @@ export function validateInitialPauseSource(source, commonDir) {
     sequence: originalRequestSequence,
     authorId: coordinator.current.request.authorId,
   });
-  assertTaskFields(scope, {
-    task: task410,
-    lane: 'development',
-    owner: worker410,
-    admission: ticket.admission,
-    request: ticket.request,
-  });
+  if (ticket.status === 'completed') validateCompletedDevelopment(queue, registry);
+  else {
+    assert.equal(ticket.status, 'running', '410 must hold its original running or completed development ticket');
+    assertTaskFields(scope, {
+      task: task410,
+      lane: 'development',
+      owner: worker410,
+      admission: ticket.admission,
+      request: ticket.request,
+    });
+  }
   assertTaskFields(bindingEvent, {
     action: 'bind-native-worker',
     task: task410,
