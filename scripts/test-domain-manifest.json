@@ -693,6 +693,7 @@
     "scripts/delivery-repairs/archive-039-delivery-pause-cli.mjs": {
       "digest": "becc6b9bd7d1d513537944daf8b05134dcca98fb7e994740dc8fb126e4ac503c",
       "imports": [
+        "scripts/delivery-repairs/archive-039-delivery-pause-cli.mjs",
         "scripts/delivery-repairs/archive-039-delivery-pause.mjs",
         "scripts/task-context.mjs",
         "scripts/task-execution-order.mjs",
