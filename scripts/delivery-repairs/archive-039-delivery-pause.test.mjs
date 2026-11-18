@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   correct039DeliveryPause,
+  nativeBoardProof,
   receipts039,
   sha256,
   task039,
@@ -27,6 +28,222 @@ function boardProof() {
   }));
   return { board, progress: { history, receipts } };
 }
+function boardProofWithAppliedReceipt() {
+  const f = boardProof();
+  const receipt = {
+    action: { id: 'fixture:development', label: 'Development ready' },
+    event: 'completed',
+    evidence_refs: ['fixture:development-evidence'],
+    next: { kind: 'action', label: 'Prepare delivery' },
+    observed_at: '2026-01-01T00:00:00.000Z',
+    receipt_id: 'fixture-applied-review-receipt',
+    sequence: 5,
+    stage_fact: {
+      conditions: { development_complete: true, no_known_defects: true, verification_passed: true },
+      kind: 'development_ready',
+      references: { candidate: 'fixture-head', verification: 'fixture-report' },
+    },
+    task_id: task039,
+    version: 1,
+  };
+  const latest = f.progress.history.at(-1);
+  latest.snapshot.progress_receipt = {
+    receipt: { version: receipt.version, ...receipt },
+    payload: JSON.stringify(receipt),
+  };
+  f.applied = {
+    version: 1,
+    receipt_id: receipt.receipt_id,
+    outcome: 'applied',
+    applied_revision: 6,
+    receipt: structuredClone(receipt),
+    task: f.board,
+  };
+  f.progress.readAppliedReceipt = (id) => {
+    assert.equal(id, receipt.receipt_id);
+    return f.applied;
+  };
+  return f;
+}
+
+test('latest Site progress annotation accepts its exact independent applied receipt', () => {
+  const f = boardProofWithAppliedReceipt();
+  const original = structuredClone(f.progress.history);
+  assert.doesNotThrow(() => validate039Board(f.progress, f.board));
+  assert.deepEqual(f.progress.history, original);
+});
+
+const nativeCheckedAt = '2026-01-01T00:01:00.000Z';
+function nativeObservationsFor(f) {
+  const observation = (operation, args, data) => ({
+    operation,
+    args,
+    observedAt: nativeCheckedAt,
+    provider: 'codex-native-task-board',
+    result: { isError: false, content: [{ type: 'text', text: JSON.stringify(data) }] },
+  });
+  const args = { id: task039 };
+  const history = f.progress.history.map((event) => ({ ...event, snapshot: JSON.stringify(event.snapshot) }));
+  const observations = [
+    observation('get_task_by_id', args, f.board),
+    observation('task_history', args, history),
+    ...f.progress.receipts.map((seen) =>
+      observation('get_task_progress_receipt', { ...args, receipt_id: seen.receipt_id }, seen),
+    ),
+  ];
+  if (f.applied) {
+    const receipt_id = f.progress.history.at(-1).snapshot.progress_receipt.receipt.receipt_id;
+    observations.push(observation('get_task_progress_receipt', { ...args, receipt_id }, f.applied));
+  }
+  return observations;
+}
+
+test('published native proof keeps four observations for an ordinary latest revision', () => {
+  const f = boardProof();
+  const observations = nativeObservationsFor(f);
+  assert.deepEqual(nativeBoardProof(observations, nativeCheckedAt), f.board);
+  const applied = boardProofWithAppliedReceipt();
+  assert.throws(
+    () => nativeBoardProof([...observations, nativeObservationsFor(applied).at(-1)], nativeCheckedAt),
+    /without an applied receipt/,
+  );
+});
+
+test('published native proof checks the fifth observation and preserves original history bytes', async (t) => {
+  const f = boardProofWithAppliedReceipt();
+  const observations = nativeObservationsFor(f);
+  const bytes = JSON.stringify(observations);
+  assert.deepEqual(nativeBoardProof(observations, nativeCheckedAt), f.board);
+  assert.equal(JSON.stringify(observations), bytes);
+
+  for (const [name, change, error] of [
+    ['missing readback', (items) => items.pop(), /One exact native board/],
+    [
+      'foreign task observation',
+      (items) => {
+        items.at(-1).args.id = 'other-task';
+      },
+      /One exact native board/,
+    ],
+    [
+      'wrong receipt argument',
+      (items) => {
+        items.at(-1).args.receipt_id = 'different-id';
+      },
+      /One exact native board/,
+    ],
+    [
+      'stale native observation',
+      (items) => {
+        items.at(-1).observedAt = '2025-12-31T23:59:59.999Z';
+      },
+      /Fresh native board/,
+    ],
+    [
+      'tool failure',
+      (items) => {
+        items.at(-1).result.isError = true;
+      },
+      /true !== false/,
+    ],
+    [
+      'duplicate observation',
+      (items) => {
+        items[3] = structuredClone(items[4]);
+      },
+      /One exact native board/,
+    ],
+  ]) {
+    await t.test(name, () => {
+      const copy = structuredClone(observations);
+      change(copy);
+      assert.throws(() => nativeBoardProof(copy, nativeCheckedAt), error);
+    });
+  }
+});
+
+test('independent applied receipt must match identity, version, snapshot and original bytes', async (t) => {
+  for (const [name, change, error] of [
+    [
+      'invalid tool version',
+      (f) => {
+        f.applied.version = 2;
+      },
+      /2 !== 1/,
+    ],
+    [
+      'wrong returned receipt ID',
+      (f) => {
+        f.applied.receipt_id = 'different-id';
+      },
+      /applied receipt identity differs/,
+    ],
+    [
+      'not applied',
+      (f) => {
+        f.applied.outcome = 'not_found';
+      },
+      /not_found/,
+    ],
+    [
+      'wrong applied revision',
+      (f) => {
+        f.applied.applied_revision = 5;
+      },
+      /different revision/,
+    ],
+    [
+      'changed task projection',
+      (f) => {
+        f.applied.task = { ...f.board, current_work: 'other work' };
+      },
+      /exact current board disagree/,
+    ],
+    [
+      'different receipt contents',
+      (f) => {
+        f.applied.receipt.next.label = 'Changed';
+      },
+      /receipt differs from history/,
+    ],
+    [
+      'noncanonical raw payload',
+      (f) => {
+        const record = f.progress.history.at(-1).snapshot.progress_receipt;
+        record.payload = JSON.stringify(record.receipt, null, 2);
+      },
+      /payload bytes differ/,
+    ],
+    [
+      'different raw payload contents',
+      (f) => {
+        f.progress.history.at(-1).snapshot.progress_receipt.payload = '{"sequence":999}';
+      },
+      /payload bytes differ/,
+    ],
+    [
+      'changed unrelated snapshot field',
+      (f) => {
+        f.progress.history.at(-1).snapshot.current_work = 'other work';
+      },
+      /Full history and exact current board disagree/,
+    ],
+    [
+      'unrecognized annotation data',
+      (f) => {
+        f.progress.history.at(-1).snapshot.progress_receipt.extra = 'other';
+      },
+      /payload.*receipt/s,
+    ],
+  ]) {
+    await t.test(name, () => {
+      const f = boardProofWithAppliedReceipt();
+      change(f);
+      assert.throws(() => nativeBoardProof(nativeObservationsFor(f), nativeCheckedAt), error);
+    });
+  }
+});
+
 test('only full same-revision history and two exact not_found results qualify', () => {
   const f = boardProof();
   validate039Board(f.progress, f.board);
