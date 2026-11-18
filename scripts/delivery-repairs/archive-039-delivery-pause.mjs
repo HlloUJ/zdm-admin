@@ -134,7 +134,19 @@ export function collect039Source(commonDir, coordinatorThreadId, queue, registry
   return { task, ticket, development, events, decision, authority, fence, coordinator: current.current };
 }
 
-export function validate039Board({ history, receipts }, board) {
+// Match the released Site's canonical receipt payload byte for byte.
+function canonicalReceiptPayload(value) {
+  if (Array.isArray(value)) return '[' + value.map(canonicalReceiptPayload).join(',') + ']';
+  if (value && typeof value === 'object') {
+    const fields = Object.keys(value)
+      .sort()
+      .map((key) => JSON.stringify(key) + ':' + canonicalReceiptPayload(value[key]));
+    return '{' + fields.join(',') + '}';
+  }
+  return JSON.stringify(value);
+}
+
+export function validate039Board({ history, receipts, readAppliedReceipt }, board) {
   assert.equal(board?.id, task039);
   assert.equal(board.status, 'review');
   assert.equal(board.board_column, 'review');
@@ -157,7 +169,30 @@ export function validate039Board({ history, receipts }, board) {
   assert.equal(rows[5].status, 'review');
   const overview = { ...board };
   delete overview.board_column;
-  assert.deepEqual(rows.at(-1), overview, 'Full history and exact current board disagree');
+  const latest = rows.at(-1);
+  const snapshot = { ...latest };
+  let appliedReceiptId = null;
+  if (Object.hasOwn(latest, 'progress_receipt')) {
+    const record = latest.progress_receipt;
+    assert.ok(record && typeof record === 'object' && !Array.isArray(record), 'Malformed historical receipt record');
+    assert.deepEqual(Object.keys(record).sort(), ['payload', 'receipt']);
+    const { payload, receipt } = record;
+    assert.equal(receipt?.task_id, task039);
+    assert.equal(receipt.version, 1);
+    assert.ok(typeof receipt.receipt_id === 'string' && receipt.receipt_id.trim());
+    assert.equal(typeof readAppliedReceipt, 'function', 'Independent applied receipt observation required');
+    const applied = readAppliedReceipt(receipt.receipt_id);
+    assert.equal(applied?.version, 1);
+    assert.equal(applied.receipt_id, receipt.receipt_id, 'Independent applied receipt identity differs');
+    assert.equal(applied.outcome, 'applied');
+    assert.equal(applied.applied_revision, latest.revision, 'Historical receipt was applied at a different revision');
+    assert.deepEqual(applied.task, board, 'Applied receipt and exact current board disagree');
+    assert.deepEqual(applied.receipt, receipt, 'Independent applied receipt differs from history');
+    assert.equal(payload, canonicalReceiptPayload(applied.receipt), 'Original historical receipt payload bytes differ');
+    appliedReceiptId = receipt.receipt_id;
+    delete snapshot.progress_receipt;
+  }
+  assert.deepEqual(snapshot, overview, 'Full history and exact current board disagree');
   assert.equal(receipts.length, receipts039.length);
   receipts.forEach((seen, i) => {
     assert.equal(seen.receipt_id, receipts039[i].id);
@@ -166,6 +201,7 @@ export function validate039Board({ history, receipts }, board) {
     assert.equal(seen.applied_revision, null);
     assert.deepEqual(seen.task, board);
   });
+  return appliedReceiptId;
 }
 export function verify039ClientTransport(raw, input) {
   assert.deepEqual(
@@ -234,15 +270,28 @@ function exactObservation(native, operation, args, checkedAt) {
   assert.equal(result.content[0].type, 'text');
   return JSON.parse(result.content[0].text);
 }
-function nativeBoardProof(observations, checkedAt) {
-  assert.equal(observations?.length, 4);
+export function nativeBoardProof(observations, checkedAt) {
+  assert.ok([4, 5].includes(observations?.length), 'Unexpected native observation count');
   const args = { id: task039 };
   const board = exactObservation(observations, 'get_task_by_id', args, checkedAt);
   const history = exactObservation(observations, 'task_history', args, checkedAt);
   const receipts = receiptIds.map((receipt_id) =>
     exactObservation(observations, 'get_task_progress_receipt', { ...args, receipt_id }, checkedAt),
   );
-  validate039Board({ history, receipts }, board);
+  const appliedReceiptId = validate039Board(
+    {
+      history,
+      receipts,
+      readAppliedReceipt: (receipt_id) =>
+        exactObservation(observations, 'get_task_progress_receipt', { ...args, receipt_id }, checkedAt),
+    },
+    board,
+  );
+  assert.equal(
+    observations.length,
+    appliedReceiptId === null ? 4 : 5,
+    'Unexpected observation for a revision without an applied receipt',
+  );
   return board;
 }
 
