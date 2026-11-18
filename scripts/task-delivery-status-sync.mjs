@@ -61,7 +61,7 @@ export function captureCompletionProgress(directory, state, previous) {
 export function captureQueueProgress(commonDir, state, previous) {
   const pausedFor = executionPausedFor;
   for (const ticket of state.tickets) {
-    if (['completed', 'cancelled'].includes(ticket.status)) continue;
+    if (['completed', 'cancelled', 'parked'].includes(ticket.status)) continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
     // Admission is NOT proof of actual action start. No synthetic started event on claim.
     const paused = pausedFor(state, ticket);

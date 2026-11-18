@@ -1,3 +1,4 @@
+import { CONTINUATION_HOST_ACTIONS, continuationHostAction } from './task-continuation-host.mjs';
 import assert from 'node:assert/strict';
 import { createBoardIntake } from './task-board-intake.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
@@ -89,12 +90,20 @@ export function taskHandoffFailure(error) {
 // This is a handoff contract, not an independent security boundary against its local owner.
 export async function advanceTaskThread(
   input,
-  { commonDir, readTask, start, registry, dependenciesReady, observe, now = Date.now() },
+  { commonDir, readTask, start, registry, dependenciesReady, readActionDependencies, observe, root, now = Date.now() },
 ) {
   assert.ok(
-    ['receive', 'continue-intake', 'start', 'rename', 'rebind', 'rebind-plan', 'resume', 'coordinate'].includes(
-      input.action,
-    ),
+    [
+      'receive',
+      'continue-intake',
+      'start',
+      'rename',
+      'rebind',
+      'rebind-plan',
+      'resume',
+      'coordinate',
+      ...CONTINUATION_HOST_ACTIONS,
+    ].includes(input.action),
   );
   const coordination = readTaskCoordination(commonDir);
   if (input.action === 'start' && coordination)
@@ -111,6 +120,7 @@ export async function advanceTaskThread(
     readTask,
     start,
     dependenciesReady,
+    readActionDependencies,
     readUnavailableThread: async (id) => {
       // Preserve the actual native error. This is absence of a readable chat,
       // never an idle observation or permission to skip resource checks.
@@ -170,7 +180,10 @@ export async function advanceTaskThread(
     },
   };
   let result;
-  if (input.action === 'coordinate') result = await authorizeTaskCoordinator(commonDir, input.task, host);
+  if (CONTINUATION_HOST_ACTIONS.includes(input.action)) {
+    assert.ok(registry && registry.commonDir === commonDir && root, 'Actual published registry root required');
+    result = await continuationHostAction(input.action, input.task, host, { registry, root, observe });
+  } else if (input.action === 'coordinate') result = await authorizeTaskCoordinator(commonDir, input.task, host);
   else if (['rebind', 'rebind-plan', 'resume'].includes(input.action)) {
     assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
     const adapters = { registry, queue: host.queue, now, ...(observe ? { observe } : {}) };

@@ -1,3 +1,4 @@
+import { assertDeliveredDependencies } from './task-context.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, readFileSync, lstatSync } from 'node:fs';
@@ -155,6 +156,8 @@ export async function applyPreviewCombination(root, targetId, plan, owner, depen
     leases.run('task-preview-' + targetId, targetId, () =>
       withIntegrationResource(root, targetId, async () => {
         const target = registry.resolve({ id: targetId });
+        if (target.actionDependencies?.some(({ actions }) => actions.includes('combination')))
+          assertDeliveredDependencies(root, target, 'combination');
         assert.ok(
           !existsSync(path.join(registry.commonDir, 'task-environments', target.id)),
           'Existing data or preparation must be preserved; use a new carrier',

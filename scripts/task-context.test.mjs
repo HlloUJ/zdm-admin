@@ -1,3 +1,4 @@
+import { continuationPlan } from './task-continuation-plan.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -226,4 +227,25 @@ test('planning still requires clean source, the exact recorded head and assigned
   });
   assert.throws(() => planBatchDelivery(f.a), /Unassigned task commit/);
   assert.equal(readFileSync(path.join(f.b, 'src/feature.js'), 'utf8'), 'unfinished B');
+});
+
+test('continuation plan reports independent action readiness and leaves source, index and queue untouched', (t) => {
+  const f = fixture(t);
+  const a = f.registry.readTask('a');
+  f.registry.revise('a', a.revision, (record) => {
+    record.actionDependencies = [{ task: 'b', actions: ['combination', 'final'], evidence: 'delivery' }];
+  });
+  const branch = f.git(f.a, 'rev-parse', 'HEAD');
+  const index = f.git(f.a, 'ls-files', '--stage');
+  const before = f.registry.readTask('a');
+  const plan = continuationPlan(f.main, 'a');
+  assert.equal(plan.source.value.head, branch);
+  const development = plan.actions.find((item) => item.action === 'development');
+  assert.deepEqual(development.reasons, ['Missing development phase ticket']);
+  assert.match(plan.actions.find((item) => item.action === 'combination').reasons[0], /not formally delivered/);
+  assert.equal(plan.operationalAuthorization, false);
+  assert.equal(plan.requiresFreshChecks, true);
+  assert.deepEqual(f.registry.readTask('a'), before);
+  assert.equal(f.git(f.a, 'ls-files', '--stage'), index);
+  assert.equal(existsSync(path.join(f.registry.commonDir, 'task-registry', 'execution-order')), false);
 });

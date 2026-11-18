@@ -1,3 +1,5 @@
+import { releaseIdleCapacity, validateReleasedCapacity } from './task-capacity-release.mjs';
+import { recordNextAction, recordCoordinationObservation } from './task-coordination-next.mjs';
 import { requireNativeIntake, createTaskThreadTitles } from './task-thread-titles.mjs';
 import { hasScopedAdmission, scopedAdmissions } from './task-execution-scope.mjs';
 import assert from 'node:assert/strict';
@@ -67,7 +69,8 @@ function validate(state) {
   const keys = new Set();
   for (const ticket of state.tickets) {
     assert.ok(EXECUTION_LANES.includes(ticket.lane) && id(ticket.task) && text(ticket.owner));
-    assert.ok(['queued', 'running', 'blocked', 'completed', 'cancelled'].includes(ticket.status));
+    assert.ok(['queued', 'running', 'blocked', 'parked', 'completed', 'cancelled'].includes(ticket.status));
+    validateReleasedCapacity(state, ticket);
     event(ticket.request);
     assert.ok(Number.isSafeInteger(ticket.order) && ticket.order > 0, 'Exact effective queue order required');
     const key = `${ticket.lane}:${ticket.task}`;
@@ -733,7 +736,7 @@ export function createExecutionOrder(commonDir) {
     const state = read();
     assert.ok(state, 'Execution-order policy not activated');
     const current = ticket(state, lane, task, owner);
-    assert.equal(current.status, 'blocked', 'Only a blocked original slot can be cancelled');
+    assert.ok(['blocked', 'parked'].includes(current.status), 'Only a fenced blocked or parked slot can be cancelled');
     assert.equal(current.admission, admission, 'Exact original admission required');
     return structuredClone(current);
   }
@@ -754,7 +757,10 @@ export function createExecutionOrder(commonDir) {
         assert.equal(current.status, 'cancelled');
         return structuredClone(current); // no write, probe, release or dispatch on replay
       }
-      assert.equal(current.status, 'blocked', 'Only a blocked original slot can be cancelled');
+      assert.ok(
+        ['blocked', 'parked'].includes(current.status),
+        'Only a fenced blocked or parked slot can be cancelled',
+      );
       assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
       assert.equal(source.authorId, current.request.authorId, 'Original user required');
       assert.ok(
@@ -892,6 +898,17 @@ export function createExecutionOrder(commonDir) {
     });
   }
   return {
+    releaseCapacity: (input, verify) => update((state) => releaseIdleCapacity(state, input, verify)),
+    recordNextAction: (input, verify) =>
+      update((state) => {
+        verify(state);
+        return recordNextAction(state, input);
+      }),
+    recordCoordinationObservation: (input, verify) =>
+      update((state) => {
+        verify(state);
+        return recordCoordinationObservation(state, input);
+      }),
     commonDir,
     read,
     initialize,

@@ -21,6 +21,7 @@ function fixture(t) {
   for (const name of [
     'task-entry.mjs',
     'task-registry.mjs',
+    'task-action-dependencies.mjs',
     'task-monitor-registration.mjs',
     'task-board-intake.mjs',
     'task-thread-titles.mjs',
@@ -164,3 +165,38 @@ for (const surface of ['codex-thread', 'collaboration-agent'])
     assert.equal(f.git('worktree', 'list', '--porcelain'), before);
     assert.throws(() => readFileSync(path.join(f.a, 'child-started')), { code: 'ENOENT' });
   });
+
+test('published dependency registration requires the actual worktree owner and exact task revision', (t) => {
+  const f = fixture(t);
+  const registry = createTaskRegistry(f.main);
+  registry.register({ id: 'a', worktree: f.a, owner: 'fixture-owner' });
+  const b = path.join(path.dirname(f.a), 'b');
+  f.git('worktree', 'add', '-b', 'codex/b', b);
+  registry.register({ id: 'b', worktree: b, owner: 'peer' });
+  const invoke = (owner, revision) =>
+    spawnSync(
+      process.execPath,
+      [
+        path.join(f.main, 'scripts/task-entry.mjs'),
+        '--worktree',
+        f.a,
+        'registry',
+        'action-dependencies',
+        '--task',
+        'a',
+        '--expected-revision',
+        String(revision),
+        '--requirements',
+        JSON.stringify([{ task: 'b', actions: ['final'], evidence: 'delivery' }]),
+      ],
+      { cwd: f.main, encoding: 'utf8', env: { ...process.env, CODEX_THREAD_ID: owner } },
+    );
+  assert.match(invoke('foreign-owner', 1).stderr, /must own this exact task/);
+  const result = invoke('fixture-owner', 1);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(registry.readTask('a').actionDependencies, [
+    { task: 'b', actions: ['final'], evidence: 'delivery' },
+  ]);
+  assert.match(invoke('fixture-owner', 1).stderr, /Task revision changed/);
+  assert.deepEqual(registry.readTask('a').dependsOn, []);
+});

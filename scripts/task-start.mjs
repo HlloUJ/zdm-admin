@@ -1,3 +1,4 @@
+import { assertDeliveredDependencies } from './task-context.mjs';
 import { createBoardIntake } from './task-board-intake.mjs';
 import './task-network.mjs';
 import { assertTaskExecutor, executionBinding } from './task-execution-binding.mjs';
@@ -78,6 +79,8 @@ export function startParallelTask(
     assert.deepEqual(options.monitorContext, binding.monitoring, 'Exact current execution monitoring required');
   }
   function ready(result) {
+    if (result.task.actionDependencies?.some(({ actions }) => actions.includes('development')))
+      assertDeliveredDependencies(root, result.task, 'development');
     result.task = verifyStartMonitoringReadback(registry, result.task, options.monitorContext);
     result.artifacts = prepare(result.task);
     try {

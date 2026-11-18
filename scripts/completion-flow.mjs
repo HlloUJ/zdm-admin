@@ -1,3 +1,4 @@
+import { assertDeliveredDependencies } from './task-context.mjs';
 import { assertAcceptedSource, publishAcceptance, readAcceptance } from './accepted-source.mjs';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -89,7 +90,7 @@ export async function runCompletionFlow(
     assert.equal(git(batch.worktree, 'status', '--porcelain'), '');
     assertAcceptedSource(batch.worktree, batch.id, head);
     assert.equal(git(anchor, 'status', '--porcelain'), '');
-    planBatchDelivery(root);
+    planBatchDelivery(root, { action: 'preparation' });
     const assets = inventoryAssets(batch.worktree);
     assert.ok(
       assets.every((a) => a.kind !== 'blocked'),
@@ -331,6 +332,7 @@ export async function runCompletionFlow(
     return dispatch(anchor, ['settle', batch.id, main.sha, String(ci.runId)]);
   }
   if (!parallel) return complete();
+  assertDeliveredDependencies(root, batch, 'final');
   const queue = createTaskDeliveryQueue(common);
   refresh('queued');
   const ticket = await queue.enqueue({
@@ -354,6 +356,7 @@ export async function runCompletionFlow(
       // Stop this task's mounted watchers before changing its source. Another
       // selected task remains healthy and untouched.
       await previewControl.prepareComposition(worktreePlan(latest));
+      assertDeliveredDependencies(root, batch, 'combination');
       const composed = applyTaskComposition(root, batch.id, latest);
       batch = readActiveBatch(root);
       const changed = composed.recordedHead !== head;
@@ -363,6 +366,7 @@ export async function runCompletionFlow(
       pull = await publishCandidate({ readiness: true });
       if (changed) await awaitRun('pr', head);
     } else assert.equal(current.state, 'MERGED');
+    assertDeliveredDependencies(root, batch, 'final');
     const result = await complete(turn, queue);
     if (result.status === 'deferred') {
       const retained = await queue.deferSettlement(turn, {

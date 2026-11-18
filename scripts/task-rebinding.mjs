@@ -632,9 +632,13 @@ export async function resumeBoundTask(
     'Only a fenced historical task may resume; never replay a running task',
   );
   assert.equal(ticket.owner, task.owner);
-  if (task.dependsOn?.length) {
+  if (task.dependsOn?.length || task.actionDependencies?.length) {
     assert.equal(typeof host.dependenciesReady, 'function', 'Formal delivered dependency proof required');
-    assert.equal(host.dependenciesReady(task), true, 'Waiting for formally delivered task dependencies');
+    assert.equal(
+      host.dependenciesReady(task, input.lane === 'development' ? 'development' : 'final'),
+      true,
+      'Waiting for formally delivered task dependencies',
+    );
   }
   const assertResumeReady = () => {
     const before = resources(task);
@@ -686,7 +690,11 @@ export async function resumeBoundTask(
   } else {
     assert.equal(input.lane, 'delivery');
     assert.equal(typeof host.dependenciesReady, 'function', 'Formal delivered dependency proof required');
-    assert.equal(host.dependenciesReady(task), true, 'Waiting for formally delivered task dependencies');
+    assert.equal(
+      host.dependenciesReady(task, input.lane === 'development' ? 'development' : 'final'),
+      true,
+      'Waiting for formally delivered task dependencies',
+    );
     assertResumeReady();
     queue.direct({
       action: 'resume-only',

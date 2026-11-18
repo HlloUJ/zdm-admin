@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { advanceTaskThread, taskHandoffFailure } from './task-thread-host-bridge.mjs';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
-import { assertDeliveredDependencies } from './task-context.mjs';
+import { assertDeliveredDependencies, taskDispatchDependencies } from './task-context.mjs';
 const execute = promisify(execFile);
 assert.ok(process.stdin.isTTY, 'Use a private PTY for authenticated host input');
 process.stdin.setRawMode(true);
@@ -39,8 +39,10 @@ process.stdin.on('data', async (chunk) => {
     const registry = createTaskRegistry(main);
     const result = await advanceTaskThread(input, {
       commonDir: registry.commonDir,
+      root: main,
       registry,
-      dependenciesReady: (task) => assertDeliveredDependencies(main, task),
+      dependenciesReady: (task, action) => assertDeliveredDependencies(main, task, action),
+      readActionDependencies: (task, action) => taskDispatchDependencies(main, task, action),
       readTask: (id) => readBoardTask({ url: input.url, token: input.token, id }),
       start: async ({ taskId, owner, monitorContext, admission }) => {
         await execute(
