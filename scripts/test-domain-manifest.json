@@ -902,6 +902,11 @@
       "imports": ["scripts/task-thread-titles.mjs"],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/task-delivery-queue-progress.mjs": {
+      "digest": "e64583a1a16d53e65cd921aa9e1b6c5a334dbc7f6aea49d73a2f6941e235961f",
+      "imports": ["scripts/task-delivery-status-sync.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/task-dynamic-host.mjs": {
       "digest": "fde647bbe567d397e6d972286d761547f70b26325ca4ccb60fa341079e4c3108",
       "imports": [
@@ -924,8 +929,12 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-dynamic-model.test.mjs": {
-      "digest": "583e1a4e691c72c25a8d60b0ecba4ccf261f5b6775b55546363961b4eea74448",
-      "imports": ["scripts/delivery-repairs/task-dynamic-model.mjs"],
+      "digest": "4e6161b68263f8e391b109ca67c0a3a9fe37fa4da3887a4e63334f1a8b53867a",
+      "imports": [
+        "scripts/delivery-repairs/task-delivery-queue-progress.mjs",
+        "scripts/delivery-repairs/task-dynamic-model.mjs",
+        "scripts/task-progress-outbox.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-failed-creation.mjs": {
@@ -2579,12 +2588,12 @@
       "dynamicImports": 3
     },
     "scripts/task-execution-order.mjs": {
-      "digest": "a3036e2e1ab805b9dd6034dad2701f4e24a1437c27a25d511dd86ab0a7c0efdf",
+      "digest": "d3b0bc403f1cb5a8c86caf1108e7f945cd181c1e3854e283ce58e0f09be1b256",
       "imports": [
+        "scripts/delivery-repairs/task-delivery-queue-progress.mjs",
         "scripts/delivery-repairs/task-dynamic-model.mjs",
         "scripts/task-board-intake.mjs",
         "scripts/task-coordination.mjs",
-        "scripts/task-delivery-status-sync.mjs",
         "scripts/task-execution-binding.mjs",
         "scripts/task-execution-scope.mjs",
         "scripts/task-registry.mjs",
