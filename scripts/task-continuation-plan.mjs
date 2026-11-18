@@ -279,6 +279,11 @@ export function continuationPlan(root, id) {
     plannedSource,
     activeDispatch,
     actions,
+    intake: {
+      standingDelegation: 'dispatch and authorized phase enrollment for already registered tasks',
+      newTaskIntake: 'one original user message and receipt sequence per new lane ticket',
+      derivesSeparateNewTaskIntake: false,
+    },
     operationalAuthorization: false,
     requiresFreshChecks: true,
   };
