@@ -22,6 +22,8 @@ function fixture(t) {
     'task-entry.mjs',
     'task-registry.mjs',
     'task-action-dependencies.mjs',
+    'parallel-task-timing.mjs',
+    'batch-timing-core.mjs',
     'task-monitor-registration.mjs',
     'task-board-intake.mjs',
     'task-thread-titles.mjs',

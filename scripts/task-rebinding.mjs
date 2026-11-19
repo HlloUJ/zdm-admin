@@ -211,7 +211,7 @@ function safe(file) {
     if (cursor === path.dirname(cursor)) break;
   }
 }
-function resources(task) {
+export function readResumeResources(task) {
   const common = task.repository.commonDir,
     result = [];
   const add = (file) => {
@@ -510,7 +510,7 @@ export async function rebindHistoricalTask(
             'Project recovery review changed; re-read plan without rebasing',
           );
       }
-      const before = resources(record),
+      const before = readResumeResources(record),
         first = observe();
       assertHostIdle(first, record);
       const assertHistoricalWriterAbsent = (snapshot) => {
@@ -527,7 +527,7 @@ export async function rebindHistoricalTask(
       const second = observe();
       assertHostIdle(second, record);
       assertHistoricalWriterAbsent(second);
-      assert.deepEqual(resources(record), before, 'Resource evidence changed during observation');
+      assert.deepEqual(readResumeResources(record), before, 'Resource evidence changed during observation');
       if (project)
         assert.deepEqual(
           projectSource(record, state, input),
@@ -576,11 +576,17 @@ export function assertBoundResumeReady(
   task,
   state,
   input,
-  { registry, observe = observeCancellationHost, acceptFrozenCheckpoint, acceptRegisteredCheckpoint } = {},
+  {
+    registry,
+    observe = observeCancellationHost,
+    verifyDispatchHost,
+    acceptFrozenCheckpoint,
+    acceptRegisteredCheckpoint,
+  } = {},
 ) {
   const binding = executionBinding(task);
   assert.ok(binding, 'Historical execution binding required');
-  const before = resources(task);
+  const before = readResumeResources(task);
   const source = binding.sourceContentDigest ? projectSource(task, state, input) : null;
   const sourceDigest = (value) => digest({ head: value.head, index: value.index, entries: value.entries });
   const currentDigest = source ? sourceDigest(source) : null;
@@ -589,11 +595,16 @@ export function assertBoundResumeReady(
     assert.ok(verify, 'Project source changed since binding; preserve and review a new binding');
     assert.equal(verify(source), true, 'Registered checkpoint source is not verified');
   }
-  const first = observe();
-  assertHostIdle(first, task);
-  const second = observe();
-  assertHostIdle(second, task);
-  assert.deepEqual(resources(task), before, 'Resources changed before admission');
+  let hostProof;
+  if (verifyDispatchHost) hostProof = verifyDispatchHost();
+  else {
+    const first = observe();
+    assertHostIdle(first, task);
+    const second = observe();
+    assertHostIdle(second, task);
+    hostProof = { observationsDigest: digest({ first, second }) };
+  }
+  assert.deepEqual(readResumeResources(task), before, 'Resources changed before admission');
   if (source)
     assert.equal(
       sourceDigest(projectSource(task, state, input)),
@@ -604,7 +615,7 @@ export function assertBoundResumeReady(
   return {
     sourceDigest: currentDigest,
     resourcesDigest: digest(before),
-    observationsDigest: digest({ first, second }),
+    ...hostProof,
   };
 }
 export async function resumeBoundTask(

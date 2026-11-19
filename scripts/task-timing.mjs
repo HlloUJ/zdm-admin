@@ -1,3 +1,5 @@
+import { readParallelTiming, observeEntry, measuredPhases } from './parallel-task-timing.mjs';
+import { createTaskRegistry } from './task-registry.mjs';
 import { refreshCurrentTiming, timingCommon, currentTimingSummary } from './batch-timing-runtime.mjs';
 import { readTimingSummary } from './batch-timing-store.mjs';
 // Observation only. No execution policy, cache decision, approval or task status depends on this report.
@@ -12,7 +14,7 @@ import {
   writeFileSync,
 } from 'node:fs';
 import { createInterface } from 'node:readline';
-import { execFileSync } from 'node:child_process';
+import { execFileSync, spawnSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
 import { intervalDifference } from './completion-session.mjs';
 import os from 'node:os';
@@ -325,7 +327,33 @@ export async function observeTaskTiming(root, report = console.log) {
     }
   }
 }
+function assertParallelArgs(args) {
+  if (args.some((arg) => !['--parallel', '--json'].includes(arg)))
+    throw Error('Parallel timing accepts only --parallel --json');
+}
 export async function main(args = process.argv.slice(2)) {
+  if (args[0] === '--measure') {
+    if (!measuredPhases.includes(args[1]) || args[2] !== '--' || !args[3])
+      throw Error('Usage: task:timing --measure <phase> -- <command> [args]');
+    const registry = createTaskRegistry(process.cwd());
+    registry.resolve({ worktree: process.cwd() });
+    const result = observeEntry({ command: 'measure', originalArgs: [args[1]], cwd: process.cwd() }, registry, () =>
+      spawnSync(args[3], args.slice(4), { cwd: process.cwd(), env: process.env, stdio: 'inherit' }),
+    );
+    return result.status ?? 1;
+  }
+  if (args.includes('--parallel')) {
+    assertParallelArgs(args);
+    const registry = createTaskRegistry(process.cwd());
+    console.log(
+      JSON.stringify(
+        readParallelTiming(registry.commonDir, registry.list(), { readNative: readTimingSummary }),
+        null,
+        2,
+      ),
+    );
+    return 0;
+  }
   let requestedBatch = null;
   const batchIndex = args.indexOf('--batch');
   if (batchIndex >= 0) {
@@ -337,7 +365,7 @@ export async function main(args = process.argv.slice(2)) {
     throw Error('Unknown task timing argument');
   if (args.includes('--help')) {
     console.log(
-      'Usage: npm run task:timing -- [--batch batch-id] [--json] [--last-completed]\nReads the current thread event metadata and existing local observations. Does not run checks or change task state.',
+      'Usage: npm run task:timing -- --parallel --json OR --measure <phase> -- <command> [args] OR [--batch batch-id] [--json] [--last-completed]\nReads the current thread event metadata and existing local observations. Does not run checks or change task state.',
     );
     return 0;
   }

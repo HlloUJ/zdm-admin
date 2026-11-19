@@ -45,6 +45,8 @@
 
 未冻结任务在绑定后的源码变化，只接受合法开发准入下已登记的准确 checkpoint：工作区干净、HEAD 等于 recordedHead 且有该提交的 checkpoint，记录晚于当前 binding；原 resume-selected/bindingRef 或已消费动态决定证明准确 worker/owner/admission，全部非主线提交有本任务归属且不占用其他任务 checkpoint。决定保存 taskRevision、绑定版本、准确提交/树、checkpoint 及归属证明，消费前重新比对。未登记 HEAD、脏改动、归属或开发准入不明仍拒绝，不重写初始绑定摘要，也不重建冻结。
 
+macOS 的派发预约和消费可分别证明 Docker Desktop 保留的只读目录引用。每次都在当前本机 Unix socket 上核验已签名的 Docker 端点持有者、实际加载的可执行文件、启动身份、目录持有者和其内核目录句柄。两轮观察均须排除目标任务进程、其他文件或目录引用，以及运行和已停止容器的重叠挂载。挂载按实际设备和 inode 核对父子目录。证据变化或不完整时维持拒绝；消费须重新得到相同的引用身份。私有证据保留每个仍被引用的目录、实际挂载和资源证明。该证明的使用范围仅为动态派发，不提供取消、历史重绑、停止运行环境或物理清理许可。
+
 容量在原 limit/activeDevelopment/activeDelivery/activeOther 上增加 activePreparation。limit 来源须如实说明，项目预算不称为平台硬上限。运行中的开发、准备、最终交付、其他执行者及未消费决定、原生创建预约均计入，仍保留一个最终交付执行位。未知容量、依赖、资源或版本变化只阻断相应决定。
 
 预约返回 workerInput，不代表开始工作。宿主真实发送给该 worker；worker 以自己真实 CODEX_THREAD_ID 调用同一桥 `action: "dispatch-start"`，传原 workerInput 和新读回的 expectedQueueRevision，提供新鲜角色、worker 与容量观察。消费前再次核验依赖、容量、源码、票据和绑定。成功只返回 admitted-work-not-started、准确任务、monitorContext 和 admission；worker 再按既有入口恢复私有依赖并执行，不伪报预览就绪。

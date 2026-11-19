@@ -7,7 +7,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { withTaskRegistryWriteLock } from './task-registry.mjs';
-import { captureQueueProgress } from './task-delivery-status-sync.mjs';
+import { captureDeliveryQueueProgress } from './delivery-repairs/task-delivery-queue-progress.mjs';
 import { executionBinding, assertTaskExecutor } from './task-execution-binding.mjs';
 import { queuedProjectReference } from './task-board-intake.mjs';
 import { readTaskCoordination } from './task-coordination.mjs';
@@ -242,7 +242,7 @@ export function createExecutionOrder(commonDir) {
     writeFileSync(temporary, JSON.stringify(state, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     renameSync(temporary, file);
     try {
-      captureQueueProgress(commonDir, state, previous);
+      captureDeliveryQueueProgress(commonDir, state, previous);
     } catch (error) {
       console.error('Progress capture failed; original queue retained: ' + error.message);
     }

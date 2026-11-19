@@ -378,7 +378,7 @@
       ],
       "protectedTests": {
         "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
-        "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+        "tests/e2e/finished-stock.spec.ts": "f12de268d0b142cc2bc14bedba1a597ff0a947c28ad404c4c495202a578d7772",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
         "tests/e2e/slab-collaboration.spec.ts": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
         "tests/e2e/store-finished-stock.spec.ts": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
@@ -2711,6 +2711,12 @@
           "before": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
           "after": "1e57f57f0538aee643a104f3831f88f87eac8bfa4e0417d7b9ebb0980129c567",
           "reason": "520 CI44178271178: Chrome158 flex-end/flow-end别名序列化；保留查询重置、草稿、失焦及混合保存全部断言，严格比较独立标准flex-end参照并新增按钮右边缘几何断言。无业务修改、无重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "after": "f12de268d0b142cc2bc14bedba1a597ff0a947c28ad404c4c495202a578d7772",
+          "reason": "432恢复诊断：仅在原视频播放断言失败时附加媒体错误、readyState、networkState、currentTime及页面可见性，随后原样抛出失败；原断言、超时、重试、用例与业务均不变。历史失败继续保留，不据此认定根因已修复。"
         }
       ],
       "routes": [

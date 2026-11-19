@@ -1,3 +1,4 @@
+import { captureDeliveryQueueProgress } from './delivery-repairs/task-delivery-queue-progress.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, realpathSync } from 'node:fs';
@@ -313,25 +314,29 @@ test('enrolling a verified delivery phase leaves the review card alone until an 
   };
   const enrolled = { ...before, revision: 2, events: [...before.events, enrollment], tickets: [ticket] };
   const box = createProgressOutbox(path.join(root, 'task-progress', ticket.task));
-  captureQueueProgress(root, enrolled, before);
+  captureDeliveryQueueProgress(root, enrolled, before);
   assert.deepEqual(box.read().pending, []);
   const unchanged = { ...enrolled, revision: 3 };
-  captureQueueProgress(root, unchanged, enrolled);
+  captureDeliveryQueueProgress(root, unchanged, enrolled);
   assert.deepEqual(box.read().pending, []);
   const paused = {
     ...unchanged,
     revision: 4,
     events: [...enrolled.events, { action: 'pause-all', request: { ...fence, messageId: 'new-pause', sequence: 21 } }],
   };
-  captureQueueProgress(root, paused, unchanged);
-  captureQueueProgress(root, { ...paused, revision: 5 }, paused);
+  captureDeliveryQueueProgress(root, paused, unchanged);
+  captureDeliveryQueueProgress(root, { ...paused, revision: 5 }, paused);
   assert.deepEqual(
     box.read().pending.map((entry) => [entry.receipt.event, entry.receipt.next.label]),
     [['paused', '等待恢复指令']],
   );
   for (const event of [null, { ...enrollment, owner: 'wrong-worker' }, { ...enrollment, request: fence }]) {
     const isolated = fixture(t);
-    captureQueueProgress(isolated, { ...enrolled, events: [...before.events, ...(event ? [event] : [])] }, before);
+    captureDeliveryQueueProgress(
+      isolated,
+      { ...enrolled, events: [...before.events, ...(event ? [event] : [])] },
+      before,
+    );
     assert.equal(
       createProgressOutbox(path.join(isolated, 'task-progress', ticket.task)).read().pending[0].receipt.event,
       'paused',

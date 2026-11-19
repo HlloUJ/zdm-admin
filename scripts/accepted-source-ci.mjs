@@ -5,6 +5,44 @@ import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { acceptedGit, acceptedRef, verifyRemoteAcceptance } from './accepted-source.mjs';
 import { ACCEPTED_SOURCE_CHECK } from './accepted-source-policy.mjs';
+
+const publicReasons = new Map([
+  ['Bad credentials', 'bad credentials'],
+  ['Not Found', 'check resource not found'],
+  ['Resource not accessible by integration', 'resource not accessible to the GitHub App'],
+  ['Validation Failed', 'validation failed'],
+]);
+const checkFields = new Set([
+  'name',
+  'head_sha',
+  'status',
+  'conclusion',
+  'output',
+  'title',
+  'summary',
+  'output.title',
+  'output.summary',
+]);
+const validationCodes = new Set(['missing', 'missing_field', 'invalid', 'unprocessable', 'already_exists', 'custom']);
+
+function publicRejectionReason(body) {
+  const message = body?.message;
+  if (typeof message === 'string') {
+    if (message.startsWith('API rate limit exceeded')) return 'API rate limit exceeded';
+    if (message.startsWith('You have exceeded a secondary rate limit')) return 'secondary rate limit exceeded';
+  }
+  const reason = publicReasons.get(message) ?? 'no public reason recognized';
+  if (message !== 'Validation Failed' || !Array.isArray(body.errors)) return reason;
+  const details = [
+    ...new Set(
+      body.errors
+        .filter((error) => checkFields.has(error?.field) && validationCodes.has(error?.code))
+        .map(({ field, code }) => `${field}=${code}`),
+    ),
+  ];
+  return details.length ? `${reason} (${details.slice(0, 5).join(', ')})` : reason;
+}
+
 export async function runAcceptedSourceCI(root, event, { repository, token, request = fetch }) {
   const pull = event.pull_request;
   assert.equal(pull.base.ref, 'main');
@@ -18,20 +56,34 @@ export async function runAcceptedSourceCI(root, event, { repository, token, requ
     pull.base.sha,
     'Run the verifier from the exact trusted base checkout',
   );
-  const api = async (method, suffix, body) => {
-    const response = await request('https://api.github.com/repos/' + repository + suffix, {
-      method,
-      headers: {
-        Authorization: 'Bearer ' + token,
-        Accept: 'application/vnd.github+json',
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-    assert.ok(response.ok, 'Cannot publish accepted-source check');
-    return response.json();
+  const api = async (operation, method, suffix, body) => {
+    const action = `Cannot publish accepted-source check (${method} ${operation})`;
+    let response;
+    try {
+      response = await request('https://api.github.com/repos/' + repository + suffix, {
+        method,
+        headers: {
+          Authorization: 'Bearer ' + token,
+          Accept: 'application/vnd.github+json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(body),
+      });
+    } catch {
+      throw new Error(`${action}: no HTTP response, request failed`);
+    }
+    const status = Number.isInteger(response.status) ? response.status : 'unavailable';
+    if (!response.ok) {
+      const payload = await response.json().catch(() => null);
+      throw new Error(`${action}: HTTP ${status}, ${publicRejectionReason(payload)}`);
+    }
+    try {
+      return await response.json();
+    } catch {
+      throw new Error(`${action}: HTTP ${status}, invalid response JSON`);
+    }
   };
-  const check = await api('POST', '/check-runs', {
+  const check = await api('create', 'POST', '/check-runs', {
     name: ACCEPTED_SOURCE_CHECK,
     head_sha: pull.head.sha,
     status: 'in_progress',
@@ -47,18 +99,25 @@ export async function runAcceptedSourceCI(root, event, { repository, token, requ
       branch: pull.head.ref,
       trustedMain: pull.base.sha,
     });
-    await api('PATCH', '/check-runs/' + check.id, {
+    await api('complete-success', 'PATCH', '/check-runs/' + check.id, {
       status: 'completed',
       conclusion: 'success',
       output: { title: 'Accepted business snapshot matches', summary: JSON.stringify(result) },
     });
     return result;
   } catch (error) {
-    await api('PATCH', '/check-runs/' + check.id, {
-      status: 'completed',
-      conclusion: 'failure',
-      output: { title: 'Accepted business snapshot blocked', summary: String(error.message).slice(0, 4000) },
-    });
+    const summary = String(error.message).slice(0, 4000);
+    try {
+      await api('complete-failure', 'PATCH', '/check-runs/' + check.id, {
+        status: 'completed',
+        conclusion: 'failure',
+        output: { title: 'Accepted business snapshot blocked', summary },
+      });
+    } catch (publicationError) {
+      throw new AggregateError([error, publicationError], `${summary}\n${publicationError.message}`, {
+        cause: publicationError,
+      });
+    }
     throw error;
   }
 }

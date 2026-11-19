@@ -2,6 +2,11 @@ import { releaseIdleCapacity, validateReleasedCapacity } from '../task-capacity-
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
+import { mkdtempSync, realpathSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { createProgressOutbox } from '../task-progress-outbox.mjs';
+import { captureDeliveryQueueProgress } from './task-delivery-queue-progress.mjs';
 import {
   registerDynamicAuthority,
   reserveDynamicDecision,
@@ -13,6 +18,27 @@ import {
   enrollDynamicDelivery,
 } from './task-dynamic-model.mjs';
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+
+function progressFixture(t, f) {
+  const root = mkdtempSync(path.join(realpathSync(tmpdir()), 'delivery-queue-progress-'));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  f.state.events.unshift({ action: 'initialize', request: { ...f.request, sequence: 10 } });
+  const box = createProgressOutbox(path.join(root, 'task-progress', 'a'));
+  return {
+    capture(previous) {
+      f.state.revision++;
+      const original = structuredClone(f.state);
+      captureDeliveryQueueProgress(root, f.state, previous);
+      assert.deepEqual(f.state, original);
+      return box.read().pending.map(({ receipt }) => receipt);
+    },
+    pause() {
+      const previous = structuredClone(f.state);
+      f.state.events.push({ action: 'pause-all', request: { ...f.request, sequence: 21 } });
+      return this.capture(previous);
+    },
+  };
+}
 
 function phaseFixture() {
   const f = fixture();
@@ -59,6 +85,44 @@ function phaseFixture() {
   };
   return { ...f, phase, phaseProof: proof };
 }
+test('derived delivery enrollment preserves review progress, preparation finish queues, and a later pause wins', (t) => {
+  const f = phaseFixture();
+  const progress = progressFixture(t, f);
+  const beforeEnrollment = structuredClone(f.state);
+  const phase = { ...f.phase('a'), expectedQueueRevision: f.state.revision };
+  const ticket = enrollDynamicDelivery(f.state, phase, () => f.phaseProof(phase));
+  assert.ok(ticket.request.sequence < 10);
+  assert.deepEqual(
+    progress.capture(beforeEnrollment).map(({ event }) => event),
+    [],
+  );
+
+  const input = f.input('a');
+  reserveDynamicDecision(f.state, input, () => f.proof(input));
+  consumeDynamicDecision(f.state, { decisionId: input.decisionId, expectedQueueRevision: f.state.revision }, () =>
+    f.proof(input),
+  );
+  const beforeFinish = structuredClone(f.state);
+  finishDynamicPreparation(f.state, { decisionId: input.decisionId, expectedQueueRevision: f.state.revision }, () => ({
+    actor: input.executor,
+    verified: true,
+    prepared: { head: 'a'.repeat(40), runId: '42' },
+  }));
+  assert.deepEqual(
+    f.state.tickets.find((item) => item.lane === 'delivery' && item.task === 'a'),
+    ticket,
+  );
+  assert.deepEqual(
+    progress.capture(beforeFinish).map(({ event }) => event),
+    ['queued'],
+  );
+  const receipts = progress.pause();
+  assert.deepEqual(
+    receipts.map(({ event }) => event),
+    ['queued', 'paused'],
+  );
+  assert.equal(receipts.at(-1).next.label, '等待恢复指令');
+});
 test('one preserved delegation enrolls two completed developments without claiming final, then prepares independently', () => {
   const f = phaseFixture(),
     final = f.input('c', 'final');
@@ -307,14 +371,16 @@ test('blocked consumed task resumes with a new decision, preserving original tic
   );
   assert.equal(JSON.stringify(f.state), bytes);
 });
-test('completed preparation restores the original blocked ticket without closing or losing its position', () => {
+test('completed preparation restores the original blocked ticket and projects its preserved reason', (t) => {
   const f = fixture();
+  const progress = progressFixture(t, f);
   f.state.tickets[0].status = 'blocked';
   f.state.tickets[0].reason = 'preserved old blocker';
   const original = structuredClone(f.state.tickets[0]),
     input = f.input('a');
   reserveDynamicDecision(f.state, input, () => f.proof(input));
   consumeDynamicDecision(f.state, { decisionId: input.decisionId, expectedQueueRevision: 10 }, () => f.proof(input));
+  const beforeFinish = structuredClone(f.state);
   const prepared = { head: 'a'.repeat(40), runId: '42', accepted: 'b'.repeat(40) };
   finishDynamicPreparation(f.state, { decisionId: input.decisionId, expectedQueueRevision: 10 }, () => ({
     actor: input.executor,
@@ -331,6 +397,14 @@ test('completed preparation restores the original blocked ticket without closing
   }));
   assert.equal(JSON.stringify(f.state), before);
   validateDynamicState(f.state);
+  const [receipt] = progress.capture(beforeFinish);
+  assert.equal(receipt.event, 'blocked');
+  assert.equal(receipt.reason, 'preserved old blocker');
+  const receipts = progress.pause();
+  assert.deepEqual(
+    receipts.map(({ event }) => event),
+    ['blocked', 'paused'],
+  );
 });
 test('capacity includes pending decisions, other preparations and native creation reservations', () => {
   const f = fixture(),
@@ -417,6 +491,27 @@ test('one decision ID cannot be repurposed; a changed pending decision can only 
     consumeDynamicDecision(f.state, { decisionId: input.decisionId }, () => f.proof(input)).startAuthorized,
     false,
   );
+});
+test('worker start needs a fresh observation of the same retained directory identities', () => {
+  const f = fixture();
+  const input = f.input('a');
+  const reserve = f.proof(input);
+  reserve.sourceProof.retainedDirectoryDigest = 'original-fd-digest';
+  reserve.readiness = { retainedDockerDirectories: { file: '/fixture/reserve-proof' } };
+  reserveDynamicDecision(f.state, input, () => reserve);
+  const command = { decisionId: input.decisionId, expectedQueueRevision: 10 };
+  const before = JSON.stringify(f.state);
+  const changed = f.proof(input);
+  changed.sourceProof.retainedDirectoryDigest = 'different-vnode-digest';
+  assert.throws(() => consumeDynamicDecision(f.state, command, () => changed), /changed before start/);
+  assert.equal(JSON.stringify(f.state), before);
+  const fresh = f.proof(input);
+  fresh.sourceProof.retainedDirectoryDigest = reserve.sourceProof.retainedDirectoryDigest;
+  fresh.readiness = { retainedDockerDirectories: { file: '/fixture/consume-proof' } };
+  const started = consumeDynamicDecision(f.state, command, () => fresh);
+  assert.equal(started.startAuthorized, true);
+  assert.deepEqual(started.readiness, reserve.readiness);
+  assert.deepEqual(started.consumedReadiness, fresh.readiness);
 });
 test('later pause revokes delegation, and a changed coordinator fences already consumed scopes', () => {
   const f = fixture(),

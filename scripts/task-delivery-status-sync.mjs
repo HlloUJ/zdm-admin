@@ -1,4 +1,3 @@
-import { isDeepStrictEqual } from 'node:util';
 import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { executionPausedFor } from './task-execution-scope.mjs';
@@ -59,48 +58,7 @@ export function captureCompletionProgress(directory, state, previous) {
     bestEffortProgress(outboxDirectory, state.batch, `completion:${event.id}:${event.status}`, payload);
   }
 }
-function deliveryWaitRequest(state, ticket) {
-  if (ticket.lane !== 'delivery' || !['queued', 'blocked'].includes(ticket.status)) return null;
-  const event = state.events?.findLast(
-    (item) =>
-      item.task === ticket.task &&
-      (['delivery-phase-enrolled', 'preparation-finished'].includes(item.action) ||
-        (item.action === 'dispatch-applied' && item.lane === ticket.lane)),
-  );
-  if (event?.action === 'delivery-phase-enrolled') {
-    const origin = ticket.phaseOrigin;
-    if (
-      ticket.status !== 'queued' ||
-      ticket.admission !== null ||
-      !origin?.phaseId ||
-      !origin.authorityId ||
-      event.phaseId !== origin.phaseId ||
-      event.authorityId !== origin.authorityId ||
-      event.owner !== ticket.owner ||
-      event.order !== ticket.order ||
-      event.developmentEvidenceDigest !== origin.developmentEvidenceDigest
-    )
-      return null;
-    const grant = state.dynamicAuthorities?.find((item) => item.id === origin.authorityId);
-    return grant && isDeepStrictEqual(event.request, grant.request) ? grant.request : null;
-  }
-  if (event?.action !== 'preparation-finished') return null;
-  const decision = state.dynamicDecisions?.find((item) => item.id === event.decisionId);
-  if (
-    decision?.status !== 'finished' ||
-    !decision.prepared ||
-    decision.input.phase !== 'preparation' ||
-    decision.input.lane !== ticket.lane ||
-    decision.input.task !== ticket.task ||
-    decision.input.owner !== ticket.owner ||
-    !isDeepStrictEqual(decision.ticketBefore, ticket)
-  )
-    return null;
-  const grant = state.dynamicAuthorities?.find((item) => item.id === decision.input.authorityId);
-  return grant && isDeepStrictEqual(event.request, grant.request) ? grant.request : null;
-}
-
-export function captureQueueProgress(commonDir, state, previous) {
+export function captureQueueProgress(commonDir, state, previous, readDeliveryRequest = () => null) {
   const pausedFor = (current, ticket) => {
     if (!executionPausedFor(current, ticket)) return false;
     const fence = current.events?.findLast((event) => ['initialize', 'pause-all'].includes(event.action))?.request;
@@ -123,7 +81,7 @@ export function captureQueueProgress(commonDir, state, previous) {
     const request =
       ticket.status === 'queued' && pendingNative && ticket.admission === null
         ? ticket.request
-        : deliveryWaitRequest(current, ticket);
+        : readDeliveryRequest(current, ticket);
     // Enrollment and preparation preserve the original ticket. Use the
     // verified delegation only for progress projection.
     return !(

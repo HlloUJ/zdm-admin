@@ -86,7 +86,7 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-ci.mjs": {
-      "digest": "afe9e825827e1234e434da1aa4a095dba61e387bbbe22f473781f68a627362a1",
+      "digest": "c56cab4928d693d14b7c8aeb71825869b8a3a4574a6a3eef98dcb07f1c145e1f",
       "imports": ["scripts/accepted-source-policy.mjs", "scripts/accepted-source.mjs"],
       "dynamicImports": 0
     },
@@ -138,7 +138,7 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source.test.mjs": {
-      "digest": "18dc4e8857dbf58c0f4fae499ba8c45df02ae74ce97e2d5855b8cabbd7cdd8df",
+      "digest": "9249287df7d1b13fc849d2b18b9bc2db1286e00c3fb92c2e6f32e33527595f85",
       "imports": [
         "scripts/accepted-source-ci.mjs",
         "scripts/accepted-source-hook.mjs",
@@ -227,8 +227,13 @@
       "dynamicImports": 0
     },
     "scripts/batch-timing-runtime.mjs": {
-      "digest": "450d51cd8a5d37cf98535b7500f007d74142ebf49153814b639b535fab20fc00",
-      "imports": ["scripts/batch-timing-core.mjs", "scripts/batch-timing-store.mjs", "scripts/task-batch.mjs"],
+      "digest": "72fcd3acf1b0643a963b374eaf2386c33af1e4b93a06466a0e21174a9ac37155",
+      "imports": [
+        "scripts/batch-timing-core.mjs",
+        "scripts/batch-timing-store.mjs",
+        "scripts/parallel-task-timing.mjs",
+        "scripts/task-batch.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/batch-timing-runtime.test.mjs": {
@@ -264,7 +269,7 @@
       "dynamicImports": 0
     },
     "scripts/business-regression-contracts.json": {
-      "digest": "a3d730a6e49eee3289930312002229b6dfeaf526ec2699cef22f782cf66b0dac",
+      "digest": "7eb496e87e101fb277152a7ae33632939a97fb2f590533d8a8e68aab09ed8cff",
       "imports": [],
       "dynamicImports": 0
     },
@@ -486,7 +491,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "e820e65ed69001c3260558a567bddd54ad08d26daab89631214c59a2cc60ee2c",
+      "digest": "9305e5130d4a5cd789fbef4bde62e3e4bfb5b81683aa3afb3f1f371efe6fc492",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -499,6 +504,7 @@
         "scripts/completion-recovery.mjs",
         "scripts/completion-session.mjs",
         "scripts/completion-status.mjs",
+        "scripts/delivery-repairs/completion-ci-diagnosis.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/delivery-repairs/preview-reference-source.mjs",
         "scripts/delivery-repairs/task-cleanup-npm.mjs",
@@ -578,7 +584,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "e7b1da1090da832ec65f7c76d03c0fcaa02e00c70e158f4c19ffd3482f8ef8d5",
+      "digest": "927b2844e8b63c5dcadbcdc261d2b29f7e04c081d366241f210c350b4cf96256",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -594,6 +600,7 @@
         "scripts/task-batch.mjs",
         "scripts/task-composition.mjs",
         "scripts/task-delivery-queue.mjs",
+        "scripts/task-execution-order.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-registry.mjs",
         "scripts/verification-evidence.mjs"
@@ -659,7 +666,7 @@
       "dynamicImports": 1
     },
     "scripts/completion-session.mjs": {
-      "digest": "402f8c8d70236c3cd8c8ee2fdf4c041a5519f7fb5b4fbf90b1313857baf79e26",
+      "digest": "22bb7d048cb5c55dd9db711023d55faa077abed8de7eb211dff3197aaa9646da",
       "imports": [
         "scripts/completion-process.mjs",
         "scripts/task-delivery-status-sync.mjs",
@@ -743,6 +750,50 @@
       "imports": ["scripts/delivery-migration-safety.mjs"],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/archive-039-delivery-pause-cli.mjs": {
+      "digest": "becc6b9bd7d1d513537944daf8b05134dcca98fb7e994740dc8fb126e4ac503c",
+      "imports": [
+        "scripts/delivery-repairs/archive-039-delivery-pause-cli.mjs",
+        "scripts/delivery-repairs/archive-039-delivery-pause.mjs",
+        "scripts/task-context.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/archive-039-delivery-pause.mjs": {
+      "digest": "d8195885f2178caab1840d67cb212d0d1478e1af94e3b583356cab3205cc7438",
+      "imports": ["scripts/task-coordination.mjs", "scripts/task-execution-scope.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/archive-039-delivery-pause.test.mjs": {
+      "digest": "687e17d1f5d8a724c6ad8b7cf53d61346d7aca132e804c3448f3473761369881",
+      "imports": ["scripts/delivery-repairs/archive-039-delivery-pause.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/archive-672-bound-progress-cli.mjs": {
+      "digest": "5042b8bc2c6b535849cb9445bae6844179003b378a9e0f1bf05502665ebfbc8f",
+      "imports": [
+        "scripts/delivery-repairs/archive-672-bound-progress-cli.mjs",
+        "scripts/delivery-repairs/archive-672-bound-progress.mjs",
+        "scripts/task-board-transport.mjs",
+        "scripts/task-context.mjs",
+        "scripts/task-coordination.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/archive-672-bound-progress.mjs": {
+      "digest": "7dcdbf7248e5763704b6d1e920643788b062133fd7ce6c58f9f036201cba6732",
+      "imports": ["scripts/task-execution-scope.mjs", "scripts/task-progress-outbox.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/archive-672-bound-progress.test.mjs": {
+      "digest": "6d816fdaba0776828f6d8aeecb144e02f8bbe1d728d6cbaca129f79ded78db94",
+      "imports": ["scripts/delivery-repairs/archive-672-bound-progress.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/batch-timing-io.mjs": {
       "digest": "c4a3225f7a412a7b3ed890366af56b3feba3e62e3588e160bb139bcc40d05ab6",
       "imports": [],
@@ -756,6 +807,16 @@
         "scripts/delivery-repairs/batch-timing-io.mjs"
       ],
       "dynamicImports": 1
+    },
+    "scripts/delivery-repairs/completion-ci-diagnosis.mjs": {
+      "digest": "19176189c5c540b0997eee215e80957177f680503250631c341811f3d5478918",
+      "imports": ["scripts/completion-ci-evidence.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/completion-ci-diagnosis.test.mjs": {
+      "digest": "69afbf04d649b3dd76b5c8cd9de082a73aba005e13994cdcdd91ea6f402093b2",
+      "imports": ["scripts/completion-session.mjs", "scripts/delivery-repairs/completion-ci-diagnosis.mjs"],
+      "dynamicImports": 0
     },
     "scripts/delivery-repairs/fixtures/timing-v1/batch-timing-core.mjs.txt": {
       "digest": "95b3ea09b3b24ed2bd0bc4d7ac1eeff648cad58ea676762c757f8661aa2b50fe",
@@ -784,7 +845,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-docker-directories.mjs": {
-      "digest": "3dcba08ac1658d71d45a4dc43d7614ecb9f23c9764a480cd51724bf378f99e8c",
+      "digest": "c29ffa870909672663c3d2d7b00bcef1916b8f1de7c5ad0096367a0aee19f2fd",
       "imports": [
         "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
@@ -793,7 +854,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-docker-vnode-source.mjs": {
-      "digest": "2bd6f5a600c87ab54fe3c838f9100243caf6f37fce221c73160551f2d582cb2d",
+      "digest": "4a7de83bacfec49a1d1d74765609c512fc0dca9fc87f3c08d18d9f8f7a25169f",
       "imports": [],
       "dynamicImports": 0
     },
@@ -862,6 +923,31 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/task-410-initial-pause-correction.mjs": {
+      "digest": "67323195fe9a73cfef5840c79f811fdce91f031871a833ad0be6e0b72a078df5",
+      "imports": [
+        "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
+        "scripts/task-coordination.mjs",
+        "scripts/task-execution-order-cli.mjs",
+        "scripts/task-execution-scope.mjs",
+        "scripts/task-progress-outbox.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/task-410-initial-pause-correction.test.mjs": {
+      "digest": "9e09a7b11046e95d7c9e0b2456e77776269be220e8f413796b4b5641e7a1cf64",
+      "imports": [
+        "scripts/delivery-repairs/task-410-initial-pause-correction.mjs",
+        "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
+        "scripts/task-progress-outbox.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs": {
+      "digest": "de41f214e0c905caebfb069bfc201a9bfcf714ad9757b2a9d5f0e6e1a28c6205",
+      "imports": ["scripts/task-thread-titles.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/task-cleanup-npm-archive.py": {
       "digest": "c871dca802fdc553c721fa55125ce1eb7b343e60f293f9d12ebe3ea3fced6d0f",
       "imports": [],
@@ -903,11 +989,32 @@
       "imports": ["scripts/task-thread-titles.mjs"],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/task-delivery-queue-progress.mjs": {
+      "digest": "885beebe55df8c87a441206f5470060aa832e6be757d266286a76188210231b2",
+      "imports": ["scripts/task-delivery-status-sync.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/task-dispatch-host-proof.mjs": {
+      "digest": "df570ffa461a564584781bfe3e755eea546f1895d814ccf9392367d65760d1c2",
+      "imports": [
+        "scripts/delivery-repairs/preview-docker-directories.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/task-cancellation-proof.mjs",
+        "scripts/task-rebinding.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/task-dispatch-host-proof.test.mjs": {
+      "digest": "0398cb349f28f1b0ad2040d6c6131d2f4263a5677155e143c62b626526f9a1df",
+      "imports": ["scripts/delivery-repairs/task-dispatch-host-proof.mjs", "scripts/task-cancellation-proof.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/task-dynamic-host.mjs": {
-      "digest": "22ebcb3403db526287c7f63357eb2e37e7fa79f85fd90cacc1b5ac4c3f8bfc98",
+      "digest": "66675c9d06b71c1c85f48b7479f3b840c9d233c9d9f2b0329e9417faf3aa3cf3",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-ci-evidence.mjs",
+        "scripts/delivery-repairs/task-dispatch-host-proof.mjs",
         "scripts/task-cancellation-proof.mjs",
         "scripts/task-commit-ownership.mjs",
         "scripts/task-coordination.mjs",
@@ -925,8 +1032,13 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-dynamic-model.test.mjs": {
-      "digest": "07f7172779ab5621dcc7dcee4b3a317347ef829d1ac07431dcf66abe14a30deb",
-      "imports": ["scripts/delivery-repairs/task-dynamic-model.mjs", "scripts/task-capacity-release.mjs"],
+      "digest": "fc4171ae1e37da3b6be4c6089db03b83e5dc85fccd91416e1223a8f67a56ddfe",
+      "imports": [
+        "scripts/delivery-repairs/task-delivery-queue-progress.mjs",
+        "scripts/delivery-repairs/task-dynamic-model.mjs",
+        "scripts/task-capacity-release.mjs",
+        "scripts/task-progress-outbox.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-failed-creation.mjs": {
@@ -1111,7 +1223,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "233328679e982a24e50c45d6b75fe6bba2991cb82a02c2379c8a3760339ce772",
+      "digest": "c99e63da2b4e3d4caedb2f5ba72b0ac449efd150fe3c45aee1aa1b614d95b1dc",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -1570,7 +1682,7 @@
       "dynamicImports": 0
     },
     "scripts/local-diagnostic-evidence.mjs": {
-      "digest": "296fa25f35053083025b05c2adebf9a5ed57902bc6b993419dc01c1c046d5863",
+      "digest": "fa5e9b082ebf4b955b5fac348b0d66e047cbf7144baea0a416b3c9fb14ca7c23",
       "imports": [
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/frontend-test-evidence.mjs",
@@ -1580,14 +1692,15 @@
       "dynamicImports": 0
     },
     "scripts/local-diagnostic-evidence.test.mjs": {
-      "digest": "b96b6fde52ce0c4fa621c471e278723779d96fbcdd78c5ae554777382561ab19",
+      "digest": "5c625d5e67be6033b2f1782fd928876686aad65958182a71456bd573cf8d001f",
       "imports": [
         "scripts/ci-diagnostic-evidence.mjs",
         "scripts/local-diagnostic-evidence.mjs",
         "scripts/remaining.test.mjs",
-        "scripts/run-script-tests.mjs"
+        "scripts/run-script-tests.mjs",
+        "scripts/verification-evidence.mjs"
       ],
-      "dynamicImports": 0
+      "dynamicImports": 1
     },
     "scripts/local-test-entrypoints.test.mjs": {
       "digest": "e372ca0c9ffe4b26cfc170dcbd0d62a721e189042ba3af32bf5f97d181606f78",
@@ -1638,6 +1751,16 @@
     "scripts/parallel-acceptance.test.mjs": {
       "digest": "fdd4d66185b85e23edba24cf65a62be0f2bf3cca8c4ab63efa8ea6d31a8ee57d",
       "imports": ["scripts/parallel-acceptance.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/parallel-task-timing.mjs": {
+      "digest": "b96750a6acf40099e555b0b38bf3054c228ad6b2bf29591b220b385153832652",
+      "imports": ["scripts/batch-timing-core.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/parallel-task-timing.test.mjs": {
+      "digest": "87c25f72f0cdcc3e90dbfc693734b0f4be8bc36f9700195c74ace4d4e1293529",
+      "imports": ["scripts/parallel-task-timing.mjs", "scripts/task-registry.mjs", "scripts/task-timing.mjs"],
       "dynamicImports": 0
     },
     "scripts/parallel-task-transition.mjs": {
@@ -2344,7 +2467,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "90662d29e8cfd9bb2d385ff56daac8bdca9fff472c3fef36986c9c4bcf4e88c2",
+      "digest": "1a3fc9dfe0d94f11e9f2f5174f82400a2f74e888709bbc738e01d1844185f0a8",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",
@@ -2452,18 +2575,13 @@
       "dynamicImports": 0
     },
     "scripts/task-continuity-enrollment.mjs": {
-      "digest": "3d7b59b4c544f43677cb3f0cd2eefc027f6ef8bf9b6bf531114926223ead0ead",
-      "imports": ["scripts/task-execution-order.mjs", "scripts/task-registry.mjs"],
+      "digest": "68a3299995c5e92eecaf8a955b0fd3f84226008dbfc05171c48febf7b563275c",
+      "imports": ["scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity-enrollment.test.mjs": {
-      "digest": "6121411aabcb4c7926d9ffe6e4c192a03145dc545ac82fae09fad690a347816b",
-      "imports": [
-        "scripts/task-continuity-enrollment.mjs",
-        "scripts/task-execution-order.mjs",
-        "scripts/task-progress-collector.mjs",
-        "scripts/task-registry.mjs"
-      ],
+      "digest": "c19ad307f5c096a92b51c5d73dc441d606285e054b9b99086c0280d297b9fc54",
+      "imports": ["scripts/task-continuity-enrollment.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-continuity.mjs": {
@@ -2548,7 +2666,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.mjs": {
-      "digest": "04e41f79ba0c4ba2f47a5357671b27e55286d7bcbef9c0fb1bc949c8748baab9",
+      "digest": "d65bad56d89311e389743f54f7ec2af16bd2adb4b2f45215ea9a05cf6bc55480",
       "imports": [
         "scripts/task-execution-scope.mjs",
         "scripts/task-progress-host.mjs",
@@ -2557,9 +2675,10 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.test.mjs": {
-      "digest": "4d48a55f838f0f9d07dda1414769ce39b447f7e4ba319ce91bf40b278aec7d4a",
+      "digest": "a7509e876c222d66f13b81d96d9b9be697824c9a9fdc2d6db5e1d6d3c9d8c1d9",
       "imports": [
         "scripts/completion-session.mjs",
+        "scripts/delivery-repairs/task-delivery-queue-progress.mjs",
         "scripts/task-delivery-status-sync.mjs",
         "scripts/task-progress-outbox.mjs"
       ],
@@ -2619,9 +2738,10 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "c03216bcb72f0aeebea512e8279be8da83cec8fb90e038145ff6faa8f1b23e96",
+      "digest": "4082b899c08b5e399766b56c116933b25172cbefe0155431d863c5214b23d3d2",
       "imports": [
         "scripts/dev-task.mjs",
+        "scripts/parallel-task-timing.mjs",
         "scripts/task-board-intake.mjs",
         "scripts/task-completion.mjs",
         "scripts/task-continuation-plan.mjs",
@@ -2639,7 +2759,7 @@
       "dynamicImports": 1
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "4c955e1a55019fb87a9540b40d00e37ddbfd22920bd5c41627c2296b1da13337",
+      "digest": "b22da51af1f9f4050b22349217e2f4301a83901ab56ba365369230798a225107",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
@@ -2669,14 +2789,14 @@
       "dynamicImports": 3
     },
     "scripts/task-execution-order.mjs": {
-      "digest": "7a54574b9a14b37340e6267999fe8b94e965c93c7a4fa84f13964f032f05cfec",
+      "digest": "35b734010b91b2b9445f9301f2ad65746020d73f720d33366370620d6d9648dd",
       "imports": [
+        "scripts/delivery-repairs/task-delivery-queue-progress.mjs",
         "scripts/delivery-repairs/task-dynamic-model.mjs",
         "scripts/task-board-intake.mjs",
         "scripts/task-capacity-release.mjs",
         "scripts/task-coordination-next.mjs",
         "scripts/task-coordination.mjs",
-        "scripts/task-delivery-status-sync.mjs",
         "scripts/task-execution-binding.mjs",
         "scripts/task-execution-scope.mjs",
         "scripts/task-registry.mjs",
@@ -2888,8 +3008,12 @@
       "dynamicImports": 0
     },
     "scripts/task-progress-outbox.mjs": {
-      "digest": "0035c6d848b847baa4e3ae046cbf292714063e082a5e5b65a7713e361f78e4ab",
-      "imports": ["scripts/delivery-repairs/task-creation-progress.mjs", "scripts/task-progress-supersession.mjs"],
+      "digest": "3232038c25c68a0ce8d78aa31a0b4037ec820f9b440cb915666b03ebb9897e6d",
+      "imports": [
+        "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
+        "scripts/delivery-repairs/task-creation-progress.mjs",
+        "scripts/task-progress-supersession.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/task-progress-replay.mjs": {
@@ -2918,7 +3042,7 @@
       "dynamicImports": 0
     },
     "scripts/task-rebinding.mjs": {
-      "digest": "f72d1bdb9be93cc218c764a2c68a66e34d4ffe184480a9cabcab6753c6008d3f",
+      "digest": "f5ec407add9b1ca998e03afe955f4f6758f4ce262604f88403ff11ea1d2ece44",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/task-cancellation-proof.mjs",
@@ -3010,9 +3134,10 @@
       "dynamicImports": 0
     },
     "scripts/task-start.mjs": {
-      "digest": "14efaf2286ff46d29ed471b1d406ae24b0c2e70dde2b1522cd93760f3d5443f9",
+      "digest": "6063bbc8e1cfca4c1a06c519d815906000084e801549ebd367eab29c62d2e1f6",
       "imports": [
         "scripts/batch-timing-store.mjs",
+        "scripts/parallel-task-timing.mjs",
         "scripts/resource-lease.mjs",
         "scripts/task-artifacts.mjs",
         "scripts/task-board-intake.mjs",
@@ -3052,8 +3177,9 @@
       "dynamicImports": 0
     },
     "scripts/task-thread-host-bridge.mjs": {
-      "digest": "251f7905c3be5a8a78215d5721bd375479a2176ee96d3bce19177bd2c0d33fcb",
+      "digest": "e621bcb31040d3dcf38d1ec6b04d6e43eee52cae8c064c02412dc54732d49860",
       "imports": [
+        "scripts/delivery-repairs/task-410-initial-pause-correction.mjs",
         "scripts/delivery-repairs/task-dynamic-host.mjs",
         "scripts/task-board-intake.mjs",
         "scripts/task-codex-host.mjs",
@@ -3092,11 +3218,13 @@
       "dynamicImports": 0
     },
     "scripts/task-timing.mjs": {
-      "digest": "1b2603f8c9502e2c00e591f20b9038c6250ad48dd5e809a2091178452515b30d",
+      "digest": "ac9ceb2c04d1b7ee743fb456fa799a630f7bb67a8ebb54cbada601bcc97931fc",
       "imports": [
         "scripts/batch-timing-runtime.mjs",
         "scripts/batch-timing-store.mjs",
-        "scripts/completion-session.mjs"
+        "scripts/completion-session.mjs",
+        "scripts/parallel-task-timing.mjs",
+        "scripts/task-registry.mjs"
       ],
       "dynamicImports": 0
     },
@@ -3184,7 +3312,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.mjs": {
-      "digest": "2cb68ed446e5768f5f89afdbfc3acc5d5feca23431c9a639eb79348e88c1ebde",
+      "digest": "22c210495f19513a882e2fddcc136ac26f6a0fd2757dc8bc6a8a55bf134cf988",
       "imports": [
         "scripts/backend-test-evidence.mjs",
         "scripts/business-regression.mjs",
@@ -3194,7 +3322,7 @@
       "dynamicImports": 0
     },
     "scripts/verification-evidence.test.mjs": {
-      "digest": "33c0a55dc4c9528e3479a43eaaf7f598bbb99c2607937617ec8804e56fb65353",
+      "digest": "9094ff801fffb4583b51fb16b09b8e3d84fd8b9c0efbb2d9967a9d465c06e4a7",
       "imports": [
         "scripts/run-frontend-tests.mjs",
         "scripts/verification-evidence.mjs",

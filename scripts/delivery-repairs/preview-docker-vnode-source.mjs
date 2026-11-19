@@ -20,7 +20,7 @@ static void json_string(const char *s) {
   putchar('"');
 }
 int main(int argc, char **argv) {
-  if (argc<3) return 2;
+  if (argc<2) return 2;
   int pid=atoi(argv[1]);
   if (pid<=0) return 2;
   struct proc_bsdinfo before, after;
@@ -63,6 +63,8 @@ int main(int argc, char **argv) {
   }
   if(proc_pidinfo(pid,PROC_PIDTBSDINFO,0,&after,sizeof(after))!=(int)sizeof(after)) return 5;
   if(before.pbi_pid!=after.pbi_pid || before.pbi_ppid!=after.pbi_ppid || before.pbi_uid!=after.pbi_uid || before.pbi_start_tvsec!=after.pbi_start_tvsec || before.pbi_start_tvusec!=after.pbi_start_tvusec) return 6;
+  char current[PROC_PIDPATHINFO_MAXSIZE]; memset(current,0,sizeof(current));
+  if(proc_pidpath(pid,current,sizeof(current))<=0 || strcmp(executable,current)!=0) return 7;
   puts("],\"processStable\":true}");
   return 0;
 }
