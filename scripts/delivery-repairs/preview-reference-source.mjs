@@ -127,11 +127,20 @@ export function referenceConsumerSnapshot(root) {
   return { candidate, tree };
 }
 export function parseReferenceProofArguments(args) {
+  const [foreignTask, historyFile, ...flags] = args;
+  const forPrepare = flags[0] === '--for-prepare' || flags.at(-1) === '--for-prepare';
+  const baseline = forPrepare ? flags.filter((_, index) => index !== flags.indexOf('--for-prepare')) : flags;
   assert.ok(
-    args.length === 2 || (args.length === 4 && args[2] === '--published-baseline'),
-    'Expected reference-proof <foreign-task-id> <exact-native-history-file> [--published-baseline <full-published-sha>]',
+    foreignTask &&
+      historyFile &&
+      (!baseline.length || (baseline.length === 2 && baseline[0] === '--published-baseline')),
+    'Expected reference-proof <foreign-task-id> <exact-native-history-file> [--published-baseline <full-published-sha>] [--for-prepare]',
   );
-  assert.ok(typeof args[0] === 'string' && args[0] && typeof args[1] === 'string' && args[1]);
-  if (args.length === 4) assert.match(args[3], /^[a-f0-9]{40}$/);
-  return { foreignTask: args[0], historyFile: args[1], publishedBaseline: args[3] };
+  if (baseline.length) assert.match(baseline[1], /^[a-f0-9]{40}$/);
+  return {
+    foreignTask,
+    historyFile,
+    publishedBaseline: baseline[1],
+    ...(forPrepare ? { effect: 'preparation' } : {}),
+  };
 }

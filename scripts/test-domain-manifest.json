@@ -491,7 +491,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "44d7f3c114366d0e11f5b07de1d39ed79a019615f10079e1bcd3a8e82305cc23",
+      "digest": "8bebbcd8d72ded9ab21eba0f8940ad763aed82dc670d76b28c76040ba7231478",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -542,7 +542,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-fixed-preview.mjs": {
-      "digest": "441646896c199f0cb5f3a6a61ec24bb43af4e9e795aa4dcba3b3f20ff66a54af",
+      "digest": "bc7c6631dc9381b81af46060bd0b7ab3703bbb0842d7cbd5136b07ed07c30a38",
       "imports": ["scripts/dev-task.mjs", "scripts/task-registry.mjs", "scripts/task-runtime-references.mjs"],
       "dynamicImports": 0
     },
@@ -552,7 +552,7 @@
       "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
-      "digest": "71570dff06954fd7696b4b64bf442bd313f9307298d390779e6f98133773fa13",
+      "digest": "18dc4bf7053ec82f1dde588b473b2288cac258d840de4d335ca5f7a48e7b9625",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source.mjs",
@@ -567,6 +567,7 @@
         "scripts/task-composition.mjs",
         "scripts/task-delivery-queue.mjs",
         "scripts/task-registry.mjs",
+        "scripts/task-runtime-references.mjs",
         "scripts/verify.mjs"
       ],
       "dynamicImports": 1
@@ -585,7 +586,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "7336f9b94e09b3bbfa404df53c3d5fd544f9af0aaf2d6bf01a60413e1524b3ba",
+      "digest": "c8d848b1c1319417f9a10753ac72e2cb3aec49ead169a0f759ac838340c6aefa",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -607,6 +608,7 @@
         "scripts/task-execution-order.mjs",
         "scripts/task-preview-service.mjs",
         "scripts/task-registry.mjs",
+        "scripts/task-runtime-references.mjs",
         "scripts/verification-evidence.mjs"
       ],
       "dynamicImports": 0
@@ -617,7 +619,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-preview.mjs": {
-      "digest": "302720bef0c9895e54ba1c513f1a155a1825c8c5a51bef7ae8a15451a51d6619",
+      "digest": "8e3647157fc2f2800c40acc42854f45559cb761c662ba690c1858826e0eeab0e",
       "imports": [
         "scripts/completion-fixed-preview.mjs",
         "scripts/dev-task.mjs",
@@ -878,7 +880,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof.mjs": {
-      "digest": "8aac8e86d00bcfc53aa85553b2c2f2b16580b9e2c96f36795600181143b07b8d",
+      "digest": "4c093f9e9926cf060af94697b3e5a194b6cb60b3bcb6e74e56ffe8082f7f5556",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/delivery-repairs/preview-docker-directories.mjs",
@@ -910,7 +912,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-source.mjs": {
-      "digest": "d48c8c57d3baf2d5d8517e9e6e5e7c43b7f8f20e118240f89cfa600aaad8e4fb",
+      "digest": "698db27a5c7da3af42a41ccc95b3b2316b5ecec878022cce30ab1b7c304a9234",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/delivery-repairs/preview-docker-directories.mjs",
@@ -925,7 +927,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-source.test.mjs": {
-      "digest": "0be9889b1a8030643368deb7ba462b7711af46017f24117b0b0f01062556f89b",
+      "digest": "df20e98874eda97a89b90ce88148cfeab5c45a1493ce29d880e61fb43360ac2e",
       "imports": [
         "scripts/delivery-repairs/preview-reference-history.mjs",
         "scripts/delivery-repairs/preview-reference-source.mjs"
@@ -1798,7 +1800,7 @@
       "dynamicImports": 0
     },
     "scripts/preview-consumers.mjs": {
-      "digest": "fdbdecd27e6e04854e2aa0b9417e8c39890e938193ef53380e8c70d55424ff96",
+      "digest": "4a2de71cdbb21f1817422db5e087bed71cd6a760fb9f0a32cd0411ddb8431689",
       "imports": ["scripts/delivery-repairs/preview-reference-proof.mjs", "scripts/resource-lease.mjs"],
       "dynamicImports": 1
     },
@@ -2444,7 +2446,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "1a3fc9dfe0d94f11e9f2f5174f82400a2f74e888709bbc738e01d1844185f0a8",
+      "digest": "a284106f31e459014daaefd5bc0525a72fea112cbaef7d08b5ba564d10bc3e14",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",
@@ -3003,7 +3005,7 @@
       "dynamicImports": 0
     },
     "scripts/task-runtime-references.mjs": {
-      "digest": "f7035d7a2097d61af97491b7c94acffe309eaac71f6baa509701d7a29f9ef01b",
+      "digest": "9264bd406502582405d9d80990c25a0878c81c6899fef048dd85d59e9b031a86",
       "imports": ["scripts/dev-task.mjs", "scripts/preview-consumers.mjs", "scripts/task-registry.mjs"],
       "dynamicImports": 0
     },

@@ -64,7 +64,13 @@ function observation(port, response) {
 // the owner of the exact already-stopped temporary child can acknowledge its
 // closed port while retaining the lease until cleanup completes.
 export async function inspectPreviewConsumers(
-  { worktree, taskId, ports = [5175, 5176, ...Array.from({ length: 23 }, (_, i) => 5177 + i)], closingLeases = [] },
+  {
+    worktree,
+    taskId,
+    ports = [5175, 5176, ...Array.from({ length: 23 }, (_, i) => 5177 + i)],
+    closingLeases = [],
+    referenceEffect,
+  },
   { request = readPreviewResponse, readLeases } = {},
 ) {
   assert.equal(typeof readLeases, 'function', 'Explicit repository lease reader required');
@@ -92,7 +98,7 @@ export async function inspectPreviewConsumers(
       let stoppedReference = null;
       if (!ownStopped && item.closed && process.env.ZDM_CLOSED_PREVIEW_REFERENCE) {
         const { verifyClosedPreviewReference } = await import('./delivery-repairs/preview-reference-proof.mjs');
-        stoppedReference = await verifyClosedPreviewReference({ worktree, taskId, lease });
+        stoppedReference = await verifyClosedPreviewReference({ worktree, taskId, lease, effect: referenceEffect });
       }
       assert.ok(
         ownStopped || stoppedReference,
