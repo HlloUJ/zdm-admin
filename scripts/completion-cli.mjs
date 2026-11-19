@@ -99,6 +99,11 @@ async function completionCommandLocked(
   },
 ) {
   const preparationOnly = args[0] === 'prepare';
+  let engineeringReviewFile;
+  if (preparationOnly && args.length === 5 && args[3] === '--engineering-review') {
+    engineeringReviewFile = args[4];
+    args = args.slice(0, 3);
+  }
   if (preparationOnly) args = ['deliver', ...args.slice(1)];
   assert.equal(typeof deferSettle, 'boolean');
   assert.ok(!deferSettle || args[0] === 'deliver', 'deferSettle only applies to deliver');
@@ -295,6 +300,7 @@ async function completionCommandLocked(
     assert.equal(rest[1], batch.recordedHead, 'Exact frozen task head required');
     return runCompletionFlow(root, batch, rest[1], {
       preparationOnly,
+      engineeringReviewFile,
       assertCurrentAdmission,
       execute,
       state,

@@ -12,7 +12,13 @@ import { applyTaskComposition } from './task-composition.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
 import { withCandidateRuntime } from './task-candidate-runtime.mjs';
-import { preCiManifestCommit, preCiManifestTree } from './delivery-repairs/pre-ci-manifest-composition.mjs';
+import {
+  persistPreCiReview,
+  preCiCompositionCommit,
+  preCiCompositionTree,
+  readPreCiReview,
+  storedPreCiReview,
+} from './delivery-repairs/pre-ci-composition.mjs';
 
 // This command is invoked only after the human authorizes this exact batch's formal delivery.
 // Every phase awaits its predecessor directly; no extra sleep, watcher, test run or approval loop.
@@ -32,6 +38,7 @@ export async function runCompletionFlow(
     candidateRuntime = withCandidateRuntime,
     deferSettle = false,
     preparationOnly = false,
+    engineeringReviewFile,
     assertCurrentAdmission,
     readState = () => state,
   },
@@ -96,8 +103,8 @@ export async function runCompletionFlow(
       taskRegistryVersion: 2,
     };
   };
-  function verifyManifestCandidate(proof, accepted) {
-    const candidate = preCiManifestCommit(batch.worktree, proof);
+  function verifyCompositionCandidate(proof, accepted, review) {
+    const candidate = review?.candidate ?? preCiCompositionCommit(batch.worktree, proof);
     const checked = verifyRemoteAcceptance(batch.worktree, {
       candidate,
       accepted: accepted.commit,
@@ -107,7 +114,7 @@ export async function runCompletionFlow(
     assert.equal(checked.candidateMergeTree, proof.candidateTree, 'Manifest resolution changed the actual merge tree');
     return candidate;
   }
-  function installManifestCandidate(proof, candidate) {
+  function installCompositionCandidate(proof, candidate) {
     assertCurrentAdmission?.();
     assert.equal(batch.recordedHead, proof.taskHead, 'Original checkpointed candidate required');
     assert.equal(git(batch.worktree, 'rev-parse', 'HEAD'), proof.taskHead);
@@ -120,12 +127,34 @@ export async function runCompletionFlow(
   if (parallel) {
     const accepted = readAcceptance(root, batch.id);
     const proof = readAcceptedComposition(root, batch.id, accepted.commit);
-    if (proof && !proof.candidateCommit && git(batch.worktree, 'rev-parse', 'HEAD') === proof.taskHead) {
-      assertCurrentAdmission?.();
-      const tree = preCiManifestTree(batch.worktree, { ...proof, protectedPaths: accepted.protectedPaths });
-      if (tree) {
-        assert.equal(tree, proof.candidateTree, 'Recovered manifest differs from the original composition proof');
-        installManifestCandidate(proof, verifyManifestCandidate(proof, accepted));
+    if (proof && !proof.candidateCommit) {
+      const current = git(batch.worktree, 'rev-parse', 'HEAD');
+      const review = storedPreCiReview(batch.worktree, proof);
+      if (current === proof.taskHead) {
+        assertCurrentAdmission?.();
+        const tree = preCiCompositionTree(
+          batch.worktree,
+          { ...proof, protectedPaths: accepted.protectedPaths },
+          review,
+        );
+        if (tree) {
+          assert.equal(tree, proof.candidateTree, 'Recovered candidate differs from the original composition proof');
+          installCompositionCandidate(proof, verifyCompositionCandidate(proof, accepted, review));
+          engineeringReviewFile = undefined; // Recovery consumes the durable original review.
+        }
+      } else if (
+        review &&
+        git(batch.worktree, 'rev-parse', 'HEAD^{tree}') === proof.candidateTree &&
+        batch.recordedHead === proof.taskHead
+      ) {
+        assert.equal(current, review.candidate, 'Recovery must register the exact reviewed commit');
+      }
+      if (review && engineeringReviewFile && git(batch.worktree, 'rev-parse', 'HEAD') === review.candidate) {
+        const supplied = readPreCiReview(batch.worktree, engineeringReviewFile);
+        if (supplied.candidate === review.candidate) {
+          assert.deepEqual(supplied, review, 'Registered engineering review changed');
+          engineeringReviewFile = undefined;
+        }
       }
     }
     applyTaskComposition(root, batch.id, undefined, { recover: true });
@@ -187,20 +216,28 @@ export async function runCompletionFlow(
     assertCurrentAdmission?.();
     const main = git(root, 'rev-parse', 'origin/main');
     const accepted = readAcceptance(root, batch.id);
-    const candidateTree = preCiManifestTree(batch.worktree, {
-      taskHead: head,
-      main,
-      protectedPaths: accepted.protectedPaths,
-    });
+    const review = engineeringReviewFile ? readPreCiReview(batch.worktree, engineeringReviewFile) : undefined;
+    const candidateTree = preCiCompositionTree(
+      batch.worktree,
+      {
+        accepted: accepted.commit,
+        taskHead: head,
+        main,
+        protectedPaths: accepted.protectedPaths,
+        rejectUnreviewed: true,
+      },
+      review,
+    );
     if (candidateTree) {
       assert.equal(batch.recordedHead, head, 'Original checkpointed candidate required');
       await phase('prepare', head + ':pre-ci-composition:' + main, async () => {
         const inputs = { batch: batch.id, accepted: accepted.commit, main, taskHead: head, candidateTree };
-        const candidate = verifyManifestCandidate(inputs, accepted);
+        const candidate = verifyCompositionCandidate(inputs, accepted, review);
         await previewControl.prepareComposition(worktreePlan(main));
         assertCurrentAdmission?.();
+        if (review) persistPreCiReview(batch.worktree, inputs, review);
         const proof = writeAcceptedComposition(batch.worktree, inputs);
-        installManifestCandidate(proof, candidate);
+        installCompositionCandidate(proof, candidate);
         const composed = applyTaskComposition(root, batch.id, undefined, { recover: true });
         assert.equal(composed.recordedHead, candidate, 'Composition must register its exact candidate');
         return { head: candidate, main, originalHead: head, accepted: accepted.commit, candidateTree };

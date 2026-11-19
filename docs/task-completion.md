@@ -10,7 +10,9 @@
 
 合并卡的并行候选准备使用 `task:entry -- --worktree <准确目录> complete prepare <task-id> <40位SHA>`，仅在真实委托的 preparation scope 中执行。它完成原冻结、发布及首次完整 PR CI 后返回，不进入最终 main 队列，不合并、交接或结项；普通 deliver/final-handoff/settle 仍须唯一 final scope。准备证明和 scope 交接见[持续委托与动态任务调度](engineering/dynamic-task-dispatch.md)。
 
-并行准备时，若原候选尚无成功的 Quality CI，且与准确 `origin/main` 唯一冲突是 `scripts/test-domain-manifest.json`，发布入口会先核对双亲各自的工程登记，再用受信规划器从组合后的 Git 对象重算清单。入口核验原冻结和两侧的保护内容，保全组合证明后登记准确双亲的合并提交。中断时从同一证明恢复，再按同一分支正常快进更新原 PR 并等待准确候选 CI。涉及其他冲突、清单受冻结保护或任一侧的工程登记不符时，仍由原保护阻断。
+并行准备会在原候选首次成功 Quality CI 前核对其与准确 `origin/main` 的组合。若唯一冲突是 `scripts/test-domain-manifest.json`，入口先核对双亲各自的工程登记，再用受信规划器从 Git 对象重算清单。入口核验原冻结、保护内容及组合树，保全证明后登记有准确双亲的合并提交。中断时恢复同一证明，准备继续按同一分支正常快进更新原 PR 并等待准确候选 CI。
+
+出现其他已知技术文件冲突时，原任务执行者可审阅准确双亲的组合提交，并为同一 `complete prepare` 追加 `--engineering-review <任务工作区 .task-verification 内的绝对路径>`。JSON 使用 `version: 1`、`accepted`、`taskHead`、`main`、`candidate` 和 `files`。每个实际冲突文件记录 `file`、`inputs: { base, task, main }`、`result`、`reason`，其中各版本记录 Git `mode` 和完整 blob `object`。原执行者在理由中说明保留两侧有效行为与测试的依据。入口从真实 Git 三方对象验证输入、候选双亲、输出和实际冲突清单，独立重算工程清单并核对完整候选树。业务、控制面、未知项、删除、模式变化、未经审阅的冲突或候选自行带入的其他变化继续拒绝。有效审阅随原组合证明留存供中断恢复，远端原有来源与 CI 门禁继续执行。
 
 独立任务获得准确“任务完成”授权后，首选 `npm run task:completion -- deliver <batch-id> <准确任务40位SHA>`。该入口绑定准确 task/owner/Worktree 并冻结实际源码；核对保护、备份与健康，推送并完成初始 PR CI，再进入 FIFO 正式交付队列。队列内刷新 main、按原始冻结与受信主线组合，在该准确组合候选自己的源码中执行本地就绪检查，必要运行验证使用当前任务独占的临时端口，不抢占正在展示其他任务的5175；变化候选重新推送和验证后才准确合并，随后完成本地 main 同步、main CI、最终交接和 settle；每个阶段直接await前一阶段，不靠人工休眠轮询再接命令。只有刚创建事件尚未出现时有限等待查询，绝不dispatch或重跑CI；多个候选、失败、重跑、主线变化或保护不符均停止。源码修改不授权调用deliver；PR创建输出URL后仍须由调用方附加到当前对话。
 

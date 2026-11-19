@@ -491,7 +491,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "9305e5130d4a5cd789fbef4bde62e3e4bfb5b81683aa3afb3f1f371efe6fc492",
+      "digest": "44d7f3c114366d0e11f5b07de1d39ed79a019615f10079e1bcd3a8e82305cc23",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -552,13 +552,13 @@
       "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
-      "digest": "0637f63d26530a6a01db3b7b345def6557172650a10611f89a4411c3313de46e",
+      "digest": "71570dff06954fd7696b4b64bf442bd313f9307298d390779e6f98133773fa13",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-session.mjs",
-        "scripts/delivery-repairs/pre-ci-manifest-composition.mjs",
+        "scripts/delivery-repairs/pre-ci-composition.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/resource-lease.mjs",
@@ -585,7 +585,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "e7fb7bbe38c0ab5aecfde1369e20da5f11d84a84fe221dfd0adab3b5e96f2e5a",
+      "digest": "7336f9b94e09b3bbfa404df53c3d5fd544f9af0aaf2d6bf01a60413e1524b3ba",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -595,7 +595,7 @@
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
         "scripts/completion-session.mjs",
-        "scripts/delivery-repairs/pre-ci-manifest-composition.mjs",
+        "scripts/delivery-repairs/pre-ci-composition.mjs",
         "scripts/dev-task.mjs",
         "scripts/new-helper.mjs",
         "scripts/published.mjs",
@@ -848,8 +848,8 @@
       ],
       "dynamicImports": 0
     },
-    "scripts/delivery-repairs/pre-ci-manifest-composition.mjs": {
-      "digest": "5ece86df06aaca0159ce92b7f1a33d37f3099dd99ff461c8f21fd19fba9df403",
+    "scripts/delivery-repairs/pre-ci-composition.mjs": {
+      "digest": "5e3eeac2d5d6156689386e39b4238b9ffed8b717037ba8cbc9746a0c6fb6fe89",
       "imports": ["scripts/accepted-source-policy.mjs", "scripts/script-test-plan.mjs"],
       "dynamicImports": 0
     },
