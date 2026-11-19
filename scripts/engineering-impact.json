@@ -2325,7 +2325,7 @@
     "scripts/verification-runner.mjs": "ba33bb78da9b7ba176f2444cbae811cc998061ca929297661c0e87119994144f",
     "scripts/verification-scope.test.mjs": "ba48064c072e1217e39896476dadc88267cb4bb4c577ceefc10f67c145599956",
     "scripts/verify.mjs": "29cdc4e417bb14ca0fe77fd40c8d315910d858293b9fdaea9e9bea51e61ff7d2",
-    "scripts/vite-watch.test.mjs": "47686cdc91b7c81af6c665e8c8bee45e0a9d09e484cb7ee783c81070c862bffc",
+    "scripts/vite-watch.test.mjs": "342085d45738a25f6a6455e714e769318518b9bcdfd02d582c900067e7a9a470",
     "scripts/vitest-evidence-reporter.mjs": "1bfd049f64888dd3224b23de9a870caff9234728bde7723941f8b753f495741f"
   }
 }

@@ -1231,7 +1231,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "12669bc8a24a36a0f74f7f5454bc5660bd0a74249810039b82402848f82a9de1",
+      "digest": "c013c9dd01e7b6102c9f816e2bf27822eda202a5d1dab7f7a88da6d26f52815b",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -3451,7 +3451,7 @@
       "dynamicImports": 0
     },
     "scripts/vite-watch.test.mjs": {
-      "digest": "47686cdc91b7c81af6c665e8c8bee45e0a9d09e484cb7ee783c81070c862bffc",
+      "digest": "342085d45738a25f6a6455e714e769318518b9bcdfd02d582c900067e7a9a470",
       "imports": ["vite.config.js"],
       "dynamicImports": 0
     },
