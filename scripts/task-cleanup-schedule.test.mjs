@@ -40,3 +40,19 @@ test('launchd plan directly invokes one script twice daily and never creates a c
     /timezone/,
   );
 });
+
+test('an explicit loopback SOCKS proxy only changes the scheduled process SSH environment', () => {
+  const options = {
+    root: '/fixture',
+    node: '/opt/node',
+    commonDir: '/fixture/common',
+    runtimeDirectory: '/fixture/common/task-cleanup/runtime/' + 'a'.repeat(40),
+    hostTimezone: 'Asia/Shanghai',
+  };
+  assert.doesNotMatch(cleanupLaunchAgentPlan(options).plist, /GIT_SSH_COMMAND/);
+  const proxied = cleanupLaunchAgentPlan({ ...options, gitSocksPort: 1082 });
+  assert.match(proxied.plist, /<key>GIT_SSH_COMMAND<\/key>/);
+  assert.match(proxied.plist, /StrictHostKeyChecking=yes/);
+  assert.match(proxied.plist, /&apos;\/usr\/bin\/nc -X 5 -x 127\.0\.0\.1:1082 %h %p&apos;/);
+  assert.throws(() => cleanupLaunchAgentPlan({ ...options, gitSocksPort: '1082;cmd' }), /local SOCKS port/);
+});
