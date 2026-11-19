@@ -12,6 +12,7 @@ import { applyTaskComposition } from './task-composition.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
 import { withCandidateRuntime } from './task-candidate-runtime.mjs';
+import { taskRuntimeReferences } from './task-runtime-references.mjs';
 import {
   persistPreCiReview,
   preCiCompositionCommit,
@@ -35,6 +36,7 @@ export async function runCompletionFlow(
     common,
     inventoryAssets,
     previewControl,
+    runtimeReferences = taskRuntimeReferences,
     candidateRuntime = withCandidateRuntime,
     deferSettle = false,
     preparationOnly = false,
@@ -103,6 +105,12 @@ export async function runCompletionFlow(
       taskRegistryVersion: 2,
     };
   };
+  async function assertSelectedReferenceCurrent() {
+    if (!process.env.ZDM_CLOSED_PREVIEW_REFERENCE) return;
+    const { assertReferenceProofCurrent } = await import('./delivery-repairs/preview-reference-proof.mjs');
+    assertReferenceProofCurrent(batch.worktree, preparationOnly ? 'preparation' : 'final');
+  }
+  const preparationReferences = { referenceEffect: 'preparation' };
   function verifyCompositionCandidate(proof, accepted, review) {
     const candidate = review?.candidate ?? preCiCompositionCommit(batch.worktree, proof);
     const checked = verifyRemoteAcceptance(batch.worktree, {
@@ -122,11 +130,17 @@ export async function runCompletionFlow(
     assertAcceptedSource(batch.worktree, batch.id, candidate);
     git(batch.worktree, 'merge', '--ff-only', candidate);
   }
-  // Complete an interrupted, already-proved merge before normal source checks.
-  // Runtime quiescence happened before that proof was written.
+  // A persisted composition proves source, so recheck live references before
+  // resuming its installation or publishing the newly registered candidate.
+  if (preparationOnly) await assertSelectedReferenceCurrent();
   if (parallel) {
     const accepted = readAcceptance(root, batch.id);
     const proof = readAcceptedComposition(root, batch.id, accepted.commit);
+    if (preparationOnly && proof) {
+      assertCurrentAdmission?.();
+      await runtimeReferences(tasks.readTask(batch.id), preparationReferences);
+      await assertSelectedReferenceCurrent();
+    }
     if (proof && !proof.candidateCommit) {
       const current = git(batch.worktree, 'rev-parse', 'HEAD');
       const review = storedPreCiReview(batch.worktree, proof);
@@ -160,6 +174,7 @@ export async function runCompletionFlow(
     applyTaskComposition(root, batch.id, undefined, { recover: true });
     batch = readActiveBatch(root);
     head = batch.recordedHead;
+    if (preparationOnly) await assertSelectedReferenceCurrent();
   }
   let repository;
   if (preparationOnly) {
@@ -233,7 +248,8 @@ export async function runCompletionFlow(
       await phase('prepare', head + ':pre-ci-composition:' + main, async () => {
         const inputs = { batch: batch.id, accepted: accepted.commit, main, taskHead: head, candidateTree };
         const candidate = verifyCompositionCandidate(inputs, accepted, review);
-        await previewControl.prepareComposition(worktreePlan(main));
+        await previewControl.prepareComposition(worktreePlan(main), preparationReferences);
+        await assertSelectedReferenceCurrent();
         assertCurrentAdmission?.();
         if (review) persistPreCiReview(batch.worktree, inputs, review);
         const proof = writeAcceptedComposition(batch.worktree, inputs);
@@ -244,6 +260,7 @@ export async function runCompletionFlow(
       });
       batch = readActiveBatch(root);
       head = batch.recordedHead;
+      await assertSelectedReferenceCurrent();
     }
   }
   async function publishCandidate({ readiness = false } = {}) {
@@ -516,10 +533,7 @@ export async function runCompletionFlow(
       batch = readActiveBatch(root);
       const changed = composed.recordedHead !== head;
       head = composed.recordedHead;
-      if (process.env.ZDM_CLOSED_PREVIEW_REFERENCE) {
-        const { assertReferenceProofCurrent } = await import('./delivery-repairs/preview-reference-proof.mjs');
-        assertReferenceProofCurrent(root);
-      }
+      await assertSelectedReferenceCurrent();
       // Development proof and the initial exact PR CI precede this turn. Run
       // final local readiness from the composed candidate's own immutable tools.
       pull = await publishCandidate({ readiness: true });

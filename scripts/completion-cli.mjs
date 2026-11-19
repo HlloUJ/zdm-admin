@@ -310,6 +310,7 @@ async function completionCommandLocked(
       common,
       inventoryAssets,
       previewControl,
+      runtimeReferences,
       deferSettle,
       readState: () => openCompletion(directory, batch.id, { formal: false }),
       dispatch: (cwd, args) =>
@@ -822,16 +823,34 @@ export async function completionCommand(root, args, options = {}) {
     const { collectPreviewReferenceProof } = await import('./delivery-repairs/preview-reference-proof.mjs');
     return collectPreviewReferenceProof(root, selected.foreignTask, selected.historyFile, {
       publishedBaseline: selected.publishedBaseline,
+      effect: selected.effect,
     });
   }
   const proofFlag = args.indexOf('--reference-proof');
   if (proofFlag >= 0) {
-    assert.ok(['deliver', 'settle'].includes(args[0]), 'Reference selection only belongs to formal deliver/settle');
-    assert.equal(proofFlag, args[0] === 'deliver' ? 3 : 4);
-    assert.equal(args.length, proofFlag + 2, 'Unexpected reference-proof arguments');
+    const [command, task] = args;
+    assert.ok(
+      ['prepare', 'deliver', 'settle'].includes(command),
+      'Reference selection requires prepare, deliver or settle',
+    );
+    const effect = command === 'prepare' ? 'preparation' : 'final';
+    const baseLength = command === 'settle' ? 4 : 3;
+    const base = args.slice(0, baseLength);
+    const flags = args.slice(baseLength);
+    const reviewIndex = flags.indexOf('--engineering-review');
+    assert.ok(
+      flags.length === 2 || (command === 'prepare' && flags.length === 4 && [0, 2].includes(reviewIndex)),
+      'Unexpected reference-proof arguments',
+    );
+    assert.ok([0, 2].includes(proofFlag - baseLength) && args[proofFlag + 1], 'Unexpected reference-proof arguments');
+    if (flags.length === 4) {
+      assert.equal(reviewIndex + proofFlag - baseLength, 2, 'Exact engineering review and reference proof required');
+      assert.ok(flags[reviewIndex + 1], 'Engineering review file required');
+      base.push('--engineering-review', flags[reviewIndex + 1]);
+    }
     const { withPreviewReferenceProof } = await import('./delivery-repairs/preview-reference-proof.mjs');
-    return withPreviewReferenceProof(root, args[proofFlag + 1], () =>
-      completionCommand(root, args.slice(0, proofFlag), options),
+    return withPreviewReferenceProof(root, args[proofFlag + 1], { task, effect }, () =>
+      completionCommand(root, base, options),
     );
   }
   const registry = createTaskRegistry(root);
