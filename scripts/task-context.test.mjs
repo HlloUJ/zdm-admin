@@ -5,7 +5,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSy
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
-import { selectedTaskBatch, withTaskContext } from './task-context.mjs';
+import { closeTaskBatch, selectedTaskBatch, withTaskContext } from './task-context.mjs';
 import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 import { completionCommand } from './completion-cli.mjs';
 import { readAcceptance, assertAcceptedSource } from './accepted-source.mjs';
@@ -226,4 +226,31 @@ test('planning still requires clean source, the exact recorded head and assigned
   });
   assert.throws(() => planBatchDelivery(f.a), /Unassigned task commit/);
   assert.equal(readFileSync(path.join(f.b, 'src/feature.js'), 'utf8'), 'unfinished B');
+});
+
+test('scheduled cleanup handoff closes the exact released task while retaining its Git carrier', (t) => {
+  const f = fixture(t);
+  f.git(f.main, 'merge', '--ff-only', 'codex/a');
+  f.git(f.main, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+  const task = f.registry.readTask('a');
+  f.registry.revise('a', task.revision, (record) => {
+    record.stage = 'handoff-verified';
+  });
+  const batch = selectedTaskBatch(f.a);
+  assert.throws(() => closeTaskBatch(f.main, batch), /carrier remains/);
+  const deferredCleanup = {
+    state: 'deferred-to-scheduled-cleanup',
+    task: 'a',
+    worktree: f.a,
+    branch: task.branch,
+    head: task.recordedHead,
+    main: f.git(f.main, 'rev-parse', 'HEAD'),
+  };
+  assert.throws(() => closeTaskBatch(f.main, batch, { deferredCleanup: { ...deferredCleanup, task: 'b' } }));
+  const closed = closeTaskBatch(f.main, batch, { deferredCleanup });
+  assert.equal(closed.stage, 'closed');
+  assert.equal(f.registry.readTask('a').stage, 'closed');
+  assert.ok(existsSync(f.a));
+  assert.ok(existsSync(f.b));
+  assert.equal(f.git(f.main, 'rev-parse', 'codex/a'), task.recordedHead);
 });

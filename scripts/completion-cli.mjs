@@ -2,7 +2,7 @@ import { assertTaskExecutor } from './task-execution-binding.mjs';
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
 import { handoffAuditedDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
 import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
-import { assertCleanupUnreferenced } from './task-cleanup-cli.mjs';
+import { assertCleanupUnreferenced, loadCleanupPolicy } from './task-cleanup-cli.mjs';
 import { captureCiProgress } from './task-delivery-status-sync.mjs';
 import { drainProgressHost } from './task-progress-host.mjs';
 import {
@@ -63,7 +63,7 @@ import {
 import { retainedPublishedPreview } from './start-micro-task.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
-import { selectedTaskBatch, withTaskContext } from './task-context.mjs';
+import { closeTaskBatch, selectedTaskBatch, withTaskContext } from './task-context.mjs';
 import { verifyRetainedDependencies } from './task-dependency-retention.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
 
@@ -488,6 +488,17 @@ async function completionCommandLocked(
     preview = entries.find((e) => e.branch === 'codex/preview-current')?.path;
   assert.ok(anchor && integration && preview, 'Required retained worktrees missing');
   const key = expectedMain + ':' + runId;
+  const cleanupPolicy = path.join(common, 'task-cleanup/policy.json');
+  const deferCleanup =
+    batch.taskRegistryVersion === 2 && existsSync(cleanupPolicy) && loadCleanupPolicy(common).ownershipV2 === true;
+  const cleanupDisposition = {
+    state: 'deferred-to-scheduled-cleanup',
+    task: batch.id,
+    worktree: batch.worktree,
+    branch: batch.branch,
+    head: batch.recordedHead,
+    main: expectedMain,
+  };
   for (const repair of state.repairs.filter((r) => !r.finishedAt && r.isCiFailure !== false))
     finishRepair(state, repair.id);
   save(state);
@@ -584,6 +595,7 @@ async function completionCommandLocked(
               main: expectedMain,
             });
           if (!existsSync(batch.worktree)) return preserved.result;
+          if (deferCleanup) return { state: 'evidence-retained-for-scheduled-cleanup' };
           const cleanupHandoff =
             batch.taskRegistryVersion === 2
               ? await handoffBuiltDist({
@@ -751,6 +763,7 @@ async function completionCommandLocked(
           requireBatchTimingForCleanup(common, batch.id);
           if (existsSync(batch.worktree)) assert.equal(execute(batch.worktree, 'git', ['status', '--porcelain']), '');
           process.chdir(anchor);
+          if (deferCleanup) return cleanupDisposition;
           if (existsSync(batch.worktree)) execute(anchor, 'git', ['worktree', 'remove', batch.worktree]);
           if (git('for-each-ref', '--format=%(objectname)', 'refs/heads/' + batch.branch))
             execute(anchor, 'git', ['branch', '-d', batch.branch]);
@@ -765,7 +778,9 @@ async function completionCommandLocked(
       },
       close: {
         run: () => {
-          const result = closeBatch(anchor);
+          const result = deferCleanup
+            ? closeTaskBatch(anchor, batch, { deferredCleanup: cleanupDisposition })
+            : closeBatch(anchor);
           return { batch: result.id, main: result.main };
         },
       },

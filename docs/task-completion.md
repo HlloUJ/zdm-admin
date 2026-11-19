@@ -12,6 +12,8 @@
 
 独立任务获得准确“任务完成”授权后，首选 `npm run task:completion -- deliver <batch-id> <准确任务40位SHA>`。该入口绑定准确 task/owner/Worktree 并冻结实际源码；核对保护、备份与健康，推送并完成初始 PR CI，再进入 FIFO 正式交付队列。队列内刷新 main、按原始冻结与受信主线组合，在该准确组合候选自己的源码中执行本地就绪检查，必要运行验证使用当前任务独占的临时端口，不抢占正在展示其他任务的5175；变化候选重新推送和验证后才准确合并，随后完成本地 main 同步、main CI、最终交接和 settle；每个阶段直接await前一阶段，不靠人工休眠轮询再接命令。只有刚创建事件尚未出现时有限等待查询，绝不dispatch或重跑CI；多个候选、失败、重跑、主线变化或保护不符均停止。源码修改不授权调用deliver；PR创建输出URL后仍须由调用方附加到当前对话。
 
+启用 [已交付任务定时清理](engineering/delivered-task-cleanup.md) 的 V2 策略后，独立任务仍核对准确 CI、运行交接、计时和关闭回执；工作区及任务分支由正式定时器按任务归属清理，关闭时记录待清理。
+
 有真实外部周期验收的工程任务，可由可信宿主显式传 `completionOptions.deferSettle: true`；私有 `task-completion-progress-cli.mjs` 输入对应顶层布尔 `deferSettle: true`。默认是 false，普通交付仍完整 settle。该选项只有准确 main CI 与 `main:final` 运行交接的成功原记录齐全后才返回 `status=deferred`、`formalDeliveryComplete=false`、原因“外部周期验收待完成”；不执行保全/清理/关闭，也不生成 `delivery_complete`。原 main FIFO 票据以 waiting 加 deferred 明细保留 id、owner、冻结身份及顺序，正常释放本次 main 临界租约；集成交接自身在返回前释放其临界租约。任务归属与执行层交付票据仍保留，不用伪造失败或提前 done 来结束当前命令。
 
 可信宿主拿到真实周期、通知送达等所需外部证明后，只使用默认 `deferSettle=false` 调用既有 `settle <batch-id> <原main-sha> <原run-id>`。该入口按原 deferred 票据重新取得临界位，核对原候选/main/run 身份并完成现有收尾；不重新等待 CI 或调用 final-handoff。输入变化、健康或来源证明失效仍由原保护拒绝，不能凭 deferred 跳过。普通阶段回执只显示下一步等待，不作为任务完成事实；正常进程返回也不等于正式交付成功。外部证明由准确任务的可信宿主在 settle 前核验，这个本地布尔接口本身不构成不可绕过的验收保护。

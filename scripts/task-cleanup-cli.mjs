@@ -5,6 +5,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createTaskRegistry } from './task-registry.mjs';
 import { deliveryStatus } from './completion-status.mjs';
+import { runOwnershipCleanup } from './task-cleanup-ownership.mjs';
+import { cleanupTestResources } from './task-cleanup-test-resources.mjs';
 import { createCleanupQueue, cleanupObjectId, safePath } from './task-cleanup-queue.mjs';
 import {
   cleanupNotice,
@@ -22,10 +24,20 @@ export function loadCleanupPolicy(commonDir) {
   const policy = JSON.parse(readFileSync(file, 'utf8'));
   assert.ok(
     Object.keys(policy).every((key) =>
-      ['budgetMs', 'limit', 'maxLogicalBytes', 'version', 'scheduler', 'metadata', 'notification'].includes(key),
+      [
+        'budgetMs',
+        'limit',
+        'maxLogicalBytes',
+        'version',
+        'scheduler',
+        'metadata',
+        'notification',
+        'ownershipV2',
+      ].includes(key),
     ),
   );
   assert.equal(policy.version, 1);
+  assert.ok(policy.ownershipV2 === undefined || typeof policy.ownershipV2 === 'boolean');
   assert.ok(Number.isSafeInteger(policy.limit) && policy.limit > 0 && policy.limit <= 100);
   assert.ok(Number.isSafeInteger(policy.budgetMs) && policy.budgetMs > 0 && policy.budgetMs <= 300000);
   assert.ok(Number.isSafeInteger(policy.maxLogicalBytes) && policy.maxLogicalBytes > 0);
@@ -58,6 +70,7 @@ export function loadCleanupPolicy(commonDir) {
   }
   return {
     limit: policy.limit,
+    ...(policy.ownershipV2 ? { ownershipV2: true } : {}),
     budgetMs: policy.budgetMs,
     maxLogicalBytes: policy.maxLogicalBytes,
     ...(policy.scheduler ? { scheduler: policy.scheduler } : {}),
@@ -187,6 +200,19 @@ export async function cleanupCommand(
     // A pre-close manifest may be accepted; the consumer independently waits for complete closure.
     await verify(record);
     return queue.handoff(record);
+  }
+  if (args[0] === 'ownership-plan' || args[0] === 'run-ownership') {
+    assert.equal(args.length, 1);
+    const policy = loadCleanupPolicy(registry.commonDir);
+    const apply = args[0] === 'run-ownership';
+    if (apply) assert.equal(policy.ownershipV2, true, 'V2 scheduled cleanup must be explicitly enabled');
+    return runOwnershipCleanup(root, {
+      registry,
+      policy,
+      unreferenced,
+      verifyRuntimeResources: cleanupTestResources,
+      apply,
+    });
   }
   assert.ok(
     args.length === 1 && ['plan', 'run'].includes(args[0]),
