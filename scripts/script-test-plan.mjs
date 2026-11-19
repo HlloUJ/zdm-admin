@@ -4,7 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 export const SOURCE_GUARD_TESTS = ['scripts/feedback-foundation.test.mjs', 'scripts/ui-template-policy.test.mjs'];
-const MANIFEST = 'scripts/test-domain-manifest.json';
+export const SCRIPT_INPUT_MANIFEST = 'scripts/test-domain-manifest.json';
 export const ENGINEERING_EXTRA_INPUTS = [
   'package.json',
   'package-lock.json',
@@ -59,17 +59,13 @@ function importsFor(file, source) {
 
 // Updating this snapshot is a review action: inspect actual filesystem readers and imports first.
 // A changed/new/unreviewed engineering input forces full engineering CI until that review occurs.
-export function captureReviewedScriptInputs(root) {
-  const files = [
-    ...filesBelow(root, 'scripts').filter((file) => file !== MANIFEST),
-    ...ENGINEERING_EXTRA_INPUTS,
-  ].sort();
+export function captureReviewedScriptEntries(files, readSource) {
   return {
     version: 1,
     sourceGuards: SOURCE_GUARD_TESTS,
     files: Object.fromEntries(
-      files.map((file) => {
-        const source = readFileSync(path.join(root, file), 'utf8');
+      [...files].sort().map((file) => {
+        const source = readSource(file);
         return [
           file,
           {
@@ -82,9 +78,16 @@ export function captureReviewedScriptInputs(root) {
     ),
   };
 }
+export function captureReviewedScriptInputs(root) {
+  return captureReviewedScriptEntries(
+    [...filesBelow(root, 'scripts').filter((file) => file !== SCRIPT_INPUT_MANIFEST), ...ENGINEERING_EXTRA_INPUTS],
+    (file) => readFileSync(path.join(root, file), 'utf8'),
+  );
+}
+
 export function engineeringDomainProof(root) {
   try {
-    const expected = JSON.parse(readFileSync(path.join(root, MANIFEST), 'utf8'));
+    const expected = JSON.parse(readFileSync(path.join(root, SCRIPT_INPUT_MANIFEST), 'utf8'));
     const actual = captureReviewedScriptInputs(root);
     const proven = JSON.stringify(expected) === JSON.stringify(actual);
     return {
@@ -105,7 +108,7 @@ export function createScriptTestPlan(files, root) {
   const full = (reason) => ({ mode: 'full', tests: [], reason });
   if (!root) return full('No repository input proof; run all script tests.');
   try {
-    const manifest = JSON.parse(readFileSync(path.join(root, MANIFEST), 'utf8'));
+    const manifest = JSON.parse(readFileSync(path.join(root, SCRIPT_INPUT_MANIFEST), 'utf8'));
     const current = captureReviewedScriptInputs(root);
     if (
       manifest.version !== 1 ||
@@ -154,7 +157,7 @@ export function createScriptTestPlan(files, root) {
 }
 
 export function reviewedInputDifferences(root) {
-  const expected = JSON.parse(readFileSync(path.join(root, MANIFEST), 'utf8'));
+  const expected = JSON.parse(readFileSync(path.join(root, SCRIPT_INPUT_MANIFEST), 'utf8'));
   const actual = captureReviewedScriptInputs(root);
   return [...new Set([...Object.keys(expected.files), ...Object.keys(actual.files)])]
     .sort()

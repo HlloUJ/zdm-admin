@@ -21,6 +21,8 @@ function fixture(t) {
   for (const name of [
     'task-entry.mjs',
     'task-registry.mjs',
+    'parallel-task-timing.mjs',
+    'batch-timing-core.mjs',
     'task-monitor-registration.mjs',
     'task-board-intake.mjs',
     'task-thread-titles.mjs',

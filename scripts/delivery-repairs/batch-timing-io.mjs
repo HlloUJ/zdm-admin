@@ -120,10 +120,10 @@ function recoverExitedWriter(directory, file) {
       fs.unlinkSync(file);
       syncDirectory(directory);
     }
-    db.exec('COMMIT');
-    transaction = false;
     return true;
   } finally {
+    // SQLite only serializes the filesystem recovery. Rollback releases the mutex
+    // without committing database initialization while another handle is reading.
     if (transaction) db.exec('ROLLBACK');
     db.close();
   }

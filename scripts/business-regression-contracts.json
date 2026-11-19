@@ -438,7 +438,7 @@
         "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
         "tests/e2e/feedback-foundation.spec.ts": "cad6465de30701955cff10f92344f4f0ab32d20fa3c4d0e6f51555c9ca4f816a",
         "tests/e2e/finished-stock-permissions.spec.ts": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
-        "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+        "tests/e2e/finished-stock.spec.ts": "f12de268d0b142cc2bc14bedba1a597ff0a947c28ad404c4c495202a578d7772",
         "tests/e2e/login.spec.ts": "dad16c7d553f9645a821bf9fd79c7f08a3e944ccc5b02b10e8f97964bc81722c",
         "tests/e2e/markup-configuration.spec.ts": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
         "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
@@ -2743,6 +2743,12 @@
           "before": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
           "after": "1e57f57f0538aee643a104f3831f88f87eac8bfa4e0417d7b9ebb0980129c567",
           "reason": "520 CI44178271178: Chrome158 flex-end/flow-end别名序列化；保留查询重置、草稿、失焦及混合保存全部断言，严格比较独立标准flex-end参照并新增按钮右边缘几何断言。无业务修改、无重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "after": "f12de268d0b142cc2bc14bedba1a597ff0a947c28ad404c4c495202a578d7772",
+          "reason": "432恢复诊断：仅在原视频播放断言失败时附加媒体错误、readyState、networkState、currentTime及页面可见性，随后原样抛出失败；原断言、超时、重试、用例与业务均不变。历史失败继续保留，不据此认定根因已修复。"
         },
         {
           "file": "tests/e2e/feedback-foundation.spec.ts",
