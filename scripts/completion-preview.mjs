@@ -198,9 +198,9 @@ export function createCompletionPreviewControl({
     });
     return { paused: true };
   }
-  async function quiesceTemporary(plan) {
+  async function quiesceTemporary(plan, referenceEffect) {
     const task = registry(plan.anchor).resolve({ worktree: plan.task });
-    const snapshot = await references(task),
+    const snapshot = await references(task, { referenceEffect }),
       installed = installedLauncher(plan);
     for (const frontend of snapshot.owned.filter((item) => item.port >= 5177)) {
       assert.equal(frontend.metadata.branch, task.branch, 'Temporary preview branch changed');
@@ -223,9 +223,9 @@ export function createCompletionPreviewControl({
     }
     return snapshot;
   }
-  async function prepareComposition(plan) {
+  async function prepareComposition(plan, { referenceEffect } = {}) {
     const owner = await assertOwner(plan);
-    const snapshot = await quiesceTemporary(plan);
+    const snapshot = await quiesceTemporary(plan, referenceEffect);
     if (snapshot.owned.length === 0 && snapshot.backendPorts.length === 0) {
       if (owner.preservedTask) await checkPreserved(plan, owner);
       return { quiesced: true, runtimeAbsent: true, preservedTask: owner.preservedTask?.id ?? null };

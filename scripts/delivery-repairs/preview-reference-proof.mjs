@@ -118,7 +118,8 @@ export function referenceConsumerAnchor(root, common) {
   return anchor;
 }
 
-function consumerScope(root, id = null) {
+function consumerScope(root, id = null, effect = 'final') {
+  assert.ok(['preparation', 'final'].includes(effect), 'Exact delivery effect required');
   const registry = createTaskRegistry(root);
   const task = id ? registry.readTask(id) : registry.resolve({ worktree: root });
   assertTaskExecutor(task, process.env.CODEX_THREAD_ID);
@@ -127,11 +128,14 @@ function consumerScope(root, id = null) {
     task: task.id,
     owner: task.owner,
     admission: process.env.ZDM_EXECUTION_ADMISSION,
+    effect,
   });
-  assert.equal(admission.active, true, 'Read-only reference selection requires the active final delivery scope');
+  assert.equal(admission.active, true, 'Read-only reference selection requires an active delivery scope');
   assert.ok(task.frozen?.accepted, 'Reference proof requires an existing formal business freeze');
   const accepted = readAcceptance(root, task.id);
-  assert.equal(task.frozen.accepted, accepted.commit);
+  assert.equal(task.frozen.accepted, accepted?.commit, 'Original acceptance ref required');
+  assert.equal(task.frozen.tree, accepted.tree, 'Original frozen tree required');
+  assert.equal(task.frozen.businessDigest, accepted.businessDigest, 'Original frozen business digest required');
   const anchor = referenceConsumerAnchor(root, registry.commonDir);
   return { registry, task, accepted, anchor };
 }
@@ -420,12 +424,15 @@ async function liveProof(scope, selector, expected = null, ownClosures = []) {
 
 export async function collectPreviewReferenceProof(root, foreignTask, historyFile, options = {}) {
   assert.ok(
-    Object.keys(options).every((key) => key === 'publishedBaseline'),
+    Object.keys(options).every((key) => ['publishedBaseline', 'effect'].includes(key)),
     'No collector/observation adapters',
   );
-  const scope = consumerScope(root);
+  const { effect = 'final' } = options;
+  const scope = consumerScope(root, null, effect);
   const consumerSource = referenceConsumerSnapshot(scope.task.worktree);
   const candidate = consumerSource.candidate;
+  if (effect === 'preparation')
+    assert.equal(candidate, scope.task.recordedHead, 'Preparation requires the exact registered candidate');
   assert.equal(
     git(scope.task.worktree, 'status', '--porcelain'),
     '',
@@ -441,7 +448,11 @@ export async function collectPreviewReferenceProof(root, foreignTask, historyFil
   const trusted = await publishedCore(scope, selector.publishedBaseline);
   trusted['scripts/accepted-source.mjs'].assertAcceptedSource(scope.task.worktree, scope.task.id, candidate);
   const live = await liveProof(scope, selector);
-  assert.deepEqual(currentCollector(scope, candidate), collector, 'Collector source changed during real observation');
+  const current = consumerScope(root, scope.task.id, effect);
+  assert.deepEqual(current.task, scope.task, 'Consumer registration changed during real observation');
+  assert.deepEqual(current.accepted, scope.accepted, 'Frozen source changed during real observation');
+  assertReferenceConsumerCandidate(scope.task.worktree, candidate, consumerSource.tree);
+  assert.deepEqual(currentCollector(current, candidate), collector, 'Collector source changed during real observation');
   const packet = {
     version: 2,
     contract,
@@ -491,7 +502,7 @@ export async function collectPreviewReferenceProof(root, foreignTask, historyFil
   };
 }
 
-function loadSelection(root, file) {
+function loadSelection(root, file, { task, effect }) {
   const { bytes, stat } = regularReferenceFile(file);
   assert.equal(stat.mode & 0o077, 0, 'Proof must be private');
   const packet = JSON.parse(bytes);
@@ -536,7 +547,8 @@ function loadSelection(root, file) {
     assert.equal(round.observerPid, packet.collectorPid);
     assertStoppedPreviewRound(round, packet.identity, packet.finishedAt);
   }
-  const scope = consumerScope(root, packet.consumer.task);
+  assert.equal(packet.consumer.task, task, 'Reference proof belongs to a different task');
+  const scope = consumerScope(root, task, effect);
   assertReferenceCollectorPublication(scope.anchor, packet.consumer, packet.collector);
   assert.equal(packet.consumer.executor, taskExecutor(scope.task));
   assert.equal(packet.consumer.common, scope.registry.commonDir);
@@ -546,6 +558,12 @@ function loadSelection(root, file) {
     [packet.consumer.candidate, packet.consumer.recordedHeadAtCapture].includes(scope.task.recordedHead),
     'Consumer recorded source changed',
   );
+  if (effect === 'preparation')
+    assert.equal(
+      packet.consumer.candidate,
+      scope.task.recordedHead,
+      'Reference proof requires the current registered candidate',
+    );
   if (existsSync(scope.task.worktree)) {
     assertReferenceConsumerCandidate(scope.task.worktree, packet.consumer.candidate, packet.consumer.tree);
   }
@@ -562,7 +580,7 @@ function loadSelection(root, file) {
 // Composition may change a candidate, never the meaning of its old packet.
 // Refuse before merge; the same public collector creates a distinct new proof
 // for the new HEAD, after which the caller resumes the existing delivery.
-export function assertReferenceProofCurrent(root) {
+export function assertReferenceProofCurrent(root, effect = 'final') {
   if (!process.env[VARIABLE]) return null;
   const selection = JSON.parse(process.env[VARIABLE]);
   if (path.resolve(root) !== selection.consumerWorktree) return null;
@@ -572,7 +590,7 @@ export function assertReferenceProofCurrent(root) {
     selection.consumerCandidate,
     git(root, 'rev-parse', selection.consumerCandidate + '^{tree}'),
   );
-  const loaded = loadSelection(root, selection.file);
+  const loaded = loadSelection(root, selection.file, { task: selection.consumerTask, effect });
   assert.equal(loaded.digest, selection.digest);
   assert.equal(loaded.scope.task.id, selection.consumerTask);
   return { candidate: loaded.packet.consumer.candidate, collector: loaded.collector };
@@ -580,8 +598,8 @@ export function assertReferenceProofCurrent(root) {
 
 // The environment contains a selector, not a safe flag or caller observations.
 // Direct children still execute both complete production host observations.
-export async function withPreviewReferenceProof(root, file, action) {
-  const loaded = loadSelection(root, file),
+export async function withPreviewReferenceProof(root, file, { task, effect }, action) {
+  const loaded = loadSelection(root, file, { task, effect }),
     previous = process.env[VARIABLE];
   assert.equal(previous, undefined, 'Nested reference-proof selection refused');
   process.env[VARIABLE] = JSON.stringify({
@@ -600,7 +618,7 @@ export async function withPreviewReferenceProof(root, file, action) {
   }
 }
 
-export async function verifyClosedPreviewReference({ worktree, taskId, lease, ownClosures = [] }) {
+export async function verifyClosedPreviewReference({ worktree, taskId, lease, effect = 'final', ownClosures = [] }) {
   if (!process.env[VARIABLE]) return null;
   const selection = JSON.parse(process.env[VARIABLE]);
   assert.deepEqual(Object.keys(selection).sort(), [
@@ -619,7 +637,8 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease, ow
     lease.task !== selection.foreignTask
   )
     return null;
-  const loaded = loadSelection(worktree, selection.file);
+  const context = { task: selection.consumerTask, effect };
+  const loaded = loadSelection(worktree, selection.file, context);
   assert.equal(loaded.digest, selection.digest, 'Reference selector changed');
   assert.equal(loaded.scope.task.id, selection.consumerTask);
   assert.equal(loaded.packet.consumer.candidate, selection.consumerCandidate);
@@ -630,7 +649,7 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease, ow
   assert.equal(port, loaded.packet.identity.port);
   assert.deepEqual(original, loaded.packet.identity.lease);
   const live = await liveProof(loaded.scope, loaded.packet.selector, loaded.packet.identity, ownClosures);
-  const after = loadSelection(worktree, selection.file);
+  const after = loadSelection(worktree, selection.file, context);
   assert.equal(after.digest, loaded.digest, 'Selection changed during live proof');
   assert.deepEqual(after.collector, loaded.collector, 'Actual collector changed during live proof');
   const evidence = path.join(path.dirname(loaded.file), 'live-' + randomUUID() + '.json');

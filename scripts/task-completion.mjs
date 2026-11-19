@@ -249,6 +249,7 @@ async function main(args) {
       'measure',
       'repair-start',
       'repair-finish',
+      'record-ci-diagnosis',
       'report',
       'settle',
       'wait',
@@ -325,7 +326,7 @@ async function main(args) {
     console.log(JSON.stringify(await checkCompletionRuntime(root, commonDir), null, 2));
   } else
     throw new Error(
-      'Usage: task:completion -- deliver <batch> <task-head> | prepare <batch> <task-head> | reference-proof <foreign-task> <native-history-file> [--published-baseline <sha>] | recover | begin [requested-at] | plan | wait <run|pr|main> <head> | handoff-plan <main> | final-handoff <main> | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> [code|environment|transport|unclassified] | repair-finish <id> | settle <batch> <main> <run> | report <batch> | status <batch> | backfill <batch> | pause-record <batch> | resume-record <batch> | preserve | runtime',
+      'Usage: task:completion -- deliver <batch> <task-head> | prepare <batch> <task-head> [--engineering-review <file>] [--reference-proof <file>] | reference-proof <foreign-task> <native-history-file> [--published-baseline <sha>] [--for-prepare] | recover | begin [requested-at] | plan | wait <run|pr|main> <head> | handoff-plan <main> | final-handoff <main> | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> [code|environment|transport|unclassified] | repair-finish <id> | record-ci-diagnosis <failed-run> <evidence> | settle <batch> <main> <run> | report <batch> | status <batch> | backfill <batch> | pause-record <batch> | resume-record <batch> | preserve | runtime',
     );
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

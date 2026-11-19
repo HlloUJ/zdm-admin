@@ -9,6 +9,7 @@ import { bestEffortProgress } from './task-delivery-status-sync.mjs';
 import { createProgressOutbox, progressSourceIdentity } from './task-progress-outbox.mjs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { correct410InitialPause } from './delivery-repairs/task-410-initial-pause-correction.mjs';
 import { dynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
 
 function recordReadiness(commonDir, input, result) {
@@ -109,6 +110,7 @@ export async function advanceTaskThread(
       'dispatch-cancel',
       'preparation-finish',
       'retry-creation',
+      'correct-410-initial-pause',
     ].includes(input.action),
   );
   const coordination = readTaskCoordination(commonDir);
@@ -231,6 +233,9 @@ export async function advanceTaskThread(
       queue: host.queue,
       ...(observe ? { observe } : {}),
     });
+  } else if (input.action === 'correct-410-initial-pause') {
+    assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
+    result = await correct410InitialPause(input.task, host, registry, { now: observationNow });
   } else if (input.action === 'retry-creation') {
     assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
     result = await createTaskThreadTitles(commonDir).retryCreation(input.task, host, {

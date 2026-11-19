@@ -6,6 +6,12 @@ import {
   validateTerminalInvalidSupersession,
 } from './task-progress-supersession.mjs';
 import assert from 'node:assert/strict';
+import {
+  createInitialPauseArchive,
+  initialPauseReceipt,
+  readClosedInitialPause,
+  retiredInitialPause,
+} from './delivery-repairs/task-410-initial-pause-evidence.mjs';
 import { readClosedCreationAttempt } from './delivery-repairs/task-creation-progress.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import {
@@ -104,6 +110,7 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
           assert.equal(byteHash(bytes), existing.auditDigest);
           return { ...JSON.parse(bytes).entry, state: existing.state };
         }
+        if (existing.state === retiredInitialPause) return readRetirement(state);
         return structuredClone(existing);
       }
       assert.ok(
@@ -253,6 +260,67 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
       return structuredClone(result);
     });
   }
+  const initialPauseAudit = path.join(directory, 'initial-pause-' + initialPauseReceipt + '.json');
+  function readRetirement(state) {
+    const matches = (state.retired ?? []).filter((entry) => entry.receipt_id === initialPauseReceipt);
+    if (!matches.length) return null;
+    assert.equal(matches.length, 1);
+    const [result] = matches;
+    assert.match(result.auditDigest ?? '', /^[a-f0-9]{64}$/);
+    const { archive } = readClosedInitialPause(initialPauseAudit, directory, result.auditDigest);
+    assert.deepEqual(result, {
+      ...archive.entry,
+      state: retiredInitialPause,
+      audit: initialPauseAudit,
+      auditDigest: result.auditDigest,
+    });
+    assert.ok(
+      [...state.pending, ...state.acknowledged, ...(state.rejected ?? [])].every(
+        (entry) => entry.receipt_id !== initialPauseReceipt,
+      ),
+      'Retired initial pause also appears in transport state',
+    );
+    return structuredClone(result);
+  }
+  function retire410InitialPause(raw, facts, recheck) {
+    assert.equal(typeof recheck, 'function');
+    return change(
+      (state) => {
+        const prior = readRetirement(state);
+        if (prior) return { ...prior, replay: true };
+        assert.deepEqual(readFileSync(file), raw, '410 outbox changed during readback; retain the original packet');
+        const audit = createInitialPauseArchive(raw, facts, directory);
+        recheck();
+        if (!existsSync(initialPauseAudit)) {
+          const fd = openSync(initialPauseAudit, 'wx', 0o600);
+          try {
+            writeFileSync(fd, JSON.stringify(audit) + '\n');
+            fsyncSync(fd);
+          } finally {
+            closeSync(fd);
+          }
+          const parent = openSync(directory, 'r');
+          try {
+            fsyncSync(parent);
+          } finally {
+            closeSync(parent);
+          }
+        }
+        const { archive, digest } = readClosedInitialPause(initialPauseAudit, directory);
+        assert.deepEqual(
+          archive.originalOutbox,
+          audit.originalOutbox,
+          'Interrupted audit is for different original bytes',
+        );
+        recheck();
+        const [entry] = state.pending.splice(0, 1);
+        const result = { ...entry, state: retiredInitialPause, audit: initialPauseAudit, auditDigest: digest };
+        (state.retired ??= []).push(result);
+        return structuredClone(result);
+      },
+      { skipUnchanged: true, durable: true },
+    );
+  }
   function retireCreationAttempt({ archiveFile, archiveDigest }) {
     assert.ok(
       typeof archiveFile === 'string' && /^[a-f0-9]{64}$/.test(archiveDigest ?? ''),
@@ -372,6 +440,8 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
     acknowledge,
     fail,
     retireCreationAttempt,
+    readInitialPauseRetirement: () => readRetirement(read()),
+    retire410InitialPause,
     quarantineStale: (id, proof, options) => {
       assert.notEqual(proof.kind, 'superseded-without-submission');
       return quarantineTerminal(id, proof, options);

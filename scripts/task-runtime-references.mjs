@@ -34,7 +34,12 @@ function backendPorts(task) {
 export async function taskRuntimeReferences(task, dependencies = {}) {
   const ports = (dependencies.backendPorts ?? backendPorts)(task);
   const snapshot = await inspectPreviewConsumers(
-    { worktree: task.worktree, taskId: task.id, closingLeases: dependencies.closingLeases ?? [] },
+    {
+      worktree: task.worktree,
+      taskId: task.id,
+      closingLeases: dependencies.closingLeases ?? [],
+      referenceEffect: dependencies.referenceEffect,
+    },
     {
       request: dependencies.request ?? readPreviewResponse,
       readLeases:
