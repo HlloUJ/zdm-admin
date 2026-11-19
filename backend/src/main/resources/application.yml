@@ -33,6 +33,9 @@ springdoc:
     path: /swagger-ui.html
 
 zdm:
+  store-exit:
+    ledger-directory: ${ZDM_STORE_EXIT_LEDGER_DIR:}
+    ledger-service-url: ${ZDM_STORE_EXIT_LEDGER_URL:http://zdm-store-exit-ledger-SCOPE:8090}
   security:
     dev-tokens-enabled: ${ZDM_SECURITY_DEV_TOKENS_ENABLED:false}
     verification-code: ${ZDM_SECURITY_VERIFICATION_CODE:}

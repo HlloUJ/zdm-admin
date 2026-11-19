@@ -128,7 +128,7 @@ for (const surface of surfaces) {
     if (surface.client === 'supply-chain')
       await expect(main.getByRole('button', { name: '发布商品', exact: true })).toBeVisible();
     if (surface.client === 'store')
-      await expect(main.getByRole('button', { name: '商品中心', exact: true })).toBeVisible();
+      await expect(main.getByRole('button', { name: '选品中心', exact: true })).toBeVisible();
   });
   test(`${surface.path} All never grants an unauthorized state or action`, async ({ page }) => {
     await setup(page, surface, [
@@ -249,11 +249,11 @@ for (const surface of surfaces.filter((s) => s.client === 'store')) {
     const main = page.getByRole('main');
     for (const label of ['全部', '仓库中']) {
       await main.locator('.t-tabs__nav-item').filter({ hasText: label }).click();
-      await expect(main.getByRole('button', { name: '商品中心', exact: true })).toBeVisible();
+      await expect(main.getByRole('button', { name: '选品中心', exact: true })).toBeVisible();
       await expect(main.getByRole('button', { name: '操作日志', exact: true })).toHaveCount(0);
     }
     await main.locator('.t-tabs__nav-item').filter({ hasText: '已上架' }).click();
-    await expect(main.getByRole('button', { name: '商品中心', exact: true })).toHaveCount(0);
+    await expect(main.getByRole('button', { name: '选品中心', exact: true })).toHaveCount(0);
   });
 }
 

@@ -47,6 +47,22 @@ test('stores and displays the logged-in user', async ({ page }) => {
 });
 
 test('logs out and clears the local account session', async ({ page }) => {
+  const unexpectedApiRequests: string[] = [];
+  let logoutRequests = 0;
+  // This page test must never fall through to the shared development API.
+  await page.route('**/api/**', async (route) => {
+    const request = route.request();
+    const pathname = new URL(request.url()).pathname;
+    if (pathname === '/api/admin/auth/contexts' && request.method() === 'GET') {
+      await route.fulfill({ json: { code: 0, data: [] } });
+    } else if (pathname === '/api/admin/auth/logout' && request.method() === 'POST') {
+      logoutRequests += 1;
+      await route.fulfill({ json: { code: 0, data: true } });
+    } else {
+      unexpectedApiRequests.push(`${request.method()} ${pathname}`);
+      await route.abort('blockedbyclient');
+    }
+  });
   await page.addInitScript(() => {
     window.localStorage.setItem('zdm-admin-token', 'dev-token:1');
     window.localStorage.setItem(
@@ -69,6 +85,8 @@ test('logs out and clears the local account session', async ({ page }) => {
   await expect(page.getByRole('heading', { name: '欢迎登录' })).toBeVisible();
   expect(await page.evaluate(() => window.localStorage.getItem('zdm-admin-token'))).toBeNull();
   expect(await page.evaluate(() => window.localStorage.getItem('zdm-admin-user'))).toBeNull();
+  expect(logoutRequests).toBe(1);
+  expect(unexpectedApiRequests).toEqual([]);
 });
 
 test('built-in super admin switches to the supply-chain system with full scoped access', async ({ page }) => {

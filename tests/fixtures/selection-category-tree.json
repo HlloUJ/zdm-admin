@@ -1,0 +1,488 @@
+[
+  {
+    "id": 62,
+    "name": "餐桌",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 64,
+    "name": "圆形餐桌",
+    "type": "finished",
+    "parentId": 62
+  },
+  {
+    "id": 66,
+    "name": "固定式长方形餐桌",
+    "type": "finished",
+    "parentId": 65
+  },
+  {
+    "id": 68,
+    "name": "四人位伸缩式长方形餐桌",
+    "type": "finished",
+    "parentId": 67
+  },
+  {
+    "id": 70,
+    "name": "四人位固定式长方形餐桌",
+    "type": "finished",
+    "parentId": 66
+  },
+  {
+    "id": 72,
+    "name": "固定式圆形餐桌",
+    "type": "finished",
+    "parentId": 64
+  },
+  {
+    "id": 74,
+    "name": "带转盘伸缩式圆形餐桌",
+    "type": "finished",
+    "parentId": 73
+  },
+  {
+    "id": 76,
+    "name": "带转盘固定式圆形餐桌",
+    "type": "finished",
+    "parentId": 72
+  },
+  {
+    "id": 78,
+    "name": "组合茶几",
+    "type": "finished",
+    "parentId": 63
+  },
+  {
+    "id": 79,
+    "name": "圆形组合茶几",
+    "type": "finished",
+    "parentId": 78
+  },
+  {
+    "id": 88,
+    "name": "椅子",
+    "type": "accessory",
+    "parentId": null
+  },
+  {
+    "id": 90,
+    "name": "餐椅",
+    "type": "accessory",
+    "parentId": 88
+  },
+  {
+    "id": 92,
+    "name": "餐桌腿",
+    "type": "accessory",
+    "parentId": 89
+  },
+  {
+    "id": 94,
+    "name": "无扶手餐椅",
+    "type": "accessory",
+    "parentId": 90
+  },
+  {
+    "id": 96,
+    "name": "固定高度吧椅",
+    "type": "accessory",
+    "parentId": 91
+  },
+  {
+    "id": 98,
+    "name": "软包无扶手餐椅",
+    "type": "accessory",
+    "parentId": 94
+  },
+  {
+    "id": 100,
+    "name": "软包扶手餐椅",
+    "type": "accessory",
+    "parentId": 95
+  },
+  {
+    "id": 102,
+    "name": "软包固定高度吧椅",
+    "type": "accessory",
+    "parentId": 96
+  },
+  {
+    "id": 104,
+    "name": "软包升降吧椅",
+    "type": "accessory",
+    "parentId": 97
+  },
+  {
+    "id": 106,
+    "name": "独立式餐桌腿",
+    "type": "accessory",
+    "parentId": 92
+  },
+  {
+    "id": 108,
+    "name": "可调节柜脚",
+    "type": "accessory",
+    "parentId": 93
+  },
+  {
+    "id": 110,
+    "name": "可调节独立式餐桌腿",
+    "type": "accessory",
+    "parentId": 106
+  },
+  {
+    "id": 112,
+    "name": "长方形框架式餐桌腿",
+    "type": "accessory",
+    "parentId": 107
+  },
+  {
+    "id": 114,
+    "name": "圆形可调节柜脚",
+    "type": "accessory",
+    "parentId": 108
+  },
+  {
+    "id": 116,
+    "name": "圆形固定高度柜脚",
+    "type": "accessory",
+    "parentId": 109
+  },
+  {
+    "id": 120,
+    "name": "圆形单体茶几",
+    "type": "finished",
+    "parentId": 119
+  },
+  {
+    "id": 126,
+    "name": "独立岛台",
+    "type": "finished",
+    "parentId": 125
+  },
+  {
+    "id": 129,
+    "name": "壁挂式洗手台",
+    "type": "finished",
+    "parentId": 128
+  },
+  {
+    "id": 130,
+    "name": "单盆壁挂式洗手台",
+    "type": "finished",
+    "parentId": 129
+  },
+  {
+    "id": 134,
+    "name": "壁挂式浴室柜",
+    "type": "finished",
+    "parentId": 133
+  },
+  {
+    "id": 135,
+    "name": "单盆壁挂式浴室柜",
+    "type": "finished",
+    "parentId": 134
+  },
+  {
+    "id": 136,
+    "name": "台上盆单盆壁挂式浴室柜",
+    "type": "finished",
+    "parentId": 135
+  },
+  {
+    "id": 141,
+    "name": "落地式电视柜",
+    "type": "finished",
+    "parentId": 140
+  },
+  {
+    "id": 65,
+    "name": "长方形餐桌",
+    "type": "finished",
+    "parentId": 62
+  },
+  {
+    "id": 67,
+    "name": "伸缩式长方形餐桌",
+    "type": "finished",
+    "parentId": 65
+  },
+  {
+    "id": 69,
+    "name": "六人位伸缩式长方形餐桌",
+    "type": "finished",
+    "parentId": 67
+  },
+  {
+    "id": 71,
+    "name": "六人位固定式长方形餐桌",
+    "type": "finished",
+    "parentId": 66
+  },
+  {
+    "id": 73,
+    "name": "伸缩式圆形餐桌",
+    "type": "finished",
+    "parentId": 64
+  },
+  {
+    "id": 75,
+    "name": "无转盘伸缩式圆形餐桌",
+    "type": "finished",
+    "parentId": 73
+  },
+  {
+    "id": 77,
+    "name": "无转盘固定式圆形餐桌",
+    "type": "finished",
+    "parentId": 72
+  },
+  {
+    "id": 89,
+    "name": "五金腿",
+    "type": "accessory",
+    "parentId": null
+  },
+  {
+    "id": 91,
+    "name": "吧椅",
+    "type": "accessory",
+    "parentId": 88
+  },
+  {
+    "id": 93,
+    "name": "柜脚",
+    "type": "accessory",
+    "parentId": 89
+  },
+  {
+    "id": 95,
+    "name": "扶手餐椅",
+    "type": "accessory",
+    "parentId": 90
+  },
+  {
+    "id": 97,
+    "name": "升降吧椅",
+    "type": "accessory",
+    "parentId": 91
+  },
+  {
+    "id": 99,
+    "name": "硬座无扶手餐椅",
+    "type": "accessory",
+    "parentId": 94
+  },
+  {
+    "id": 101,
+    "name": "硬座扶手餐椅",
+    "type": "accessory",
+    "parentId": 95
+  },
+  {
+    "id": 103,
+    "name": "硬座固定高度吧椅",
+    "type": "accessory",
+    "parentId": 96
+  },
+  {
+    "id": 105,
+    "name": "硬座升降吧椅",
+    "type": "accessory",
+    "parentId": 97
+  },
+  {
+    "id": 107,
+    "name": "框架式餐桌腿",
+    "type": "accessory",
+    "parentId": 92
+  },
+  {
+    "id": 109,
+    "name": "固定高度柜脚",
+    "type": "accessory",
+    "parentId": 93
+  },
+  {
+    "id": 111,
+    "name": "固定高度独立式餐桌腿",
+    "type": "accessory",
+    "parentId": 106
+  },
+  {
+    "id": 113,
+    "name": "圆形框架式餐桌腿",
+    "type": "accessory",
+    "parentId": 107
+  },
+  {
+    "id": 115,
+    "name": "方形可调节柜脚",
+    "type": "accessory",
+    "parentId": 108
+  },
+  {
+    "id": 117,
+    "name": "方形固定高度柜脚",
+    "type": "accessory",
+    "parentId": 109
+  },
+  {
+    "id": 119,
+    "name": "单体茶几",
+    "type": "finished",
+    "parentId": 63
+  },
+  {
+    "id": 121,
+    "name": "长方形单体茶几",
+    "type": "finished",
+    "parentId": 119
+  },
+  {
+    "id": 124,
+    "name": "方圆组合茶几",
+    "type": "finished",
+    "parentId": 78
+  },
+  {
+    "id": 127,
+    "name": "岛台餐桌一体",
+    "type": "finished",
+    "parentId": 125
+  },
+  {
+    "id": 131,
+    "name": "双盆壁挂式洗手台",
+    "type": "finished",
+    "parentId": 129
+  },
+  {
+    "id": 132,
+    "name": "立柱式洗手台",
+    "type": "finished",
+    "parentId": 128
+  },
+  {
+    "id": 137,
+    "name": "台下盆单盆壁挂式浴室柜",
+    "type": "finished",
+    "parentId": 135
+  },
+  {
+    "id": 138,
+    "name": "双盆壁挂式浴室柜",
+    "type": "finished",
+    "parentId": 134
+  },
+  {
+    "id": 139,
+    "name": "落地式浴室柜",
+    "type": "finished",
+    "parentId": 133
+  },
+  {
+    "id": 142,
+    "name": "壁挂式电视柜",
+    "type": "finished",
+    "parentId": 140
+  },
+  {
+    "id": 63,
+    "name": "茶几",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 118,
+    "name": "椭圆形餐桌",
+    "type": "finished",
+    "parentId": 62
+  },
+  {
+    "id": 122,
+    "name": "双件圆形组合茶几",
+    "type": "finished",
+    "parentId": 78
+  },
+  {
+    "id": 147,
+    "name": "休闲椅",
+    "type": "accessory",
+    "parentId": 88
+  },
+  {
+    "id": 148,
+    "name": "茶几腿",
+    "type": "accessory",
+    "parentId": 89
+  },
+  {
+    "id": 123,
+    "name": "三件圆形组合茶几",
+    "type": "finished",
+    "parentId": 78
+  },
+  {
+    "id": 125,
+    "name": "岛台",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 149,
+    "name": "边几腿",
+    "type": "accessory",
+    "parentId": 89
+  },
+  {
+    "id": 128,
+    "name": "洗手台",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 150,
+    "name": "吧台腿",
+    "type": "accessory",
+    "parentId": 89
+  },
+  {
+    "id": 133,
+    "name": "浴室柜",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 140,
+    "name": "电视柜",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 143,
+    "name": "边几",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 144,
+    "name": "玄关桌",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 145,
+    "name": "吧台",
+    "type": "finished",
+    "parentId": null
+  },
+  {
+    "id": 146,
+    "name": "餐边柜",
+    "type": "finished",
+    "parentId": null
+  }
+]

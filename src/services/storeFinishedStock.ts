@@ -54,28 +54,6 @@ export interface StoreFinishedProduct extends WarehouseEntryInformation {
   createdAt?: string;
 }
 
-export interface StorePoolSku extends Omit<StoreSkuPrice, 'costPrice' | 'salePrice' | 'priceMode' | 'saleCoefficient'> {
-  partnerPrice: number | null;
-}
-
-export interface StorePoolDetail {
-  storeLevelName?: string | null;
-  attributeNames: Record<string, string>;
-  attributeDisplayOrder?: { product: string[]; sales: string[] };
-  id: number;
-  name: string;
-  merchantCode: string;
-  totalStock: number;
-  imageUrl?: string;
-  imageUrls: string[];
-  videoUrl?: string;
-  detail?: string;
-  categoryName?: string;
-  attributes: FinishedProductAttributeEntry[];
-  specDimensions: FinishedSpecDimension[];
-  skus: StorePoolSku[];
-}
-
 export interface StorePoolCategory {
   id: number;
   parentId?: number | null;
@@ -83,21 +61,6 @@ export interface StorePoolCategory {
 }
 
 export const listStoreFinishedCategories = () => request<StorePoolCategory[]>(`${base}/categories`);
-export const listStoreFinishedPoolCategories = () => request<StorePoolCategory[]>(`${base}/pool-categories`);
-
-export interface StorePoolProduct {
-  storeLevelName?: string | null;
-  guidePriceMin?: number | null;
-  guidePriceMax?: number | null;
-  partnerPriceMin?: number | null;
-  partnerPriceMax?: number | null;
-  id: number;
-  name: string;
-  merchantCode: string;
-  totalStock: number;
-  imageUrl?: string;
-  categoryId?: number;
-}
 
 export interface StoreFinishedLog {
   id: number;
@@ -118,10 +81,6 @@ const json = (body: unknown) => JSON.stringify(body);
 
 export const listStoreFinishedProducts = () => request<StoreFinishedProduct[]>(base);
 export const getStoreFinishedProduct = (id: number) => request<StoreFinishedProduct>(`${base}/${id}`);
-export const getStoreFinishedPoolDetail = (id: number) => request<StorePoolDetail>(`${base}/pool/${id}`);
-export const listStoreFinishedPool = () => request<StorePoolProduct[]>(`${base}/pool`);
-export const selectStoreFinishedProducts = (productIds: number[]) =>
-  request<StoreFinishedProduct[]>(`${base}/select`, { method: 'POST', body: json({ productIds }) });
 export const changeStoreFinishedStatus = (id: number, target: string, reason?: string, detail?: string) =>
   request<StoreFinishedProduct>(`${base}/${id}/status`, {
     method: 'PUT',

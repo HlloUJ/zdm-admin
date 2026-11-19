@@ -196,6 +196,62 @@
       "fingerprint": "80199bcb830e46561c48963f0c909a5a1e951bc0874d833e6102ef468d64d16c",
       "kind": "business-selection",
       "reason": "导航或选项选择控件，保留激活态与原有选择、拖拽交互"
+    },
+    {
+      "file": "src/pages/selection-center/components/CategoryChoiceSpacing.vue",
+      "tag": "t-button",
+      "fingerprint": "f041cb1e3cf827c2bc424ed55e1eadf28d5248080f3230d786d24b69c91a97b4",
+      "kind": "selection-control",
+      "reason": "User confirmed selection-center PRD and V24 display code reuse; this exact local presentation only."
+    },
+    {
+      "file": "src/pages/selection-center/components/SelectionCategoryPanel.vue",
+      "tag": "t-button",
+      "fingerprint": "6fd61424f667764c9156e4483d16846fb873f473a48cd374d32691cd6dc67a61",
+      "kind": "selection-control",
+      "reason": "User confirmed selection-center PRD and V24 display code reuse; this exact local presentation only."
+    },
+    {
+      "file": "src/pages/selection-center/index.vue",
+      "tag": "t-button",
+      "fingerprint": "dfda3ad1d27f689da7c755edf0eb614b936eef5265f4f353a12b4b9a7998fa21",
+      "kind": "selection-control",
+      "reason": "User confirmed selection-center PRD and V24 display code reuse; this exact local presentation only."
+    },
+    {
+      "file": "src/pages/selection-center/index.vue",
+      "tag": "t-button",
+      "fingerprint": "7dc8854090dac6496d9674c809cbe3d5564f493cf20c4ab01f703fe1dcc0e096",
+      "kind": "selection-control",
+      "reason": "User confirmed selection-center PRD and V24 display code reuse; this exact local presentation only."
+    },
+    {
+      "file": "src/pages/selection-center/index.vue",
+      "tag": "t-button",
+      "fingerprint": "09c5b124ab0a04fcae8a6352c1891c9417561dd1ffe0513fb20699099e360232",
+      "kind": "selection-control",
+      "reason": "User confirmed selection-center PRD and V24 display code reuse; this exact local presentation only."
+    },
+    {
+      "file": "src/pages/selection-center/index.vue",
+      "tag": "t-button",
+      "fingerprint": "4de043623b13f71e7029763cbc61f3c4eed92ed7a063df4d2d0f08f37eac921c",
+      "kind": "selection-control",
+      "reason": "User confirmed selection-center PRD and V24 display code reuse; this exact local presentation only."
+    },
+    {
+      "file": "src/pages/selection-center/index.vue",
+      "tag": "t-button",
+      "fingerprint": "11f0b7668ed491a1433eaf3db22c3bb77690bb9e0fd80cf35ed7669ed6c5611c",
+      "kind": "selection-control",
+      "reason": "User confirmed selection-center PRD and V24 display code reuse; this exact local presentation only."
+    },
+    {
+      "file": "src/pages/selection-center/index.vue",
+      "tag": "t-button",
+      "fingerprint": "198c8b9668913c8803b9c55a2627a29a1f3833ac3fc2f93598cc6733cd44f3d9",
+      "kind": "selection-control",
+      "reason": "User confirmed selection-center PRD and V24 display code reuse; this exact local presentation only."
     }
   ]
 }

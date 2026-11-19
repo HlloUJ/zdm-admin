@@ -28,12 +28,15 @@ public class SessionTokenService {
   private final AuthAccountMapper authAccountMapper;
   private final SecurityProperties securityProperties;
   private final EffectivePermissionResolver effectivePermissionResolver;
+  private final com.zdm.platform.storeexit.StoreExitRecoveryState recovery;
 
   public SessionTokenService(
       JdbcTemplate jdbcTemplate,
       AuthAccountMapper authAccountMapper,
       SecurityProperties securityProperties,
-      EffectivePermissionResolver effectivePermissionResolver) {
+      EffectivePermissionResolver effectivePermissionResolver,
+      com.zdm.platform.storeexit.StoreExitRecoveryState recovery) {
+    this.recovery = recovery;
     this.jdbcTemplate = jdbcTemplate;
     this.authAccountMapper = authAccountMapper;
     this.securityProperties = securityProperties;
@@ -136,6 +139,7 @@ public class SessionTokenService {
   }
 
   private CurrentIdentity toCurrentIdentity(Long sessionId, AuthAccount account) {
+    if (recovery.blocks(account.getStoreId())) { return null; }
     String identityType = StringUtils.hasText(account.getIdentityType()) ? account.getIdentityType() : "employee";
     List<String> roles = switch (identityType) {
       case "platform_admin" -> List.of("SUPER_ADMIN");

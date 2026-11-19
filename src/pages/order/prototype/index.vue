@@ -4,11 +4,19 @@
     <div class="admin-shell">
       <AdminSideMenu />
       <main class="page" :class="{ 'sales-order-page': page === 'sales' && !selected }">
-        <div>
+        <div v-if="scopeVerified">
           <template v-if="selected">
             <AdminDetailPage :title="selected.id" :items="detailItems">
               <t-space break-line
-                ><t-button :theme="buttonTheme('back')" variant="outline" @click="selectedId = ''">返回列表</t-button
+                ><t-button
+                  :theme="buttonTheme('back')"
+                  variant="outline"
+                  @click="
+                    runScopedRead(() => {
+                      selectedId = '';
+                    })
+                  "
+                  >返回列表</t-button
                 ><t-button
                   v-for="a in detailActions"
                   :key="a.id"
@@ -140,7 +148,14 @@
               >
                 <template #at="{ row }">{{ time(row.at) }}</template
                 ><template #change="{ row }"
-                  ><t-link :theme="buttonTheme('view')" hover="color" @click="logDetail = row"
+                  ><t-link
+                    :theme="buttonTheme('view')"
+                    hover="color"
+                    @click="
+                      runScopedRead(() => {
+                        logDetail = row;
+                      })
+                    "
                     >查看前后数据</t-link
                   ></template
                 >
@@ -258,9 +273,20 @@
             >
           </AdminListPage>
         </div>
+        <t-empty
+          v-if="!scopeVerified"
+          type="network-error"
+          title="门店状态待核验"
+          :description="scopeError || '请核验门店身份后再查看订单。'"
+        >
+          <template #action
+            ><t-button :theme="buttonTheme('search')" @click="runScopedRead(() => {})">重新核验</t-button></template
+          >
+        </t-empty>
       </main>
     </div>
     <OrderEditor
+      v-if="scopeVerified"
       v-model:visible="editorVisible"
       :order="editingOrder"
       :state="state"
@@ -268,7 +294,7 @@
       @save="saveEditor"
     />
     <OrderActionDialog
-      v-if="actionOrder"
+      v-if="scopeVerified && actionOrder"
       v-model:visible="actionVisible"
       :action="action"
       :label="actionLabel"
@@ -309,7 +335,7 @@
       @confirm="deleteSetting"
     />
     <AdminDialog
-      :visible="Boolean(proofUrl)"
+      :visible="scopeVerified && Boolean(proofUrl)"
       header="收退款凭证"
       width="min(960px, 94vw)"
       confirm-function="close"
@@ -320,7 +346,7 @@
       ><img :src="proofUrl" alt="收退款凭证" width="100%"
     /></AdminDialog>
     <AdminDialog
-      :visible="Boolean(logDetail)"
+      :visible="scopeVerified && Boolean(logDetail)"
       header="操作前后数据"
       width="min(960px, 94vw)"
       confirm-function="close"
@@ -340,8 +366,9 @@
   </div>
 </template>
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue';
+import { computed, ref, watch, onMounted, onBeforeUnmount } from 'vue';
 import { useRoute } from 'vue-router';
+import { storeScopeFingerprint } from '@/services/storeCacheCleanup';
 import type { PageInfo } from 'tdesign-vue-next';
 import AdminTopNav from '@/components/AdminTopNav.vue';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -359,6 +386,11 @@ import {
 import { buttonTheme, buttonFunctionFor } from '@/components/foundation/actions/buttonFunctions';
 import { formConfirmation } from '@/components/foundation/actions/confirmation';
 import { getLoginUser } from '@/services/auth';
+import {
+  requireCurrentStoreScope,
+  isCurrentStoreScopeVerified,
+  startCurrentStoreScopeMonitor,
+} from '@/services/storeScopeValidity';
 import { hasPermission } from '@/services/adminPermissions';
 import { getUserFunctionAudience } from '@/services/functionAudience';
 import { useFormFeedback } from '@/utils/formValidation';
@@ -421,6 +453,42 @@ const context = computed<Context>(() => ({
   name: user.value.name,
 }));
 const key = computed(() => scopeKey(context.value));
+const scopeVerified = computed(isCurrentStoreScopeVerified);
+const scopeError = ref('');
+let stopScopeMonitor: (() => void) | undefined;
+onMounted(() => {
+  window.addEventListener('zdm-store-cache-cleared', clearDeletedCache);
+  stopScopeMonitor = startCurrentStoreScopeMonitor((error) => {
+    scopeError.value = error instanceof Error ? error.message : '门店状态暂时无法核验';
+  });
+});
+onBeforeUnmount(() => {
+  stopScopeMonitor?.();
+  window.removeEventListener('zdm-store-cache-cleared', clearDeletedCache);
+});
+function clearDeletedCache(event: Event) {
+  if (
+    !(event instanceof CustomEvent) ||
+    !event.detail.includes(storeScopeFingerprint(String(context.value.tenantId), String(context.value.storeId)))
+  )
+    return;
+  state.value = createState(context.value);
+  scopeError.value = '门店已彻底删除';
+}
+async function runScopedRead(read: () => void) {
+  const captured = key.value;
+  try {
+    await requireCurrentStoreScope();
+    if (captured !== key.value) return;
+    scopeError.value = '';
+    read();
+  } catch (error) {
+    if (captured === key.value) {
+      scopeError.value = error instanceof Error ? error.message : '门店状态暂时无法核验';
+      adminFeedback.error(scopeError.value);
+    }
+  }
+}
 const state = ref<State>(createState(context.value));
 const storageWarning = ref(false);
 watch(
@@ -455,7 +523,7 @@ watch(
   state,
   () => {
     try {
-      localStorage.setItem(key.value, JSON.stringify(state.value));
+      if (scopeVerified.value) localStorage.setItem(key.value, JSON.stringify(state.value));
     } catch {
       if (!storageWarning.value) {
         storageWarning.value = true;
@@ -472,7 +540,7 @@ watch(page, () => {
   selectedId.value = '';
 });
 const scopedOrders = computed(() =>
-  state.value.orders.filter(
+  (scopeVerified.value ? state.value.orders : []).filter(
     (o) =>
       o.tenantId === context.value.tenantId &&
       o.storeId === context.value.storeId &&
@@ -483,8 +551,10 @@ const scopedOrders = computed(() =>
   ),
 );
 const expandedOrderIds = ref<Array<string | number>>([]);
-function updateOrderExpansion(keys: Array<string | number>) {
-  expandedOrderIds.value = keys;
+async function updateOrderExpansion(keys: Array<string | number>) {
+  await runScopedRead(() => {
+    expandedOrderIds.value = keys;
+  });
 }
 const status = ref<Status>('pending'),
   selectedId = ref('');
@@ -514,9 +584,12 @@ const filterDraft = ref<FilterValues>({}),
 const detailPagination = ref({ current: 1, pageSize: 5 });
 const fulfillmentPagination = ref({ current: 1, pageSize: 10 });
 const settingsPagination = ref({ current: 1, pageSize: 10 });
-function updateListPagination(pagination: { current: number; pageSize: number }, info: PageInfo) {
-  pagination.current = info.current;
-  pagination.pageSize = info.pageSize;
+async function updateListPagination(pagination: { current: number; pageSize: number }, info: PageInfo) {
+  if (pagination.current === info.current && pagination.pageSize === info.pageSize) return;
+  await runScopedRead(() => {
+    pagination.current = info.current;
+    pagination.pageSize = info.pageSize;
+  });
 }
 function clampListPage(pagination: { current: number; pageSize: number }, total: number) {
   pagination.current = Math.min(pagination.current, Math.max(1, Math.ceil(total / pagination.pageSize)));
@@ -588,24 +661,34 @@ const filtered = computed(() =>
 const rows = computed(() =>
   filtered.value.slice((pageNumber.value - 1) * pageSize.value, pageNumber.value * pageSize.value),
 );
-function search() {
+function applySearch() {
   expandedOrderIds.value = [];
   applied.value = { ...filterDraft.value };
   pageNumber.value = 1;
 }
-function reset() {
-  filterDraft.value = {};
-  search();
+async function search() {
+  await runScopedRead(applySearch);
 }
-function switchTab(v: string | number) {
-  status.value = String(v) as Status;
-  reset();
+async function reset() {
+  await runScopedRead(() => {
+    filterDraft.value = {};
+    applySearch();
+  });
 }
-function changePage(info: PageInfo) {
+async function switchTab(v: string | number) {
+  await runScopedRead(() => {
+    status.value = String(v) as Status;
+    filterDraft.value = {};
+    applySearch();
+  });
+}
+async function changePage(info: PageInfo) {
   if (info.current === pageNumber.value && info.pageSize === pageSize.value) return;
-  expandedOrderIds.value = [];
-  pageNumber.value = info.current;
-  pageSize.value = info.pageSize;
+  await runScopedRead(() => {
+    expandedOrderIds.value = [];
+    pageNumber.value = info.current;
+    pageSize.value = info.pageSize;
+  });
 }
 const toolbarActions = computed<ListAction[]>(() =>
   can('create') ? [{ id: 'create', label: '新增订单', function: 'create', icon: 'add' }] : [],
@@ -645,6 +728,8 @@ function findOrder(id: string) {
 async function openAction(id: string, o?: Order, rid = '') {
   const openingScope = key.value;
   try {
+    await requireCurrentStoreScope();
+    if (openingScope !== key.value) return;
     demand(getUserFunctionAudience(user.value) === 'store', '仅门店端可访问订单原型');
     if (id === 'ship' || id === 'receive') demand(canTask(id), '没有操作权限');
     else demand(can(id, o), '没有操作权限');
@@ -685,8 +770,11 @@ async function openAction(id: string, o?: Order, rid = '') {
     if (openingScope === key.value) adminFeedback.error(e instanceof Error ? e.message : '操作失败');
   }
 }
-function saveEditor(o: Order, reason: string) {
+async function saveEditor(o: Order, reason: string) {
+  const savingScope = key.value;
   try {
+    await requireCurrentStoreScope();
+    if (savingScope !== key.value) return;
     demand(can(editing.value ? 'edit' : 'create', o), '没有保存权限');
     if (!editing.value && state.value.orders.some((existing) => existing.id === o.id))
       o.id = generateOrderNumber(state.value.orders.map((existing) => existing.id));
@@ -699,6 +787,9 @@ function saveEditor(o: Order, reason: string) {
   }
 }
 async function execute(f: ActionForm) {
+  const executionScope = key.value;
+  await requireCurrentStoreScope();
+  if (executionScope !== key.value) throw new Error('当前身份已变化，请重新操作');
   const o = findOrder(actionOrderId.value),
     c = context.value;
   demand(
@@ -974,6 +1065,22 @@ async function deleteSetting() {
 }
 const proofUrl = ref(''),
   logDetail = ref<Log | null>(null);
+watch(
+  scopeVerified,
+  (verified) => {
+    if (verified) return;
+    selectedId.value = '';
+    expandedOrderIds.value = [];
+    editorVisible.value = false;
+    actionVisible.value = false;
+    settingVisible.value = false;
+    toggleSettingVisible.value = false;
+    deleteSettingVisible.value = false;
+    proofUrl.value = '';
+    logDetail.value = null;
+  },
+  { flush: 'sync' },
+);
 const pretty = (v: string) => {
   try {
     return JSON.stringify(JSON.parse(v), null, 2);

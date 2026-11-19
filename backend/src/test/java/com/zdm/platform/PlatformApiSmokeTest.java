@@ -100,6 +100,15 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
   }
 
   @Test
+  void anonymousCacheExitCheckExposesOnlyRequestedFingerprints() throws Exception {
+    mockMvc.perform(post("/api/open/store-cache-exits").contentType("application/json")
+        .content("{\"fingerprints\":[\""+"a".repeat(64)+"\"]}"))
+        .andExpect(status().isOk()).andExpect(jsonPath("$.data").isArray());
+    mockMvc.perform(post("/api/open/store-cache-exits").contentType("application/json").content("{\"storeId\":1}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void slabNumberCanBeEmptyAndCleared() throws Exception {
     Long main = uploadSlabMedia("optional-main.png", "image/png");
     Long scan = uploadSlabMedia("optional-scan.png", "image/png");
@@ -331,8 +340,15 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     }
   }
 
+  private static final java.nio.file.Path STORE_EXIT_LEDGER = newLedgerDirectory();
+  private static java.nio.file.Path newLedgerDirectory() {
+    try { return java.nio.file.Files.createTempDirectory("platform-smoke-exit-ledger-"); }
+    catch (java.io.IOException e) { throw new IllegalStateException(e); }
+  }
+
   @DynamicPropertySource
   static void registerDatasource(DynamicPropertyRegistry registry) {
+    registry.add("zdm.store-exit.ledger-directory", STORE_EXIT_LEDGER::toString);
     registry.add("spring.datasource.url", MYSQL::getJdbcUrl);
     registry.add("spring.datasource.username", MYSQL::getUsername);
     registry.add("spring.datasource.password", MYSQL::getPassword);
@@ -2881,10 +2897,10 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         storeId,
         storeId);
 
-    mockMvc.perform(delete("/api/admin/stores/{id}", storeId)
+    mockMvc.perform(delete("/api/admin/stores/{id}", storeId).param("planHash", storeExitPlan(storeId))
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.data").value(true));
+        .andExpect(jsonPath("$.data.databaseStatus").value("CLEARED"));
 
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM stores WHERE id = ?", Integer.class, storeId)).isZero();
@@ -2935,10 +2951,10 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         supplierId);
 
     try {
-      mockMvc.perform(delete("/api/admin/stores/{id}", storeId)
+      mockMvc.perform(delete("/api/admin/stores/{id}", storeId).param("planHash", storeExitPlan(storeId))
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
           .andExpect(status().isBadRequest())
-          .andExpect(jsonPath("$.message").value("该门店仍有供应商被商品引用，不能彻底删除"));
+          .andExpect(jsonPath("$.message").value("该门店仍有跨组织引用，不能彻底删除"));
       assertThat(jdbcTemplate.queryForObject(
           "SELECT COUNT(*) FROM stores WHERE id = ?", Integer.class, storeId)).isEqualTo(1);
       assertThat(jdbcTemplate.queryForObject(
@@ -5074,6 +5090,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
           jdbcTemplate.update("DELETE FROM auth_sessions WHERE account_id=?",accountId);
           jdbcTemplate.update("DELETE FROM account_identities WHERE account_id=?",accountId);
           jdbcTemplate.update("DELETE FROM employee_invite_acceptances WHERE account_id=?",accountId);
+          jdbcTemplate.update("DELETE FROM employee_invite_acceptances WHERE invite_id IN (SELECT id FROM employee_invites WHERE created_by_account_id=? OR token=?)",accountId,invite);
           jdbcTemplate.update("DELETE FROM employee_invites WHERE created_by_account_id=? OR token=?",accountId,invite);
           jdbcTemplate.update("DELETE FROM accounts WHERE id=?",accountId);
         }
@@ -5857,7 +5874,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenantIdValue)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
-            .content("{\"confirmationName\":\"集成测试租户-已更新\"}"))
+            .content(tenantExitPayload(tenantIdValue, "集成测试租户-已更新")))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.tenantDeleteCount").value(1))
         .andExpect(jsonPath("$.data.storeDeleteCount").value(2))
@@ -5867,7 +5884,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         "SELECT COUNT(*) FROM accounts WHERE id = ? AND phone IS NULL AND status='disabled'",
         Integer.class,
         tenantAccountId)).isEqualTo(1);
-    // The owner used authenticated operations; its audit history stays linked to the old account.
+    // Tenant-owned account retirement keeps the original historical-account policy.
     assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM security_audit_logs WHERE account_id=?", Integer.class, tenantAccountId)).isPositive();
     assertThat(jdbcTemplate.queryForObject(
         "SELECT COUNT(*) FROM stores WHERE id = ?",
@@ -6720,7 +6737,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
       mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenantId)
               .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
               .contentType("application/json")
-              .content("{\"confirmationName\":\"%s\"}".formatted(tenantName)))
+              .content(tenantExitPayload(tenantId, tenantName)))
           .andExpect(status().isOk())
           .andExpect(jsonPath("$.data.accountDeleteCount").value(0))
           .andExpect(jsonPath("$.data.accountRetainCount").value(1));
@@ -6781,7 +6798,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenantId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
-            .content("{\"confirmationName\":\"%s\"}".formatted(tenantName)))
+            .content(tenantExitPayload(tenantId, tenantName)))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.message").value("该租户存在暂不支持删除的跨组织业务数据"));
     assertThat(jdbcTemplate.queryForObject(
@@ -6791,7 +6808,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenantId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
-            .content("{\"confirmationName\":\"%s\"}".formatted(tenantName)))
+            .content(tenantExitPayload(tenantId, tenantName)))
         .andExpect(status().isOk());
   }
 
@@ -6840,7 +6857,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenantId)
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
             .contentType("application/json")
-            .content("{\"confirmationName\":\"装点猫直营租户\"}"))
+            .content(tenantExitPayload(Long.parseLong(tenantId), "装点猫直营租户")))
         .andExpect(status().isOk());
   }
 
@@ -7122,7 +7139,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         .andExpect(jsonPath("$.data.accountRetainCount").value(1)).andExpect(jsonPath("$.data.phoneReleaseCount").value(1));
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenant)
         .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
-        .contentType("application/json").content("{\"confirmationName\":\"%s\"}".formatted(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?", String.class, oldId))))
+        .contentType("application/json").content(tenantExitPayload(tenant, jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?", String.class, oldId))))
         .andExpect(status().isOk()).andExpect(jsonPath("$.data.phoneReleaseCount").value(1));
     assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isNull();
     assertThat(jdbcTemplate.queryForObject("SELECT created_by_account_id FROM roles WHERE code='EXIT_HISTORY_99203'", Long.class)).isEqualTo(oldId);
@@ -7138,7 +7155,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     Long oldId = jdbcTemplate.queryForObject("SELECT id FROM accounts WHERE phone=?", Long.class, phone);
     mockMvc.perform(post("/api/admin/tenants/{id}/purge", tenant)
         .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)
-        .contentType("application/json").content("{\"confirmationName\":\"%s\"}".formatted(jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?", String.class, oldId))))
+        .contentType("application/json").content(tenantExitPayload(tenant, jdbcTemplate.queryForObject("SELECT display_name FROM accounts WHERE id=?", String.class, oldId))))
         .andExpect(status().isOk()).andExpect(jsonPath("$.data.phoneReleaseCount").value(0));
     assertThat(jdbcTemplate.queryForObject("SELECT phone FROM accounts WHERE id=?", String.class, oldId)).isEqualTo(phone);
     assertThat(jdbcTemplate.queryForObject("SELECT status FROM employees WHERE id=?", String.class, employee)).isEqualTo("disabled");
@@ -7149,7 +7166,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     createStoreScopedEmployee(99205L, "15926629205", "门店退出", "admin.permission-management.employee-management.view");
     mockMvc.perform(patch("/api/admin/stores/99205/archive")
         .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
-    mockMvc.perform(delete("/api/admin/stores/99205")
+    mockMvc.perform(delete("/api/admin/stores/99205").param("planHash", storeExitPlan(99205L))
         .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN)).andExpect(status().isOk());
     assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM accounts WHERE phone='15926629205'", Integer.class)).isZero();
     assertThat(jdbcTemplate.queryForObject("SELECT COUNT(*) FROM tenants WHERE id=1", Integer.class)).isEqualTo(1);
@@ -7310,6 +7327,23 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     jdbcTemplate.update("UPDATE employees SET tenant_id = NULL, store_id = NULL WHERE account_id = ?", accountId);
     jdbcTemplate.update("UPDATE account_identities SET tenant_id = NULL, store_id = NULL "
         + "WHERE account_id = ? AND identity_type = 'employee'", accountId);
+  }
+
+  private String storeExitPlan(long id) throws Exception {
+    var result = mockMvc.perform(get("/api/admin/stores/{id}/purge-preview", id)
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk()).andReturn();
+    return com.jayway.jsonpath.JsonPath.read(result.getResponse().getContentAsString(), "$.data.planHash");
+  }
+
+  private String tenantExitPayload(long id, String name) throws Exception {
+    var result = mockMvc.perform(get("/api/admin/tenants/{id}/purge-preview", id)
+        .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
+        .andExpect(status().isOk()).andReturn();
+    var response = new com.fasterxml.jackson.databind.ObjectMapper().readTree(result.getResponse().getContentAsString());
+    var body = new com.fasterxml.jackson.databind.ObjectMapper().createObjectNode().put("confirmationName", name);
+    body.set("storePlans", response.path("data").path("storePlans"));
+    return body.toString();
   }
 
 }

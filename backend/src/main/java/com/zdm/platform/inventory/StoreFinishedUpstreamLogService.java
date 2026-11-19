@@ -10,8 +10,11 @@ import org.springframework.stereotype.Service;
 
 /** Records one store-owned audit event per selected listing affected by an upstream change. */
 @Service
+@org.springframework.transaction.annotation.Transactional
 public class StoreFinishedUpstreamLogService {
   private final org.springframework.beans.factory.ObjectProvider<StoreFinishedProductService> storeProducts;
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.zdm.platform.storeexit.StoreExitTargetService exitTargets;
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final CurrentIdentityProvider identities;
@@ -64,6 +67,9 @@ public class StoreFinishedUpstreamLogService {
     } catch (JsonProcessingException error) {
       throw new IllegalStateException("门店上游操作日志序列化失败", error);
     }
+    var writableStores = exitTargets.lockStores(jdbc.queryForList("SELECT DISTINCT store_id FROM store_finished_products WHERE finished_product_id=? ORDER BY store_id", Long.class, productId));
+    if (writableStores.isEmpty()) { return; }
+    String storeIds = writableStores.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
     if (List.of("SOURCE_OFF_SHELF", "SOURCE_DELETE_TO_RECYCLE", "SOURCE_PURGE",
         "OPERATIONS_OFF_SHELF", "OPERATIONS_DELETE_TO_RECYCLE", "OPERATIONS_PURGE").contains(type)) {
       storeProducts.getObject().invalidateFromUpstream(productId, FinishedSourceMessage.normalize(summary));
@@ -79,8 +85,8 @@ public class StoreFinishedUpstreamLogService {
           product.name, ?, ?, listing.status, listing.status, ?, ?, ?
         FROM store_finished_products listing
         JOIN finished_products product ON product.id = listing.finished_product_id
-        WHERE listing.finished_product_id = ?
+        WHERE listing.finished_product_id = ? AND listing.store_id IN (%s)
 
-        """, type, summary, changes, actor.accountId(), actor.displayName(), productId);
+        """.replace("%s", storeIds), type, summary, changes, actor.accountId(), actor.displayName(), productId);
   }
 }
