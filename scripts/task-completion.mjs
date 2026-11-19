@@ -10,6 +10,7 @@ import { collectDeliveryChanges, createVerificationPlan } from './verify.mjs';
 import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 import { requestResponse } from './dev-task.mjs';
 import { retainTaskDependencies } from './task-dependency-retention.mjs';
+import { registeredTaskWorktrees } from './task-registry.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const knownOutput =
@@ -221,6 +222,18 @@ export async function checkCompletionRuntime(
 async function main(args) {
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']);
   const commonDir = path.resolve(root, git(root, ['rev-parse', '--git-common-dir']));
+  if (args[0] === 'compose-reviewed') {
+    const mains = registeredTaskWorktrees(root).filter((entry) => entry.branch === 'main');
+    assert.equal(mains.length, 1, 'Exact main anchor required');
+    const anchor = realpathSync(mains[0].worktree);
+    assert.equal(
+      realpathSync(fileURLToPath(import.meta.url)),
+      path.join(anchor, 'scripts/task-completion.mjs'),
+      'Use the published task:entry complete compose-reviewed command',
+    );
+    assert.equal(git(anchor, ['rev-parse', 'HEAD']), git(anchor, ['rev-parse', 'origin/main']));
+    assert.equal(git(anchor, ['status', '--porcelain']), '', 'Published main source must be clean');
+  }
   if (
     [
       'deliver',
@@ -232,6 +245,7 @@ async function main(args) {
       'begin',
       'freeze',
       'check-source',
+      'compose-reviewed',
       'measure',
       'repair-start',
       'repair-finish',
