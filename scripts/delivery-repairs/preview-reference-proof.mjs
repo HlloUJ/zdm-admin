@@ -16,7 +16,7 @@ import {
   assertStoppedPreviewIdentity,
   assertStoppedPreviewRound,
   assertStoppedPreviewPair,
-  referenceFrontendMetadata,
+  referenceBackendConsumers,
   observedHostMountPath,
 } from './preview-reference-proof-core.mjs';
 import {
@@ -348,7 +348,7 @@ async function captureIdentity(scope, selector, core, record) {
   return identity;
 }
 
-async function observe(identity, scope, core, record) {
+async function observe(identity, scope, core, record, ownClosures) {
   const observedAt = Date.now();
   // Mandatory original published implementation, with no exec/env test adapter.
   const inventory = core['scripts/task-cancellation-proof.mjs'].observeCancellationHost();
@@ -369,15 +369,7 @@ async function observe(identity, scope, core, record) {
     leases,
     'Preview leases changed during observation',
   );
-  const backendConsumers = [];
-  for (const { port, response } of responses) {
-    if (port === identity.port) continue;
-    const lease = leases.find((l) => l.port === port);
-    const metadata = referenceFrontendMetadata(port, response, lease);
-    if (metadata) {
-      if (metadata.apiTarget === `http://127.0.0.1:${identity.backendPort}`) backendConsumers.push({ port, metadata });
-    }
-  }
+  const backendConsumers = referenceBackendConsumers(responses, leases, identity, scope.task.id, ownClosures);
   const response = responses.find((r) => r.port === identity.port).response;
   const health = await readReferenceBackendHealth(`http://127.0.0.1:${identity.backendPort}/actuator/health`);
   let status;
@@ -401,22 +393,22 @@ async function observe(identity, scope, core, record) {
   };
 }
 
-async function liveProof(scope, selector, expected = null) {
+async function liveProof(scope, selector, expected = null, ownClosures = []) {
   const parent = path.join(scope.registry.commonDir, 'task-delivery', scope.task.id, 'reference-proofs');
   mkdirSync(parent, { recursive: true, mode: 0o700 });
   const evidenceDirectory = path.join(parent, 'observation-' + randomUUID());
   const record = createReferenceEvidenceJournal(evidenceDirectory);
-  record('started', { selector, consumerTask: scope.task.id, observerPid: process.pid });
+  record('started', { selector, consumerTask: scope.task.id, observerPid: process.pid, ownClosures });
   try {
     const core = await publishedCore(scope, selector.publishedBaseline);
     const identity = await captureIdentity(scope, selector, core, record);
     if (expected) assert.deepEqual(identity, expected, 'Original lease/registry/source/history/data binding changed');
-    const first = await observe(identity, scope, core, record);
+    const first = await observe(identity, scope, core, record, ownClosures);
     record('round', first);
     assertStoppedPreviewRound(first, identity, Date.now());
     const afterFirst = await captureIdentity(scope, selector, core, record);
     assert.deepEqual(afterFirst, identity, 'Identity changed after first full observation');
-    const second = await observe(identity, scope, core, record);
+    const second = await observe(identity, scope, core, record, ownClosures);
     record('round', second);
     assertStoppedPreviewRound(second, identity, Date.now());
     const afterSecond = await captureIdentity(scope, selector, core, record);
@@ -626,7 +618,7 @@ export async function withPreviewReferenceProof(root, file, { task, effect }, ac
   }
 }
 
-export async function verifyClosedPreviewReference({ worktree, taskId, lease, effect = 'final' }) {
+export async function verifyClosedPreviewReference({ worktree, taskId, lease, effect = 'final', ownClosures = [] }) {
   if (!process.env[VARIABLE]) return null;
   const selection = JSON.parse(process.env[VARIABLE]);
   assert.deepEqual(Object.keys(selection).sort(), [
@@ -656,7 +648,7 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease, ef
   const { port, ...original } = lease;
   assert.equal(port, loaded.packet.identity.port);
   assert.deepEqual(original, loaded.packet.identity.lease);
-  const live = await liveProof(loaded.scope, loaded.packet.selector, loaded.packet.identity);
+  const live = await liveProof(loaded.scope, loaded.packet.selector, loaded.packet.identity, ownClosures);
   const after = loadSelection(worktree, selection.file, context);
   assert.equal(after.digest, loaded.digest, 'Selection changed during live proof');
   assert.deepEqual(after.collector, loaded.collector, 'Actual collector changed during live proof');

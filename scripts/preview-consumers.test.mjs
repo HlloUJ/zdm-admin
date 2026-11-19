@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { copyFileSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { createResourceLeases } from './resource-lease.mjs';
 import { inspectPreviewConsumers } from './preview-consumers.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
 import { assertPreviewConsumersReleased } from './task-preview-service.mjs';
@@ -72,6 +77,77 @@ test('only a closed exact temporary port owned by this process may finish its ow
     }),
     /unknown on leased port/,
   );
+});
+test('nested 5177 proof rechecks the outer task’s exact closed 5178 lease in both rounds', async (t) => {
+  const root = mkdtempSync(path.join(tmpdir(), 'nested-preview-proof-'));
+  const selection = process.env.ZDM_CLOSED_PREVIEW_REFERENCE;
+  t.after(() => {
+    if (selection === undefined) delete process.env.ZDM_CLOSED_PREVIEW_REFERENCE;
+    else process.env.ZDM_CLOSED_PREVIEW_REFERENCE = selection;
+    rmSync(root, { recursive: true, force: true });
+  });
+  process.env.ZDM_CLOSED_PREVIEW_REFERENCE = 'isolated-fixture';
+  const common = createResourceLeases(root);
+  const own = { port: 5178, ...common.acquire('temporary-port-5178', task.id) };
+  const foreign = { port: 5177, ...common.acquire('temporary-port-5177', 'retained') };
+  const readLeases = () => [foreign, own];
+  const observe = [
+    { port: foreign.port, response: closed },
+    { port: own.port, response: closed },
+  ];
+  const input = path.join(root, 'second.json');
+  const core = new URL('./delivery-repairs/preview-reference-proof-core.mjs', import.meta.url);
+  for (const file of ['preview-consumers.mjs', 'resource-lease.mjs'])
+    copyFileSync(new URL('./' + file, import.meta.url), path.join(root, file));
+  mkdirSync(path.join(root, 'delivery-repairs'));
+  // The unmodified outer caller imports this isolated transport module. It
+  // runs the production consumer evaluator against both captured rounds.
+  writeFileSync(
+    path.join(root, 'delivery-repairs/preview-reference-proof.mjs'),
+    `import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import { referenceBackendConsumers } from ${JSON.stringify(core.href)};
+const first = ${JSON.stringify({ leases: readLeases(), responses: observe })};
+export async function verifyClosedPreviewReference({ taskId, lease, ownClosures }) {
+  const second = JSON.parse(readFileSync(${JSON.stringify(input)}, 'utf8'));
+  assert.deepEqual(lease, first.leases[0]);
+  for (const round of [first, second]) {
+    assert.deepEqual(
+      referenceBackendConsumers(round.responses, round.leases, { port: lease.port, backendPort: 8081 }, taskId, ownClosures),
+      [],
+    );
+  }
+  return { leaseRetained: true, cleanupAuthorized: false };
+}
+`,
+  );
+  const outer = await import(pathToFileURL(path.join(root, 'preview-consumers.mjs')).href);
+  const check = () =>
+    outer.inspectPreviewConsumers(
+      { worktree: task.worktree, taskId: task.id, ports: [5177, 5178], closingLeases: [own] },
+      { request: async () => closed, readLeases },
+    );
+  writeFileSync(input, JSON.stringify({ leases: readLeases(), responses: observe }));
+  const result = await check();
+  assert.deepEqual(result.observations[0].stoppedReference, { leaseRetained: true, cleanupAuthorized: false });
+  for (const change of [
+    { leases: [foreign, { ...own, task: 'other' }] },
+    { leases: [foreign, { ...own, token: 'different' }] },
+    { leases: [foreign, { ...own, pid: process.pid + 1 }] },
+    { leases: [foreign, { ...own, resource: 'temporary-port-5179' }] },
+    { leases: [foreign] },
+    { responses: [observe[0], { port: own.port, response: response(metadata(task.worktree)) }] },
+    { responses: [observe[0], { port: own.port, response: { statusCode: 0, errorCode: 'ETIMEDOUT' } }] },
+  ]) {
+    writeFileSync(input, JSON.stringify({ leases: readLeases(), responses: observe, ...change }));
+    await assert.rejects(check, /Owned validation preview changed during nested observation/);
+  }
+  assert.deepEqual(common.inspect(own.resource), {
+    resource: own.resource,
+    task: own.task,
+    pid: own.pid,
+    token: own.token,
+  });
 });
 test('independent healthy leased B and unrelated unleased web servers remain untouched', async () => {
   const r = await taskRuntimeReferences(task, {

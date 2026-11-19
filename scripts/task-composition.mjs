@@ -10,14 +10,22 @@ const git = (root, ...args) =>
 
 // The immutable composition proof is also the recovery intent. Never reset an
 // edited worktree, resolve a business conflict, or rebuild the original freeze.
-export function applyTaskComposition(root, id, main, { recover = false } = {}) {
+export function applyTaskComposition(root, id, main, { recover = false, reviewedCandidate } = {}) {
   const registry = createTaskRegistry(root),
     task = registry.resolve({ id });
   assert.equal(git(task.worktree, 'status', '--porcelain'), '', 'Composition requires a clean owned task');
   const accepted = readAcceptance(root, id);
   assert.equal(task.frozen?.accepted, accepted?.commit, 'Original task freeze required');
   let proof = readAcceptedComposition(root, id, accepted.commit);
-  if (!recover) proof = prepareAcceptedComposition(task.worktree, id, main);
+  if (!recover) {
+    if (reviewedCandidate !== undefined)
+      assert.equal(
+        git(task.worktree, 'rev-parse', 'HEAD'),
+        task.recordedHead,
+        'Exact checkpointed task parent required',
+      );
+    proof = prepareAcceptedComposition(task.worktree, id, main, reviewedCandidate);
+  }
   if (!proof) return task;
   let head = git(task.worktree, 'rev-parse', 'HEAD');
   const tree = git(task.worktree, 'rev-parse', head + '^{tree}');
@@ -51,6 +59,7 @@ export function applyTaskComposition(root, id, main, { recover = false } = {}) {
       ]);
     }
     git(task.worktree, 'merge-base', '--is-ancestor', proof.main, settled);
+    if (proof.candidateCommit) assert.equal(settled, proof.candidateCommit, 'Reviewed intent settled another commit');
     git(task.worktree, 'merge-base', '--is-ancestor', settled, head);
     const owned = new Set(task.checkpoints.map((checkpoint) => checkpoint.commit));
     for (const commit of git(task.worktree, 'rev-list', settled + '..' + head)
@@ -75,11 +84,16 @@ export function applyTaskComposition(root, id, main, { recover = false } = {}) {
   if (head === proof.taskHead && git(task.worktree, 'rev-list', '-n', '1', proof.main, '--not', head)) {
     // This tree was already proven against the original freeze and fresh main.
     // Hooks remain enabled; a failure leaves the exact Git operation intact.
-    git(task.worktree, 'merge', '--no-ff', '--no-edit', proof.main);
+    if (proof.candidateCommit) {
+      assert.equal(head, task.recordedHead, 'Reviewed candidate parent moved outside its intent');
+      assertAcceptedSource(task.worktree, id, proof.candidateCommit);
+      git(task.worktree, 'merge', '--ff-only', proof.candidateCommit);
+    } else git(task.worktree, 'merge', '--no-ff', '--no-edit', proof.main);
     head = git(task.worktree, 'rev-parse', 'HEAD');
   }
   git(task.worktree, 'merge-base', '--is-ancestor', proof.taskHead, head);
   git(task.worktree, 'merge-base', '--is-ancestor', proof.main, head);
+  if (proof.candidateCommit) assert.equal(head, proof.candidateCommit, 'Reviewed intent cannot adopt another commit');
   assert.equal(
     git(task.worktree, 'rev-parse', head + '^{tree}'),
     proof.candidateTree,
