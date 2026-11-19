@@ -9,6 +9,8 @@ import { bestEffortProgress } from './task-delivery-status-sync.mjs';
 import { createProgressOutbox, progressSourceIdentity } from './task-progress-outbox.mjs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { correct410InitialPause } from './delivery-repairs/task-410-initial-pause-correction.mjs';
+import { dynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
 
 function recordReadiness(commonDir, input, result) {
   if (!['receive', 'continue-intake', 'start'].includes(input.action)) return;
@@ -92,9 +94,24 @@ export async function advanceTaskThread(
   { commonDir, readTask, start, registry, dependenciesReady, observe, now = Date.now() },
 ) {
   assert.ok(
-    ['receive', 'continue-intake', 'start', 'rename', 'rebind', 'rebind-plan', 'resume', 'coordinate'].includes(
-      input.action,
-    ),
+    [
+      'receive',
+      'continue-intake',
+      'start',
+      'rename',
+      'rebind',
+      'rebind-plan',
+      'resume',
+      'coordinate',
+      'delegate',
+      'delivery-enroll',
+      'dispatch',
+      'dispatch-start',
+      'dispatch-cancel',
+      'preparation-finish',
+      'retry-creation',
+      'correct-410-initial-pause',
+    ].includes(input.action),
   );
   const coordination = readTaskCoordination(commonDir);
   if (input.action === 'start' && coordination)
@@ -155,6 +172,40 @@ export async function advanceTaskThread(
       assert.ok(Number.isFinite(at) && at <= current && current - at <= 60000, 'Fresh native capacity required');
       return input.capacity.snapshot;
     },
+    readCreationProgress: async (id, receiptIds) => {
+      assert.equal(
+        input.progressNativeObservations?.length,
+        receiptIds.length + 1,
+        'Exact native history and receipt observation set required',
+      );
+      const read = (operation, args) => {
+        const keys = Object.keys(args);
+        const matches = (input.progressNativeObservations ?? []).filter(
+          (item) =>
+            item.operation === operation &&
+            Object.keys(item.args ?? {}).length === keys.length &&
+            keys.every((key) => item.args?.[key] === args[key]),
+        );
+        assert.equal(matches.length, 1, 'One exact native progress readback required');
+        const observation = matches[0];
+        assert.equal(observation.provider, 'codex-native-task-board');
+        const at = Date.parse(observation.observedAt),
+          current = observationNow();
+        assert.ok(
+          Number.isFinite(at) && at <= current && current - at <= 60000,
+          'Fresh native progress evidence required',
+        );
+        assert.equal(observation.result?.isError, false);
+        assert.equal(observation.result.content?.length, 1);
+        assert.equal(observation.result.content[0].type, 'text');
+        return JSON.parse(observation.result.content[0].text);
+      };
+      return {
+        history: read('task_history', { id }),
+        receipts: receiptIds.map((receipt_id) => read('get_task_progress_receipt', { id, receipt_id })),
+        nativeObservations: input.progressNativeObservations,
+      };
+    },
     createThread: async (plan) => {
       actions.push({ tool: 'create_thread', ...plan });
       return {};
@@ -170,7 +221,28 @@ export async function advanceTaskThread(
     },
   };
   let result;
-  if (input.action === 'coordinate') result = await authorizeTaskCoordinator(commonDir, input.task, host);
+  if (
+    ['delegate', 'delivery-enroll', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(
+      input.action,
+    )
+  ) {
+    assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
+    result = await dynamicHostAction(input.action, input.task, host, {
+      commonDir,
+      registry,
+      queue: host.queue,
+      ...(observe ? { observe } : {}),
+    });
+  } else if (input.action === 'correct-410-initial-pause') {
+    assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
+    result = await correct410InitialPause(input.task, host, registry, { now: observationNow });
+  } else if (input.action === 'retry-creation') {
+    assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
+    result = await createTaskThreadTitles(commonDir).retryCreation(input.task, host, {
+      registry,
+      ...(observe ? { observe } : {}),
+    });
+  } else if (input.action === 'coordinate') result = await authorizeTaskCoordinator(commonDir, input.task, host);
   else if (['rebind', 'rebind-plan', 'resume'].includes(input.action)) {
     assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
     const adapters = { registry, queue: host.queue, now, ...(observe ? { observe } : {}) };

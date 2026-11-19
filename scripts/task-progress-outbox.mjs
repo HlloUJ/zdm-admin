@@ -6,6 +6,13 @@ import {
   validateTerminalInvalidSupersession,
 } from './task-progress-supersession.mjs';
 import assert from 'node:assert/strict';
+import {
+  createInitialPauseArchive,
+  initialPauseReceipt,
+  readClosedInitialPause,
+  retiredInitialPause,
+} from './delivery-repairs/task-410-initial-pause-evidence.mjs';
+import { readClosedCreationAttempt } from './delivery-repairs/task-creation-progress.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -43,16 +50,34 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
     assert.equal(state.version, 1);
     return state;
   }
-  function change(fn) {
+  function change(fn, { skipUnchanged = false, durable = false } = {}) {
     safe(file);
     mkdirSync(directory, { recursive: true, mode: 0o700 });
     writeFileSync(lock, String(process.pid), { flag: 'wx', mode: 0o600 });
     try {
       const state = read();
+      const original = skipUnchanged ? JSON.stringify(state) : null;
       const result = fn(state);
+      if (skipUnchanged && JSON.stringify(state) === original) return result;
       const temporary = file + '.' + randomUUID();
       writeFileSync(temporary, JSON.stringify(state) + '\n', { flag: 'wx', mode: 0o600 });
+      if (durable) {
+        const fd = openSync(temporary, 'r');
+        try {
+          fsyncSync(fd);
+        } finally {
+          closeSync(fd);
+        }
+      }
       renameSync(temporary, file);
+      if (durable) {
+        const fd = openSync(directory, 'r');
+        try {
+          fsyncSync(fd);
+        } finally {
+          closeSync(fd);
+        }
+      }
       return result;
     } finally {
       unlinkSync(lock);
@@ -65,9 +90,12 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
     const receipt_id = progressSourceIdentity(task, sourceKey);
     const payloadHash = hash(payload);
     return change((state) => {
-      const existing = [...state.pending, ...state.acknowledged, ...(state.rejected ?? [])].find(
-        (r) => r.receipt_id === receipt_id,
-      );
+      const existing = [
+        ...state.pending,
+        ...state.acknowledged,
+        ...(state.rejected ?? []),
+        ...(state.retired ?? []),
+      ].find((r) => r.receipt_id === receipt_id);
       if (existing) {
         assert.equal(existing.payload_hash, payloadHash, 'Receipt identity reused with changed facts');
         if (
@@ -82,6 +110,7 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
           assert.equal(byteHash(bytes), existing.auditDigest);
           return { ...JSON.parse(bytes).entry, state: existing.state };
         }
+        if (existing.state === retiredInitialPause) return readRetirement(state);
         return structuredClone(existing);
       }
       assert.ok(
@@ -231,6 +260,178 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
       return structuredClone(result);
     });
   }
+  const initialPauseAudit = path.join(directory, 'initial-pause-' + initialPauseReceipt + '.json');
+  function readRetirement(state) {
+    const matches = (state.retired ?? []).filter((entry) => entry.receipt_id === initialPauseReceipt);
+    if (!matches.length) return null;
+    assert.equal(matches.length, 1);
+    const [result] = matches;
+    assert.match(result.auditDigest ?? '', /^[a-f0-9]{64}$/);
+    const { archive } = readClosedInitialPause(initialPauseAudit, directory, result.auditDigest);
+    assert.deepEqual(result, {
+      ...archive.entry,
+      state: retiredInitialPause,
+      audit: initialPauseAudit,
+      auditDigest: result.auditDigest,
+    });
+    assert.ok(
+      [...state.pending, ...state.acknowledged, ...(state.rejected ?? [])].every(
+        (entry) => entry.receipt_id !== initialPauseReceipt,
+      ),
+      'Retired initial pause also appears in transport state',
+    );
+    return structuredClone(result);
+  }
+  function retire410InitialPause(raw, facts, recheck) {
+    assert.equal(typeof recheck, 'function');
+    return change(
+      (state) => {
+        const prior = readRetirement(state);
+        if (prior) return { ...prior, replay: true };
+        assert.deepEqual(readFileSync(file), raw, '410 outbox changed during readback; retain the original packet');
+        const audit = createInitialPauseArchive(raw, facts, directory);
+        recheck();
+        if (!existsSync(initialPauseAudit)) {
+          const fd = openSync(initialPauseAudit, 'wx', 0o600);
+          try {
+            writeFileSync(fd, JSON.stringify(audit) + '\n');
+            fsyncSync(fd);
+          } finally {
+            closeSync(fd);
+          }
+          const parent = openSync(directory, 'r');
+          try {
+            fsyncSync(parent);
+          } finally {
+            closeSync(parent);
+          }
+        }
+        const { archive, digest } = readClosedInitialPause(initialPauseAudit, directory);
+        assert.deepEqual(
+          archive.originalOutbox,
+          audit.originalOutbox,
+          'Interrupted audit is for different original bytes',
+        );
+        recheck();
+        const [entry] = state.pending.splice(0, 1);
+        const result = { ...entry, state: retiredInitialPause, audit: initialPauseAudit, auditDigest: digest };
+        (state.retired ??= []).push(result);
+        return structuredClone(result);
+      },
+      { skipUnchanged: true, durable: true },
+    );
+  }
+  function retireCreationAttempt({ archiveFile, archiveDigest }) {
+    assert.ok(
+      typeof archiveFile === 'string' && /^[a-f0-9]{64}$/.test(archiveDigest ?? ''),
+      'Trusted sealed attempt archive reader required; raw closure JSON is not accepted',
+    );
+    safe(archiveFile);
+    assert.ok(lstatSync(archiveFile).isFile() && (lstatSync(archiveFile).mode & 0o077) === 0);
+    const archive = JSON.parse(readFileSync(archiveFile));
+    assert.equal(hash(archive), archiveDigest, 'Original creation recovery archive changed');
+    const closedAttempt = readClosedCreationAttempt(archiveFile);
+    const proof = archive.retiredProgress,
+      task = archive.original.taskId,
+      decision = archive.next.recovery.decisionId;
+    assert.equal(
+      archiveFile,
+      path.join(path.dirname(path.dirname(directory)), 'task-thread-titles/failed-creations', task, decision + '.json'),
+    );
+    assert.equal(directory, path.join(path.dirname(path.dirname(directory)), 'task-progress', task));
+    assert.equal(archive.failure, 'Native thread must read back this exact task creation instruction');
+    assert.equal(archive.original.state, 'creation-unknown');
+    assert.equal(proof?.kind, 'never-submitted-failed-creation-projections');
+    assert.equal(proof.task, task);
+    assert.equal(closedAttempt.task, task);
+    assert.equal(closedAttempt.outboxDirectory, directory);
+    assert.deepEqual(
+      closedAttempt.receipts,
+      proof.entries.map((entry) => ({ receipt_id: entry.receipt_id, entryDigest: hash(entry) })),
+    );
+    assert.equal(proof.originalAttempt, archive.original.createRequestId);
+    assert.equal(byteHash(Buffer.from(proof.bytes, 'base64')), proof.sha256);
+    return change(
+      (state) => {
+        const prior = state.retiredAttempts?.find((item) => item.decisionId === decision);
+        if (prior) {
+          assert.equal(prior.archiveDigest, archiveDigest);
+          assert.deepEqual(
+            prior.retiredReceiptIds,
+            proof.entries.map((entry) => entry.receipt_id),
+          );
+          assert.equal(prior.queuedReceiptId, progressSourceIdentity(task, 'failed-creation-retry:' + decision));
+          assert.equal(state.retired?.length, proof.entries.length);
+          for (const original of proof.entries) {
+            const retained = state.retired.find((entry) => entry.receipt_id === original.receipt_id);
+            assert.ok(retained);
+            assert.equal(retained.state, 'retired-attempt-not-delivered');
+            assert.equal(retained.decisionId, decision);
+            assert.equal(retained.originalAttempt, proof.originalAttempt);
+            assert.equal(retained.audit, archiveFile);
+            assert.equal(retained.auditDigest, byteHash(readFileSync(archiveFile)));
+            const entry = structuredClone(retained);
+            for (const field of ['decisionId', 'originalAttempt', 'audit', 'auditDigest']) delete entry[field];
+            assert.deepEqual({ ...entry, state: 'pending' }, original);
+          }
+          return structuredClone(prior);
+        }
+        assert.equal(
+          byteHash(readFileSync(file)),
+          proof.sha256,
+          'Original outbox changed; unknown writes stay blocking',
+        );
+        assert.deepEqual(state.pending, proof.entries);
+        assert.equal(state.acknowledged.length, 0);
+        assert.equal((state.rejected ?? []).length + (state.retired ?? []).length, 0);
+        assert.equal(state.tasks[task], proof.lastSequence);
+        assert.ok(proof.entries.length >= 1 && proof.entries.length <= 2);
+        for (const entry of proof.entries) {
+          assert.equal(entry.state, 'pending');
+          assert.equal(entry.revision, undefined);
+          assert.equal(entry.failure, undefined);
+          assert.equal(entry.receipt.task_id, task);
+        }
+        const payload = {
+          event: 'queued',
+          observed_at: archive.next.createdAt,
+          action: { id: 'retry-creation', label: '已知失败创建已保全，等待新尝试身份核验' },
+          evidence_refs: [`failed-native-creation:${archive.original.createRequestId}:${decision}:${archiveDigest}`],
+          next: { kind: 'action', label: '读回新尝试的精确原生创建结果，再绑定和准入' },
+        };
+        const receiptId = progressSourceIdentity(task, 'failed-creation-retry:' + decision);
+        const sequence = proof.lastSequence + 1;
+        state.retired = proof.entries.map((entry) => ({
+          ...structuredClone(entry),
+          state: 'retired-attempt-not-delivered',
+          decisionId: decision,
+          originalAttempt: proof.originalAttempt,
+          audit: archiveFile,
+          auditDigest: byteHash(readFileSync(archiveFile)),
+        }));
+        state.pending = [
+          {
+            receipt_id: receiptId,
+            payload_hash: hash(payload),
+            receipt: { ...payload, version: 1, task_id: task, receipt_id: receiptId, sequence },
+            state: 'pending',
+          },
+        ];
+        state.tasks[task] = sequence;
+        const result = {
+          decisionId: decision,
+          archiveDigest,
+          originalAttempt: proof.originalAttempt,
+          retiredReceiptIds: proof.entries.map((entry) => entry.receipt_id),
+          queuedReceiptId: receiptId,
+          delivery: 'original-attempt-never-submitted',
+        };
+        (state.retiredAttempts ??= []).push(result);
+        return structuredClone(result);
+      },
+      { skipUnchanged: true, durable: true },
+    );
+  }
   return {
     directory,
     read,
@@ -238,6 +439,9 @@ export function createProgressOutbox(directory, { capacity = 512 } = {}) {
     prepare,
     acknowledge,
     fail,
+    retireCreationAttempt,
+    readInitialPauseRetirement: () => readRetirement(read()),
+    retire410InitialPause,
     quarantineStale: (id, proof, options) => {
       assert.notEqual(proof.kind, 'superseded-without-submission');
       return quarantineTerminal(id, proof, options);

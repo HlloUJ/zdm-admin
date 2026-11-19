@@ -853,6 +853,54 @@ test('new task scoped start preserves global pause and untouched historical tick
   assert.deepEqual(f.queue.read().tickets[0], old);
   assert.equal(f.queue.read().scopedAdmissions.length, 1);
 });
+test('fresh native intake stays queued through reservation and binding until actual scoped start without false paused progress', async (t) => {
+  const f = fixture(t, { paused: true }),
+    phases = [];
+  const box = createProgressOutbox(path.join(f.commonDir, 'task-progress', f.input.taskId));
+  for (const name of ['reserveNativeCreation', 'bindNativeWorker']) {
+    const original = f.queue[name];
+    f.queue[name] = (...args) => {
+      const result = original(...args),
+        state = f.queue.read();
+      phases.push({
+        name,
+        ticket: state.tickets[0],
+        scopes: state.scopedAdmissions ?? [],
+        events: box.read().pending.map((entry) => entry.receipt.event),
+      });
+      return result;
+    };
+  }
+  const received = await prepared(f);
+  process.env.CODEX_THREAD_ID = worker;
+  await startIndependentCodexTask(received.workerInput, f.host);
+  assert.equal(f.counts().starts, 1);
+  assert.equal(f.queue.read().paused, true);
+  assert.equal(phases.length, 2);
+  for (const phase of phases) {
+    assert.equal(phase.ticket.status, 'queued');
+    assert.equal(phase.ticket.admission, null);
+    assert.equal(phase.ticket.nativeLaunchReserved, true);
+    assert.deepEqual(phase.scopes, []);
+    assert.deepEqual(phase.events, ['queued'], phase.name);
+  }
+  assert.equal(phases[1].ticket.awaitingNativeWorker, undefined);
+  assert.equal(phases[1].ticket.nativeCoordinatorOwner, coordinator);
+  assert.equal(phases[1].ticket.owner, worker);
+  assert.ok(!box.read().pending.some((entry) => entry.receipt.event === 'paused'));
+});
+test('a real new pause after native binding projects paused and revokes the later worker start', async (t) => {
+  const f = fixture(t, { paused: true }),
+    received = await prepared(f);
+  const box = createProgressOutbox(path.join(f.commonDir, 'task-progress', f.input.taskId));
+  f.queue.direct({ action: 'pause-all', request: request(4) });
+  assert.equal(box.read().pending.at(-1).receipt.event, 'paused');
+  process.env.CODEX_THREAD_ID = worker;
+  await assert.rejects(startIndependentCodexTask(received.workerInput, f.host), /later pause/);
+  assert.equal(f.counts().starts, 0);
+  assert.equal(f.queue.read().tickets[0].status, 'queued');
+  assert.equal(f.queue.read().tickets[0].admission, null);
+});
 test('official rename changes board then exact child readback, completed number remains historical', async (t) => {
   const f = fixture(t);
   await prepared(f);

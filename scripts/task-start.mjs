@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
 import { bindBatchTiming } from './batch-timing-store.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
 const runGit = (cwd, ...args) =>
   execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 const safe = (file) => {
@@ -103,7 +104,15 @@ export function startParallelTask(
     typeof owner === 'string' && owner.trim(),
     'Explicit task owner required when execution identity is unavailable',
   );
-  if (!binding && ['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface))
+  const nativeIntake =
+    !binding && ['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface);
+  const delegatedContinuation = Boolean(
+    registered &&
+    createExecutionOrder(registry.commonDir)
+      .read()
+      ?.tickets.find((ticket) => ticket.task === registered.id && ticket.lane === 'development')?.dynamicDecisionId,
+  );
+  if (nativeIntake && !delegatedContinuation)
     createBoardIntake(registry.commonDir).require(options.monitorContext, options.slug, owner);
   // The explicit root-thread receipt/claim precedes worktree creation or restoration.
   const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;
@@ -113,6 +122,16 @@ export function startParallelTask(
     owner: binding ? registered.owner : owner,
     admission: process.env.ZDM_EXECUTION_ADMISSION,
   });
+  if (nativeIntake && delegatedContinuation) {
+    assert.ok(admission.ticket?.dynamicDecisionId, 'Consumed current continuation decision required');
+    const context = {
+      ...options.monitorContext,
+      coordinatorThreadId: readTaskCoordination(registry.commonDir).current.rootThreadId,
+    };
+    // Only an already enrolled task with a consumed current decision can use
+    // historical intake evidence; new starts retain the freshness requirement.
+    createBoardIntake(registry.commonDir).require(context, options.slug, owner, { fresh: false });
+  }
   if (admission.ticket?.executionKind !== undefined)
     assert.equal(options.kind, admission.ticket.executionKind, 'Start kind differs from the authorized task');
   if (!options.slug) {

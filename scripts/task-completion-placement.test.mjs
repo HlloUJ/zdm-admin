@@ -3,8 +3,13 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, realpathSync, mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { tmpdir } from 'node:os';
-import { beginDeliveryFact, completeDeliveryFact, recordCompletePlacement } from './task-completion-placement.mjs';
-import { createProgressOutbox, authenticatedBoardAdapter } from './task-progress-outbox.mjs';
+import {
+  beginDeliveryFact,
+  completeDeliveryFact,
+  recordCompletePlacement,
+  ensureDeliveryPlacement,
+} from './task-completion-placement.mjs';
+import { createProgressOutbox, authenticatedBoardAdapter, flushProgress } from './task-progress-outbox.mjs';
 import { runCompletionWithProgress } from './task-completion-progress.mjs';
 const closed = () => ({
   batch: 'fixture',
@@ -13,6 +18,95 @@ const closed = () => ({
   sourceReceiptDigest: 'b'.repeat(64),
   closedAt: '2026-11-16T12:00:00.000Z',
   observed_at: new Date().toISOString(),
+});
+function deliverySources(f) {
+  return {
+    directory: f.directory,
+    task: { id: 'fixture', owner: 'owner', frozen: { accepted: 'a'.repeat(40) } },
+    ticket: {
+      lane: 'delivery',
+      task: 'fixture',
+      owner: 'owner',
+      status: 'running',
+      request: { messageId: 'real-user' },
+    },
+    acceptance: { batch: 'fixture', commit: 'a'.repeat(40) },
+    event: { id: 'readiness', name: 'prepare', status: 'running', startedAt: 1 },
+    readDevelopmentSource: async () => ({
+      verified: true,
+      task: 'fixture',
+      owner: 'owner',
+      assessment: { noKnownDefects: true },
+    }),
+  };
+}
+test('placement drains successive bounded chunks only while original receipts are confirmed in order', async (t) => {
+  const f = fixture(t),
+    box = createProgressOutbox(f.directory),
+    stored = new Map(),
+    writes = [];
+  for (let i = 0; i < 6; i++) box.enqueue('fixture', 'stage-' + i, { event: 'started' });
+  const original = box.read().pending.map((entry) => entry.receipt_id);
+  const adapter = authenticatedBoardAdapter(async (operation, args) => {
+    if (operation === 'apply_task_progress_receipt') {
+      stored.set(args.receipt.receipt_id, structuredClone(args.receipt));
+      writes.push(args.receipt.receipt_id);
+      return {};
+    }
+    return {
+      task: { id: 'fixture', revision: 1 + stored.size, status: 'merging', board_column: 'merging' },
+      receipt_id: args.receipt_id,
+      outcome: stored.has(args.receipt_id) ? 'applied' : 'not_found',
+      receipt: stored.get(args.receipt_id) ?? null,
+      applied_revision: stored.has(args.receipt_id) ? 1 + stored.size : null,
+    };
+  });
+  let chunks = 0;
+  const result = await ensureDeliveryPlacement(
+    {
+      ...deliverySources(f),
+      drain: async () => {
+        chunks++;
+        await flushProgress(box, adapter, { limit: 1 });
+      },
+    },
+    adapter,
+  );
+  assert.equal(result.state, 'current-merging-confirmed-no-write');
+  assert.equal(chunks, 6);
+  assert.deepEqual(writes, original);
+  assert.equal(box.read().pending.length, 0);
+  assert.equal(box.read().acknowledged.length, 6);
+});
+test('placement stops on unchanged or authenticated nonretryable pending receipts without retrying', async (t) => {
+  for (const rejected of [false, true]) {
+    const f = fixture(t),
+      box = createProgressOutbox(f.directory);
+    const first = box.enqueue('fixture', 'pending', { event: 'started' });
+    if (rejected) box.fail(first.receipt_id, 'forbidden');
+    let drains = 0;
+    const adapter = authenticatedBoardAdapter(async (_, args) => ({
+      task: { id: 'fixture', revision: 1, status: 'merging', board_column: 'merging' },
+      receipt_id: args.receipt_id,
+      outcome: 'not_found',
+      receipt: null,
+    }));
+    await assert.rejects(
+      ensureDeliveryPlacement(
+        {
+          ...deliverySources(f),
+          drain: async () => {
+            drains++;
+          },
+        },
+        adapter,
+      ),
+      rejected ? /Rejected receipt/ : /Earlier unresolved receipt/,
+    );
+    assert.equal(drains, 1);
+    assert.equal(box.read().pending.length, 1);
+    assert.equal(box.read().acknowledged.length, 0);
+  }
 });
 function fixture(t) {
   const common = realpathSync(mkdtempSync(path.join(tmpdir(), 'placement-source-'))),
