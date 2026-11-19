@@ -5,15 +5,12 @@ import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.CurrentIdentityProvider;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StoreService extends ServiceImpl<StoreMapper, Store> {
-  private static final String DELETE_FAILED_MESSAGE = "门店经营数据删除失败，请稍后重试";
-  private static final String SUPPLIER_REFERENCED_MESSAGE = "该门店仍有供应商被商品引用，不能彻底删除";
   private static final String DUPLICATE_NAME_MESSAGE = "店铺名称已存在";
 
   private final com.zdm.platform.role.StoreBuiltinRoleService builtinRoles;
@@ -21,22 +18,33 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
   private final StoreLevelService storeLevelService;
   private final JdbcTemplate jdbcTemplate;
   private final com.zdm.platform.account.AccountLifecycleService accountLifecycle;
+  private final com.zdm.platform.storeexit.StoreExitCoordinator exits;
+  private final com.zdm.platform.storeexit.HistoricIdentifierGuard historicIds;
+  private final com.zdm.platform.storeexit.StoreExitRecoveryState recovery;
 
   public StoreService(
       com.zdm.platform.role.StoreBuiltinRoleService builtinRoles,
       CurrentIdentityProvider identityProvider,
       StoreLevelService storeLevelService,
-      JdbcTemplate jdbcTemplate, com.zdm.platform.account.AccountLifecycleService accountLifecycle) {
+      JdbcTemplate jdbcTemplate, com.zdm.platform.account.AccountLifecycleService accountLifecycle,
+      com.zdm.platform.storeexit.StoreExitCoordinator exits,
+      com.zdm.platform.storeexit.HistoricIdentifierGuard historicIds,
+      com.zdm.platform.storeexit.StoreExitRecoveryState recovery) {
+    this.recovery = recovery;
+    this.historicIds = historicIds;
     this.builtinRoles = builtinRoles;
     this.identityProvider = identityProvider;
     this.storeLevelService = storeLevelService;
     this.jdbcTemplate = jdbcTemplate;
     this.accountLifecycle = accountLifecycle;
+    this.exits = exits;
   }
 
   public List<Store> listForCurrentAdmin(boolean archived) {
     identityProvider.require();
+    recovery.requireCatalogAvailable();
     return lambdaQuery()
+        .notIn(!recovery.blockedStoreIds().isEmpty(), Store::getId, recovery.blockedStoreIds())
         .eq(Store::getStatus, archived ? "disabled" : "enabled")
         .orderByDesc(Store::getCreatedAt)
         .list();
@@ -52,7 +60,9 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     store.setStatus("enabled");
     store.setCreatedBy(identity.displayName());
     store.setCreatedByAccountId(identity.accountId());
+    long watermark = historicIds.reserve("stores");
     boolean saved = save(store);
+    store.setId(historicIds.skipReserved("stores", store.getId(), watermark));
     builtinRoles.provision(store.getId(), store.getTenantId(), identity.accountId());
     provisionStoreAdmins(store);
     return saved;
@@ -112,6 +122,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (existing == null) {
       return null;
     }
+    recovery.requireFreshAvailability(id);
     requireArchived(existing);
     requireTenantOperating(existing.getTenantId());
     existing.setStatus("enabled");
@@ -120,93 +131,33 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     return getById(id);
   }
 
-  @Transactional
-  public boolean deleteStore(Long id) {
-    Store existing = getById(id);
-    if (existing == null) {
-      return false;
-    }
-    requireArchived(existing);
-    requireStoreSuppliersUnreferenced(id);
-    List<Long> accountIds = jdbcTemplate.queryForList("""
-        SELECT account_id FROM account_identities WHERE store_id=?
-        UNION SELECT account_id FROM employees WHERE store_id=? AND account_id IS NOT NULL
-        UNION SELECT account_id FROM account_roles WHERE store_id=? ORDER BY account_id
-        """, Long.class, id, id, id);
-    accountIds.forEach(accountLifecycle::lockAccount);
-    var protectedAccounts = accountIds.stream().filter(accountLifecycle::isProtected).toList();
-    try {
-      jdbcTemplate.update(
-          "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE store_id = ?)",
-          id);
-      jdbcTemplate.update(
-          "DELETE FROM account_roles WHERE store_id = ? OR role_id IN (SELECT id FROM roles WHERE store_id = ?)",
-          id,
-          id);
-      jdbcTemplate.update("DELETE FROM account_identities WHERE store_id = ?", id);
-      jdbcTemplate.update("DELETE FROM employee_invites WHERE store_id = ?", id);
-      jdbcTemplate.update("DELETE FROM employees WHERE store_id = ?", id);
-      jdbcTemplate.update(
-          "DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE store_id = ?)",
-          id);
-      jdbcTemplate.update("DELETE FROM roles WHERE store_id = ?", id);
-      jdbcTemplate.update("DELETE FROM suppliers WHERE store_id = ?", id);
-      deleteStoreCategories(id);
-      boolean removed = removeById(id);
-      if (removed) {
-        accountIds.stream().filter(accountId -> !protectedAccounts.contains(accountId))
-            .forEach(accountLifecycle::releaseIfUnbound);
-      }
-      return removed;
-    } catch (DataIntegrityViolationException exception) {
-      throw new IllegalArgumentException(DELETE_FAILED_MESSAGE, exception);
-    }
+  public void retryDelete(Long id) { exits.retry(id); }
+
+  public com.zdm.platform.storeexit.StoreExitResult deleteResult(Long id) { return exits.result(id); }
+
+  public com.zdm.platform.storeexit.StoreExitPreview previewDelete(Long id) {
+    return exits.preview(id);
   }
 
-  private void requireStoreSuppliersUnreferenced(Long storeId) {
-    Integer referenceCount = jdbcTemplate.queryForObject(
-        """
-        SELECT COUNT(*)
-        FROM suppliers supplier
-        WHERE supplier.store_id = ?
-          AND (
-            EXISTS (SELECT 1 FROM slab_inventory slab WHERE slab.supplier_id = supplier.id)
-            OR EXISTS (SELECT 1 FROM finished_products product WHERE product.supplier_id = supplier.id)
-            OR EXISTS (SELECT 1 FROM accessory_products product WHERE product.supplier_id = supplier.id)
-          )
-        """,
-        Integer.class,
-        storeId);
-    if (referenceCount != null && referenceCount > 0) {
-      throw new IllegalArgumentException(SUPPLIER_REFERENCED_MESSAGE);
+  @Transactional(isolation = org.springframework.transaction.annotation.Isolation.READ_COMMITTED)
+  public com.zdm.platform.storeexit.StoreExitResult deleteStore(Long id, String planHash) {
+    Store existing = getById(id);
+    if (existing == null) {
+      return exits.existingResult(id, planHash);
     }
+    exits.requireTenantLock(existing.getTenantId());
+    List<Long> accountIds = exits.execute(id, planHash, false);
+    accountIds.forEach(accountLifecycle::releaseForStoreExit);
+    exits.recordAccountOutcome(id, accountIds);
+    return exits.result(id);
   }
 
   private void revokeStoreSessions(Long storeId) {
-    jdbcTemplate.update(
-        """
-        UPDATE auth_sessions
-        SET revoked_at = CURRENT_TIMESTAMP
-        WHERE revoked_at IS NULL
-          AND identity_id IN (SELECT id FROM account_identities WHERE store_id = ?)
-        """,
-        storeId);
+    jdbcTemplate.update("""
+        UPDATE auth_sessions SET revoked_at=CURRENT_TIMESTAMP
+        WHERE revoked_at IS NULL AND identity_id IN (SELECT id FROM account_identities WHERE store_id=?)
+        """, storeId);
   }
-
-  private void deleteStoreCategories(Long storeId) {
-    int deletedCount;
-    do {
-      deletedCount = jdbcTemplate.update(
-          """
-          DELETE category
-          FROM store_categories category
-          LEFT JOIN store_categories child ON child.parent_id = category.id
-          WHERE category.store_id = ? AND child.id IS NULL
-          """,
-          storeId);
-    } while (deletedCount > 0);
-  }
-
 
   private void requireOpenedBusiness(Long tenantId, String storeType) {
     Integer count = jdbcTemplate.queryForObject(
@@ -280,6 +231,7 @@ public class StoreService extends ServiceImpl<StoreMapper, Store> {
     if (entity != null) {
       com.zdm.platform.security.DataScope.requireAccess(
           identityProvider.require(), entity.getCreatedByAccountId());
+      recovery.requireAvailable(entity.getId());
     }
     return entity;
   }

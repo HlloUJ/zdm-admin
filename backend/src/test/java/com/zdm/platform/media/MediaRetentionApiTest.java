@@ -47,6 +47,7 @@ class MediaRetentionApiTest extends SpringContainerTestSupport {
   @Autowired MediaRetentionService retention;
   @Autowired MediaCleanupService cleanup;
   @Autowired MediaCleanupWorker worker;
+  @org.springframework.boot.test.mock.mockito.SpyBean MediaDeletionQuarantine quarantine;
   @Autowired JdbcTemplate jdbc;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
   @Autowired MediaAdminController admin;
@@ -69,6 +70,128 @@ class MediaRetentionApiTest extends SpringContainerTestSupport {
   private void runCleanup(Long id) {
     Long task = cleanup.enqueue(id, "test", "隔离数据库测试", false);
     if (task != null) { worker.process(task); }
+  }
+
+  @Test
+  void physicalDeleteSurvivesSqlRollbackAndRetryMustConverge() throws Exception {
+    Long id = image();
+    jdbc.update("UPDATE media_assets SET unreferenced_since=DATE_SUB(NOW(),INTERVAL 182 DAY) WHERE id=?", id);
+    jdbc.update("UPDATE media_lifecycle_control SET deletion_enabled=TRUE WHERE id=1");
+    Long task = cleanup.enqueue(id, "test", "isolated rollback reproduction", false);
+    String key = assets.getById(id).getStorageKey();
+    var tx = new org.springframework.transaction.support.TransactionTemplate(transactionManager);
+    org.assertj.core.api.Assertions.assertThatThrownBy(() -> tx.execute(status -> {
+      assertThat(worker.process(task).deleted()).isFalse();
+      assertThat(java.nio.file.Files.exists(ROOT.resolve(key))).isFalse();
+      throw new IllegalStateException("injected failure before outer SQL commit");
+    })).isInstanceOf(IllegalStateException.class);
+    assertThat(java.nio.file.Files.exists(ROOT.resolve(key))).isTrue();
+    assertThat(assets.getById(id).getStatus()).isNotEqualTo("deleted");
+    assertThat(jdbc.queryForObject("SELECT status FROM media_cleanup_tasks WHERE id=?", String.class, task)).isEqualTo("pending");
+    var result = worker.process(task);
+    System.out.println("MEDIA_ROLLBACK_REPRO fileExists=" + java.nio.file.Files.exists(ROOT.resolve(key))
+        + " asset=" + assets.getById(id).getStatus() + " retryFailed=" + result.failed());
+    assertThat(result.failed()).isFalse();
+    assertThat(assets.getById(id).getStatus()).isEqualTo("deleted");
+  }
+
+  private Long eligibleCleanup(Long id) {
+    jdbc.update("UPDATE media_assets SET unreferenced_since=DATE_SUB(NOW(),INTERVAL 182 DAY) WHERE id=?", id);
+    jdbc.update("UPDATE media_lifecycle_control SET deletion_enabled=TRUE WHERE id=1");
+    return cleanup.enqueue(id, "test", "isolated recovery", false);
+  }
+
+  private void retryNow(Long task) {
+    jdbc.update("UPDATE media_cleanup_tasks SET next_retry_at=DATE_SUB(NOW(),INTERVAL 1 MINUTE) WHERE id=?", task);
+  }
+
+  @Test void unknownMissingFileStillFailsWithoutADeletionRecord() throws Exception {
+    Long id = image(); Long task = eligibleCleanup(id);
+    java.nio.file.Files.delete(ROOT.resolve(assets.getById(id).getStorageKey()));
+    assertThat(worker.process(task).failed()).isTrue();
+    assertThat(assets.getById(id).getStatus()).isNotEqualTo("deleted");
+    assertThat(jdbc.queryForObject("SELECT status FROM media_cleanup_tasks WHERE id=?", String.class, task)).isEqualTo("failed");
+  }
+
+  @Test void interruptedStageRestoresBeforeRecheckingANewSharedReference() throws Exception {
+    Long id = image(); Long task = eligibleCleanup(id); var asset = assets.getById(id);
+    quarantine.stage(asset);
+    assertThat(java.nio.file.Files.exists(ROOT.resolve(asset.getStorageKey()))).isFalse();
+    references.replace("RECOVERY_OTHER_STORE", id, Map.of("image", id));
+    assertThat(worker.process(task).failed()).isFalse();
+    assertThat(java.nio.file.Files.exists(ROOT.resolve(asset.getStorageKey()))).isTrue();
+    assertThat(assets.getById(id).getStatus()).isNotEqualTo("deleted");
+    assertThat(retention.count(id, "BUSINESS")).isEqualTo(1);
+  }
+
+  @Test void finishFailureIsRetryableAndNeverReportedAsTaskSuccess() throws Exception {
+    Long id = image(); Long task = eligibleCleanup(id);
+    org.mockito.Mockito.doThrow(new IllegalStateException("injected before physical finish"))
+        .doCallRealMethod().when(quarantine).finish(org.mockito.ArgumentMatchers.argThat(a -> a != null && id.equals(a.getId())));
+    assertThat(worker.process(task).failed()).isTrue();
+    assertThat(assets.getById(id).getStatus()).isEqualTo("deleted");
+    assertThat(jdbc.queryForObject("SELECT status FROM media_cleanup_tasks WHERE id=?", String.class, task)).isEqualTo("failed");
+    retryNow(task);
+    assertThat(worker.process(task).failed()).isFalse();
+    assertThat(jdbc.queryForObject("SELECT status FROM media_cleanup_tasks WHERE id=?", String.class, task)).isEqualTo("success");
+    assertThat(worker.process(task).deleted()).isFalse();
+  }
+
+  @Test void finishThenSqlFailureConvergesWithoutDeletingAnythingElse() throws Exception {
+    Long id = image(); Long task = eligibleCleanup(id);
+    var once = new java.util.concurrent.atomic.AtomicBoolean(true);
+    org.mockito.Mockito.doAnswer(call -> {
+      Object result = call.callRealMethod();
+      if (once.getAndSet(false)) { throw new IllegalStateException("injected after physical finish before SQL task completion"); }
+      return result;
+    }).when(quarantine).finish(org.mockito.ArgumentMatchers.argThat(a -> a != null && id.equals(a.getId())));
+    assertThat(worker.process(task).failed()).isTrue();
+    retryNow(task);
+    assertThat(worker.process(task).failed()).isFalse();
+    assertThat(jdbc.queryForObject("SELECT status FROM media_cleanup_tasks WHERE id=?", String.class, task)).isEqualTo("success");
+  }
+
+  @Test void originalPathReplacementBlocksRestoreWithoutOverwritingIt() throws Exception {
+    Long id = image(); Long task = eligibleCleanup(id); var asset = assets.getById(id);
+    quarantine.stage(asset);
+    byte[] replacement = new byte[]{42, 17, 9};
+    java.nio.file.Files.write(ROOT.resolve(asset.getStorageKey()), replacement);
+    assertThat(worker.process(task).failed()).isTrue();
+    assertThat(java.nio.file.Files.readAllBytes(ROOT.resolve(asset.getStorageKey()))).isEqualTo(replacement);
+    assertThat(quarantine.hasRecord(asset)).isTrue();
+  }
+
+  @Test void freshInstanceFinishesCommittedDeletionAndRetryIsIdempotent() throws Exception {
+    Long id = image(); Long task = eligibleCleanup(id); var asset = assets.getById(id);
+    quarantine.stage(asset);
+    jdbc.update("UPDATE media_assets SET status='deleted',deleted_at=NOW() WHERE id=?", id);
+    var restarted = new MediaDeletionQuarantine(ROOT.toString(), new com.fasterxml.jackson.databind.ObjectMapper());
+    restarted.finish(assets.getById(id));
+    assertThat(worker.process(task).failed()).isFalse();
+    assertThat(jdbc.queryForObject("SELECT status FROM media_cleanup_tasks WHERE id=?", String.class, task)).isEqualTo("success");
+  }
+
+  @Test void tamperedQuarantinePayloadCannotBeRestoredOrDestroyed() throws Exception {
+    Long id = image(); Long task = eligibleCleanup(id); var asset = assets.getById(id);
+    quarantine.stage(asset);
+    Path payload = ROOT.resolve(".deletion-quarantine").resolve(id.toString()).resolve("payload");
+    byte[] changed = new byte[]{8, 7, 6};
+    java.nio.file.Files.write(payload, changed);
+    assertThat(worker.process(task).failed()).isTrue();
+    assertThat(java.nio.file.Files.readAllBytes(payload)).isEqualTo(changed);
+    assertThat(java.nio.file.Files.exists(ROOT.resolve(asset.getStorageKey()))).isFalse();
+  }
+
+  @Test void symlinkSourceCannotRedirectDeletionToAnotherFile() throws Exception {
+    Long id = image(); Long task = eligibleCleanup(id); Long other = image();
+    Path source = ROOT.resolve(assets.getById(id).getStorageKey());
+    Path protectedFile = ROOT.resolve(assets.getById(other).getStorageKey());
+    byte[] original = java.nio.file.Files.readAllBytes(protectedFile);
+    java.nio.file.Files.delete(source);
+    java.nio.file.Files.createSymbolicLink(source, protectedFile);
+    assertThat(worker.process(task).failed()).isTrue();
+    assertThat(java.nio.file.Files.readAllBytes(protectedFile)).isEqualTo(original);
+    assertThat(java.nio.file.Files.isSymbolicLink(source)).isTrue();
   }
 
   @Test

@@ -56,7 +56,7 @@
       "dynamicImports": 0
     },
     "ci/e2e-shards.json": {
-      "digest": "66589647ce4142c236cced747887a2041868bd10a72076c56858385d82678eb4",
+      "digest": "2d6c0008ed3696073058f209a9f92dddaf3a3550e913cc239144a2c66dc7aeb3",
       "imports": [],
       "dynamicImports": 0
     },
@@ -67,6 +67,16 @@
     },
     "docker-compose.yml": {
       "digest": "7769def3226af0a609b1df402d6a6da87e95be89c377ed33b177d463bd76d36d",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "infrastructure/store-exit-ledger/Dockerfile": {
+      "digest": "524c1fe0bbb68512b520984d4d2d3c7f78dd9faf221d21306899bfbfbd796bca",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "infrastructure/store-exit-ledger/server.mjs": {
+      "digest": "22d69165149a6b4acc9116c185e0680821b59b2a27c215fe9987a6d7b0e324d5",
       "imports": [],
       "dynamicImports": 0
     },
@@ -272,17 +282,17 @@
       "dynamicImports": 0
     },
     "scripts/business-regression-contracts.json": {
-      "digest": "7eb496e87e101fb277152a7ae33632939a97fb2f590533d8a8e68aab09ed8cff",
+      "digest": "7713aa8cac88109f0b3a96b223617a9926958bf619241291e25a5ea69f383666",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/business-regression.mjs": {
-      "digest": "9d5ff5e8a490880eaf4c7783cdfbf2246964ab898d46b54c1e6ab51840206f17",
+      "digest": "76dea1d9245df0ad9011a144a9074b59be43812d55972967fb239e67ded88346",
       "imports": [],
       "dynamicImports": 0
     },
     "scripts/business-regression.test.mjs": {
-      "digest": "4722db1080d475f82b93b84665b249f21d6afa1219c818771611f2a3b44e4a4d",
+      "digest": "38f7b719e929832ef10d75fdd86e3b1d35676a5854aaef204fdaba87ebfbfe64",
       "imports": [
         "scripts/business-regression.mjs",
         "scripts/check-changed-plan.mjs",
@@ -1171,8 +1181,8 @@
       "dynamicImports": 0
     },
     "scripts/display-text-policy.mjs": {
-      "digest": "53daad89679d680322dd0664e31cdb93956d8e5392bf06c5351c77d7da88ab0e",
-      "imports": [],
+      "digest": "8ca042a70f231bf5b955f4a9697ed3a96b7fd4024442778d9a50714ef2c87b9f",
+      "imports": ["docs/ui/selection-center-extension.json", "scripts/button-color-policy.mjs"],
       "dynamicImports": 0
     },
     "scripts/e2e-app.d.mts": {
@@ -1221,7 +1231,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "62bbf289cf3ab3979f5f5dce52ec0b541b1755fb42b9af0fb3989fa2ada72f47",
+      "digest": "c013c9dd01e7b6102c9f816e2bf27822eda202a5d1dab7f7a88da6d26f52815b",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",
@@ -1300,12 +1310,39 @@
         "scripts/delivery-launcher.mjs",
         "scripts/delivery-launcher.test.mjs",
         "scripts/delivery-migration-safety.mjs",
+        "scripts/delivery-repairs/archive-039-delivery-pause-cli.mjs",
+        "scripts/delivery-repairs/archive-039-delivery-pause.mjs",
+        "scripts/delivery-repairs/archive-039-delivery-pause.test.mjs",
+        "scripts/delivery-repairs/archive-672-bound-progress-cli.mjs",
+        "scripts/delivery-repairs/archive-672-bound-progress.mjs",
+        "scripts/delivery-repairs/archive-672-bound-progress.test.mjs",
         "scripts/delivery-repairs/batch-timing-io.mjs",
         "scripts/delivery-repairs/batch-timing-publication.test.mjs",
+        "scripts/delivery-repairs/completion-ci-diagnosis.mjs",
+        "scripts/delivery-repairs/completion-ci-diagnosis.test.mjs",
+        "scripts/delivery-repairs/pre-ci-composition.mjs",
+        "scripts/delivery-repairs/preview-docker-directories.mjs",
+        "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
+        "scripts/delivery-repairs/preview-reference-history.mjs",
+        "scripts/delivery-repairs/preview-reference-proof-core.mjs",
+        "scripts/delivery-repairs/preview-reference-proof.mjs",
+        "scripts/delivery-repairs/preview-reference-proof.test.mjs",
+        "scripts/delivery-repairs/preview-reference-source.mjs",
+        "scripts/delivery-repairs/preview-reference-source.test.mjs",
+        "scripts/delivery-repairs/task-410-initial-pause-correction.mjs",
+        "scripts/delivery-repairs/task-410-initial-pause-correction.test.mjs",
+        "scripts/delivery-repairs/task-410-initial-pause-evidence.mjs",
         "scripts/delivery-repairs/task-cleanup-npm-proof.mjs",
         "scripts/delivery-repairs/task-cleanup-npm.mjs",
         "scripts/delivery-repairs/task-cleanup-npm.test.mjs",
         "scripts/delivery-repairs/task-completion-placement-order.test.mjs",
+        "scripts/delivery-repairs/task-creation-progress.mjs",
+        "scripts/delivery-repairs/task-delivery-queue-progress.mjs",
+        "scripts/delivery-repairs/task-dynamic-host.mjs",
+        "scripts/delivery-repairs/task-dynamic-model.mjs",
+        "scripts/delivery-repairs/task-dynamic-model.test.mjs",
+        "scripts/delivery-repairs/task-failed-creation.mjs",
+        "scripts/delivery-repairs/task-failed-creation.test.mjs",
         "scripts/delivery-repairs/task-progress-invalid-supersession.test.mjs",
         "scripts/delivery-repairs/test-support/cleanup-npm-fixture.mjs",
         "scripts/delivery-repairs/test-support/fixture.mjs",
@@ -1359,10 +1396,13 @@
         "scripts/node-source-evidence-reporter.mjs",
         "scripts/node-test-evidence.mjs",
         "scripts/parallel-acceptance.mjs",
+        "scripts/parallel-task-timing.mjs",
+        "scripts/parallel-task-timing.test.mjs",
         "scripts/parallel-task-transition.mjs",
         "scripts/parallel-task-transition.test.mjs",
         "scripts/parallel-upgrade-preflight.mjs",
         "scripts/playwright-evidence-reporter.mjs",
+        "scripts/preview-consumers-io.test.mjs",
         "scripts/preview-consumers.mjs",
         "scripts/preview-consumers.test.mjs",
         "scripts/preview-frozen-recovery.test.mjs",
@@ -1374,6 +1414,7 @@
         "scripts/preview-target.test.mjs",
         "scripts/preview-transition.mjs",
         "scripts/producer.test.mjs",
+        "scripts/published.mjs",
         "scripts/remaining.test.mjs",
         "scripts/repair.mjs",
         "scripts/resource-lease.mjs",
@@ -1397,6 +1438,8 @@
         "scripts/shared-work.test.mjs",
         "scripts/start-micro-task.mjs",
         "scripts/start-micro-task.test.mjs",
+        "scripts/store-exit-ledger.mjs",
+        "scripts/store-exit-ledger.test.mjs",
         "scripts/stylesheet-scope.mjs",
         "scripts/stylesheet-scope.test.mjs",
         "scripts/sync-integration.mjs",
@@ -1439,6 +1482,7 @@
         "scripts/task-cleanup-scheduled-cli.test.mjs",
         "scripts/task-cleanup-types.mjs",
         "scripts/task-codex-cycle-cli.mjs",
+        "scripts/task-codex-cycle.mjs",
         "scripts/task-codex-cycle.test.mjs",
         "scripts/task-codex-host.mjs",
         "scripts/task-codex-host.test.mjs",
@@ -1457,6 +1501,8 @@
         "scripts/task-continuity-enrollment.test.mjs",
         "scripts/task-continuity.mjs",
         "scripts/task-continuity.test.mjs",
+        "scripts/task-coordination.mjs",
+        "scripts/task-coordination.test.mjs",
         "scripts/task-data-environment.mjs",
         "scripts/task-data-environment.test.mjs",
         "scripts/task-data-scope.mjs",
@@ -1474,15 +1520,19 @@
         "scripts/task-development.test.mjs",
         "scripts/task-entry.mjs",
         "scripts/task-entry.test.mjs",
+        "scripts/task-execution-binding.mjs",
         "scripts/task-execution-order-cli.mjs",
         "scripts/task-execution-order.mjs",
         "scripts/task-execution-order.test.mjs",
+        "scripts/task-execution-scope.mjs",
         "scripts/task-frozen-history.test.mjs",
         "scripts/task-interruption-notice.mjs",
         "scripts/task-interruption-notice.test.mjs",
         "scripts/task-maven.mjs",
         "scripts/task-maven.test.mjs",
         "scripts/task-monitor-registration.mjs",
+        "scripts/task-network.mjs",
+        "scripts/task-network.test.mjs",
         "scripts/task-preview-combination.mjs",
         "scripts/task-preview-combination.test.mjs",
         "scripts/task-preview-control-http.test.mjs",
@@ -1499,9 +1549,12 @@
         "scripts/task-progress-host.mjs",
         "scripts/task-progress-host.test.mjs",
         "scripts/task-progress-outbox.mjs",
+        "scripts/task-progress-replay.mjs",
         "scripts/task-progress-replay.test.mjs",
         "scripts/task-progress-stale.test.mjs",
+        "scripts/task-progress-supersession.mjs",
         "scripts/task-progress-supersession.test.mjs",
+        "scripts/task-rebinding.mjs",
         "scripts/task-rebinding.test.mjs",
         "scripts/task-registry-lock.test.mjs",
         "scripts/task-registry.mjs",
@@ -1676,7 +1729,7 @@
       "dynamicImports": 0
     },
     "scripts/list-selection-policy.mjs": {
-      "digest": "204de0a5a72d031aff33ecb8c059c5e2fa8d8f7cf37f8e9e825651bacf91e6fb",
+      "digest": "af4c6d9410e39a896ee11b6c6f48fd143695cf6997ed693f3aa375c846a5f88f",
       "imports": [],
       "dynamicImports": 0
     },
@@ -2023,7 +2076,7 @@
       "dynamicImports": 0
     },
     "scripts/script-test-plan.mjs": {
-      "digest": "3f5ae03d0bc5c763bcd2720664adfaf426ab6f1cd8a407b1a4d10efc05a5ba61",
+      "digest": "c77ef061d5eb608f30227f7fa47c4292552c39dcc2067b03cf7c20545614a6da",
       "imports": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
       "dynamicImports": 0
     },
@@ -2066,6 +2119,16 @@
     "scripts/start-micro-task.test.mjs": {
       "digest": "d26679cc87842e7e38fb76f4884e75d79a0c3e64aac909225678e1ac839fedbf",
       "imports": ["scripts/dev-task.mjs", "scripts/start-micro-task.mjs", "scripts/task-batch.mjs"],
+      "dynamicImports": 0
+    },
+    "scripts/store-exit-ledger.mjs": {
+      "digest": "4d4e3e5b97de33142c87e29c979705b74e624b8c35658886e1eab317038e6a3f",
+      "imports": [],
+      "dynamicImports": 0
+    },
+    "scripts/store-exit-ledger.test.mjs": {
+      "digest": "6fbc36d98302f44bd187dc270d46e1a9a08a707f7ca500e7ee045a5403028d42",
+      "imports": [],
       "dynamicImports": 0
     },
     "scripts/stylesheet-scope.mjs": {
@@ -3202,7 +3265,7 @@
       "dynamicImports": 0
     },
     "scripts/ui-template-policy.test.mjs": {
-      "digest": "1d5349a64effb450b34b92aa9d4644ee39e208f9edfd3c6f39670ed38d6a2f83",
+      "digest": "c61587ed62e73391e03d9b11d4836cfc47c4a7e8448c10125250f570c0dd648b",
       "imports": [
         "scripts/button-color-policy.mjs",
         "scripts/confirmation-policy.mjs",
@@ -3388,7 +3451,7 @@
       "dynamicImports": 0
     },
     "scripts/vite-watch.test.mjs": {
-      "digest": "47686cdc91b7c81af6c665e8c8bee45e0a9d09e484cb7ee783c81070c862bffc",
+      "digest": "342085d45738a25f6a6455e714e769318518b9bcdfd02d582c900067e7a9a470",
       "imports": ["vite.config.js"],
       "dynamicImports": 0
     },

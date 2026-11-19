@@ -13,6 +13,13 @@ public class MediaRetentionService {
   public MediaRetentionService(JdbcTemplate jdbc, MediaStorageService storage) { this.jdbc = jdbc; this.storage = storage; }
 
   public MediaRetentionPolicy.Decision evaluate(MediaAsset asset) {
+    Long unresolvedRestore = jdbc.queryForObject("""
+        SELECT COUNT(*) FROM store_exit_tasks WHERE media_id=? AND status='blocked'
+        AND last_error_code='RESTORE_RELEASE_TIME_UNCERTAIN'
+        """, Long.class, asset.getId());
+    if (unresolvedRestore != null && unresolvedRestore > 0) {
+      return new MediaRetentionPolicy.Decision(false, null, "恢复后的引用解除时间待核验");
+    }
     if (count(asset.getId(), "HISTORY") > 0 && "ready".equals(asset.getHistoryPreviewState())) {
       var previews = jdbc.queryForList("SELECT storage_key FROM media_assets WHERE id=? AND status<>'deleted'", String.class, asset.getHistoryPreviewMediaId());
       if (previews.isEmpty() || !storage.load(previews.getFirst()).exists()) {

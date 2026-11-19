@@ -106,7 +106,7 @@ const storeFinishedStock: FunctionModule = {
           label: '成品现货管理页',
           value: 'store.finished-stock-management',
           actions: [
-            { label: '商品中心', value: 'store.finished-stock-management.select' },
+            { label: '选品中心', value: 'store.finished-stock-management.select' },
             { label: '操作日志', value: 'store.finished-stock-management.operation-log.view' },
           ],
           tabs: [
@@ -167,7 +167,7 @@ const storeAccessoryStock: FunctionModule = {
           label: '配件管理页',
           value: 'store.accessory-management',
           actions: [
-            { label: '商品中心', value: 'store.accessory-management.select' },
+            { label: '选品中心', value: 'store.accessory-management.select' },
             { label: '操作日志', value: 'store.accessory-management.operation-log.view' },
           ],
           tabs: [

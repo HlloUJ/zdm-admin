@@ -8,6 +8,8 @@ import org.springframework.stereotype.Component;
 
 @Component
 public class CurrentIdentityProvider {
+  private final com.zdm.platform.storeexit.StoreExitRecoveryState exits;
+  public CurrentIdentityProvider(com.zdm.platform.storeexit.StoreExitRecoveryState exits) { this.exits = exits; }
   public Optional<CurrentIdentity> current() {
     Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
     if (authentication == null || !(authentication.getPrincipal() instanceof CurrentIdentity identity)) {
@@ -17,6 +19,8 @@ public class CurrentIdentityProvider {
   }
 
   public CurrentIdentity require() {
-    return current().orElseThrow(() -> new AccessDeniedException("当前业务身份无效"));
+    CurrentIdentity identity = current().orElseThrow(() -> new AccessDeniedException("当前业务身份无效"));
+    exits.requireAvailable(identity.storeId());
+    return identity;
   }
 }

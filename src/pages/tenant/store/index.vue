@@ -233,6 +233,31 @@
     >
       {{ confirmState.content }}
     </AdminConfirmDialog>
+    <AdminDialog
+      v-model:visible="deleteResultVisible"
+      header="删除结果"
+      confirm-function="close"
+      :confirmation="{ kind: 'none' }"
+      :footer="false"
+    >
+      <t-descriptions
+        v-if="deleteResult"
+        :column="1"
+        :items="[
+          { label: '经营数据', content: '已清理' },
+          {
+            label: '后续处理',
+            content:
+              deleteResult.cleanupStatus === 'COMPLETE'
+                ? '已完成'
+                : deleteResult.cleanupStatus === 'ATTENTION'
+                  ? '有收尾事项需人工核验，经营数据清理结果不回退'
+                  : `仍有${deleteResult.pendingTasks}项收尾任务，系统将按规则处理`,
+          },
+          { label: '保留范围', content: deleteResult.retained.join('；') },
+        ]"
+      />
+    </AdminDialog>
   </div>
 </template>
 
@@ -260,6 +285,8 @@ import {
   archiveStore,
   createStore,
   deleteStore,
+  getStorePurgePreview,
+  type StoreExitResult,
   listStores,
   restoreStore,
   updateStore,
@@ -698,11 +725,35 @@ const openRestoreConfirm = (row: StoreItem) => {
   confirmDialogVisible.value = true;
 };
 
-const openDeleteConfirm = (row: StoreItem) => {
-  confirmState.type = 'delete';
-  confirmState.row = row;
-  confirmState.content = '彻底删除后，该门店的经营数据永久不可恢复，请谨慎操作';
-  confirmDialogVisible.value = true;
+const deleteResult = ref<StoreExitResult | null>(null);
+const deleteResultVisible = ref(false);
+const deletePlanHash = ref('');
+const openDeleteConfirm = async (row: StoreItem) => {
+  deletePlanHash.value = '';
+  try {
+    const preview = await getStorePurgePreview(row.id);
+    if (preview.blockers.length > 0) {
+      adminFeedback.actionError({
+        action: '删除预检',
+        target: row.shopName,
+        error: new Error(preview.blockers.join('；')),
+      });
+      return;
+    }
+    deletePlanHash.value = preview.planHash;
+    confirmState.type = 'delete';
+    confirmState.row = row;
+    const businessCount = Object.entries(preview.counts)
+      .filter(
+        ([name]) =>
+          !['media_lifecycle_candidates', 'accounts_delete', 'accounts_retained', 'phones_released'].includes(name),
+      )
+      .reduce((sum, [, count]) => sum + count, 0);
+    confirmState.content = `将清理门店“${preview.storeName}”的独占业务数据，预检涉及${businessCount}条业务数据，${preview.counts.media_lifecycle_candidates ?? 0}项媒体候选；删除独立账号${preview.counts.accounts_delete ?? 0}个，保留仍有业务关联或受保护账号${preview.counts.accounts_retained ?? 0}个。${preview.retained.join('；')}。删除后无法通过产品恢复。`;
+    confirmDialogVisible.value = true;
+  } catch (error) {
+    adminFeedback.actionError({ action: '删除预检', target: row.shopName, error });
+  }
 };
 
 const closeConfirmDialog = () => {
@@ -717,7 +768,8 @@ const handleConfirm = async () => {
 
   try {
     if (confirmState.type === 'delete') {
-      await deleteStore(target.id);
+      deleteResult.value = await deleteStore(target.id, deletePlanHash.value);
+      deleteResultVisible.value = true;
       tableData.value = tableData.value.filter((item) => item.id !== target.id);
     } else if (confirmState.type === 'archive') {
       await archiveStore(target.id);

@@ -206,7 +206,7 @@ describe('full function catalog', () => {
     ]);
     expect(storeValues).toContain('store.finished-stock-management.selling.off-shelf');
     expect(storeValues).toContain('store.finished-stock-management.selling.delete');
-    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['商品中心', '操作日志']);
+    expect(stock.menus[0].pages[0].actions.map((action) => action.label)).toEqual(['选品中心', '操作日志']);
     expect(storeValues).not.toContain('store.finished-stock-management.unavailable.purge');
     const pricing = terminalFunctionTrees.store.find((module) => module.value === 'store.price-configuration')!;
     expect(pricing.menus[0].direct).toBe(true);

@@ -1,0 +1,6 @@
+{
+  "paymentCommit": "1b286e082a7f05acc2a93ed210572887063b3c31",
+  "selectionCommit": "33b3e104e821c073e1d7b1204b6c43cb7bfa33d6",
+  "selectionDirtyPatchSha256": "8a899898486fb447f4a96655b8c657b9c753779fb7feb5ad4f0450a0c890d88e",
+  "crossPatchSha256": "030a79d96839fc6b5e5e5297d53c1d4df48d94abece34479b651c30cfcd2c0b1"
+}
