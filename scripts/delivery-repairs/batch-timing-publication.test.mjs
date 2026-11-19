@@ -6,7 +6,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { once } from 'node:events';
-import { syncBuiltinESMExports } from 'node:module';
+import { createRequire, syncBuiltinESMExports } from 'node:module';
 import { pathToFileURL } from 'node:url';
 import { newTimeline } from '../batch-timing-core.mjs';
 import { timingWriterLock, preserveTimingSnapshot, atomicTimingJson } from './batch-timing-io.mjs';
@@ -345,6 +345,33 @@ test("two concurrent recovery processes never steal each other's lease or lose a
   const code = `import fs from'node:fs';import{timingWriterLock}from${JSON.stringify(io)};timingWriterLock(${JSON.stringify(f.directory)},()=>{const p=${JSON.stringify(counter)},n=Number(fs.readFileSync(p));Atomics.wait(new Int32Array(new SharedArrayBuffer(4)),0,0,20);fs.writeFileSync(p,String(n+1))});`;
   await Promise.all([exited(childScript(code)), exited(childScript(code))]);
   assert.equal(fs.readFileSync(counter, 'utf8'), '2');
+});
+test('recovering a dead timing writer releases the mutex while a SQLite reader remains active', async (t) => {
+  const f = fixture(t);
+  const lock = path.join(f.directory, 'writer.lock');
+  const old = childScript('');
+  await exited(old);
+  assert.throws(() => process.kill(old.pid, 0), { code: 'ESRCH' });
+  const lease = json({ pid: old.pid, host: os.hostname() });
+  fs.writeFileSync(lock, lease, { flag: 'wx' });
+
+  const { DatabaseSync } = createRequire(import.meta.url)('node:sqlite');
+  const reader = new DatabaseSync(path.join(f.directory, 'writer-recovery.sqlite'));
+  try {
+    reader.exec('BEGIN');
+    assert.deepEqual(reader.prepare('SELECT name FROM sqlite_schema').all(), []);
+    let updates = 0;
+    timingWriterLock(f.directory, () => {
+      assert.equal(JSON.parse(fs.readFileSync(lock, 'utf8')).pid, process.pid);
+      assert.deepEqual(fs.readFileSync(path.join(f.directory, 'exited-writer-' + digest(lease) + '.json')), lease);
+      updates++;
+    });
+    assert.equal(updates, 1);
+    assert.equal(fs.existsSync(lock), false);
+    reader.exec('ROLLBACK');
+  } finally {
+    reader.close();
+  }
 });
 test('live, foreign and malformed leases stay protected and linked paths cannot be published', (t) => {
   const f = fixture(t),
