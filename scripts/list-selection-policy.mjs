@@ -13,6 +13,10 @@ const businessPickers = new Map([
 // change requires review again; new/unknown tables fail closed, never inherit an exception.
 const reviewedDisplayTables = new Map([
   [
+    'src/pages/selection-center/components/SelectionDetail.vue',
+    { columns: 'model.columns', digest: '4d8b9a6ee2e29d89e7bb45bef98a70de5fa435f6ad687aacdd1c9a458997fe71' },
+  ],
+  [
     'src/pages/finished-stock/store/StoreFinishedEditor.vue',
     { columns: 'editorColumns(columns)', digest: '1492742ec4776eba7b9d0612c49609744f8590ef60bfd2dbc4f291cd1f2e8724' },
   ],

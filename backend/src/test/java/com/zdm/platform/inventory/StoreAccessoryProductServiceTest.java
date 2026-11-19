@@ -761,7 +761,7 @@ class StoreAccessoryProductServiceTest extends SpringContainerTestSupport {
         """);
     identity(99894L);
     var expected = java.time.LocalDateTime.of(2026, 10, 9, 10, 34, 2);
-    var scopes = new CityPartnerStoreScope(new com.zdm.platform.security.CurrentIdentityProvider(), jdbc);
+    var scopes = new CityPartnerStoreScope(new com.zdm.platform.security.CurrentIdentityProvider(org.mockito.Mockito.mock(com.zdm.platform.storeexit.StoreExitRecoveryState.class)), jdbc);
     for (String zone : List.of("Asia/Shanghai", "UTC")) {
       String url = MYSQL.getJdbcUrl();
       var datasource = new org.springframework.jdbc.datasource.DriverManagerDataSource(

@@ -40,6 +40,11 @@
       "estimatedMs": 79596
     },
     {
+      "file": "batch-shelf-result-layout.spec.ts",
+      "shard": 2,
+      "estimatedMs": 12089
+    },
+    {
       "file": "category-attribute-template.spec.ts",
       "shard": 1,
       "estimatedMs": 79196
@@ -80,6 +85,11 @@
       "estimatedMs": 10065
     },
     {
+      "file": "list-batch-selection.spec.ts",
+      "shard": 2,
+      "estimatedMs": 29700
+    },
+    {
       "file": "login.spec.ts",
       "shard": 2,
       "estimatedMs": 23133
@@ -100,6 +110,11 @@
       "estimatedMs": 700
     },
     {
+      "file": "operations-batch-shelf.spec.ts",
+      "shard": 1,
+      "estimatedMs": 16115
+    },
+    {
       "file": "pagination-responsive.spec.ts",
       "shard": 2,
       "estimatedMs": 18552
@@ -108,6 +123,16 @@
       "file": "permission-center.spec.ts",
       "shard": 1,
       "estimatedMs": 72274
+    },
+    {
+      "file": "product-all-view.spec.ts",
+      "shard": 2,
+      "estimatedMs": 69231
+    },
+    {
+      "file": "product-batch-delete.spec.ts",
+      "shard": 1,
+      "estimatedMs": 49044
     },
     {
       "file": "product-category-drag.spec.ts",
@@ -185,6 +210,11 @@
       "estimatedMs": 11877
     },
     {
+      "file": "store-exit.spec.ts",
+      "shard": 1,
+      "estimatedMs": 0
+    },
+    {
       "file": "store-finished-stock.spec.ts",
       "shard": 1,
       "estimatedMs": 95699
@@ -210,6 +240,11 @@
       "estimatedMs": 4466
     },
     {
+      "file": "store-recycle-selection.spec.ts",
+      "shard": 1,
+      "estimatedMs": 4312
+    },
+    {
       "file": "submit-failure-feedback.spec.ts",
       "shard": 2,
       "estimatedMs": 2286
@@ -218,6 +253,11 @@
       "file": "supplier-supply-type.spec.ts",
       "shard": 2,
       "estimatedMs": 3125
+    },
+    {
+      "file": "terminal-all-batch-shelf.spec.ts",
+      "shard": 1,
+      "estimatedMs": 15042
     },
     {
       "file": "textarea-count.spec.ts",
@@ -230,44 +270,14 @@
       "estimatedMs": 10524
     },
     {
-      "file": "batch-shelf-result-layout.spec.ts",
-      "shard": 2,
-      "estimatedMs": 12089
-    },
-    {
-      "file": "operations-batch-shelf.spec.ts",
-      "shard": 1,
-      "estimatedMs": 16115
-    },
-    {
-      "file": "product-all-view.spec.ts",
-      "shard": 2,
-      "estimatedMs": 69231
-    },
-    {
-      "file": "terminal-all-batch-shelf.spec.ts",
-      "shard": 1,
-      "estimatedMs": 15042
-    },
-    {
-      "file": "product-batch-delete.spec.ts",
-      "shard": 1,
-      "estimatedMs": 49044
-    },
-    {
-      "file": "store-recycle-selection.spec.ts",
-      "shard": 1,
-      "estimatedMs": 4312
-    },
-    {
-      "file": "list-batch-selection.spec.ts",
-      "shard": 2,
-      "estimatedMs": 29700
-    },
-    {
       "file": "dialog-confirmation.spec.ts",
       "shard": 1,
       "estimatedMs": 6000
+    },
+    {
+      "file": "selection-center.spec.ts",
+      "shard": 1,
+      "estimatedMs": 9000
     }
   ]
 }

@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import os from 'node:os';
+import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import {
   validateContracts,
@@ -14,6 +15,7 @@ import {
   requireBackendBehaviors,
   validateContractEvolution,
   validateChangedBusinessCoverage,
+  changedBusinessFiles,
   discoverBrowserConsumers,
 } from './business-regression.mjs';
 import { createValidationPlan } from './check-changed-plan.mjs';
@@ -197,21 +199,105 @@ test('browser URL roots include test helper import consumers without selecting u
   }
 });
 
-test('the real changed-check entry blocks an unregistered source before any task executes', async () => {
-  let executions = 0;
-  const candidate = { digest: 'candidate', baseline: 'base', mergeBase: 'base', mutationStamp: 'stamp' };
-  await assert.rejects(
-    () =>
-      checkChanged(['src/router/index.ts'], {
-        root,
-        capture: () => candidate,
-        run: async () => {
-          executions++;
-          return { exitCode: 0 };
+function createContractFixture(fixture) {
+  const write = (file, value) => {
+    mkdirSync(path.dirname(path.join(fixture, file)), { recursive: true });
+    writeFileSync(path.join(fixture, file), value);
+  };
+  mkdirSync(path.join(fixture, 'backend/src/main'), { recursive: true });
+  const browser = 'tests/e2e/known.spec.ts',
+    backend = 'backend/src/test/KnownTest.java';
+  write('src/known.ts', 'export const known = true;');
+  write(browser, 'export const browser = true;');
+  write(backend, 'class KnownTest {}');
+  const registry = {
+    version: 1,
+    contracts: [
+      {
+        id: 'known',
+        roots: ['src/known.ts'],
+        tables: ['known'],
+        routes: [],
+        consumers: ['src/known.ts'],
+        browserConsumers: [],
+        browserTests: [browser],
+        backendTests: [backend],
+        protectedTests: {
+          [browser]: digest(readFileSync(path.join(fixture, browser), 'utf8')),
+          [backend]: digest(readFileSync(path.join(fixture, backend), 'utf8')),
         },
-        report: () => {},
-      }),
-    /Unregistered business change/,
-  );
-  assert.equal(executions, 0);
+      },
+    ],
+  };
+  const saveRegistry = () => write('scripts/business-regression-contracts.json', JSON.stringify(registry));
+  const git = (...args) => execFileSync('git', args, { cwd: fixture, stdio: 'pipe' });
+  const commitBaseline = () => {
+    git('add', '.');
+    git('-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.invalid', 'commit', '-m', 'fixture');
+    git('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  };
+  git('init');
+  saveRegistry();
+  return { write, registry, saveRegistry, commitBaseline };
+}
+
+test('the real changed-check entry blocks an unregistered source before any task executes', async () => {
+  const fixture = mkdtempSync(path.join(os.tmpdir(), 'unregistered-business-'));
+  let executions = 0;
+  try {
+    const { write, commitBaseline } = createContractFixture(fixture);
+    commitBaseline();
+    write('src/unknown.ts', 'export const unknown = true;');
+    const candidate = { digest: 'candidate', baseline: 'base', mergeBase: 'base', mutationStamp: 'stamp' };
+    await assert.rejects(
+      () =>
+        checkChanged(['src/unknown.ts'], {
+          root: fixture,
+          capture: () => candidate,
+          run: async () => {
+            executions++;
+            return { exitCode: 0 };
+          },
+          report: () => {},
+        }),
+      /Unregistered business change/,
+    );
+    assert.equal(executions, 0);
+  } finally {
+    rmSync(fixture, { recursive: true });
+  }
+});
+
+test('retired main consumers retain associated regression coverage while unknown deletions fail closed', () => {
+  const fixture = mkdtempSync(path.join(os.tmpdir(), 'retired-business-consumers-'));
+  try {
+    const registered = 'src/registered-retired.ts',
+      unknown = 'src/unknown-retired.ts';
+    const { write, registry, saveRegistry, commitBaseline } = createContractFixture(fixture);
+    write(registered, "export { known } from './known';");
+    write(unknown, 'export const unrelated = true;');
+    registry.contracts[0].consumers.push(registered);
+    saveRegistry();
+    commitBaseline();
+    validateContracts(fixture);
+
+    rmSync(path.join(fixture, registered));
+    rmSync(path.join(fixture, unknown));
+    registry.contracts[0].consumers = ['src/known.ts'];
+    saveRegistry();
+
+    assert.deepEqual(
+      changedBusinessFiles(fixture)
+        .filter((file) => file.startsWith('src/'))
+        .sort(),
+      [registered, unknown],
+    );
+    assert.doesNotThrow(() => validateChangedBusinessCoverage(fixture, [registered]));
+    assert.throws(
+      () => validateChangedBusinessCoverage(fixture, [unknown]),
+      /Unregistered business change: src\/unknown-retired\.ts/,
+    );
+  } finally {
+    rmSync(fixture, { recursive: true });
+  }
 });

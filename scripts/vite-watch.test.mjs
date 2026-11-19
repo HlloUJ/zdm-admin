@@ -14,7 +14,6 @@ test(
     for (const folder of ['src', 'backend/target/site', '.task-verification/logs', '.task-runtime/cache'])
       mkdirSync(path.join(root, folder), { recursive: true });
     const source = path.join(root, 'src/probe.js');
-    writeFileSync(source, 'export const x=1;');
     for (const folder of ['backend/target/site', '.task-verification/logs', '.task-runtime/cache'])
       writeFileSync(path.join(root, folder, 'artifact.html'), 'report');
     const watch = config({ mode: 'test' }).server.watch;
@@ -28,42 +27,41 @@ test(
       await server.close();
       rmSync(root, { recursive: true });
     });
-    const ready = Promise.all([
-      new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Source watcher failed to become ready')), 5000);
-        server.watcher.once('ready', () => {
-          clearTimeout(timer);
-          resolve();
-        });
-      }),
-      new Promise((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('Source watcher failed to become ready')), 5000);
-        // Global ready can precede the recursive source registration on Linux.
-        const onAdd = (file) => {
-          if (file !== source) return;
-          clearTimeout(timer);
-          server.watcher.off('add', onAdd);
-          resolve();
-        };
-        server.watcher.on('add', onAdd);
-        if (server.watcher.getWatched()[path.dirname(source)]?.includes(path.basename(source))) onAdd(source);
-      }),
-    ]);
+    const ready = new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Source watcher failed to become ready')), 5000);
+      server.watcher.once('ready', () => {
+        clearTimeout(timer);
+        resolve();
+      });
+    });
     await server.listen();
     await ready;
+
+    function sourceEvent(event, message) {
+      return new Promise((resolve, reject) => {
+        const onEvent = (file) => {
+          if (file !== source) return;
+          clearTimeout(timer);
+          server.watcher.off(event, onEvent);
+          resolve();
+        };
+        const timer = setTimeout(() => {
+          server.watcher.off(event, onEvent);
+          reject(new Error(message));
+        }, 5000);
+        server.watcher.on(event, onEvent);
+      });
+    }
+
+    // Wait for a filesystem event from the new file before testing its next write.
+    const added = sourceEvent('add', 'Source watcher missed a new file');
+    writeFileSync(source, 'export const x=1;', { flag: 'wx' });
+    await added;
     assert.ok(server.watcher.getWatched()[path.dirname(source)]?.includes(path.basename(source)));
     const watched = Object.keys(server.watcher.getWatched());
     for (const folder of ['backend/target', '.task-verification', '.task-runtime'])
       assert.ok(!watched.some((directory) => directory.startsWith(path.join(root, folder))), folder);
-    const changed = new Promise((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error('Source HMR stopped working')), 5000);
-      server.watcher.on('change', (file) => {
-        if (file === source) {
-          clearTimeout(timer);
-          resolve();
-        }
-      });
-    });
+    const changed = sourceEvent('change', 'Source HMR stopped working');
     writeFileSync(source, 'export const x=2;');
     await changed;
   },

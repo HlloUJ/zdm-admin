@@ -23,6 +23,8 @@ public class AccessorySupplyEditAuditService {
   private static final Set<String> SYSTEM = Set.of("状态", "下架原因", "详细说明", "下架时间", "创建人", "创建时间", "商品ID", "发布类型");
   @org.springframework.beans.factory.annotation.Autowired
   private AccessoryStateActivityService stateActivities;
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.zdm.platform.storeexit.StoreExitTargetService exitTargets;
   private final JdbcTemplate jdbc;
   private final ObjectMapper json;
   private final CurrentIdentityProvider identities;
@@ -39,16 +41,18 @@ public class AccessorySupplyEditAuditService {
   EditContext prepare(AccessoryProduct product, Map<String, Object> before) {
     JsonNode snapshot = json.valueToTree(before);
     boolean active = Boolean.TRUE.equals(jdbc.queryForObject("SELECT operations_deleted=FALSE AND operations_invalidated_at IS NULL FROM accessory_products WHERE id=?", Boolean.class, product.getId()));
-    jdbc.queryForList("SELECT DISTINCT store_id FROM store_accessory_products WHERE accessory_product_id=? AND invalidated_at IS NULL ORDER BY store_id", product.getId())
-        .forEach(row -> salePrices.lockCategories(((Number) row.get("store_id")).longValue()));
+    var writableStores = exitTargets.lockStores(jdbc.queryForList("SELECT DISTINCT store_id FROM store_accessory_products WHERE accessory_product_id=? AND invalidated_at IS NULL ORDER BY store_id", Long.class, product.getId()));
+    writableStores.forEach(salePrices::lockCategories);
+    String storeIds = writableStores.isEmpty() ? "NULL" : writableStores.stream().map(String::valueOf).collect(java.util.stream.Collectors.joining(","));
     var stores = jdbc.query("""
         SELECT listing.id,listing.tenant_id,listing.store_id,listing.status,store.store_level_id
         FROM store_accessory_products listing JOIN stores store ON store.id=listing.store_id
         JOIN accessory_products product ON product.id=listing.accessory_product_id
         WHERE listing.accessory_product_id=? AND listing.invalidated_at IS NULL
           AND listing.selection_generation=product.selection_generation
+          AND listing.store_id IN (%s)
         ORDER BY listing.id FOR UPDATE
-        """, (row, index) -> new StoreSnapshot(row.getLong("id"), row.getLong("tenant_id"), row.getLong("store_id"), row.getString("status"),
+        """.replace("%s", storeIds), (row, index) -> new StoreSnapshot(row.getLong("id"), row.getLong("tenant_id"), row.getLong("store_id"), row.getString("status"),
             storeSnapshot(snapshot, row.getLong("id"), row.getObject("store_level_id", Long.class))), product.getId());
     return new EditContext(snapshot, product.getSourceStatus(), active, stores);
   }
@@ -86,6 +90,7 @@ public class AccessorySupplyEditAuditService {
       writeProductLog(product, "admin", "SOURCE_UPDATE", "该" + subject + "已被供应链修改", context.before(), after, changed, sales, event, time);
     }
     for (StoreSnapshot store : context.stores()) {
+      if (!exitTargets.lockStore(store.storeId())) { continue; }
       Long level = jdbc.queryForObject("SELECT store_level_id FROM stores WHERE id=?", Long.class, store.storeId());
       String nextStatus = sales ? salePrices.synchronizeSupplyEdit(store.id(), after, actor.accountId(), storeTime) : store.status();
       JsonNode next = storeSnapshot(after, store.id(), level);
