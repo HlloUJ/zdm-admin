@@ -2930,7 +2930,7 @@
       "dynamicImports": 0
     },
     "scripts/task-preview-service.mjs": {
-      "digest": "569881584b65b313bcde16dc2953963a6b137461df496f30ed36499fd7bd9634",
+      "digest": "5c38747b258b92bf63c761bc1d73eecdcef62cfd552587a1a9c4c23f08c79610",
       "imports": [
         "scripts/preview-consumers.mjs",
         "scripts/preview-target.mjs",
