@@ -2,6 +2,7 @@ import { createBoardIntake } from './task-board-intake.mjs';
 import './task-network.mjs';
 import { checkStartMonitoringArgs } from './task-monitor-registration.mjs';
 import assert from 'node:assert/strict';
+import { observeEntry } from './parallel-task-timing.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
@@ -91,7 +92,7 @@ export function publishedTaskEntry(root, args) {
         : command === 'registry' && rest[0] === 'register'
           ? [...rest, '--worktree', target]
           : rest;
-  return { script, cwd: target, args: forwarded, published, source: main };
+  return { script, cwd: target, args: forwarded, published, source: main, command, originalArgs: rest };
 }
 export function main(root = process.cwd(), args = process.argv.slice(2)) {
   if (args.includes('--help')) {
@@ -101,11 +102,13 @@ export function main(root = process.cwd(), args = process.argv.slice(2)) {
     return;
   }
   const plan = publishedTaskEntry(root, args);
-  const result = spawnSync(process.execPath, [plan.script, ...plan.args], {
-    cwd: plan.cwd,
-    env: process.env,
-    stdio: 'inherit',
-  });
+  const result = observeEntry(plan, createTaskRegistry(root), () =>
+    spawnSync(process.execPath, [plan.script, ...plan.args], {
+      cwd: plan.cwd,
+      env: process.env,
+      stdio: 'inherit',
+    }),
+  );
   assert.equal(
     result.status,
     0,

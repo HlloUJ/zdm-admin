@@ -1,3 +1,4 @@
+import { observeBinding, observeEntry } from './parallel-task-timing.mjs';
 import { createBoardIntake } from './task-board-intake.mjs';
 import './task-network.mjs';
 import { assertTaskExecutor, executionBinding } from './task-execution-binding.mjs';
@@ -80,7 +81,11 @@ export function startParallelTask(
   }
   function ready(result) {
     result.task = verifyStartMonitoringReadback(registry, result.task, options.monitorContext);
-    result.artifacts = prepare(result.task);
+    result.artifacts = observeEntry(
+      { command: 'measure', originalArgs: ['dependencies'], cwd: result.task.worktree },
+      registry,
+      () => ({ status: 0, value: prepare(result.task) }),
+    ).value;
     try {
       const mains = registeredTaskWorktrees(root).filter((entry) => entry.branch === 'main');
       assert.equal(mains.length, 1);
@@ -92,6 +97,7 @@ export function startParallelTask(
     } catch (error) {
       result.timing = { status: 'unavailable', reason: error.message };
     }
+    observeBinding(result.task, result.timing);
     return result;
   }
   assert.ok(
