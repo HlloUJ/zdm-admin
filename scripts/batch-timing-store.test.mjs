@@ -322,9 +322,10 @@ test('collector upgrade replaces only its proven owned stale bundle and retains 
   const upgraded = f.trackObserver(ensureObserver(f.directory));
   assert.notEqual(upgraded.pid, owner.pid);
   assert.notEqual(upgraded.bundleDigest, owner.bundleDigest);
-  assert.equal(ensureObserver(f.directory).pid, upgraded.pid);
+  // A spawned PID does not prove the collector is ready to handle events.
   f.append(event(f, 'turn_aborted', 'one', 100));
   await until(() => readTimeline(f.common, 'timing').turns[0].termination === 'interrupted');
+  assert.equal(ensureObserver(f.directory).pid, upgraded.pid);
   const lease = path.join(f.directory, 'observer.json');
   writeFileSync(lease, JSON.stringify({ ...upgraded, pid: process.pid }));
   assert.throws(() => ensureObserver(f.directory), /Cannot prove timing observer exited/);
