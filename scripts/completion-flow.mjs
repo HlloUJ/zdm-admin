@@ -1,4 +1,5 @@
-import { assertAcceptedSource, publishAcceptance, readAcceptance } from './accepted-source.mjs';
+import { assertAcceptedSource, publishAcceptance, readAcceptance, verifyRemoteAcceptance } from './accepted-source.mjs';
+import { readAcceptedComposition, writeAcceptedComposition } from './accepted-source-composition.mjs';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -11,6 +12,13 @@ import { applyTaskComposition } from './task-composition.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
 import { withCandidateRuntime } from './task-candidate-runtime.mjs';
+import {
+  persistPreCiReview,
+  preCiCompositionCommit,
+  preCiCompositionTree,
+  readPreCiReview,
+  storedPreCiReview,
+} from './delivery-repairs/pre-ci-composition.mjs';
 
 // This command is invoked only after the human authorizes this exact batch's formal delivery.
 // Every phase awaits its predecessor directly; no extra sleep, watcher, test run or approval loop.
@@ -30,6 +38,7 @@ export async function runCompletionFlow(
     candidateRuntime = withCandidateRuntime,
     deferSettle = false,
     preparationOnly = false,
+    engineeringReviewFile,
     assertCurrentAdmission,
     readState = () => state,
   },
@@ -94,17 +103,72 @@ export async function runCompletionFlow(
       taskRegistryVersion: 2,
     };
   };
+  function verifyCompositionCandidate(proof, accepted, review) {
+    const candidate = review?.candidate ?? preCiCompositionCommit(batch.worktree, proof);
+    const checked = verifyRemoteAcceptance(batch.worktree, {
+      candidate,
+      accepted: accepted.commit,
+      branch: batch.branch,
+      trustedMain: proof.main,
+    });
+    assert.equal(checked.candidateMergeTree, proof.candidateTree, 'Manifest resolution changed the actual merge tree');
+    return candidate;
+  }
+  function installCompositionCandidate(proof, candidate) {
+    assertCurrentAdmission?.();
+    assert.equal(batch.recordedHead, proof.taskHead, 'Original checkpointed candidate required');
+    assert.equal(git(batch.worktree, 'rev-parse', 'HEAD'), proof.taskHead);
+    assert.equal(git(batch.worktree, 'status', '--porcelain'), '', 'Composition requires a clean owned task');
+    assertAcceptedSource(batch.worktree, batch.id, candidate);
+    git(batch.worktree, 'merge', '--ff-only', candidate);
+  }
   // Complete an interrupted, already-proved merge before normal source checks.
   // Runtime quiescence happened before that proof was written.
   if (parallel) {
+    const accepted = readAcceptance(root, batch.id);
+    const proof = readAcceptedComposition(root, batch.id, accepted.commit);
+    if (proof && !proof.candidateCommit) {
+      const current = git(batch.worktree, 'rev-parse', 'HEAD');
+      const review = storedPreCiReview(batch.worktree, proof);
+      if (current === proof.taskHead) {
+        assertCurrentAdmission?.();
+        const tree = preCiCompositionTree(
+          batch.worktree,
+          { ...proof, protectedPaths: accepted.protectedPaths },
+          review,
+        );
+        if (tree) {
+          assert.equal(tree, proof.candidateTree, 'Recovered candidate differs from the original composition proof');
+          installCompositionCandidate(proof, verifyCompositionCandidate(proof, accepted, review));
+          engineeringReviewFile = undefined; // Recovery consumes the durable original review.
+        }
+      } else if (
+        review &&
+        git(batch.worktree, 'rev-parse', 'HEAD^{tree}') === proof.candidateTree &&
+        batch.recordedHead === proof.taskHead
+      ) {
+        assert.equal(current, review.candidate, 'Recovery must register the exact reviewed commit');
+      }
+      if (review && engineeringReviewFile && git(batch.worktree, 'rev-parse', 'HEAD') === review.candidate) {
+        const supplied = readPreCiReview(batch.worktree, engineeringReviewFile);
+        if (supplied.candidate === review.candidate) {
+          assert.deepEqual(supplied, review, 'Registered engineering review changed');
+          engineeringReviewFile = undefined;
+        }
+      }
+    }
     applyTaskComposition(root, batch.id, undefined, { recover: true });
     batch = readActiveBatch(root);
     head = batch.recordedHead;
   }
   let repository;
+  if (preparationOnly) {
+    assertCurrentAdmission?.();
+    git(root, 'fetch', 'origin');
+  }
   await phase('prepare', head, async () => {
     repository = JSON.parse(execute(root, 'gh', ['repo', 'view', '--json', 'nameWithOwner'])).nameWithOwner;
-    git(root, 'fetch', 'origin');
+    if (!preparationOnly) git(root, 'fetch', 'origin');
     assert.equal(git(batch.worktree, 'rev-parse', 'HEAD'), head);
     assert.equal(git(batch.worktree, 'status', '--porcelain'), '');
     assertAcceptedSource(batch.worktree, batch.id, head);
@@ -145,6 +209,43 @@ export async function runCompletionFlow(
     if (state.previewFingerprint) assert.equal(runtime.profileFingerprint, state.previewFingerprint);
     return { head, protectionChecked: true, runtimePreflight: true, assets };
   });
+  if (
+    preparationOnly &&
+    !state.events.some((event) => event.name === 'ci' && event.status === 'success' && event.result?.headSha === head)
+  ) {
+    assertCurrentAdmission?.();
+    const main = git(root, 'rev-parse', 'origin/main');
+    const accepted = readAcceptance(root, batch.id);
+    const review = engineeringReviewFile ? readPreCiReview(batch.worktree, engineeringReviewFile) : undefined;
+    const candidateTree = preCiCompositionTree(
+      batch.worktree,
+      {
+        accepted: accepted.commit,
+        taskHead: head,
+        main,
+        protectedPaths: accepted.protectedPaths,
+        rejectUnreviewed: true,
+      },
+      review,
+    );
+    if (candidateTree) {
+      assert.equal(batch.recordedHead, head, 'Original checkpointed candidate required');
+      await phase('prepare', head + ':pre-ci-composition:' + main, async () => {
+        const inputs = { batch: batch.id, accepted: accepted.commit, main, taskHead: head, candidateTree };
+        const candidate = verifyCompositionCandidate(inputs, accepted, review);
+        await previewControl.prepareComposition(worktreePlan(main));
+        assertCurrentAdmission?.();
+        if (review) persistPreCiReview(batch.worktree, inputs, review);
+        const proof = writeAcceptedComposition(batch.worktree, inputs);
+        installCompositionCandidate(proof, candidate);
+        const composed = applyTaskComposition(root, batch.id, undefined, { recover: true });
+        assert.equal(composed.recordedHead, candidate, 'Composition must register its exact candidate');
+        return { head: candidate, main, originalHead: head, accepted: accepted.commit, candidateTree };
+      });
+      batch = readActiveBatch(root);
+      head = batch.recordedHead;
+    }
+  }
   async function publishCandidate({ readiness = false } = {}) {
     if (parallel) {
       const merged = JSON.parse(
@@ -222,9 +323,14 @@ export async function runCompletionFlow(
         '--json',
         'number,url,state,headRefOid,mergeCommit',
       ];
-      let pulls = JSON.parse(execute(root, 'gh', args)).filter((p) => p.headRefOid === head);
+      const observed = JSON.parse(execute(root, 'gh', args));
+      let pulls = observed.filter((p) => p.headRefOid === head);
       assert.ok(pulls.length <= 1, 'Ambiguous pull request');
       if (!pulls.length) {
+        assert.ok(
+          !observed.some((p) => p.state === 'OPEN'),
+          'Existing PR has not read back the exact pushed candidate',
+        );
         const title = batch.modules
           .map((m) => m.title)
           .join('；')

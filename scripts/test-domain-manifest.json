@@ -491,7 +491,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "9305e5130d4a5cd789fbef4bde62e3e4bfb5b81683aa3afb3f1f371efe6fc492",
+      "digest": "44d7f3c114366d0e11f5b07de1d39ed79a019615f10079e1bcd3a8e82305cc23",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -552,11 +552,13 @@
       "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
-      "digest": "e45e366707a017fb7c2f8a05c3bd00c7bfbb85ceeec77e4ef67ae90bd845334a",
+      "digest": "71570dff06954fd7696b4b64bf442bd313f9307298d390779e6f98133773fa13",
       "imports": [
+        "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-session.mjs",
+        "scripts/delivery-repairs/pre-ci-composition.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/resource-lease.mjs",
@@ -583,7 +585,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "927b2844e8b63c5dcadbcdc261d2b29f7e04c081d366241f210c350b4cf96256",
+      "digest": "7336f9b94e09b3bbfa404df53c3d5fd544f9af0aaf2d6bf01a60413e1524b3ba",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -593,9 +595,12 @@
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
         "scripts/completion-session.mjs",
+        "scripts/delivery-repairs/pre-ci-composition.mjs",
         "scripts/dev-task.mjs",
         "scripts/new-helper.mjs",
+        "scripts/published.mjs",
         "scripts/resource-lease.mjs",
+        "scripts/script-test-plan.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-composition.mjs",
         "scripts/task-delivery-queue.mjs",
@@ -841,6 +846,11 @@
         "scripts/delivery-repairs/fixtures/timing-v2/batch-timing-core.mjs",
         "scripts/delivery-repairs/fixtures/timing-v2/batch-timing-observer.mjs"
       ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/pre-ci-composition.mjs": {
+      "digest": "5e3eeac2d5d6156689386e39b4238b9ffed8b717037ba8cbc9746a0c6fb6fe89",
+      "imports": ["scripts/accepted-source-policy.mjs", "scripts/script-test-plan.mjs"],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-docker-directories.mjs": {
@@ -2004,7 +2014,7 @@
       "dynamicImports": 0
     },
     "scripts/script-test-plan.mjs": {
-      "digest": "e5add1a574ee0c798cfe0e55020e3a5a6cf7c59858ceaac7fc0cd9948b399ba8",
+      "digest": "3f5ae03d0bc5c763bcd2720664adfaf426ab6f1cd8a407b1a4d10efc05a5ba61",
       "imports": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
       "dynamicImports": 0
     },
