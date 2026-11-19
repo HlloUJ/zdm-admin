@@ -51,7 +51,7 @@ def child_parent(root, relative, capture=False):
         raise
 
 
-def inventory(fd, roots, limit, verified_repositories):
+def inventory(fd, roots, limit, verified_repositories, closed_at):
     entries = []
     blocked = []
     repositories = []
@@ -64,6 +64,9 @@ def inventory(fd, roots, limit, verified_repositories):
             blocked.append(relative)
             return
         is_dir = stat.S_ISDIR(s.st_mode)
+        if not is_dir and closed_at is not None and s.st_ctime_ns // 1_000_000 > closed_at:
+            blocked.append(relative)
+            return
         if not is_dir and not (stat.S_ISLNK(s.st_mode) or (stat.S_ISREG(s.st_mode) and s.st_nlink == 1)):
             blocked.append(relative)
             return
@@ -144,7 +147,8 @@ def main():
     fd = open_root(request['path'])
     try:
         if request['action'] == 'inventory':
-            result = inventory(fd, request.get('roots'), 250_000, request.get('repositories', []))
+            result = inventory(fd, request.get('roots'), 250_000,
+                               request.get('repositories', []), request.get('closedAt'))
         elif request['action'] == 'subtract':
             result = subtract(fd, request)
         else:

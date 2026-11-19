@@ -131,11 +131,19 @@ function fixture(t, { historical = false } = {}) {
   };
   writeFileSync(path.join(cleanupBase, 'policy.json'), JSON.stringify(policy), { mode: 0o600 });
   const registry = { commonDir, list: () => (historical ? [] : [task]) };
-  const run = (options = {}) =>
-    runOwnershipCleanup(root, { registry, policy, unreferenced: () => {}, apply: true, ...options });
+  let sealed = historical;
+  const seal = () => {
+    if (sealed) return;
+    task.closedAt = new Date().toISOString();
+    sealed = true;
+  };
+  const run = (options = {}) => {
+    seal();
+    return runOwnershipCleanup(root, { registry, policy, unreferenced: () => {}, apply: true, ...options });
+  };
   const assets = path.join(commonDir, 'task-assets', id);
   const state = () => JSON.parse(readFileSync(path.join(cleanupBase, 'ownership-v2', id + '.json')));
-  return { root, commonDir, task, directory, receipt, worktree, branch, assets, policy, run, state };
+  return { root, commonDir, task, directory, receipt, worktree, branch, assets, policy, run, seal, state };
 }
 test('calendar slot consumes completed task, actual worktree and branch refs, and preserves final receipt', async (t) => {
   const f = fixture(t);
@@ -301,6 +309,7 @@ test('interrupted cleanup owner is recovered and the next round completes the re
   const f = fixture(t);
   const deleted = artifact(path.join(f.directory, 'records', 'already-processed'));
   const waiting = artifact(path.join(f.assets, 'records', 'next-object'));
+  f.seal();
   const worker = spawn(
     process.execPath,
     [
@@ -338,4 +347,17 @@ test('interrupted cleanup owner is recovered and the next round completes the re
   assert.equal((await f.run()).remaining, 0);
   assert.equal(existsSync(waiting), false);
   assert.equal(f.state().outcome, 'cleaned');
+});
+
+test('an ignored file written after formal closure keeps the worktree and branch protected', async (t) => {
+  const f = fixture(t);
+  const original = artifact(path.join(f.worktree, 'output', 'completed-task-cache'));
+  f.seal();
+  await new Promise((resolve) => setTimeout(resolve, 25));
+  const next = path.join(f.worktree, 'output', 'new-uncommitted-input');
+  writeFileSync(next, 'new local content');
+  assert.equal((await f.run()).processed[0].state, 'blocked');
+  assert.equal(existsSync(original), false);
+  assert.equal(readFileSync(next, 'utf8'), 'new local content');
+  assert.ok(git(f.root, 'ls-remote', 'origin', 'refs/heads/' + f.branch));
 });

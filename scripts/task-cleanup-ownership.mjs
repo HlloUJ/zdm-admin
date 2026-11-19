@@ -90,7 +90,9 @@ function deliveredTasks(registry) {
 
 function assertClosed(root, task, delivery) {
   assert.equal(task.stage, 'closed');
-  assert.ok(task.closedAt && shaPattern.test(task.recordedHead) && shaPattern.test(task.main?.local));
+  const closedAt = Date.parse(task.closedAt);
+  assert.ok(Number.isFinite(closedAt) && closedAt <= Date.now(), 'Formal closure time is invalid');
+  assert.ok(shaPattern.test(task.recordedHead) && shaPattern.test(task.main?.local));
   assert.equal(task.main.local, task.main.remote);
   assert.ok(
     task.branch.startsWith('codex/') && !['codex/integration-current', 'codex/preview-current'].includes(task.branch),
@@ -283,7 +285,9 @@ function removeTarget(root, target, task, state, persist, check, budget, deadlin
   const selected = content(target, task);
   let record = state.files[file];
   if (!record) {
-    let inventory = tree('inventory', { path: file, roots: selected }, deadline);
+    const observation = { path: file, roots: selected };
+    if (target.kind === 'worktree') observation.closedAt = Date.parse(task.closedAt);
+    let inventory = tree('inventory', observation, deadline);
     const repositories = [];
     const rejected = [];
     for (const relative of inventory.repositories) {
@@ -294,7 +298,7 @@ function removeTarget(root, target, task, state, persist, check, budget, deadlin
         rejected.push({ path: relative, reason: error.message });
       }
     }
-    if (repositories.length) inventory = tree('inventory', { path: file, roots: selected, repositories }, deadline);
+    if (repositories.length) inventory = tree('inventory', { ...observation, repositories }, deadline);
     record = { ...inventory, cursor: 0, remainingDirectories: [], rejected };
     state.files[file] = record;
     persist();

@@ -24,6 +24,7 @@ export function cleanupLaunchAgentPlan({
   node,
   commonDir,
   runtimeDirectory,
+  gitSocksPort,
   hostTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
 }) {
   // launchd calendar rules use the host timezone, not the child's TZ environment.
@@ -37,6 +38,17 @@ export function cleanupLaunchAgentPlan({
   assert.match(path.basename(runtimeDirectory ?? ''), /^[a-f0-9]{40}$/);
   assert.equal(runtimeDirectory, path.join(commonDir, 'task-cleanup/runtime', path.basename(runtimeDirectory)));
   const command = [node, path.join(runtimeDirectory, 'scripts/task-cleanup-scheduled-cli.mjs'), runtimeDirectory];
+  const environment = { PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin' };
+  if (gitSocksPort !== undefined) {
+    assert.ok(Number.isInteger(gitSocksPort) && gitSocksPort > 0 && gitSocksPort <= 65535, 'Invalid local SOCKS port');
+    environment.GIT_SSH_COMMAND =
+      "ssh -o BatchMode=yes -o ConnectTimeout=8 -o StrictHostKeyChecking=yes -o ProxyCommand='/usr/bin/nc -X 5 -x 127.0.0.1:" +
+      gitSocksPort +
+      " %h %p'";
+  }
+  const envPlist = Object.entries(environment)
+    .map(([key, value]) => '<key>' + xml(key) + '</key><string>' + xml(value) + '</string>')
+    .join('');
   const plist = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
@@ -45,7 +57,7 @@ export function cleanupLaunchAgentPlan({
 <key>WorkingDirectory</key><string>${xml(root)}</string>
 <key>StartCalendarInterval</key><array>${CLEANUP_HOURS.map((hour) => '<dict><key>Hour</key><integer>' + hour + '</integer><key>Minute</key><integer>0</integer></dict>').join('')}</array>
 <key>RunAtLoad</key><true/>
-<key>EnvironmentVariables</key><dict><key>PATH</key><string>/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin</string></dict>
+<key>EnvironmentVariables</key><dict>${envPlist}</dict>
 <key>StandardOutPath</key><string>/dev/null</string>
 <key>StandardErrorPath</key><string>/dev/null</string>
 </dict></plist>\n`;
