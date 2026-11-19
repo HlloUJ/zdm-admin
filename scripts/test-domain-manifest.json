@@ -86,7 +86,7 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-ci.mjs": {
-      "digest": "afe9e825827e1234e434da1aa4a095dba61e387bbbe22f473781f68a627362a1",
+      "digest": "d29997b501ab3caed6ebebd697b52aad75161d8636df6844ca3bb63d8aa0813f",
       "imports": ["scripts/accepted-source-policy.mjs", "scripts/accepted-source.mjs"],
       "dynamicImports": 0
     },
@@ -138,7 +138,7 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source.test.mjs": {
-      "digest": "18dc4e8857dbf58c0f4fae499ba8c45df02ae74ce97e2d5855b8cabbd7cdd8df",
+      "digest": "8d84e89e22b7f06a2ffbdbd70c837765eb0973397ab02bc48837c31f77fe2969",
       "imports": [
         "scripts/accepted-source-ci.mjs",
         "scripts/accepted-source-hook.mjs",
@@ -1175,7 +1175,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.json": {
-      "digest": "233328679e982a24e50c45d6b75fe6bba2991cb82a02c2379c8a3760339ce772",
+      "digest": "d7ec16a4a929c822adf933511db50d11545790c3f9e8919195e5427660a1da19",
       "imports": [
         "scripts/absent.mjs",
         "scripts/accepted-source-ci.mjs",

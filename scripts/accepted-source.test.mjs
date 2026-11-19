@@ -214,7 +214,14 @@ test('frozen commit index blocks staged business edits without rewriting the ind
   assert.equal(readFileSync(path.join(f.root, 'src/product.js'), 'utf8'), 'later user business');
 });
 
-for (const scenario of ['success', 'business-change', 'missing-tag']) {
+for (const scenario of [
+  'success',
+  'business-change',
+  'missing-tag',
+  'create-rejected',
+  'success-update-rejected',
+  'both-updates-rejected',
+]) {
   test('trusted CI fetches Git objects only and reports exact candidate: ' + scenario, async (t) => {
     const f = fixture(t);
     const remote = path.join(f.root, '.task-verification/origin.git');
@@ -240,8 +247,33 @@ for (const scenario of ['success', 'business-change', 'missing-tag']) {
       repository: 'owner/repo',
       token: 'test-only',
       request: async (url, init) => {
-        calls.push({ url, method: init.method, body: JSON.parse(init.body) });
-        return { ok: true, json: async () => ({ id: 123 }) };
+        const body = JSON.parse(init.body);
+        calls.push({ url, method: init.method, body });
+        if (scenario === 'create-rejected') {
+          return new Response(
+            JSON.stringify({
+              message: 'Resource not accessible by integration',
+              documentation_url: 'https://example.invalid/private-response-detail',
+            }),
+            { status: 403 },
+          );
+        }
+        if (scenario === 'both-updates-rejected' && body.conclusion === 'failure') {
+          return new Response('private-proxy-response', { status: 503 });
+        }
+        if (['success-update-rejected', 'both-updates-rejected'].includes(scenario) && body.conclusion === 'success') {
+          return new Response(
+            JSON.stringify({
+              message: 'Validation Failed',
+              errors: [
+                { field: 'output.summary', code: 'invalid', message: 'private-response-detail' },
+                { field: 'private-field', code: 'private-code' },
+              ],
+            }),
+            { status: 422 },
+          );
+        }
+        return new Response(JSON.stringify({ id: 123 }), { status: init.method === 'POST' ? 201 : 200 });
       },
     };
     const event = {
@@ -251,11 +283,43 @@ for (const scenario of ['success', 'business-change', 'missing-tag']) {
       },
     };
     const run = runAcceptedSourceCI(trusted, event, options);
-    if (scenario === 'success') assert.equal((await run).candidate, candidate);
-    else await assert.rejects(run);
+    if (scenario === 'success') {
+      assert.equal((await run).candidate, candidate);
+    } else if (scenario === 'create-rejected') {
+      await assert.rejects(run, {
+        message:
+          'Cannot publish accepted-source check (POST create): HTTP 403, resource not accessible to the GitHub App',
+      });
+      assert.equal(calls.length, 1);
+    } else if (['success-update-rejected', 'both-updates-rejected'].includes(scenario)) {
+      const original =
+        'Cannot publish accepted-source check (PATCH complete-success): HTTP 422, validation failed (output.summary=invalid)';
+      await assert.rejects(run, {
+        message:
+          scenario === 'both-updates-rejected'
+            ? original +
+              '\nCannot publish accepted-source check (PATCH complete-failure): HTTP 503, no public reason recognized'
+            : original,
+      });
+      assert.deepEqual(
+        calls.map(({ method, body }) => [method, body.conclusion]),
+        [
+          ['POST', undefined],
+          ['PATCH', 'success'],
+          ['PATCH', 'failure'],
+        ],
+      );
+      assert.equal(calls[2].body.output.summary, original);
+      assert.equal(calls[2].url, calls[1].url);
+    } else {
+      await assert.rejects(run);
+    }
     assert.equal(calls[0].body.head_sha, candidate);
-    assert.equal(calls[1].body.conclusion, scenario === 'success' ? 'success' : 'failure');
-    assert.equal(calls[1].url.endsWith('/check-runs/123'), true);
+    if (scenario !== 'create-rejected') {
+      const check = calls.at(-1);
+      assert.equal(check.body.conclusion, scenario === 'success' ? 'success' : 'failure');
+      assert.equal(check.url.endsWith('/check-runs/123'), true);
+    }
     assert.equal(readFileSync(path.join(trusted, 'scripts/check.mjs'), 'utf8'), '// technical\n');
     assert.equal(readFileSync(path.join(trusted, 'src/product.js'), 'utf8'), 'export const price = 12;\n');
     assert.equal(
