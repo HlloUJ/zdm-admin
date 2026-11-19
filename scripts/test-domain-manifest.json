@@ -552,11 +552,13 @@
       "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
-      "digest": "e45e366707a017fb7c2f8a05c3bd00c7bfbb85ceeec77e4ef67ae90bd845334a",
+      "digest": "0637f63d26530a6a01db3b7b345def6557172650a10611f89a4411c3313de46e",
       "imports": [
+        "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-session.mjs",
+        "scripts/delivery-repairs/pre-ci-manifest-composition.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/resource-lease.mjs",
@@ -583,7 +585,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "927b2844e8b63c5dcadbcdc261d2b29f7e04c081d366241f210c350b4cf96256",
+      "digest": "e7fb7bbe38c0ab5aecfde1369e20da5f11d84a84fe221dfd0adab3b5e96f2e5a",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -593,9 +595,12 @@
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
         "scripts/completion-session.mjs",
+        "scripts/delivery-repairs/pre-ci-manifest-composition.mjs",
         "scripts/dev-task.mjs",
         "scripts/new-helper.mjs",
+        "scripts/published.mjs",
         "scripts/resource-lease.mjs",
+        "scripts/script-test-plan.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-composition.mjs",
         "scripts/task-delivery-queue.mjs",
@@ -841,6 +846,11 @@
         "scripts/delivery-repairs/fixtures/timing-v2/batch-timing-core.mjs",
         "scripts/delivery-repairs/fixtures/timing-v2/batch-timing-observer.mjs"
       ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/pre-ci-manifest-composition.mjs": {
+      "digest": "5ece86df06aaca0159ce92b7f1a33d37f3099dd99ff461c8f21fd19fba9df403",
+      "imports": ["scripts/accepted-source-policy.mjs", "scripts/script-test-plan.mjs"],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-docker-directories.mjs": {
@@ -2004,7 +2014,7 @@
       "dynamicImports": 0
     },
     "scripts/script-test-plan.mjs": {
-      "digest": "e5add1a574ee0c798cfe0e55020e3a5a6cf7c59858ceaac7fc0cd9948b399ba8",
+      "digest": "3f5ae03d0bc5c763bcd2720664adfaf426ab6f1cd8a407b1a4d10efc05a5ba61",
       "imports": ["scripts/feedback-foundation.test.mjs", "scripts/ui-template-policy.test.mjs"],
       "dynamicImports": 0
     },

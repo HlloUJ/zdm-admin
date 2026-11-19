@@ -26,8 +26,33 @@ import { assertFrozenValidationStart } from './dev-task.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { finalHandoffPlan } from './completion-handoff.mjs';
 import { completionCommand } from './completion-cli.mjs';
+import {
+  captureReviewedScriptInputs,
+  engineeringDomainProof,
+  ENGINEERING_EXTRA_INPUTS,
+  SCRIPT_INPUT_MANIFEST,
+} from './script-test-plan.mjs';
+import { preCiManifestTree } from './delivery-repairs/pre-ci-manifest-composition.mjs';
 
-function fixture(t) {
+const productionGates = ['Frontend quality', 'Backend quality', 'Accepted business snapshot'];
+function ciEvidence(runId, headSha, isMain, at) {
+  return {
+    runId,
+    headSha,
+    branch: isMain ? 'main' : 'codex/a',
+    eventName: isMain ? 'push' : 'pull_request',
+    gatesFinishedAt: new Date(at).toISOString(),
+    attempt: 1,
+    conclusion: 'success',
+    jobs: productionGates.map((name) => ({ name, status: 'completed', conclusion: 'success' })),
+  };
+}
+
+function writeEngineeringManifest(root) {
+  writeFileSync(path.join(root, SCRIPT_INPUT_MANIFEST), JSON.stringify(captureReviewedScriptInputs(root)));
+}
+
+function fixture(t, { manifestConflict = false } = {}) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'completion-parallel-'))),
     main = path.join(dir, 'main'),
     a = path.join(dir, 'a'),
@@ -45,6 +70,13 @@ function fixture(t) {
   writeFileSync(path.join(main, 'base.txt'), 'base');
   mkdirSync(path.join(main, 'scripts'));
   writeFileSync(path.join(main, 'scripts/check.mjs'), '// original verifier\n');
+  if (manifestConflict) {
+    for (const input of ENGINEERING_EXTRA_INPUTS) {
+      mkdirSync(path.dirname(path.join(main, input)), { recursive: true });
+      writeFileSync(path.join(main, input), '{}');
+    }
+    writeEngineeringManifest(main);
+  }
   git(main, 'add', '.');
   git(main, 'commit', '-m', 'base');
   git(main, 'push', '-u', 'origin', 'main');
@@ -59,6 +91,10 @@ function fixture(t) {
   registry.register({ id: 'a', worktree: a, owner: 'chat-a' });
   registry.register({ id: 'b', worktree: b, owner: 'chat-b' });
   writeFileSync(path.join(a, 'feature-a.txt'), 'accepted A');
+  if (manifestConflict) {
+    writeFileSync(path.join(a, 'scripts/check.mjs'), '// task verifier');
+    writeEngineeringManifest(a);
+  }
   git(a, 'add', '.');
   git(a, 'commit', '-m', 'task A');
   const head = git(a, 'rev-parse', 'HEAD'),
@@ -75,6 +111,10 @@ function fixture(t) {
   });
   writeFileSync(path.join(b, 'unfinished.txt'), 'unfinished B must survive');
   writeFileSync(path.join(main, 'published-b.txt'), 'independent published main change');
+  if (manifestConflict) {
+    writeFileSync(path.join(main, 'scripts/published.mjs'), '// main verifier');
+    writeEngineeringManifest(main);
+  }
   git(main, 'add', '.');
   git(main, 'commit', '-m', 'published independent change');
   git(main, 'push', 'origin', 'main');
@@ -206,17 +246,6 @@ test('an already merged task can release a technical follow-up through its origi
   const actions = [];
   let publishedSettler = 'old';
   let secondMain;
-  const productionGates = ['Frontend quality', 'Backend quality', 'Accepted business snapshot'];
-  const ciEvidence = (runId, headSha, isMain, at) => ({
-    runId,
-    headSha,
-    branch: isMain ? 'main' : 'codex/a',
-    eventName: isMain ? 'push' : 'pull_request',
-    gatesFinishedAt: new Date(at).toISOString(),
-    attempt: 1,
-    conclusion: 'success',
-    jobs: productionGates.map((name) => ({ name, status: 'completed', conclusion: 'success' })),
-  });
   const historical = Date.now() - 60_000;
   const originalFailure = {
     id: 'original-failure',
@@ -765,3 +794,109 @@ for (const [failure, deferSettle, preparationOnly = false] of [
       assert.equal(queue.inspect().tickets.length, deferSettle ? 1 : 0);
     }
   });
+
+test('preparation restores a persisted pre-CI manifest composition and updates the original PR', async (t) => {
+  const f = fixture(t, { manifestConflict: true });
+  const frozen = readAcceptance(f.a, 'a');
+  const beforeB = f.registry.readTask('b');
+  f.git(f.a, 'push', 'origin', 'codex/a');
+  publishAcceptance(f.a, 'a');
+  const state = { events: [] };
+  const failure = await completionStage(state, 'ci', f.head + ':original', async () => {
+    throw Error('Original accepted-source CI failed');
+  }).catch((error) => {
+    assert.match(error.message, /Original accepted-source CI failed/);
+    return structuredClone(state.events.at(-1));
+  });
+  let interrupted = false,
+    quiesced = 0,
+    candidate;
+  const options = {
+    preparationOnly: true,
+    common: f.registry.commonDir,
+    state,
+    save: () => {},
+    inventoryAssets: () => [],
+    checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+    previewControl: {
+      assertOwner: async () => {},
+      prepareComposition: async (plan) => {
+        quiesced++;
+        assert.equal(plan.main, f.latest);
+        assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+      },
+    },
+    execute(cwd, tool, args) {
+      if (tool === 'git') {
+        if (args[0] === 'merge' && args[1] === '--ff-only' && !interrupted) {
+          interrupted = true;
+          throw Error('Interrupted after durable composition proof');
+        }
+        return f.git(cwd, ...args);
+      }
+      assert.equal(tool, 'gh');
+      if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'fixture/repo' });
+      if (args[0] === 'api')
+        return JSON.stringify({
+          enforce_admins: { enabled: true },
+          required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+        });
+      assert.deepEqual(args.slice(0, 2), ['pr', 'list'], 'Reuse the existing PR');
+      return JSON.stringify([{ number: 149, state: 'OPEN', headRefOid: candidate }]);
+    },
+    async dispatch(_cwd, args) {
+      assert.deepEqual(args, ['wait', 'pr', candidate]);
+      assert.deepEqual(createTaskDeliveryQueue(f.registry.commonDir).inspect().tickets, []);
+      return (
+        await completionStage(state, 'ci', candidate + ':42', async () =>
+          ciEvidence('42', candidate, false, Date.now()),
+        )
+      ).result;
+    },
+  };
+  const run = () => runCompletionFlow(f.a, readActiveBatch(f.a), f.head, options);
+  await assert.rejects(run(), /Interrupted after durable composition proof/);
+  const proof = readAcceptedComposition(f.a, 'a', f.accepted.commit);
+  assert.equal(proof.taskHead, f.head);
+  assert.equal(proof.main, f.latest);
+  assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+  assert.equal(f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a').split('\t')[0], f.head);
+  const originalExecute = options.execute;
+  options.execute = (cwd, tool, args) => {
+    if (tool === 'gh' && args[1] === 'list') candidate = f.git(f.a, 'rev-parse', 'HEAD');
+    return originalExecute(cwd, tool, args);
+  };
+  const result = await run();
+  assert.equal(result.pullRequest, 149);
+  assert.equal(result.runId, '42');
+  assert.equal(result.head, candidate);
+  assert.equal(quiesced, 1);
+  assert.deepEqual(f.git(f.a, 'show', '-s', '--format=%P', candidate).split(' '), [f.head, f.latest]);
+  assert.equal(f.git(f.a, 'rev-parse', 'HEAD^{tree}'), proof.candidateTree);
+  assert.equal(f.git(f.a, 'show', 'HEAD:scripts/check.mjs'), '// task verifier');
+  assert.equal(f.git(f.a, 'show', 'HEAD:scripts/published.mjs'), '// main verifier');
+  assert.equal(engineeringDomainProof(f.a).proven, true);
+  assert.deepEqual(readAcceptance(f.a, 'a'), frozen);
+  assert.deepEqual(readAcceptedComposition(f.a, 'a', frozen.commit), proof);
+  assert.deepEqual(
+    state.events.find((event) => event.id === failure.id),
+    failure,
+  );
+  assert.equal(f.registry.readTask('a').recordedHead, candidate);
+  assert.deepEqual(f.registry.readTask('b'), beforeB);
+});
+
+test('manifest composition refuses an explicitly protected manifest or an unreviewed input', (t) => {
+  const f = fixture(t, { manifestConflict: true });
+  assert.throws(
+    () => preCiManifestTree(f.a, { taskHead: f.head, main: f.latest, protectedPaths: [SCRIPT_INPUT_MANIFEST] }),
+    /Frozen engineering manifest cannot be replaced/,
+  );
+  writeFileSync(path.join(f.main, 'scripts/published.mjs'), '// stale engineering input');
+  f.git(f.main, 'commit', '-am', 'unreviewed main input');
+  const main = f.git(f.main, 'rev-parse', 'HEAD');
+  assert.throws(
+    () => preCiManifestTree(f.a, { taskHead: f.head, main, protectedPaths: [] }),
+    /Parent engineering manifest is not current/,
+  );
+});
