@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { createProgressOutbox, flushProgress } from './task-progress-outbox.mjs';
 import { recordToolProgress, bestEffortProgress, captureQueueProgress } from './task-delivery-status-sync.mjs';
+import { captureDeliveryQueueProgress } from './delivery-repairs/task-delivery-queue-progress.mjs';
 import { openCompletion, completionStage, saveCompletion } from './completion-session.mjs';
 const payload = {
   observed_at: '2026-11-15T12:00:00.000Z',
@@ -282,7 +283,7 @@ test('delivery enrollment projects only a verified phase and never invents an ac
     dynamicAuthorities: [{ id: phaseOrigin.authorityId, request }],
   };
   for (const [event, expected] of [
-    [enrollment, []],
+    [enrollment, ['queued']],
     [{ ...enrollment, phaseDigest: '0'.repeat(64) }, ['paused']],
     [{ ...enrollment, order: ticket.order + 1 }, ['paused']],
     [{ ...enrollment, request: { ...request, roomId: 'other' } }, ['paused']],
@@ -291,7 +292,7 @@ test('delivery enrollment projects only a verified phase and never invents an ac
     const root = fixture(t);
     const after = { ...previous, revision: 2, events: [...previous.events, event], tickets: [ticket] };
     const original = structuredClone(after);
-    captureQueueProgress(root, after, previous);
+    captureDeliveryQueueProgress(root, after, previous);
     assert.deepEqual(after, original);
     assert.deepEqual(
       createProgressOutbox(path.join(root, 'task-progress', ticket.task))

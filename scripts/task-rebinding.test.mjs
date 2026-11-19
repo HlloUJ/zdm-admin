@@ -459,15 +459,16 @@ test('completed original development with no delivery ticket enters preparation 
   assert.equal(ticket.status, 'queued');
   assert.equal(ticket.admission, null);
   const outbox = createProgressOutbox(path.join(f.registry.commonDir, 'task-progress/task'));
-  assert.equal(
-    outbox
-      .read()
-      .pending.some(({ receipt }) =>
-        receipt.evidence_refs.includes(`execution-order:${f.queue.read().revision}:delivery:task`),
-      ),
-    false,
-    'Enrollment must leave the review card progress intact',
+  const receipts = outbox
+    .read()
+    .pending.map(({ receipt }) => receipt)
+    .filter((receipt) => receipt.evidence_refs.includes(`execution-order:${f.queue.read().revision}:delivery:task`));
+  assert.deepEqual(
+    receipts.map(({ event }) => event),
+    ['queued'],
   );
+  assert.equal(Object.hasOwn(receipts[0], 'stage_fact'), false);
+  assert.equal(f.board.status, 'review');
   assert.deepEqual(
     f.queue.read().tickets.find((t) => t.lane === 'development'),
     before.tickets.find((t) => t.lane === 'development'),

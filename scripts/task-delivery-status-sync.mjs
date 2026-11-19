@@ -106,7 +106,7 @@ function deliveryWaitBasis(state, ticket) {
 }
 
 export function captureQueueProgress(commonDir, state, previous) {
-  const pausedFor = (current, ticket, basis = deliveryWaitBasis(current, ticket)) => {
+  const pausedFor = (current, ticket) => {
     if (!executionPausedFor(current, ticket)) return false;
     const fence = current.events?.findLast((event) => ['initialize', 'pause-all'].includes(event.action))?.request;
     // Binding a reserved new native worker does not start it or revoke its
@@ -126,7 +126,9 @@ export function captureQueueProgress(commonDir, state, previous) {
             event.workerOwner === ticket.owner,
         ));
     const request =
-      ticket.status === 'queued' && pendingNative && ticket.admission === null ? ticket.request : basis?.request;
+      ticket.status === 'queued' && pendingNative && ticket.admission === null
+        ? ticket.request
+        : deliveryWaitBasis(current, ticket)?.request;
     return !(
       Number.isSafeInteger(fence?.sequence) &&
       typeof fence.authorId === 'string' &&
@@ -141,10 +143,7 @@ export function captureQueueProgress(commonDir, state, previous) {
     if (['completed', 'cancelled'].includes(ticket.status)) continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
     // Admission is NOT proof of actual action start. No synthetic started event on claim.
-    const basis = deliveryWaitBasis(state, ticket);
-    const paused = pausedFor(state, ticket, basis);
-    // Enrollment updates the ledger while the completed development remains in review.
-    if (!before && !paused && basis?.action === 'delivery-phase-enrolled') continue;
+    const paused = pausedFor(state, ticket);
     const changed = !before || before.status !== ticket.status || paused !== pausedFor(previous, before);
     if (!changed || (!['queued', 'blocked'].includes(ticket.status) && !paused)) continue;
     const event = paused ? 'paused' : ticket.status;
