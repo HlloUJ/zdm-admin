@@ -26,6 +26,7 @@ import { assertFrozenValidationStart } from './dev-task.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { finalHandoffPlan } from './completion-handoff.mjs';
 import { completionCommand } from './completion-cli.mjs';
+import { taskRuntimeReferences } from './task-runtime-references.mjs';
 import {
   captureReviewedScriptInputs,
   engineeringDomainProof,
@@ -863,9 +864,14 @@ for (const reviewedConflict of [false, true])
       save: () => {},
       inventoryAssets: () => [],
       checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+      runtimeReferences: async (task, { referenceEffect }) => {
+        assert.equal(referenceEffect, 'preparation');
+        assert.equal(task.worktree, f.a);
+      },
       previewControl: {
         assertOwner: async () => {},
-        prepareComposition: async (plan) => {
+        prepareComposition: async (plan, { referenceEffect }) => {
+          assert.equal(referenceEffect, 'preparation');
           quiesced++;
           assert.equal(plan.main, f.latest);
           assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
@@ -935,6 +941,49 @@ for (const reviewedConflict of [false, true])
     assert.equal(f.registry.readTask('a').recordedHead, candidate);
     assert.deepEqual(f.registry.readTask('b'), beforeB);
   });
+
+test('public prepare refuses an unknown 5177 reference before writing the original composition', async (t) => {
+  const f = fixture(t, { manifestConflict: true, reviewedConflict: true });
+  const reviewFile = path.join(f.a, '.task-verification/engineering-review.json');
+  mkdirSync(path.dirname(reviewFile));
+  writeFileSync(reviewFile, JSON.stringify(reviewedFixture(f)));
+  const options = {
+    owner: 'chat-a',
+    checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+    previewControl: {
+      assertOwner: async () => {},
+      prepareComposition: async (plan, { referenceEffect }) => {
+        assert.equal(referenceEffect, 'preparation');
+        assert.equal(plan.task, f.a);
+        await taskRuntimeReferences(f.registry.readTask('a'), {
+          referenceEffect,
+          backendPorts: () => [],
+          readLeases: () => [{ task: 'b', port: 5177 }],
+          request: async () => ({ statusCode: 0, errorCode: 'ECONNREFUSED' }),
+        });
+      },
+    },
+    execute(cwd, tool, args) {
+      if (tool === 'git') return f.git(cwd, ...args);
+      assert.equal(tool, 'gh');
+      if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'fixture/repo' });
+      assert.equal(args[0], 'api', 'Unknown reference must block before any PR update');
+      return JSON.stringify({
+        enforce_admins: { enabled: true },
+        required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+      });
+    },
+  };
+  const base = ['prepare', 'a', f.head],
+    proof = ['--reference-proof', path.join(f.dir, 'missing-proof.json')],
+    review = ['--engineering-review', reviewFile];
+  for (const flags of [proof, [...proof, ...review], [...review, ...proof]])
+    await assert.rejects(completionCommand(f.a, [...base, ...flags], options), /ENOENT/);
+  await assert.rejects(completionCommand(f.a, [...base, ...review], options), /unknown on leased port 5177/);
+  assert.equal(readAcceptedComposition(f.a, 'a', f.accepted.commit), null);
+  assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+  assert.equal(f.registry.readTask('a').recordedHead, f.head);
+});
 
 test('manifest composition refuses an explicitly protected manifest or an unreviewed input', (t) => {
   const f = fixture(t, { manifestConflict: true });
