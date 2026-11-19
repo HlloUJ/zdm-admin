@@ -8,7 +8,7 @@ import { assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { deliveryStatus } from './completion-status.mjs';
 const context = new AsyncLocalStorage();
 export const withTaskContext = (identity, action) => context.run(identity, action);
-export function closeTaskBatch(root, batch) {
+export function closeTaskBatch(root, batch, { deferredCleanup } = {}) {
   const registry = createTaskRegistry(root),
     task = registry.readTask(batch.id);
   assert.ok(task && !task.compatibility?.readOnly, 'Exact current task required');
@@ -19,12 +19,23 @@ export function closeTaskBatch(root, batch) {
     remote = git('rev-parse', 'origin/main');
   assert.equal(local, remote);
   git('merge-base', '--is-ancestor', task.recordedHead, local);
-  assert.ok(
-    !existsSync(task.worktree) && !registeredTaskWorktrees(root).some((entry) => entry.worktree === task.worktree),
-    'Current task carrier remains',
-  );
-  for (const ref of ['refs/heads/' + task.branch, 'refs/remotes/origin/' + task.branch])
-    assert.equal(git('for-each-ref', '--format=%(objectname)', ref), '', 'Current task ref remains');
+  if (deferredCleanup) {
+    assert.deepEqual(deferredCleanup, {
+      state: 'deferred-to-scheduled-cleanup',
+      task: task.id,
+      worktree: task.worktree,
+      branch: task.branch,
+      head: task.recordedHead,
+      main: local,
+    });
+  } else {
+    assert.ok(
+      !existsSync(task.worktree) && !registeredTaskWorktrees(root).some((entry) => entry.worktree === task.worktree),
+      'Current task carrier remains',
+    );
+    for (const ref of ['refs/heads/' + task.branch, 'refs/remotes/origin/' + task.branch])
+      assert.equal(git('for-each-ref', '--format=%(objectname)', ref), '', 'Current task ref remains');
+  }
   const closed =
     task.stage === 'closed'
       ? task
@@ -36,7 +47,9 @@ export function closeTaskBatch(root, batch) {
   assert.equal(closed.main.local, local, 'Closed task main identity changed');
   const archived = {
     ...taskBatch(closed, root),
-    closureNote: 'Registry closure only; exact CI, runtime and cleanup remain proven by the task completion receipt.',
+    closureNote: deferredCleanup
+      ? 'Registry closure with scheduled cleanup pending; exact CI and runtime are proven by the completion receipt.'
+      : 'Registry closure only; exact CI, runtime and cleanup remain proven by the task completion receipt.',
   };
   const directory = path.join(registry.commonDir, 'task-batches/archive');
   for (const entry of [path.dirname(directory), directory])

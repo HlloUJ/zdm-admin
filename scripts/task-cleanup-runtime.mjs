@@ -42,13 +42,15 @@ export function verifyCleanupRuntime(directory) {
     assert.ok(stat.isFile() && !(stat.mode & 0o077));
     assert.equal(digest(readFileSync(target)), fingerprint, 'Runtime input changed: ' + relative);
   }
-  for (const name of [
+  const helpers = [
     'task-cleanup-scheduled-cli.mjs',
     'task-cleanup-cli.mjs',
     'task-cleanup-queue.mjs',
     'task-cleanup-delete.py',
-  ])
-    assert.ok(manifest.files['scripts/' + name], 'Runtime helper closure missing: ' + name);
+  ];
+  if (manifest.files['scripts/task-cleanup-ownership.mjs'])
+    helpers.push('task-cleanup-tree.py', 'task-cleanup-test-resources.mjs');
+  for (const name of helpers) assert.ok(manifest.files['scripts/' + name], 'Runtime helper closure missing: ' + name);
   return manifest;
 }
 
