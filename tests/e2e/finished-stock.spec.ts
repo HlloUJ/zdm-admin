@@ -321,7 +321,29 @@ test('matches slab tab counts and selects a fourth-level category in columns', a
   const player = preview.locator('video');
   await expect(player).toBeVisible();
   await expect(player).toHaveAttribute('controls', '');
-  await expect.poll(() => player.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
+  try {
+    await expect.poll(() => player.evaluate((element) => (element as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
+  } catch (error) {
+    await test.info().attach('product-video-playback-state', {
+      contentType: 'application/json',
+      body: JSON.stringify(
+        await player.evaluate((element) => {
+          const media = element as HTMLVideoElement;
+          return {
+            currentTime: media.currentTime,
+            duration: media.duration,
+            paused: media.paused,
+            ended: media.ended,
+            readyState: media.readyState,
+            networkState: media.networkState,
+            error: media.error ? { code: media.error.code, message: media.error.message } : null,
+            visibility: document.visibilityState,
+          };
+        }),
+      ),
+    });
+    throw error;
+  }
   await preview.locator('.t-dialog__close').click();
   await expect(player).toHaveCount(0);
   await expect(video.locator('.t-upload__card-image img')).toHaveAttribute('src', /^data:image\/jpeg/);
