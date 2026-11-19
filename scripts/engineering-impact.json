@@ -1564,13 +1564,13 @@
     "vite.e2e.config.mjs": "63bf7811ae45bde932675d5992835c8025354966443b620e02f67f1888ce0ef4"
   },
   "reflectiveReaders": {
-    "scripts/accepted-source-ci.mjs": "afe9e825827e1234e434da1aa4a095dba61e387bbbe22f473781f68a627362a1",
+    "scripts/accepted-source-ci.mjs": "d29997b501ab3caed6ebebd697b52aad75161d8636df6844ca3bb63d8aa0813f",
     "scripts/accepted-source-composition.mjs": "7c68cea0f9b7f4f03d1e556faaffb097173d24920c93f9db8b117cccb41457d9",
     "scripts/accepted-source-composition.test.mjs": "239b0481554b72504bb8f8a93f7446f55d431b67641a7731cfc1a5d0cbfe5b77",
     "scripts/accepted-source-hook.mjs": "67237e260cce05a6f3cb9bab5ecc68f449cb4d31d735251e385a4f1ddc2bb138",
     "scripts/accepted-source-readiness.mjs": "c10249ab536d20595bfc1c78c67d2c417dfa5c33915ce951551857f5f70a4b03",
     "scripts/accepted-source.mjs": "7efa6b0577166565e61e1a6d1c8b1bca344c9e077607ffc98e81ae9fb99da874",
-    "scripts/accepted-source.test.mjs": "18dc4e8857dbf58c0f4fae499ba8c45df02ae74ce97e2d5855b8cabbd7cdd8df",
+    "scripts/accepted-source.test.mjs": "8d84e89e22b7f06a2ffbdbd70c837765eb0973397ab02bc48837c31f77fe2969",
     "scripts/affected-test-inputs.mjs": "d83b00dc2e28d410bb334756596ac9290becea33e3df1f6fca318e3fd8c24bb3",
     "scripts/affected-test-inputs.test.mjs": "93243f89d9114e3788f9254ee76c90a767abe0587d1d43f86d59ae40ac7362e4",
     "scripts/backend-local.mjs": "d1ea4693543a423a13c49d12d282b44a479161bb1afae750e27cd8ffcfeab50d",
