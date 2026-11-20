@@ -1311,12 +1311,14 @@
       "dynamicImports": 0
     },
     "scripts/dev-task.mjs": {
-      "digest": "2bfe7a96a472b64c45d9065a2ef0b7b7c1bccccfa69654b44b73aad0f25329c4",
+      "digest": "b6a0ebf93a237d1a7e414d08fbcd9c9c742e75ff648dfc53430cda25c1268618",
       "imports": [
+        "scripts/delivery-repairs/validation-recovery-evidence.mjs",
         "scripts/dev-task.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
         "scripts/integration-resource.mjs",
+        "scripts/preview-consumers.mjs",
         "scripts/preview-policy.mjs",
         "scripts/resource-lease.mjs",
         "scripts/runtime-file-scope.mjs",
@@ -3384,12 +3386,12 @@
       "dynamicImports": 0
     },
     "scripts/task-runtime-state.mjs": {
-      "digest": "2cc473738aec0bf84a244d7edaf0d66c26422f44f0b0a5cdba5b89548add8acc",
-      "imports": ["scripts/task-maven.mjs"],
+      "digest": "ce767696b00918bc173d578344811058ccf667e285d632aa906303f2a4b74077",
+      "imports": ["scripts/task-execution-binding.mjs", "scripts/task-maven.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-runtime-state.test.mjs": {
-      "digest": "efbb84d5ca00fee8aff7caf7fb091e22e586f5428d9456f12c2762c1b0c8bb12",
+      "digest": "6860a3304712c313593de592a7b516f347b9855ce2d67abe4022a32cb51df3b9",
       "imports": [
         "scripts/task-maven.mjs",
         "scripts/task-runtime-state.mjs",
