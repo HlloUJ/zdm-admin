@@ -67,6 +67,14 @@ npm run task:entry -- --worktree "<准确任务目录>" complete prepare "<准�
 
 已消费 binding 后再 block 的任务可凭新的真实决定安全续接；不重放旧 bindingRef，不伪造用户消息。每次保留原票据快照、失败、新 admission、依赖、容量和现场证明。completed/cancelled 的同一 lane、closed 任务、越界任务、外部 worker、旧协调者、来源不明或仍运行的目标继续拒绝。
 
+### 暂停后恢复已退出的 PR 准备
+
+已重新委托的历史任务如果仍持有上一次准备的专属租约，且本地唯一未终结的阶段正在等待已成功的首次 PR CI，当前协调者可在已发布的同一宿主桥调用 `preparation-recovery-plan`。原执行对话须已空闲。输入包括当前 `coordinatorThreadId`、覆盖该任务的暂停后 `authorityId` 及其原样 `request`、工程 `task`、历史 `owner`、绑定的 `executor`、旧准备的 `decisionId`、本次唯一的 `recoveryId`，以及实际读回的 `expectedQueueRevision`、`expectedTaskRevision`、`expectedCoordinationRevision` 和 `expectedBoardRevision`。从原冻结和准备会话取 `accepted`、`head`、数字 `pr`、字符串 `runId` 和未终结等待的 `eventId`。宿主提供当前角色、工作对话的原生观察和真实看板读回。入口自行读取原 PR 和运行，检查本机进程、打开文件和容器。
+
+计划在任务私有交付目录的 `preparation-recovery` 下封存原租约、会话、全部进程日志、冻结记录、原票据和远端运行身份。协调者将返回的准确 `workerInput` 交给原执行对话。该对话以自己的身份调用 `preparation-recover`，重新核对版本、文件身份及进程组。成功回执记录原 PR、首次运行、原顺位和恢复后的会话摘要。本地等待按中断记账，停止时间保留为未知。任何活动或复用的进程标识、缺失或额外日志、文件被替换、另有预约或准入都要求保留现场。
+
+这两个动作的 `admission` 均为空。原执行对话结束恢复轮次后，总协调沿原 delivery 票据重新调用 `dispatch`，由原执行对话消费新的准备准入。原执行对话可在新准入下用既有的 `complete wait pr <原候选 SHA>` 读回该候选的完整门禁，核对结果中的 runId、headSha 和 attempt 与恢复回执及原运行相符。后续候选发生变化时沿正常准备流程验证新候选。操作结果未知时，按同一 `recoveryId` 和计划摘要查原回执。相同输入可接续已封存的中断步骤，来源或版本发生变化时须先重新核实。
+
 新策略仅在隔离 Git/队列/原生观察测试中验证，独立受信发布后才能用于真实任务。本地代码、账本和宿主观察不是独立账号或不可修改的安全边界，不宣称不可绕过。
 
 ## 已知创建失败的新尝试
