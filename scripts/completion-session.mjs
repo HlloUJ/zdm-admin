@@ -1,3 +1,5 @@
+import { drainProgressHost, prepareProgressStage } from './task-progress-host.mjs';
+import { captureCompletionProgress } from './task-delivery-status-sync.mjs';
 import { completionDirectory, processScope } from './completion-process.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
@@ -59,9 +61,11 @@ export function saveCompletion(directory, state) {
     }
   }
   assert.ok(held, 'Completion state writer busy; retain lock and retry, never seize it');
+  let previous = null;
   try {
     if (existsSync(file)) {
       const disk = JSON.parse(readFileSync(file, 'utf8'));
+      previous = structuredClone(disk);
       assert.equal(disk.batch, state.batch);
       assert.equal(disk.version, state.version);
       const merge = (old, incoming, key) => {
@@ -77,6 +81,14 @@ export function saveCompletion(directory, state) {
       };
       state.events = merge(disk.events, state.events, (e) => e.id ?? `${e.name}:${e.key}:${e.startedAt}`);
       state.repairs = merge(disk.repairs, state.repairs, (r) => r.id);
+      if (disk.historicalCiDiagnoses || state.historicalCiDiagnoses) {
+        const diagnoses = new Map((disk.historicalCiDiagnoses ?? []).map((item) => [item.failureRun, item]));
+        for (const item of state.historicalCiDiagnoses ?? []) {
+          if (diagnoses.has(item.failureRun)) assert.deepEqual(diagnoses.get(item.failureRun), item);
+          else diagnoses.set(item.failureRun, item);
+        }
+        state.historicalCiDiagnoses = [...diagnoses.values()];
+      }
       state.pauses = merge(disk.pauses ?? [], state.pauses ?? [], (p) => p.id);
       state.pauseTrackingSince = disk.pauseTrackingSince ?? state.pauseTrackingSince;
       if (disk.startedAt !== null) {
@@ -95,6 +107,11 @@ export function saveCompletion(directory, state) {
     const pending = file + '.' + randomUUID() + '.tmp';
     writeFileSync(pending, JSON.stringify(state, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     renameSync(pending, file);
+    try {
+      captureCompletionProgress(directory, state, previous);
+    } catch (error) {
+      console.error('Progress capture failed; original completion retained: ' + error.message);
+    }
   } finally {
     unlinkSync(lock);
   }
@@ -140,6 +157,8 @@ export async function completionStage(state, name, key, run, { now = Date.now, s
   state.events.push(event);
   save(state);
   try {
+    await prepareProgressStage(state, event);
+    await drainProgressHost();
     const result = await processScope(state, event, save, run);
     event.result = result;
     event.status = 'success';
@@ -301,8 +320,14 @@ export function completionSummary(state, now = Date.now()) {
       : 'observed-wait-windows',
     pauses: (state.pauses ?? []).map((p) => ({ ...p, durationMs: (p.finishedAt ?? end) - p.startedAt })),
     unrecordedFailedRuns: state.events
-      .filter((e) => e.failure?.ci && !state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)))
+      .filter(
+        (e) =>
+          e.failure?.ci &&
+          !state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)) &&
+          !state.historicalCiDiagnoses?.some((r) => r.failureEventId === e.id),
+      )
       .map((e) => e.failure.ci.runId),
+    ...(state.historicalCiDiagnoses ? { historicalCiDiagnoses: state.historicalCiDiagnoses } : {}),
     gaps: completionGaps(state, end),
     networkObservations: state.events.flatMap(
       (e) => e.result?.networkObservations ?? e.failure?.networkObservations ?? [],

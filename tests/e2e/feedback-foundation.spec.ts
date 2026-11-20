@@ -1241,7 +1241,8 @@ test('archives an operating store and warns before permanently deleting an archi
   await expect(archivedRow.getByText('1级', { exact: true })).toBeVisible();
   await expect(archivedRow.getByText('恢复运营', { exact: true })).toBeVisible();
   await archivedRow.getByText('彻底删除', { exact: true }).click();
-  await expect(page.getByText('彻底删除后，该门店的经营数据永久不可恢复，请谨慎操作', { exact: true })).toBeVisible();
+  await expect(page.getByText(/将清理门店“已归档门店”的独占业务数据/)).toBeVisible();
+  await expect(page.getByText(/删除后无法通过产品恢复/)).toBeVisible();
 });
 
 test('shows the duplicate store name error on the edit form', async ({ page }) => {

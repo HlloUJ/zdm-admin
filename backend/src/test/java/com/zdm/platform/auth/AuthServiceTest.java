@@ -27,7 +27,7 @@ class AuthServiceTest {
     effectivePermissionResolver = Mockito.mock(EffectivePermissionResolver.class);
     securityProperties.setVerificationCode("888888");
     authService = new AuthService(
-        authAccountMapper, sessionTokenService, securityProperties, effectivePermissionResolver);
+        authAccountMapper, sessionTokenService, securityProperties, effectivePermissionResolver, org.mockito.Mockito.mock(com.zdm.platform.storeexit.StoreExitRecoveryState.class));
   }
 
   @Test

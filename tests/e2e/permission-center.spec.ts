@@ -1912,7 +1912,7 @@ for (const [terminal, action, client, modules] of [
     'supply-chain',
     ['finished-stock-management', 'accessory-management', 'slab-management'],
   ],
-  ['城市合伙人门店管理后台', '商品中心', 'store', ['finished-stock-management', 'accessory-management']],
+  ['城市合伙人门店管理后台', '选品中心', 'store', ['finished-stock-management', 'accessory-management']],
 ] as const) {
   test(`${terminal} saves global ${action} once per module without selecting logs or state views`, async ({ page }) => {
     await page.goto('/terminal-function-allocation');
@@ -2015,12 +2015,12 @@ test('store role uses terminal global product-center candidates and saves withou
   await open();
   const dialog = page.locator('.t-dialog:visible').filter({ hasText: '权限配置' });
   const matrix = dialog.locator('.permission-matrix');
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(['商品中心']);
-  await matrix.getByText('商品中心', { exact: true }).click();
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(['选品中心']);
+  await matrix.getByText('选品中心', { exact: true }).click();
   await dialog.getByRole('button', { name: '确认配置权限', exact: true }).click();
   await expect(dialog).toBeHidden();
   expect(permissions).toBe(grant);
   await open();
-  await expect(dialog.getByRole('checkbox', { name: '商品中心', exact: true })).toBeChecked();
-  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(['商品中心']);
+  await expect(dialog.getByRole('checkbox', { name: '选品中心', exact: true })).toBeChecked();
+  await expect(matrix.locator('.permission-action-grid .t-checkbox')).toHaveText(['选品中心']);
 });

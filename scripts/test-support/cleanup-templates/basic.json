@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "kind": "generated-fixture-v1",
+  "files": [
+    { "path": "fixture/config.json", "text": "{\"fixture\":true,\"seed\":\"{{seed}}\"}\n" },
+    { "path": "fixture/entry.mjs", "text": "export const fixtureSeed = '{{seed}}';\n" }
+  ]
+}

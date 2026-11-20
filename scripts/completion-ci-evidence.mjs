@@ -1,3 +1,4 @@
+import { validateStandardCoverageEvidence } from './delivery-standard-coverage.mjs';
 import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import path from 'node:path';
@@ -50,6 +51,11 @@ export function verifyCompletionEvidence(root, directory, ci) {
   verifyScope(scope, identity);
   const reused = [],
     result = {};
+  const packets = {
+    inputs: read('ci-validation-scope/delivery-input-contracts.json'),
+    formatting: read('ci-formatting/metadata.json'),
+    engineering: scope.classification.engineering ? read('ci-engineering/metadata.json') : null,
+  };
   for (const [job, artifact] of Object.entries({
     formatting: 'ci-formatting',
     engineering: 'ci-engineering',
@@ -70,13 +76,11 @@ export function verifyCompletionEvidence(root, directory, ci) {
   if (scope.classification.engineering)
     verifyEngineeringEvidence(scope, read('ci-engineering/metadata.json'), identity);
   if (scope.classification.frontend) {
-    result.frontend = verifyFrontendEvidence(
-      needs,
-      ['ci-frontend-static', 'ci-frontend-e2e-1', 'ci-frontend-e2e-2'].map((n, i) => ({
-        metadata: read(n + '/metadata.json'),
-        report: read(n + (i ? '/report.json' : '/all-tests.json')),
-      })),
-    ).testCount;
+    packets.frontend = ['ci-frontend-static', 'ci-frontend-e2e-1', 'ci-frontend-e2e-2'].map((n, i) => ({
+      metadata: read(n + '/metadata.json'),
+      report: read(n + (i ? '/report.json' : '/all-tests.json')),
+    }));
+    result.frontend = verifyFrontendEvidence(needs, packets.frontend).testCount;
   }
   if (scope.classification.backend) {
     const m = read('ci-backend-full/metadata.json');
@@ -96,10 +100,13 @@ export function verifyCompletionEvidence(root, directory, ci) {
         'Standalone backend report differs',
       );
     }
+    packets.backend = m;
+    packets.backendReport = result.backend;
     result.backendTiming = {
       observedMs: m.observedElapsedMs,
       originalMavenMs: m.phases.find((p) => p.name === 'backend-quality')?.durationMs,
     };
   }
+  result.standard = validateStandardCoverageEvidence(scope.standard, packets);
   return { runId: ci.runId, head: ci.headSha, reused, coverage: result };
 }

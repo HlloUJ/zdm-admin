@@ -237,133 +237,6 @@
       </main>
     </div>
 
-    <AdminDialog
-      v-model:visible="poolVisible"
-      :confirmation="{ kind: 'none' }"
-      confirm-function="close"
-      header="商品中心"
-      :footer="false"
-      width="min(1200px, 94vw)"
-      @close="poolVisible = false"
-    >
-      <t-space direction="vertical" style="width: 100%">
-        <t-form
-          class="zdm-admin-filter-form zdm-standard-query"
-          label-width="80px"
-          :data="{ keyword: poolKeyword, category: poolCategory }"
-          colon
-        >
-          <div class="filter-row">
-            <div class="filter-fields pool-filter-fields">
-              <t-form-item label="商品名称/ID">
-                <t-input v-model="poolKeyword" clearable placeholder="请输入商品名称/ID" />
-              </t-form-item>
-              <t-form-item label="商品分类">
-                <t-select-input
-                  :value="poolCategory"
-                  :value-display="poolCategories.find((item) => item.id === poolCategory)?.name"
-                  :popup-visible="poolCategoryVisible"
-                  :popup-props="{
-                    placement: 'bottom-left',
-                    overlayInnerStyle: { width: 'auto' },
-                    popperOptions: { modifiers: [{ name: 'flip', enabled: false }] },
-                  }"
-                  clearable
-                  placeholder="请选择商品分类"
-                  @popup-visible-change="poolCategoryVisible = $event"
-                  @clear="poolCategory = undefined"
-                >
-                  <template #suffixIcon
-                    ><t-icon :name="poolCategoryVisible ? 'chevron-up' : 'chevron-down'"
-                  /></template>
-                  <template #panel>
-                    <t-cascader-panel
-                      v-if="poolCategoryVisible"
-                      :value="''"
-                      :options="poolCategoryOptions"
-                      :check-strictly="false"
-                      trigger="hover"
-                      @change="changePoolCategory"
-                    />
-                  </template>
-                </t-select-input>
-              </t-form-item>
-            </div>
-            <div class="filter-actions">
-              <t-button :theme="buttonTheme('search')" @click="searchPool"
-                ><template #icon><t-icon name="search" /></template>查询</t-button
-              >
-              <t-button :theme="buttonTheme('reset')" variant="base" @click="resetPoolFilter"
-                ><template #icon><t-icon name="refresh" /></template>重置</t-button
-              >
-            </div>
-          </div>
-        </t-form>
-        <AdminListToolbar has-actions has-batch-actions :selected-count="poolSelected.length">
-          <t-button :theme="buttonTheme('select-product')" :disabled="!poolSelected.length" @click="selectPool"
-            >批量选择</t-button
-          >
-        </AdminListToolbar>
-        <div>
-          <t-table row-key="id" :data="poolPageRows" :columns="poolColumns" hover>
-            <template #poolSelectTitle>
-              <t-checkbox
-                :checked="poolPageAllSelected"
-                :indeterminate="poolPagePartlySelected"
-                :disabled="!poolPageRows.length"
-                @change="togglePoolPage"
-              />
-            </template>
-            <template #select="{ row }"
-              ><t-checkbox
-                :checked="poolSelected.includes(row.id)"
-                @change="
-                  (checked: boolean) =>
-                    (poolSelected = checked ? [...poolSelected, row.id] : poolSelected.filter((id) => id !== row.id))
-                "
-            /></template>
-            <template #imageUrl="{ row }"
-              ><t-image
-                v-if="row.imageUrl"
-                :src="row.imageUrl"
-                fit="cover"
-                :style="{ width: '48px', height: '48px' }"
-                @click="imagePreview = row.imageUrl"
-            /></template>
-            <template #product="{ row }"
-              >{{ row.name }}
-              <div>ID：{{ row.id }}</div></template
-            >
-            <template #guidePrice="{ row }">{{ priceRange(row.guidePriceMin, row.guidePriceMax) }}</template>
-            <template #partnerPrice="{ row }">{{ priceRange(row.partnerPriceMin, row.partnerPriceMax) }}</template>
-            <template #operation="{ row }"
-              ><t-link hover="color" :theme="buttonTheme('view')" @click="openPoolDetail(row)">详情</t-link></template
-            >
-            <template #empty>暂无可挑选的已上架商品</template>
-          </t-table>
-          <AdminPagination
-            :current="poolPage"
-            :page-size="poolPageSize"
-            :total="filteredPool.length"
-            :page-size-options="[10, 20, 50]"
-            @update:current="poolPage = $event"
-            @update:page-size="poolPageSize = $event"
-          />
-        </div>
-      </t-space>
-    </AdminDialog>
-
-    <t-drawer
-      v-model:visible="poolDetailVisible"
-      header="商品详情"
-      size="min(1200px, 100%)"
-      :footer="false"
-      :close-btn="true"
-      @close="poolVisible = true"
-    >
-      <StorePoolProductDetail v-if="poolDetail" :product="poolDetail" />
-    </t-drawer>
-
     <t-drawer v-model:visible="detailVisible" header="商品详情" size="min(1200px, 100%)" :footer="false">
       <StoreProductDetail v-if="current" :product="current" />
     </t-drawer>
@@ -519,7 +392,7 @@ import { stateActivitySortIcon, stateActivityColumns, sortByStateActivity } from
 import FinishedCreationSnapshot from '../management/components/FinishedCreationSnapshot.vue';
 import FinishedRowWarnings from '../management/components/FinishedRowWarnings.vue';
 import type { FinishedStockToolbarAction, FinishedStockRowAction } from '../shared/finishedStockPageModel';
-import { computed, onMounted, reactive, ref, watch } from 'vue';
+import { computed, onMounted, onBeforeUnmount, reactive, ref, watch } from 'vue';
 import { useStoreFinishedLogs } from './useStoreFinishedLogs';
 import type { PrimaryTableCol, TableRowData } from 'tdesign-vue-next';
 import AdminSideMenu from '@/components/AdminSideMenu.vue';
@@ -532,32 +405,25 @@ import { getLoginUser } from '@/services/auth';
 import ProductOperationLogTemplate from '@/components/product-logs/ProductOperationLogTemplate.vue';
 import { finishedProductOperationSummary } from '@/services/productOperationLog';
 import {
-  type StorePoolDetail,
   type StorePoolCategory,
   type StoreFinishedProduct,
   type StoreFinishedStatus,
-  type StorePoolProduct,
 } from '@/services/storeFinishedStock';
 const {
   changeStoreFinishedStatus,
   changeStoreFinishedStatusBatch,
   clearStoreFinishedRecycle,
   getStoreFinishedProduct,
-  getStoreFinishedPoolDetail,
-  listStoreFinishedPool,
-  listStoreFinishedPoolCategories,
   listStoreFinishedCategories,
   listStoreFinishedProducts,
   purgeStoreFinishedProduct,
   purgeStoreFinishedProducts,
-  selectStoreFinishedProducts,
 } = commodity.store;
 import { useRoute, useRouter } from 'vue-router';
 import StoreFinishedEditor from './StoreFinishedEditor.vue';
 import SourceUnavailableOverlay from '../management/components/SourceUnavailableOverlay.vue';
 import FinishedEditChanges from '../management/components/FinishedEditChanges.vue';
 import StoreProductDetail from '../shared/StoreFinishedStockDetailAdapter.vue';
-import StorePoolProductDetail from '../shared/StoreFinishedStockPoolDetailAdapter.vue';
 import { AdminListLayout, AdminPagination } from '@/components/foundation';
 const route = useRoute();
 const router = useRouter();
@@ -599,6 +465,7 @@ const page = ref(1);
 const pageSize = ref(10);
 const filter = reactive<{ keyword: string; category?: number }>({ keyword: '' });
 const appliedFilter = reactive<{ keyword: string; category?: number }>({ keyword: '' });
+type PoolCategoryOption = { value: number; label: string; children?: PoolCategoryOption[] };
 const listCategories = ref<StorePoolCategory[]>([]);
 const listCategoryVisible = ref(false);
 const listCategoryOptions = computed(() => {
@@ -705,79 +572,6 @@ const priceEditable = computed(() =>
     can(current.value.effectiveStatus, 'edit'),
   ),
 );
-const poolVisible = ref(false);
-const poolDetailVisible = ref(false);
-const poolDetail = ref<StorePoolDetail | null>(null);
-const pool = ref<StorePoolProduct[]>([]);
-const poolSelected = ref<number[]>([]);
-const poolKeyword = ref('');
-const poolPage = ref(1);
-const poolPageSize = ref(10);
-const poolCategory = ref<number>();
-const poolCategoryVisible = ref(false);
-const appliedPoolFilter = reactive<{ keyword: string; category?: number }>({ keyword: '' });
-function changePoolCategory(value: unknown) {
-  if (typeof value !== 'number') return;
-  poolCategory.value = value;
-  poolCategoryVisible.value = false;
-}
-function searchPool() {
-  poolPage.value = 1;
-  appliedPoolFilter.keyword = poolKeyword.value.trim();
-  appliedPoolFilter.category = poolCategory.value;
-  poolCategoryVisible.value = false;
-}
-function resetPoolFilter() {
-  poolKeyword.value = '';
-  poolCategory.value = undefined;
-  searchPool();
-}
-const poolCategories = ref<StorePoolCategory[]>([]);
-type PoolCategoryOption = { value: number; label: string; children?: PoolCategoryOption[] };
-const poolCategoryOptions = computed(() => {
-  const nodes = new Map<number, PoolCategoryOption>(
-    poolCategories.value.map((item) => [item.id, { value: item.id, label: item.name }]),
-  );
-  const roots: PoolCategoryOption[] = [];
-  for (const item of poolCategories.value) {
-    const node = nodes.get(item.id)!;
-    const parent = item.parentId ? nodes.get(item.parentId) : undefined;
-    if (parent) (parent.children ??= []).push(node);
-    else roots.push(node);
-  }
-  return roots;
-});
-function matchesPoolCategory(categoryId?: number) {
-  if (appliedPoolFilter.category == null) return true;
-  const visited = new Set<number>();
-  let current = categoryId;
-  while (current != null && !visited.has(current)) {
-    if (current === appliedPoolFilter.category) return true;
-    visited.add(current);
-    current = poolCategories.value.find((item) => item.id === current)?.parentId ?? undefined;
-  }
-  return false;
-}
-const filteredPool = computed(() =>
-  pool.value.filter(
-    (item) => `${item.name} ${item.id}`.includes(appliedPoolFilter.keyword) && matchesPoolCategory(item.categoryId),
-  ),
-);
-const poolPageRows = computed(() =>
-  filteredPool.value.slice((poolPage.value - 1) * poolPageSize.value, poolPage.value * poolPageSize.value),
-);
-const poolPageAllSelected = computed(
-  () => poolPageRows.value.length > 0 && poolPageRows.value.every((item) => poolSelected.value.includes(item.id)),
-);
-const poolPagePartlySelected = computed(
-  () => !poolPageAllSelected.value && poolPageRows.value.some((item) => poolSelected.value.includes(item.id)),
-);
-function togglePoolPage(checked: boolean) {
-  const ids = new Set(poolPageRows.value.map((item) => item.id));
-  poolSelected.value = checked
-    ? [...new Set([...poolSelected.value, ...ids])]
-    : poolSelected.value.filter((id) => !ids.has(id));
-}
 const offShelfVisible = ref(false);
 const offShelfFormRoot = ref();
 const offShelfFeedback = useFormFeedback(offShelfVisible);
@@ -821,7 +615,7 @@ const batchAction = computed(() => {
 });
 const storeToolbarActions = computed<FinishedStockToolbarAction[]>(() => [
   ...(['all', 'warehouse'].includes(activeTab.value) && canGlobal('select')
-    ? [{ id: 'select', label: '商品中心', icon: 'add' }]
+    ? [{ id: 'select', label: '选品中心', icon: 'add' }]
     : []),
   ...(batchAction.value
     ? [
@@ -917,23 +711,8 @@ const columns = computed<PrimaryTableCol<TableRowData>[]>(() =>
     'select',
   ),
 );
-const poolColumns = computed<PrimaryTableCol<TableRowData>[]>(() => [
-  { colKey: 'select', title: 'poolSelectTitle', width: 48 },
-  { colKey: 'imageUrl', title: '商品主图', width: 96 },
-  { colKey: 'product', title: '商品名称/ID', minWidth: 320 },
-  { colKey: 'guidePrice', title: '指导价', width: 180 },
-  {
-    colKey: 'partnerPrice',
-    title: pool.value[0]?.storeLevelName ? `${pool.value[0].storeLevelName}价` : '—',
-    width: 180,
-  },
-  { colKey: 'operation', title: '操作', width: 80 },
-]);
 function time(value?: string) {
   return value ? value.replace('T', ' ').slice(0, 16).replaceAll('-', '/') : '—';
-}
-function money(value: number | null | undefined) {
-  return value == null ? '—' : Number(value).toFixed(2);
 }
 function stateLabel(value?: string | null) {
   return value ? statusLabels[value] || value : '—';
@@ -996,47 +775,9 @@ async function togglePage(checked: boolean) {
     selected.value = [...new Set([...selected.value, ...available])];
   } else selected.value = selected.value.filter((id) => !ids.includes(id));
 }
-function priceRange(min?: number | null, max?: number | null) {
-  if (min == null || max == null) return '—';
-  return Number(min) === Number(max) ? money(min) : `${money(min)} ~ ${money(max)}`;
-}
-async function openPoolDetail(row: StorePoolProduct) {
-  poolDetail.value = null;
-  try {
-    poolDetail.value = await getStoreFinishedPoolDetail(row.id);
-    poolVisible.value = false;
-    poolDetailVisible.value = true;
-  } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '商品详情加载失败'));
-  }
-}
-async function openPool() {
-  try {
-    const [products, categories] = await Promise.all([listStoreFinishedPool(), listStoreFinishedPoolCategories()]);
-    pool.value = products;
-    poolCategories.value = categories;
-    poolCategory.value = undefined;
-    poolSelected.value = [];
-    poolPageSize.value = 10;
-    resetPoolFilter();
-    poolVisible.value = true;
-  } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '商品池加载失败'));
-  }
-}
-async function selectPool() {
-  if (!poolSelected.value.length) {
-    adminFeedback.warning('请先选择商品');
-    return;
-  }
-  try {
-    await selectStoreFinishedProducts(poolSelected.value);
-    poolVisible.value = false;
-    adminFeedback.success('商品已进入本店仓库');
-    await load();
-  } catch (error) {
-    adminFeedback.error(getSafeErrorMessage(error, '挑选商品失败'));
-  }
+function openPool() {
+  const href = router.resolve({ path: '/store/selection-center', query: { view: 'browse' } }).href;
+  window.open(href, '_blank', 'noopener');
 }
 async function loadCurrent(row: StoreFinishedProduct) {
   try {
@@ -1239,7 +980,14 @@ async function runConfirmed() {
     confirming.value = false;
   }
 }
-onMounted(load);
+function refreshOnSelectionReturn() {
+  void load();
+}
+onMounted(() => {
+  void load();
+  window.addEventListener('focus', refreshOnSelectionReturn);
+});
+onBeforeUnmount(() => window.removeEventListener('focus', refreshOnSelectionReturn));
 </script>
 <style scoped>
 @import url('./index.css');

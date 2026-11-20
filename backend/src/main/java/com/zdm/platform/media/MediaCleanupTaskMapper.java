@@ -9,6 +9,9 @@ import org.apache.ibatis.annotations.Update;
 
 @Mapper
 public interface MediaCleanupTaskMapper extends BaseMapper<MediaCleanupTask> {
+  @Select("SELECT * FROM media_cleanup_tasks WHERE id = #{taskId} FOR UPDATE")
+  MediaCleanupTask selectByIdForUpdate(Long taskId);
+
   @Select("""
       SELECT COUNT(*) FROM media_cleanup_tasks
       WHERE media_id = #{mediaId} AND status IN ('pending', 'processing', 'failed')

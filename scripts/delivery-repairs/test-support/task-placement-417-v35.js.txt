@@ -1,0 +1,57 @@
+// Deterministic card placement only. These are explicit operator records,
+// not authenticated execution evidence and never inferred from prose.
+export const cardStages=['active','review','merging','done'];
+const rules={
+ active:{action:'register_development',flags:['execution_requested'],refs:['instruction','registration']},
+ review:{action:'development_ready',flags:['development_complete','verification_passed','no_known_defects'],refs:['candidate','verification']},
+ merging:{action:'begin_delivery',flags:['delivery_authorized','delivery_registered'],refs:['instruction','delivery_registration']},
+ done:{action:'delivery_complete',flags:['merged','main_ci_passed','handoff_complete','closeout_complete'],refs:['merge','main_ci','handoff','closeout']},
+};
+export function requirePlacementRecord(raw,id,from,to,deliveryEntry=null){
+ if(!cardStages.includes(to)||(from===null?to!=='active':cardStages.indexOf(to)!==cardStages.indexOf(from)+1))throw new Error('Only the next card is allowed; no skip or backward move');
+ let record;try{record=JSON.parse(raw)}catch{throw new Error('Card move requires an explicit JSON placement record in evidence')}
+ const registration=to==='done'?siteRegistration(deliveryEntry,id):null;
+ const rule=registration?{action:'delivery_complete',flags:['publication_succeeded','production_readback_passed'],refs:[]}:rules[to];
+ if(!record||record.task_id!==id||record.action!==rule.action)throw new Error('Placement action or task ID does not match');
+ for(const flag of rule.flags)if(record.conditions?.[flag]!==true)throw new Error('Missing placement condition: '+flag);
+ for(const ref of rule.refs)if(typeof record.references?.[ref]!=='string'||!record.references[ref].trim())throw new Error('Missing placement reference: '+ref);
+ if(to==='merging'&&record.delivery_kind!==undefined){
+  if(!['site_only','project_main'].includes(record.delivery_kind))throw new Error('Unknown delivery kind');
+  if(record.delivery_kind==='site_only'&&(!deploymentId(record.references.delivery_registration)||!projectId(record.references.site_project)))throw new Error('Site-only registration requires exact Site project/deployment references');
+ }
+ if(registration)requireSiteCompletion(record,registration);
+ return record;
+}
+
+const deploymentId=v=>typeof v==='string'&&/^appgdep_[a-f0-9]{32}$/.test(v);
+const projectId=v=>typeof v==='string'&&/^appgprj_[a-f0-9]{32}$/.test(v);
+// Only the actual entry into this delivery episode selects its completion rule.
+// Same-stage edits, pause/resume, later prose and caller-provided kinds cannot select it.
+export function deliveryEpisodeEntry(history){
+ let stage=null,entry=null;
+ const snapshots=history.map(e=>JSON.parse(e.snapshot)).sort((a,b)=>a.revision-b.revision);
+ for(const s of snapshots){
+  const next=s.card_stage??(cardStages.includes(s.status)?s.status:stage);
+  if(next==='merging'&&stage!=='merging')entry=s;
+  if(next!=='merging')entry=null;
+  stage=next;
+ }
+ return stage==='merging'?entry:null;
+}
+function siteRegistration(entry,id){
+ if(!entry||entry.id!==id)return null;
+ let r;try{r=JSON.parse(entry.evidence)}catch{return null}
+ if(r?.task_id!==id||r.action!=='begin_delivery'||r.conditions?.delivery_authorized!==true||r.conditions?.delivery_registered!==true)return null;
+ if(r.delivery_kind!==undefined&&r.delivery_kind!=='site_only')return null;
+ if(!deploymentId(r.references?.delivery_registration))return null;
+ if(r.delivery_kind==='site_only'&&!projectId(r.references?.site_project))return null;
+ // Legacy v29 omitted kind; its precise appgdep reference in the entry is the
+ // deterministic compatibility discriminator, never a task-number exception.
+ return {deployment:r.references.delivery_registration,project:r.references.site_project??null};
+}
+function requireSiteCompletion(record,registration){
+ const published=record.references?.publication,readback=record.references?.production_readback;
+ if(!published||published.status!=='succeeded'||published.deployment_id!==registration.deployment||!projectId(published.project_id)||!/^[a-f0-9]{40}$/.test(published.commit_sha??'')||typeof published.receipt!=='string'||!published.receipt.trim())throw new Error('Exact successful Site publication receipt required');
+ if(registration.project&&published.project_id!==registration.project)throw new Error('Site project does not match registration');
+ if(!readback||readback.status!=='passed'||readback.deployment_id!==published.deployment_id||readback.project_id!==published.project_id||readback.commit_sha!==published.commit_sha||typeof readback.receipt!=='string'||!readback.receipt.trim())throw new Error('Matching successful production readback receipt required');
+}

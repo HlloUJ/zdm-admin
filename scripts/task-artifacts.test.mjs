@@ -61,6 +61,10 @@ test('private install runs only in its own task and validates lock-indexed packa
   const f = fixture(t, true);
   let count = 0;
   const proof = prepareTaskArtifacts(f.task, {
+    auditDependencies: (task) => {
+      assert.equal(task.id, f.task.id);
+      return { summary: { auditedPristinePackages: 0, protectedRecords: 1 } };
+    },
     execute: (command, args, options) => {
       count++;
       assert.equal(command, 'npm');
@@ -72,7 +76,14 @@ test('private install runs only in its own task and validates lock-indexed packa
   });
   assert.equal(proof.dependencies.status, 'private-validated');
   assert.equal(count, 1);
-  prepareTaskArtifacts(f.task, { execute: () => assert.fail('valid private install should be reused') });
+  assert.equal(
+    JSON.parse(readFileSync(path.join(f.root, '.task-runtime/dependency-cleanup-audit-result.json'))).kind,
+    'independent-archive-audit-v1',
+  );
+  prepareTaskArtifacts(f.task, {
+    execute: () => assert.fail('valid private install should be reused'),
+    auditDependencies: () => assert.fail('no repeated audit on reuse'),
+  });
 });
 test('failed installation preserves previous private contents and records failure', (t) => {
   const f = fixture(t, true);

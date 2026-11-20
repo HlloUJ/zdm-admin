@@ -55,7 +55,11 @@
         "src/services/batchActionPermissions.ts",
         "src/services/productBatchPermissions.ts",
         "src/services/productBatchFeedback.ts",
-        "src/services/productBatchDelete.ts"
+        "src/services/productBatchDelete.ts",
+        "src/router/index.ts",
+        "src/services/storeSelectionCenter.ts",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionService.java",
+        "src/components/foundation/actions/button-functions.json"
       ],
       "tables": [
         "product_state_activity",
@@ -66,11 +70,13 @@
         "store_accessory_products"
       ],
       "consumers": [
+        "backend/src/main/java/com/zdm/platform/account/AccountLifecycleService.java",
         "backend/src/main/java/com/zdm/platform/auth/AuthController.java",
         "backend/src/main/java/com/zdm/platform/auth/AuthService.java",
         "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeController.java",
         "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeService.java",
         "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeValueController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeValueService.java",
         "backend/src/main/java/com/zdm/platform/catalog/ProductCategoryController.java",
         "backend/src/main/java/com/zdm/platform/catalog/ProductCategoryService.java",
         "backend/src/main/java/com/zdm/platform/catalog/ProductFormCatalogService.java",
@@ -105,6 +111,7 @@
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProduct.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductArrivalLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductDetailContent.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePrice.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePriceMapper.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductGuidePriceService.java",
@@ -116,6 +123,7 @@
         "backend/src/main/java/com/zdm/platform/inventory/AccessorySpecValidator.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessoryStateActivityService.java",
         "backend/src/main/java/com/zdm/platform/inventory/AccessorySupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/CityPartnerStoreScope.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingController.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedInvalidationMedia.java",
@@ -126,6 +134,7 @@
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProduct.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductArrivalLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductDetailContent.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePrice.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePriceMapper.java",
         "backend/src/main/java/com/zdm/platform/inventory/FinishedProductGuidePriceService.java",
@@ -145,8 +154,11 @@
         "backend/src/main/java/com/zdm/platform/inventory/ProductLifecycleService.java",
         "backend/src/main/java/com/zdm/platform/inventory/ProductStateActivityService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabColorController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabColorService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabGradeController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGradeService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGuidePriceSettingService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabInvalidationSnapshotService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabInventory.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryController.java",
@@ -156,11 +168,14 @@
         "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabMarkupConfigurationController.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabMarkupConfigurationService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOffShelfRecordService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabOperationLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabOriginController.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabOriginService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabPriceConfigurationSyncService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabPriceService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabTextureController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabTextureService.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabVarietyController.java",
         "backend/src/main/java/com/zdm/platform/inventory/SlabVarietyService.java",
         "backend/src/main/java/com/zdm/platform/inventory/StateActivityTime.java",
@@ -178,28 +193,57 @@
         "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedUpstreamLogService.java",
         "backend/src/main/java/com/zdm/platform/inventory/StorePriceRuleController.java",
         "backend/src/main/java/com/zdm/platform/inventory/StorePriceRuleService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionCatalog.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionService.java",
         "backend/src/main/java/com/zdm/platform/inventory/WarehouseEntryInformation.java",
         "backend/src/main/java/com/zdm/platform/media/MediaAdminController.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaAssetService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaCleanupScheduler.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaHistoryService.java",
         "backend/src/main/java/com/zdm/platform/media/MediaLifecycleMigrationService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaPreviewReferenceService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaReferenceService.java",
+        "backend/src/main/java/com/zdm/platform/media/OpenMediaController.java",
+        "backend/src/main/java/com/zdm/platform/media/StoreMediaBusinessFence.java",
         "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameController.java",
         "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameService.java",
         "backend/src/main/java/com/zdm/platform/role/RoleController.java",
         "backend/src/main/java/com/zdm/platform/role/RoleService.java",
         "backend/src/main/java/com/zdm/platform/role/TerminalFunctionPolicyController.java",
         "backend/src/main/java/com/zdm/platform/role/TerminalFunctionPolicyService.java",
+        "backend/src/main/java/com/zdm/platform/security/CurrentIdentityProvider.java",
         "backend/src/main/java/com/zdm/platform/security/EffectivePermissionResolver.java",
         "backend/src/main/java/com/zdm/platform/security/PermissionGuard.java",
+        "backend/src/main/java/com/zdm/platform/security/SecurityAuditFilter.java",
         "backend/src/main/java/com/zdm/platform/security/SessionTokenService.java",
         "backend/src/main/java/com/zdm/platform/security/TokenAuthenticationFilter.java",
         "backend/src/main/java/com/zdm/platform/store/StoreCategoryController.java",
         "backend/src/main/java/com/zdm/platform/store/StoreCategoryService.java",
         "backend/src/main/java/com/zdm/platform/store/StoreController.java",
         "backend/src/main/java/com/zdm/platform/store/StoreLevelController.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreLevelService.java",
         "backend/src/main/java/com/zdm/platform/store/StoreService.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/HistoricIdentifierGuard.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreCacheExitController.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitCoordinator.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitCoverage.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitJournal.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitMedia.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitMediaDomains.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitModule.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRecoveryState.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRecoveryWorker.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRegistry.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRemoteLedger.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitScope.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitTargetService.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitTaskWorker.java",
         "backend/src/main/java/com/zdm/platform/supplier/ProductFormSupplierService.java",
         "backend/src/main/java/com/zdm/platform/supplier/SupplierController.java",
         "backend/src/main/java/com/zdm/platform/supplier/SupplierService.java",
         "backend/src/main/java/com/zdm/platform/supplier/SupplierSupplyTypeController.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierSupplyTypeService.java",
         "backend/src/main/java/com/zdm/platform/tenant/TenantController.java",
         "backend/src/main/java/com/zdm/platform/tenant/TenantService.java",
         "backend/src/main/resources/function-audience-policy.json",
@@ -209,9 +253,11 @@
         "src/components/OperationsBatchShelfResult.vue",
         "src/components/ProductListStatusTag.vue",
         "src/components/WarehouseEntryInformation.vue",
+        "src/components/foundation/actions/button-functions.json",
         "src/components/permission/PermissionAssignmentMatrix.vue",
         "src/composables/useCommodityModule.ts",
         "src/composables/useStateActivitySort.ts",
+        "src/main.ts",
         "src/modules/accessory/routes.ts",
         "src/pages/craft/finished-stock/index.vue",
         "src/pages/customer/index.vue",
@@ -226,7 +272,6 @@
         "src/pages/finished-stock/management/index.vue",
         "src/pages/finished-stock/management/layeredSpecs.ts",
         "src/pages/finished-stock/shared/StoreFinishedStockDetailAdapter.vue",
-        "src/pages/finished-stock/shared/StoreFinishedStockPoolDetailAdapter.vue",
         "src/pages/finished-stock/shared/finishedStockAttributeValidation.ts",
         "src/pages/finished-stock/shared/finishedStockFormValidation.ts",
         "src/pages/finished-stock/shared/finishedStockListFilter.ts",
@@ -258,6 +303,9 @@
         "src/pages/product/category/index.vue",
         "src/pages/product/markup-configuration/index.vue",
         "src/pages/role/management/index.vue",
+        "src/pages/selection-center/components/SelectionDetail.vue",
+        "src/pages/selection-center/index.vue",
+        "src/pages/selection-center/selectionDetailModel.ts",
         "src/pages/slab/color/index.vue",
         "src/pages/slab/grade/index.vue",
         "src/pages/slab/management/index.vue",
@@ -279,6 +327,7 @@
         "src/pages/supplier/supply-type/index.vue",
         "src/pages/tenant/management/index.vue",
         "src/pages/tenant/store/index.vue",
+        "src/router/index.ts",
         "src/services/accessoryMarkupConfigurations.ts",
         "src/services/accessoryProducts.ts",
         "src/services/adminPermissions.ts",
@@ -304,7 +353,10 @@
         "src/services/slabMarkupConfigurations.ts",
         "src/services/slabs.ts",
         "src/services/storeAccessoryStock.ts",
+        "src/services/storeCacheCleanup.ts",
         "src/services/storeFinishedStock.ts",
+        "src/services/storeScopeValidity.ts",
+        "src/services/storeSelectionCenter.ts",
         "src/services/terminalFunctionPolicies.ts",
         "src/services/warehouseEntry.ts",
         "src/utils/numericInput.ts",
@@ -374,38 +426,47 @@
         "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java",
         "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java",
         "backend/src/test/java/com/zdm/platform/customer/CustomerApiTest.java",
-        "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java"
+        "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionCenterTest.java",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionApiTest.java"
       ],
       "protectedTests": {
-        "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
-        "tests/e2e/finished-stock.spec.ts": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
         "tests/e2e/accessory-management.spec.ts": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
+        "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
+        "tests/e2e/accessory-permissions.spec.ts": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
+        "tests/e2e/admin-foundation.spec.ts": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
+        "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
+        "tests/e2e/feedback-foundation.spec.ts": "cad6465de30701955cff10f92344f4f0ab32d20fa3c4d0e6f51555c9ca4f816a",
+        "tests/e2e/finished-stock-permissions.spec.ts": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
+        "tests/e2e/finished-stock.spec.ts": "f12de268d0b142cc2bc14bedba1a597ff0a947c28ad404c4c495202a578d7772",
+        "tests/e2e/login.spec.ts": "dad16c7d553f9645a821bf9fd79c7f08a3e944ccc5b02b10e8f97964bc81722c",
+        "tests/e2e/markup-configuration.spec.ts": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
+        "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
+        "tests/e2e/permission-center.spec.ts": "8f1a8204a784cc57bbd836094ec721f446c3dd1c0232a0d49a4925613a45f442",
+        "tests/e2e/product-state-activity.spec.ts": "cdc4b8f18b2926e0383a6b2db8fff08c1823631a41c027a9c379e87e790b6dda",
+        "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
         "tests/e2e/slab-collaboration.spec.ts": "41b1f6c94febb631ad19f6942d2d8afc3929a262fc71e9dfe9c7d6cb749e7ee1",
-        "tests/e2e/store-finished-stock.spec.ts": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
-        "tests/e2e/store-accessory-management.spec.ts": "e569ce847f6f3bfb25850aecff1b356d425ef21f39c28ad5674d11d6b33f5b2a",
+        "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
+        "tests/e2e/slab-publish-layout.spec.ts": "83fae189da20ab3113dbb2f7eb7a4b6aa19d3b10140aec002c7a90c77ccd06f3",
+        "tests/e2e/store-accessory-management.spec.ts": "c3d66e8e0832358a40ba33a6b583d857fc8f395b8ab1bb888f8dc130631bc1e3",
+        "tests/e2e/store-finished-stock.spec.ts": "73f5125a48c61b0fec0b1629364c066b0101cf47a7ffa9c4057d0c0dc95871cf",
+        "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
+        "tests/e2e/pagination-responsive.spec.ts": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
+        "tests/e2e/store-order-prototype.spec.ts": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+        "tests/e2e/product-all-view.spec.ts": "07f044f812c8f688cd4a9be44f716db6b3478776bc3e6265f90d7c54bca97d14",
+        "tests/e2e/operations-batch-shelf.spec.ts": "74533ffdc10b350e969cd17581c19acdc313946aefb236785b6422d512f7248d",
+        "tests/e2e/terminal-all-batch-shelf.spec.ts": "c5af2cb0cba0cbde25b83e0ccd0e03747e388dada25fd15444efb2d525b9588f",
+        "tests/e2e/store-price-rules.spec.ts": "1e57f57f0538aee643a104f3831f88f87eac8bfa4e0417d7b9ebb0980129c567",
+        "tests/e2e/product-batch-delete.spec.ts": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
+        "tests/e2e/customer-management.spec.ts": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
+        "tests/e2e/store-recycle-selection.spec.ts": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
+        "tests/e2e/list-batch-selection.spec.ts": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityApiTest.java": "480ec0600c494a8b4649fcb29291ab87ed018638052c479ebbd405a6ba5236a4",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "c31cf35c840adba094a22a9c3b10176cabcb88e4dc2838c1a57bfc6a4370739f",
-        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "dc7e166f9b9fc08c5fc4699b2454c789097cee57a95702f8d532de41cee39faa",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java": "1f91cf7db291864add3fe7bc99e3dee804e5b113a6cab112ca24cd4d72faea1c",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java": "ab2bf51107e11ab923741563bcd779848f09a91aab5bdaaded68d57fba3ae6bb",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionApiTest.java": "08a96240068f61d79142f27e4559ca245d9a0d9bd793e9e7e95bf7b9227642e7",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionApiTest.java": "326d0591d385f8635561450b0df61276bfaf62ca5fc3245f85f8edbf2dbb713a",
         "backend/src/test/java/com/zdm/platform/inventory/PriceConfigurationSyncScopeTest.java": "ad00786b70ddb99b2e5164150d9bef4d628a7b86c4fc74d244eee3742693342e",
-        "tests/e2e/accessory-markup-configuration.spec.ts": "01c192057d0d0b8baee6c9f9200ab0ab848865ce518626b43eca45509f8e4437",
-        "tests/e2e/accessory-permissions.spec.ts": "7ecd640dccf2a4d0564b21a1cdf8072756b97d124e2e8ae5ef965ac9a0ab7713",
-        "tests/e2e/admin-foundation.spec.ts": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
-        "tests/e2e/collapsed-menu-hover.spec.ts": "64685f4d491bdf803305f27c9a22845b5eb771a3a917c8ec1f8e67164818714d",
-        "tests/e2e/feedback-foundation.spec.ts": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
-        "tests/e2e/finished-stock-permissions.spec.ts": "4b6858ddfd8698109168ebebc4afc19d7f7f3d9afa88c282aed266a12af19341",
-        "tests/e2e/login.spec.ts": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
-        "tests/e2e/markup-configuration.spec.ts": "438d1a2da372df5c4531a6ad28d2801892689244aec0b0a7f062b9aea1273378",
-        "tests/e2e/media-upload-standard.spec.ts": "aa3a805f9a438b8da8480f5ab176507a6f8429228c91b2af1e53dea7f544e885",
-        "tests/e2e/permission-center.spec.ts": "77d1184efc47481c0a2eb5c1e30ea6cee61be2be06091f864858cc7e59765e43",
-        "tests/e2e/query-responsive.spec.ts": "fa635980c39ddebcbc430bcb2adb9085e6aa4b89dd6978a954113c1bdae40444",
-        "tests/e2e/slab-price-editor.spec.ts": "8a89a484ed8548303ec900499553ab89f5267658b6871e3a7f486e205bac24d9",
-        "tests/e2e/slab-publish-layout.spec.ts": "83fae189da20ab3113dbb2f7eb7a4b6aa19d3b10140aec002c7a90c77ccd06f3",
-        "tests/e2e/store-product-menu.spec.ts": "66bec43d6d715516b351e775ffd38082c8fc5c11a3db4f06d0ecb4e3fc6edca4",
-        "tests/e2e/admin-api-mocks.ts": "e52244efd21250ee95987836d645ee4afb70b7f9566ae912882018e1f3f031b4",
-        "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
-        "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156",
         "backend/src/test/java/com/zdm/platform/inventory/SlabCollaborationApiTest.java": "be86a49a2203d1c3cdf480bc5eb4617076c4f1cffafbedf3bd025407c1a83842",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedProductPermissionTest.java": "f245b9dd1fc458b657a2ffdbb0679ed97547e8f74d6e6a895fa1e986cdb3aff9",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductPermissionTest.java": "24637bff45722355d31fd78e75a37e5533b7c8411a9ed94f4558a30a8e62dca7",
@@ -413,34 +474,39 @@
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "8d7ab48d39c5f13836ad577e079ebacc573c42f84f887dc77da585c41bcdd176",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
-        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
-        "tests/e2e/accessory-api-mocks.ts": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
-        "tests/e2e/pagination-responsive.spec.ts": "62db9539f24b7323c1e6436b8153047fb9064ea7c9f237bb95f1082588164fea",
-        "tests/e2e/store-order-prototype.spec.ts": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
-        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
+        "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "2933e0202a0088396c118d4324137fd5ef20145c6996bf8ea90199554495e5e3",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
-        "tests/e2e/product-all-view.spec.ts": "8f9a3694189b65e6250f49f97ce662e5a78e97f4d033de20e54b231575d6574e",
-        "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
         "backend/src/test/java/com/zdm/platform/inventory/SlabGlobalPermissionTest.java": "07446173245d21a11ab96092f0eb640f83fe4509948fc75633b2149e9819bf6d",
         "backend/src/test/java/com/zdm/platform/common/FunctionPermissionNormalizerTest.java": "526e0763c610edcef5b6592006dd8eeb556ba170ebe0182fb03541799cd42a36",
         "backend/src/test/java/com/zdm/platform/security/EffectivePermissionResolverTest.java": "244db8e06b91f8ca411a8e91f55c4efafd2561a90b035528de6d75e8ddb37e0b",
         "backend/src/test/java/com/zdm/platform/role/StoreManagerRoleApiTest.java": "9f3dee717ec95bff55c0351f718cdfe956e98324849bec98dd0e2da014836018",
         "backend/src/test/java/com/zdm/platform/inventory/StateActivitySameStateTest.java": "b5c2589b50e90976401dba166539890aff278f434fcde20a62b2d5ffa7879f52",
-        "tests/e2e/operations-batch-shelf.spec.ts": "74533ffdc10b350e969cd17581c19acdc313946aefb236785b6422d512f7248d",
         "backend/src/test/java/com/zdm/platform/inventory/OperationsBatchShelfApiTest.java": "b684174cd2ad5b88f766b2d5ed692817be2d3add9140bcfc49cf92a2ca1cd482",
-        "src/services/operationsBatchShelf.test.ts": "c81d751b9c25d2106c04b2a315622be7e4361fc4f9aa990bac20859c843fa055",
-        "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
-        "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7",
-        "tests/e2e/terminal-all-batch-shelf.spec.ts": "e739fdfd2f7a102510c2ecab6846589c5cda0f3e7beb984bd768b782c47c4d63",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAllBatchShelfApiTest.java": "6cfceece42727cd0ac7d0499c9f62592ed65aef52b19384d2487061432306204",
-        "src/services/terminalAllBatchShelf.test.ts": "828b4696e37f842f0aff071949dd6efeac4c55e142f668a3429727ee14da7b33",
-        "src/services/productGlobalPermissions.test.ts": "4c53fe18f81d2b1382ab6676008ea259ff454dc78bc004457fffd75dbb44d6a7",
-        "src/services/functionCatalog.test.ts": "a0aeedbb80f8c9a4fbf5fe22570d74adecacf7bf5dd0009ff46d42a44cae09ef",
-        "src/components/WarehouseEntryInformation.test.ts": "f3adf3ec76f669c060b743ca193fabac68bbb9d3f6c56b0872963eed91cc32c7",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionTest.java": "4d8b280890870833713fede0af7ce8efb6811bf13db596d5e0552b5661e6f8ec",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionApiTest.java": "2e597d98526786b6070e1b94ff9c87c04ac94785d1843db6aa3456c3aa0368a4",
         "backend/src/test/java/com/zdm/platform/inventory/ProductAttributeVersionMigrationTest.java": "14f84fbce6075e6b7ae87d86da56d5247d7a9a05c79184ce383aab561641d6a0",
+        "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java": "3e5698da75d970c3e7ee82fb93965a086876a9d771c5e44a687213be853ef90a",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java": "8f4a40ce5c9d7b76b6c2b11a5afaea0554d45a4907cafd6f19c31412a97effff",
+        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java": "a2ea4de0623f1b0338db2d0cf2bd9c9b27c64bce5c64fdbceeb5c6df393ee1f9",
+        "backend/src/test/java/com/zdm/platform/customer/CustomerApiTest.java": "780f04ab359cc37f12f6d0deeca2c4f6e7ee5b4cb67d98f3b6a9f3545dff8557",
+        "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionCenterTest.java": "722cb12a301375e70c2cd46a399f2d4e7dc7e68efbfd70f5e0960472a9df88b6",
+        "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionApiTest.java": "8b10bc93b445d27db8ba34198a37bce2377e22a7fd7923f632d42f4fb66ccdeb",
+        "tests/e2e/admin-api-mocks.ts": "22b59209f855b495a9cdf09b8fc1bf2fd1709b2002693cc818589c5af23c7aed",
+        "backend/src/test/java/com/zdm/platform/support/MySqlTestDatabase.java": "6099881312523fb846b54750a85a139378d18c809761fef3c8d2c3374f6aa156",
+        "backend/src/test/java/com/zdm/platform/support/TestMySqlIsolationTest.java": "627ff215e5853f50e3e29efd146b2ff4a0c7075699a21db992aad2539a06fbb3",
+        "tests/e2e/accessory-api-mocks.ts": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
+        "tests/e2e/product-test-navigation.ts": "bbe6b60441d86a7cb9164785b5bd6094d0863090ec8712f3e5fda15e3f334942",
+        "src/services/operationsBatchShelf.test.ts": "c81d751b9c25d2106c04b2a315622be7e4361fc4f9aa990bac20859c843fa055",
+        "src/components/OperationsBatchShelfResult.test.ts": "33528fcca9fa253aac73e90406f0f227e71a8f61875c27cec2932f9773d81450",
+        "src/components/foundation/actions/confirmation.test.ts": "4312b9b97f2c19cef5004ada06d20dde087b8c064a9690ae2ad1f501afa28da7",
+        "src/services/terminalAllBatchShelf.test.ts": "828b4696e37f842f0aff071949dd6efeac4c55e142f668a3429727ee14da7b33",
+        "src/services/productGlobalPermissions.test.ts": "33c5bd661539ed7c04f9cc22ec0ee98ef186748314c28fce95aee0140e24673f",
+        "src/services/functionCatalog.test.ts": "1c6c9e5b6d7c0924af68258f8e7b57c5e86734829380b2da8ad91c7bad26d158",
+        "src/components/WarehouseEntryInformation.test.ts": "f3adf3ec76f669c060b743ca193fabac68bbb9d3f6c56b0872963eed91cc32c7",
         "backend/src/test/java/com/zdm/platform/support/ProductAttributeVersionFixtures.java": "c6ae4a64986bfffa142ea231f8641ebd178bbbbb13a43624902c0b7922326478",
         "tests/e2e/product-attribute-version-fixture.ts": "e0712713a226d51ed9e9e818ea891f2be494a6c09e103b7745b58ea13068d913",
         "src/pages/finished-stock/shared/finishedStockTemplateFields.test.ts": "e950a6e98e73fe2eb8421a5850c8dde6fa22d3bcf5bcc3b12a50fe2b24c21501",
@@ -450,23 +516,13 @@
         "tests/e2e/store-batch-sale-price-cases.ts": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
         "src/components/DecimalInput.test.ts": "f2641900c499220f7929ca8cbd22cc56bb25ce76a2f1492ce91ad45085a62493",
         "src/utils/numericInput.test.ts": "4ed3d4b8768d1c65ec0f279bb6736b30fbc43947b8256dd4b88e25de94deecfd",
-        "backend/src/test/java/com/zdm/platform/craft/CraftNumericInputTest.java": "3e5698da75d970c3e7ee82fb93965a086876a9d771c5e44a687213be853ef90a",
         "src/utils/numericInputValidation.test.ts": "3b7a3a3dcd4fcb8f06923dbe341e0e870e9e2791c772d8496ef8e11cbea66a26",
-        "tests/e2e/store-price-rules.spec.ts": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
-        "tests/e2e/decimal-editing.ts": "8b1a9b36d453ed44191e384109a00a87f6c7d3616a2b095ff40a66261a7cdd73",
-        "tests/e2e/price-table-feedback.ts": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
+        "tests/e2e/price-table-feedback.ts": "a401cadec86d637c44d068ef8e4fc3400411c4549607ca32292d82aca7df8ebc",
         "src/pages/finished-stock/shared/guidePriceSource.test.ts": "78b7b219cb169c86b10590cef5faaf1394ec3c00e27101c4b784001e224f2fad",
-        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceApiTest.java": "8f4a40ce5c9d7b76b6c2b11a5afaea0554d45a4907cafd6f19c31412a97effff",
-        "backend/src/test/java/com/zdm/platform/inventory/GuidePriceSourceMigrationTest.java": "a2ea4de0623f1b0338db2d0cf2bd9c9b27c64bce5c64fdbceeb5c6df393ee1f9",
-        "tests/e2e/product-batch-delete.spec.ts": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
-        "backend/src/test/java/com/zdm/platform/customer/CustomerApiTest.java": "780f04ab359cc37f12f6d0deeca2c4f6e7ee5b4cb67d98f3b6a9f3545dff8557",
-        "backend/src/test/java/com/zdm/platform/security/PermissionGuardTest.java": "b367e88369b882f41bab04c79b3f405bace5363b28b22ae38f773424ea0cabca",
         "src/services/batchActionPermissions.test.ts": "f4ed67b265dc6f436c0ed4ddddf80ccf55eb3a1517b28d35eaafbed783ab9751",
         "src/services/customerCatalog.test.ts": "e9e75039913cba436a051ab9f8ab4fea31cc757f4699140c5e15b116d4a1753b",
-        "tests/e2e/customer-management.spec.ts": "fa1915c7b159f0a01adb6bd19a529157ff8134b2cf360a9cb088a0661b0c06cf",
-        "tests/e2e/store-recycle-selection.spec.ts": "18c94152a9b5740feb6c4d28167d03cc2e1553dd7f2dd273072ff27f23239fd3",
-        "tests/e2e/list-batch-selection.spec.ts": "691c76886f36f144e24b5f1589f75663efb0680a89ba73ac7c45da52ff636847",
-        "tests/e2e/form-options-mock.ts": "5222586ea7707540bac57fdcbae795d5e214b3d6d0b3e482d85e1a75ec640b21"
+        "tests/e2e/form-options-mock.ts": "5222586ea7707540bac57fdcbae795d5e214b3d6d0b3e482d85e1a75ec640b21",
+        "tests/e2e/dialog-confirmation.ts": "6930b04183b6d72ec7b7d1467939a4df5603609cca980666e53d2988e8584bb7"
       },
       "testChanges": [
         {
@@ -2287,18 +2343,6 @@
           "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
         },
         {
-          "file": "tests/e2e/finished-stock.spec.ts",
-          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
-          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
-          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
-        },
-        {
-          "file": "tests/e2e/accessory-management.spec.ts",
-          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
-          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
-          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
-        },
-        {
           "file": "tests/e2e/price-table-feedback.ts",
           "before": "e55d185bd12712863333f5ce14ac12ff6ac4a7320dfb90d86c41b5442f257fa8",
           "after": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
@@ -2308,18 +2352,6 @@
           "file": "tests/e2e/store-batch-sale-price-cases.ts",
           "before": "f9fdecb7003c46d8eaf8aa7de9a0f95075ef316c8d894228c608478fa0fac4f4",
           "after": "4d2beff55ff388616ef0fb74174fa01377f80a3536be3361103ad2960c6a950e",
-          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
-        },
-        {
-          "file": "tests/e2e/finished-stock.spec.ts",
-          "before": "b2b85499d660d5aa88e5535c4bf398bf1dcb60abeafac292d073decc5c3611b8",
-          "after": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
-          "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
-        },
-        {
-          "file": "tests/e2e/accessory-management.spec.ts",
-          "before": "ee257010444cdd8a4551649b90c8ed0d0173be1d5e452ee638f95123dc58ee38",
-          "after": "66a6ca97889dc18eae380c4138c57763134e14575df2e332de6cafdaf8b6605b",
           "reason": "用户确认仅三端成品现货/配件销售规格列表宽度适配及只读字段必填星号；保留原列序、合并单元格、校验、权限、保存与所有其他业务。仅同步对应星号预期并补充六入口单条/分层、容器变化及错误提示布局回归，不改超时或重试。"
         },
         {
@@ -2699,6 +2731,342 @@
           "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
           "after": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
           "reason": "款项配置改由真实API供给：保留分页、数量和订单回归全部断言，移除旧本地group夹具，补充并发删除后刷新且保留输入验证。"
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+          "after": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
+          "reason": "520 CI44178271178: Chrome158将flex-end序列化为flow-end；与同浏览器独立显式flex-end参照严格比较，并新增容器右边缘几何断言。保留所有间距、宽度及其他业务断言，不修改业务样式、不增加重试。"
+        },
+        {
+          "file": "tests/e2e/store-price-rules.spec.ts",
+          "before": "a440c09d397434568a86273e55873af71aa3951ab94d35acd33a99f1b38c308b",
+          "after": "1e57f57f0538aee643a104f3831f88f87eac8bfa4e0417d7b9ebb0980129c567",
+          "reason": "520 CI44178271178: Chrome158 flex-end/flow-end别名序列化；保留查询重置、草稿、失焦及混合保存全部断言，严格比较独立标准flex-end参照并新增按钮右边缘几何断言。无业务修改、无重试。"
+        },
+        {
+          "file": "tests/e2e/finished-stock.spec.ts",
+          "before": "f5f5952d93b3ffe79be96d9f9c11f6a11446c29eb209a2b6fd632b6a8c83dabc",
+          "after": "f12de268d0b142cc2bc14bedba1a597ff0a947c28ad404c4c495202a578d7772",
+          "reason": "432恢复诊断：仅在原视频播放断言失败时附加媒体错误、readyState、networkState、currentTime及页面可见性，随后原样抛出失败；原断言、超时、重试、用例与业务均不变。历史失败继续保留，不据此认定根因已修复。"
+        },
+        {
+          "file": "tests/e2e/feedback-foundation.spec.ts",
+          "before": "3d476fb6d5c0379266768a04ae68b9cf87327f7a74b2e966da9d580b5561014d",
+          "after": "cad6465de30701955cff10f92344f4f0ab32d20fa3c4d0e6f51555c9ca4f816a",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "tests/e2e/pagination-responsive.spec.ts",
+          "before": "62db9539f24b7323c1e6436b8153047fb9064ea7c9f237bb95f1082588164fea",
+          "after": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "d046958b071db3a789e807275dd7c891e320888c9706e6eb7dc8a38925856cfa",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreFinishedProductServiceTest.java",
+          "before": "c31cf35c840adba094a22a9c3b10176cabcb88e4dc2838c1a57bfc6a4370739f",
+          "after": "1f91cf7db291864add3fe7bc99e3dee804e5b113a6cab112ca24cd4d72faea1c",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreAccessoryProductServiceTest.java",
+          "before": "dc7e166f9b9fc08c5fc4699b2454c789097cee57a95702f8d532de41cee39faa",
+          "after": "ab2bf51107e11ab923741563bcd779848f09a91aab5bdaaded68d57fba3ae6bb",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
+          "after": "53b739a15d4767fef99f81dab56dd7a5773283d8897094028aeed73fe2333fc9",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "tests/e2e/admin-api-mocks.ts",
+          "before": "e52244efd21250ee95987836d645ee4afb70b7f9566ae912882018e1f3f031b4",
+          "after": "8753eafbdf67f71ceb6ba0a33bf5a420a81ed8b3b10436a2ed97f8bd072ca886",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "tests/e2e/accessory-api-mocks.ts",
+          "before": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
+          "after": "bc1a94ac1cd149bd8e9eb406bd6db942a34d3a31bbc3165fd5a00e065fb001ab",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "tests/e2e/pagination-responsive.spec.ts",
+          "before": "07627f96fd00c64829f21a17a59ccb3e0519ab14974837e99f084b3f407f2170",
+          "after": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
+          "reason": "承接本对话已确认的款项配置真实API夹具（替代已取消group本地数据）及本次V1.3身份核验、预检计划和历史账号规则。逐项保留分页数量、范围、按钮、权限及原业务断言，新增必要保护用例。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "d046958b071db3a789e807275dd7c891e320888c9706e6eb7dc8a38925856cfa",
+          "reason": "承接本对话已确认的款项配置真实API夹具（替代已取消group本地数据）及本次V1.3身份核验、预检计划和历史账号规则。逐项保留分页数量、范围、按钮、权限及原业务断言，新增必要保护用例。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java",
+          "before": "5bbf2a877eb89b18133d6e69b7e043f21f241004e0ddf369a6eae08d742ea538",
+          "after": "2933e0202a0088396c118d4324137fd5ef20145c6996bf8ea90199554495e5e3",
+          "reason": "V1.3复查修正：已应用迁移保留原文，以后继迁移升级；补齐历史账号恢复隔离和混合表新业务域阻断；修正旧迁移夹具的真实门店父对象，不移除或放宽断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "ad0a716ceac90d7a96e207f32d97a628b9e7745d85280598daefbee96f891f9c",
+          "reason": "落实已确认门店退出预检与身份失效保护；修正模拟路由优先级及页面就绪前置条件，保留原有效业务断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "ad0a716ceac90d7a96e207f32d97a628b9e7745d85280598daefbee96f891f9c",
+          "reason": "落实已确认门店退出预检与身份失效保护；修正模拟路由优先级及页面就绪前置条件，保留原有效业务断言。"
+        },
+        {
+          "file": "tests/e2e/admin-api-mocks.ts",
+          "before": "e52244efd21250ee95987836d645ee4afb70b7f9566ae912882018e1f3f031b4",
+          "after": "432f69db22e404466669c5b09e675b50a54a8de68210dc98e19e57c1b69492b5",
+          "reason": "落实已确认门店退出预检与身份失效保护；修正模拟路由优先级及页面就绪前置条件，保留原有效业务断言。"
+        },
+        {
+          "file": "tests/e2e/accessory-api-mocks.ts",
+          "before": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
+          "after": "2a94dec49e7f3e78114067beef0439c702ca6c68c7188e1068e0b5d13eab1cb8",
+          "reason": "落实已确认门店退出预检与身份失效保护；修正模拟路由优先级及页面就绪前置条件，保留原有效业务断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "ad0a716ceac90d7a96e207f32d97a628b9e7745d85280598daefbee96f891f9c",
+          "after": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "reason": "用户已明确授权修正门店退出遗漏：已打开本地订单视图持续核验、跨端目标门店恢复保护和事务锁；保留正常门店、共享数据及原有效断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "reason": "用户已明确授权修正门店退出遗漏：已打开本地订单视图持续核验、跨端目标门店恢复保护和事务锁；保留正常门店、共享数据及原有效断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "53b739a15d4767fef99f81dab56dd7a5773283d8897094028aeed73fe2333fc9",
+          "after": "a0a83974cd6262a49183221847ea3f89fc69fb3b34d00146e6f1b11389e40975",
+          "reason": "继续已批准门店删除修补：恢复实施前租户专属账号预期；新增无历史不留姓名、旧备份名称恢复、无门店及混合租户边界测试；保留其余断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "after": "3649d790147b57b714c5a72f052f3a20340e6fcc12e140fbc5423423bbf11032",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "a0a83974cd6262a49183221847ea3f89fc69fb3b34d00146e6f1b11389e40975",
+          "after": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "53b739a15d4767fef99f81dab56dd7a5773283d8897094028aeed73fe2333fc9",
+          "after": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "3649d790147b57b714c5a72f052f3a20340e6fcc12e140fbc5423423bbf11032",
+          "after": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "after": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "1ad26bea1f21532d66b6e51bcb5db54915a7146caf0f971ef3e929d87288514b",
+          "after": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "tests/e2e/product-batch-delete.spec.ts",
+          "before": "a6849d9cacb188c1c152fcb79d290599dae0ae87a6be8cf31f71e5abaebe3279",
+          "after": "d8f6711753683180c185ac038223754cabe680dfaf54de3d5ad768ce08e1d24d",
+          "reason": "复用已发布主线 c6b3447630386ad197f376895f54db50929c000f 的工程修正：等待官方弹窗入场完成后点击，保留完整请求、结果、选择状态及失败断言；本分支原文件未改动，不回退主线测试，不修改业务或校验器。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
+          "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/admin-api-mocks.ts",
+          "before": "432f69db22e404466669c5b09e675b50a54a8de68210dc98e19e57c1b69492b5",
+          "after": "22b59209f855b495a9cdf09b8fc1bf2fd1709b2002693cc818589c5af23c7aed",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/admin-api-mocks.ts",
+          "before": "e52244efd21250ee95987836d645ee4afb70b7f9566ae912882018e1f3f031b4",
+          "after": "22b59209f855b495a9cdf09b8fc1bf2fd1709b2002693cc818589c5af23c7aed",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/accessory-api-mocks.ts",
+          "before": "2a94dec49e7f3e78114067beef0439c702ca6c68c7188e1068e0b5d13eab1cb8",
+          "after": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/accessory-api-mocks.ts",
+          "before": "1495219684697bd5f2e0d70338374aa659047a403e924df0ec6a2b550b75ad4c",
+          "after": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/permission-center.spec.ts",
+          "before": "77d1184efc47481c0a2eb5c1e30ea6cee61be2be06091f864858cc7e59765e43",
+          "after": "8f1a8204a784cc57bbd836094ec721f446c3dd1c0232a0d49a4925613a45f442",
+          "reason": "Confirmed selection-center PRD replaces legacy picker with new-tab entry, source-aware details and whole-list joins. Preserve existing lifecycle assertions; dedicated selection-center.spec.ts covers replacement selection behavior."
+        },
+        {
+          "file": "tests/e2e/store-accessory-management.spec.ts",
+          "before": "e569ce847f6f3bfb25850aecff1b356d425ef21f39c28ad5674d11d6b33f5b2a",
+          "after": "c3d66e8e0832358a40ba33a6b583d857fc8f395b8ab1bb888f8dc130631bc1e3",
+          "reason": "Confirmed selection-center PRD replaces legacy picker with new-tab entry, source-aware details and whole-list joins. Preserve existing lifecycle assertions; dedicated selection-center.spec.ts covers replacement selection behavior."
+        },
+        {
+          "file": "tests/e2e/product-all-view.spec.ts",
+          "before": "8f9a3694189b65e6250f49f97ce662e5a78e97f4d033de20e54b231575d6574e",
+          "after": "07f044f812c8f688cd4a9be44f716db6b3478776bc3e6265f90d7c54bca97d14",
+          "reason": "Confirmed selection-center PRD replaces legacy picker with new-tab entry, source-aware details and whole-list joins. Preserve existing lifecycle assertions; dedicated selection-center.spec.ts covers replacement selection behavior."
+        },
+        {
+          "file": "tests/e2e/terminal-all-batch-shelf.spec.ts",
+          "before": "e739fdfd2f7a102510c2ecab6846589c5cda0f3e7beb984bd768b782c47c4d63",
+          "after": "c5af2cb0cba0cbde25b83e0ccd0e03747e388dada25fd15444efb2d525b9588f",
+          "reason": "Confirmed selection-center PRD replaces legacy picker with new-tab entry, source-aware details and whole-list joins. Preserve existing lifecycle assertions; dedicated selection-center.spec.ts covers replacement selection behavior."
+        },
+        {
+          "file": "src/services/productGlobalPermissions.test.ts",
+          "before": "4c53fe18f81d2b1382ab6676008ea259ff454dc78bc004457fffd75dbb44d6a7",
+          "after": "33c5bd661539ed7c04f9cc22ec0ee98ef186748314c28fce95aee0140e24673f",
+          "reason": "Confirmed selection-center PRD replaces legacy picker with new-tab entry, source-aware details and whole-list joins. Preserve existing lifecycle assertions; dedicated selection-center.spec.ts covers replacement selection behavior."
+        },
+        {
+          "file": "src/services/functionCatalog.test.ts",
+          "before": "a0aeedbb80f8c9a4fbf5fe22570d74adecacf7bf5dd0009ff46d42a44cae09ef",
+          "after": "1c6c9e5b6d7c0924af68258f8e7b57c5e86734829380b2da8ad91c7bad26d158",
+          "reason": "Confirmed selection-center PRD replaces legacy picker with new-tab entry, source-aware details and whole-list joins. Preserve existing lifecycle assertions; dedicated selection-center.spec.ts covers replacement selection behavior."
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
+          "after": "a40929e81746553646bd529cee286cc8f5d9364efa531d62b0a862dd8adf6815",
+          "reason": "Selection-center PRD: preserve lifecycle assertions while replacing modal picker tests with dedicated selection-center and new-tab entry tests."
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "a40929e81746553646bd529cee286cc8f5d9364efa531d62b0a862dd8adf6815",
+          "after": "725053a21098ccb2e8c0db1f9cc44a7a4b7e2defc8c5c84872cc3c598ad58713",
+          "reason": "Selection-center PRD: preserve lifecycle assertions while replacing modal picker tests with dedicated selection-center and new-tab entry tests."
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
+          "after": "725053a21098ccb2e8c0db1f9cc44a7a4b7e2defc8c5c84872cc3c598ad58713",
+          "reason": "Confirmed selection-center PRD: replace retired modal selection with actual new-tab selection, current-store-only pricing, name-only search, dynamic read-only details, video playback and cross-page whole-basket join; retain all unrelated lifecycle/price editor assertions."
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionCenterTest.java",
+          "before": "5dafc0b0779fa323e1037c19ed9396e0702c058bb5ebeb05ca28a4fd40202dd6",
+          "after": "a761d16949404081d817939dc33a6e331cc378ada83d272763c6cb73b16fe696",
+          "reason": "选品恢复任务将未应用迁移V172改为V173以避开订单已应用版本；仅更新测试读取的SQL文件路径，SQL字节及全部断言保持不变。"
+        },
+        {
+          "file": "tests/e2e/login.spec.ts",
+          "before": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
+          "after": "dad16c7d553f9645a821bf9fd79c7f08a3e944ccc5b02b10e8f97964bc81722c",
+          "reason": "已授权选品任务验证中修复退出登录E2E漏mock：仅在用例内明确模拟contexts/logout并拒绝其他API，保留原URL、标题、token/user清理全部断言，新增一次POST与无未知API请求断言，不触及业务实现或共享服务。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/inventory/StoreSelectionCenterTest.java",
+          "before": "a761d16949404081d817939dc33a6e331cc378ada83d272763c6cb73b16fe696",
+          "after": "722cb12a301375e70c2cd46a399f2d4e7dc7e68efbfd70f5e0960472a9df88b6",
+          "reason": "已授权选品与V1.3门店退出组合：保留原断言，新增三表全状态删留、身份范围、真实并发写入/删除及来源锁顺序回归；独立审查7文件补丁及75例验证对应精确变更。"
+        },
+        {
+          "file": "tests/e2e/price-table-feedback.ts",
+          "before": "20fc81d624b119d9eb6684f32de5e78d3e1f2fe9f8eff12a2329525a7cbc16d7",
+          "after": "a401cadec86d637c44d068ef8e4fc3400411c4549607ca32292d82aca7df8ebc",
+          "reason": "组合验收逐帧证据确认 viewport 切换后列宽715→947发生在未编辑时；仅等待实际几何跨动画帧稳定后采集基线，保留原全部精确几何、填满容器、提示布局断言与覆盖，不改业务、不加固定等待、不放宽容差或重试。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "reason": "672+134 accepted-source composition: retain all main payment-name assertions; add store-context/cache-exit API mocks and removed-store identity/cache cleanup regressions from accepted 825de7c09, with no assertion removal or tolerance relaxation."
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "725053a21098ccb2e8c0db1f9cc44a7a4b7e2defc8c5c84872cc3c598ad58713",
+          "after": "73f5125a48c61b0fec0b1629364c066b0101cf47a7ffa9c4057d0c0dc95871cf",
+          "reason": "PR121 CI43602325943: align exact header assertion with user-approved frozen label 价格; all price/value/privacy/read-only assertions retained."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "PR121 CI43602325943: wait for disabled status tag rather than ambiguous action text before enable; strengthens async CRUD state assertion, no timeout or retry changes."
+        },
+        {
+          "file": "tests/e2e/store-finished-stock.spec.ts",
+          "before": "408aa9a1a3ceef3182c4054c92a0329fd3d5265f8098db60ee1fb6a8acb84b81",
+          "after": "73f5125a48c61b0fec0b1629364c066b0101cf47a7ffa9c4057d0c0dc95871cf",
+          "reason": "Confirmed selection-center PRD: replace retired modal selection with actual new-tab selection, current-store-only pricing, name-only search, dynamic read-only details, video playback and cross-page whole-basket join; retain all unrelated lifecycle/price editor assertions. PR121 CI43602325943 precise follow-up: approved price label or wait for actual disabled status tag; no assertion removals, retries, or tolerance relaxation."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "672+134 accepted-source composition: retain all main payment-name assertions; add store-context/cache-exit API mocks and removed-store identity/cache cleanup regressions from accepted 825de7c09, with no assertion removal or tolerance relaxation. PR121 CI43602325943 precise follow-up: approved price label or wait for actual disabled status tag; no assertion removals, retries, or tolerance relaxation."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+          "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+          "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+          "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
         }
       ],
       "routes": [
@@ -2767,7 +3135,8 @@
         "src/pages/finished-stock/shared/guidePriceSource.test.ts",
         "src/services/batchActionPermissions.test.ts",
         "src/services/customerCatalog.test.ts",
-        "tests/e2e/form-options-mock.ts"
+        "tests/e2e/form-options-mock.ts",
+        "tests/e2e/dialog-confirmation.ts"
       ]
     },
     {
@@ -2779,8 +3148,162 @@
       ],
       "tables": ["store_payment_names", "store_payment_name_events"],
       "consumers": [
+        "backend/src/main/java/com/zdm/platform/account/AccountLifecycleService.java",
+        "backend/src/main/java/com/zdm/platform/auth/AuthController.java",
+        "backend/src/main/java/com/zdm/platform/auth/AuthService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeValueController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeValueService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductCategoryController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductCategoryService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductFormCatalogService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/TemplateVersionController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/TemplateVersionService.java",
+        "backend/src/main/java/com/zdm/platform/common/AdminCrudController.java",
+        "backend/src/main/java/com/zdm/platform/config/SecurityConfig.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftController.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftPermissionGuard.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftService.java",
+        "backend/src/main/java/com/zdm/platform/customer/CustomerController.java",
+        "backend/src/main/java/com/zdm/platform/customer/CustomerService.java",
+        "backend/src/main/java/com/zdm/platform/employee/AdminEmployeeInviteController.java",
+        "backend/src/main/java/com/zdm/platform/employee/EmployeeController.java",
+        "backend/src/main/java/com/zdm/platform/employee/EmployeeInviteAccess.java",
+        "backend/src/main/java/com/zdm/platform/employee/EmployeeInviteService.java",
+        "backend/src/main/java/com/zdm/platform/employee/EmployeeService.java",
+        "backend/src/main/java/com/zdm/platform/employee/OpenEmployeeInviteController.java",
+        "backend/src/main/java/com/zdm/platform/employee/SupplyChainAdminController.java",
+        "backend/src/main/java/com/zdm/platform/employee/SupplyChainAdminService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryInvalidationMedia.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryLifecycleService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryMarkupConfigurationController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryMarkupConfigurationService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryOperationLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProduct.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductArrivalLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductDetailContent.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductListDetails.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductOptionsController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductWriteValidator.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessorySpecValidator.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryStateActivityService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessorySupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/CityPartnerStoreScope.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedInvalidationMedia.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedMarkupConfigurationController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedMarkupConfigurationService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedOperationLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProduct.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductArrivalLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductDetailContent.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductListDetails.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductOptionsController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductWriteValidator.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedSpecValidator.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedSupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAttributeVersionService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductLifecycleService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductStateActivityService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabColorController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabColorService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGradeController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGradeService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInvalidationSnapshotService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventory.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryLogDetails.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryReferenceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabMarkupConfigurationController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabMarkupConfigurationService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOffShelfRecordService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOperationLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOriginController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOriginService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabPriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabTextureController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabTextureService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabVarietyController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabVarietyService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessoryLogReader.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessoryProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessoryProductService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessorySalePriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessorySelectionSnapshot.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessoryUpstreamLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedLogReader.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedProductService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedSalePriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedSelectionSnapshot.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedUpstreamLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StorePriceRuleController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StorePriceRuleService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionCatalog.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaAdminController.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaAssetService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaCleanupScheduler.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaHistoryService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaLifecycleMigrationService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaPreviewReferenceService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaReferenceService.java",
+        "backend/src/main/java/com/zdm/platform/media/OpenMediaController.java",
+        "backend/src/main/java/com/zdm/platform/media/StoreMediaBusinessFence.java",
         "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameController.java",
         "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameService.java",
+        "backend/src/main/java/com/zdm/platform/role/RoleController.java",
+        "backend/src/main/java/com/zdm/platform/role/RoleService.java",
+        "backend/src/main/java/com/zdm/platform/role/TerminalFunctionPolicyController.java",
+        "backend/src/main/java/com/zdm/platform/role/TerminalFunctionPolicyService.java",
+        "backend/src/main/java/com/zdm/platform/security/CurrentIdentityProvider.java",
+        "backend/src/main/java/com/zdm/platform/security/PermissionGuard.java",
+        "backend/src/main/java/com/zdm/platform/security/SecurityAuditFilter.java",
+        "backend/src/main/java/com/zdm/platform/security/SessionTokenService.java",
+        "backend/src/main/java/com/zdm/platform/security/TokenAuthenticationFilter.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreCategoryController.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreCategoryService.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreController.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreLevelController.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreLevelService.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreService.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/HistoricIdentifierGuard.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreCacheExitController.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitCoordinator.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitCoverage.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitJournal.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRecoveryState.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRecoveryWorker.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRegistry.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRemoteLedger.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitTargetService.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitTaskWorker.java",
+        "backend/src/main/java/com/zdm/platform/supplier/ProductFormSupplierService.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierController.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierService.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierSupplyTypeController.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierSupplyTypeService.java",
+        "backend/src/main/java/com/zdm/platform/tenant/TenantController.java",
+        "backend/src/main/java/com/zdm/platform/tenant/TenantService.java",
         "src/pages/order/prototype/OrderActionDialog.vue",
         "src/pages/order/prototype/index.vue",
         "src/services/storePaymentNames.ts"
@@ -2791,7 +3314,7 @@
       "backendTests": ["backend/src/test/java/com/zdm/platform/payment/StorePaymentNameApiTest.java"],
       "supportFiles": ["tests/e2e/store-payment-name-mocks.ts"],
       "protectedTests": {
-        "tests/e2e/store-order-prototype.spec.ts": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+        "tests/e2e/store-order-prototype.spec.ts": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
         "backend/src/test/java/com/zdm/platform/payment/StorePaymentNameApiTest.java": "f0bc7785d0361355519a740488364d7f51e051d7ce4cbcd71708763143dae440",
         "tests/e2e/store-payment-name-mocks.ts": "94ca072074a9dde740187611c7d3627f03fa04450b73cba6f27c18887d0edbe2"
       },
@@ -2801,6 +3324,608 @@
           "before": "7066a9c2d6a75f0bab7f90a8f7fcd1213cd6daaf1ee57a6f316647336dda2842",
           "after": "34297af17241bc187b59fdfba33ac85defac79162b1ed50c12fd53cc8ee6acbc",
           "reason": "已确认真实款项配置：保留原订单和CRUD回归，替换仅本地配置持久化断言，增加API失败与 stale 选择不可静默覆盖用例。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "d046958b071db3a789e807275dd7c891e320888c9706e6eb7dc8a38925856cfa",
+          "reason": "已确认V1.3统一门店退出：接入真实预检计划及独立退出结果，保留原业务与权限断言；按已确认的纯审计账号处理更新精确预期，新增外键的夹具按子表先清理，不放宽验证。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "ad0a716ceac90d7a96e207f32d97a628b9e7745d85280598daefbee96f891f9c",
+          "reason": "落实已确认门店退出预检与身份失效保护；修正模拟路由优先级及页面就绪前置条件，保留原有效业务断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "ad0a716ceac90d7a96e207f32d97a628b9e7745d85280598daefbee96f891f9c",
+          "after": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "reason": "用户已明确授权修正门店退出遗漏：已打开本地订单视图持续核验、跨端目标门店恢复保护和事务锁；保留正常门店、共享数据及原有效断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "after": "3649d790147b57b714c5a72f052f3a20340e6fcc12e140fbc5423423bbf11032",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "3649d790147b57b714c5a72f052f3a20340e6fcc12e140fbc5423423bbf11032",
+          "after": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "after": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "reason": "672+134 accepted-source composition: retain all main payment-name assertions; add store-context/cache-exit API mocks and removed-store identity/cache cleanup regressions from accepted 825de7c09, with no assertion removal or tolerance relaxation."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "reason": "672 accepted removed-store context/cache regressions and isolated API mocks; retain main payment-name assertions unchanged."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "PR121 CI43602325943: wait for disabled status tag rather than ambiguous action text before enable; strengthens async CRUD state assertion, no timeout or retry changes."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "672 accepted removed-store context/cache regressions and isolated API mocks; retain main payment-name assertions unchanged. PR121 CI43602325943 precise follow-up: approved price label or wait for actual disabled status tag; no assertion removals, retries, or tolerance relaxation."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "b68b55caf9fec9a09877d29d2127a5b7da5650a9ca56fd211e6852308d876531",
+          "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+          "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+          "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+          "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        }
+      ]
+    },
+    {
+      "id": "store-permanent-exit",
+      "roots": [
+        "backend/src/main/java/com/zdm/platform/security/SecurityAuditFilter.java",
+        "backend/src/main/java/com/zdm/platform/security/SecurityAuditService.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreService.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreCacheExitController.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitCoordinator.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitMediaFollowup.java",
+        "backend/src/main/java/com/zdm/platform/tenant/TenantService.java",
+        "src/router/index.ts",
+        "src/services/storeCacheCleanup.ts",
+        "src/services/storeCacheScope.ts",
+        "src/services/storeScopeValidity.ts",
+        "src/services/stores.ts",
+        "src/services/tenants.ts"
+      ],
+      "tables": [
+        "stores",
+        "store_exit_operations",
+        "store_exit_tasks",
+        "store_exit_events",
+        "store_exit_actor_snapshots"
+      ],
+      "routes": [
+        "/tenant-store-management",
+        "/tenant-management",
+        "/store/order-management/sales",
+        "/store/order-management/settings"
+      ],
+      "consumers": [
+        "backend/src/main/java/com/zdm/platform/account/AccountLifecycleService.java",
+        "backend/src/main/java/com/zdm/platform/auth/AuthAccountMapper.java",
+        "backend/src/main/java/com/zdm/platform/auth/AuthController.java",
+        "backend/src/main/java/com/zdm/platform/auth/AuthService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeValueController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductAttributeValueService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductCategoryController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductCategoryService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/ProductFormCatalogService.java",
+        "backend/src/main/java/com/zdm/platform/catalog/TemplateVersionController.java",
+        "backend/src/main/java/com/zdm/platform/catalog/TemplateVersionService.java",
+        "backend/src/main/java/com/zdm/platform/common/AdminCrudController.java",
+        "backend/src/main/java/com/zdm/platform/common/StoreLevelPricingDirectory.java",
+        "backend/src/main/java/com/zdm/platform/config/SecurityConfig.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftController.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftPermissionGuard.java",
+        "backend/src/main/java/com/zdm/platform/craft/CraftService.java",
+        "backend/src/main/java/com/zdm/platform/customer/CustomerController.java",
+        "backend/src/main/java/com/zdm/platform/customer/CustomerService.java",
+        "backend/src/main/java/com/zdm/platform/employee/AdminEmployeeInviteController.java",
+        "backend/src/main/java/com/zdm/platform/employee/EmployeeController.java",
+        "backend/src/main/java/com/zdm/platform/employee/EmployeeInviteAccess.java",
+        "backend/src/main/java/com/zdm/platform/employee/EmployeeInviteService.java",
+        "backend/src/main/java/com/zdm/platform/employee/EmployeeService.java",
+        "backend/src/main/java/com/zdm/platform/employee/OpenEmployeeInviteController.java",
+        "backend/src/main/java/com/zdm/platform/employee/SupplyChainAdminController.java",
+        "backend/src/main/java/com/zdm/platform/employee/SupplyChainAdminService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryInvalidationMedia.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryLifecycleService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryMarkupConfigurationController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryMarkupConfigurationService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryOperationLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryPriceConfigurationSyncService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProduct.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductArrivalLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductDetailContent.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductListDetails.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductOptionsController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductPriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryProductWriteValidator.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessorySpecValidator.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessoryStateActivityService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/AccessorySupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ArrivalLogPriceTiers.java",
+        "backend/src/main/java/com/zdm/platform/inventory/CityPartnerStoreScope.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedInvalidationMedia.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedMarkupConfigurationController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedMarkupConfigurationService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedOperationLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedPriceConfigurationSyncService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProduct.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductArrivalLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductDetailContent.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductListDetails.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductOptionsController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductPriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedProductWriteValidator.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedSpecValidator.java",
+        "backend/src/main/java/com/zdm/platform/inventory/FinishedSupplyEditAuditService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/OperationsBatchShelfService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAllBatchShelfService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductAttributeVersionService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductLifecycleService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/ProductStateActivityService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabColorController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabColorService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGradeController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGradeService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGuidePriceSettingController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabGuidePriceSettingService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInvalidationSnapshotService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventory.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryLogDetails.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryMapper.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryReferenceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabInventoryService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabMarkupConfigurationController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabMarkupConfigurationService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOffShelfRecordService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOperationLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOriginController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabOriginService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabPriceConfigurationSyncService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabPriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabTextureController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabTextureService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabVarietyController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/SlabVarietyService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessoryLogReader.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessoryProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessoryProductService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessorySalePriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessorySelectionSnapshot.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreAccessoryUpstreamLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedLogReader.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedProductController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedProductService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedSalePriceService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedSelectionSnapshot.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreFinishedUpstreamLogService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StorePriceRuleController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StorePriceRuleService.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionCatalog.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionController.java",
+        "backend/src/main/java/com/zdm/platform/inventory/StoreSelectionService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaAdminController.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaAssetService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaCleanupScheduler.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaCleanupService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaCleanupWorker.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaHistoryService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaLifecycleMigrationService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaPreviewReferenceService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaReferenceService.java",
+        "backend/src/main/java/com/zdm/platform/media/MediaRetentionService.java",
+        "backend/src/main/java/com/zdm/platform/media/OpenMediaController.java",
+        "backend/src/main/java/com/zdm/platform/media/StoreMediaBusinessFence.java",
+        "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameController.java",
+        "backend/src/main/java/com/zdm/platform/payment/StorePaymentNameService.java",
+        "backend/src/main/java/com/zdm/platform/role/RoleController.java",
+        "backend/src/main/java/com/zdm/platform/role/RoleService.java",
+        "backend/src/main/java/com/zdm/platform/role/TerminalFunctionPolicyController.java",
+        "backend/src/main/java/com/zdm/platform/role/TerminalFunctionPolicyService.java",
+        "backend/src/main/java/com/zdm/platform/security/CurrentIdentityProvider.java",
+        "backend/src/main/java/com/zdm/platform/security/EffectivePermissionResolver.java",
+        "backend/src/main/java/com/zdm/platform/security/PermissionGuard.java",
+        "backend/src/main/java/com/zdm/platform/security/SecurityAuditFilter.java",
+        "backend/src/main/java/com/zdm/platform/security/SecurityAuditService.java",
+        "backend/src/main/java/com/zdm/platform/security/SessionTokenService.java",
+        "backend/src/main/java/com/zdm/platform/security/TokenAuthenticationFilter.java",
+        "backend/src/main/java/com/zdm/platform/store/Store.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreCategoryController.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreCategoryMapper.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreCategoryService.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreController.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreLevelController.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreLevelService.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreMapper.java",
+        "backend/src/main/java/com/zdm/platform/store/StoreService.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/HistoricIdentifierGuard.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreCacheExitController.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitCoordinator.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitMedia.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitMediaFollowup.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRecoveryState.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitRecoveryWorker.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitTargetService.java",
+        "backend/src/main/java/com/zdm/platform/storeexit/StoreExitTaskWorker.java",
+        "backend/src/main/java/com/zdm/platform/supplier/ProductFormSupplierService.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierController.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierService.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierSupplyTypeController.java",
+        "backend/src/main/java/com/zdm/platform/supplier/SupplierSupplyTypeService.java",
+        "backend/src/main/java/com/zdm/platform/tenant/TenantController.java",
+        "backend/src/main/java/com/zdm/platform/tenant/TenantService.java",
+        "src/main.ts",
+        "src/pages/order/prototype/index.vue",
+        "src/pages/tenant/management/index.vue",
+        "src/pages/tenant/store/index.vue",
+        "src/router/index.ts",
+        "src/services/storeCacheCleanup.ts",
+        "src/services/storeCacheScope.ts",
+        "src/services/storeScopeValidity.ts",
+        "src/services/stores.ts",
+        "src/services/tenants.ts"
+      ],
+      "browserConsumers": [
+        "tests/e2e/admin-foundation.spec.ts",
+        "tests/e2e/feedback-foundation.spec.ts",
+        "tests/e2e/login.spec.ts",
+        "tests/e2e/pagination-responsive.spec.ts",
+        "tests/e2e/permission-center.spec.ts",
+        "tests/e2e/single-column-form-width.spec.ts",
+        "tests/e2e/store-exit.spec.ts",
+        "tests/e2e/store-level.spec.ts",
+        "tests/e2e/store-order-prototype.spec.ts"
+      ],
+      "browserTests": [
+        "tests/e2e/store-exit.spec.ts",
+        "tests/e2e/store-order-prototype.spec.ts",
+        "tests/e2e/pagination-responsive.spec.ts",
+        "tests/e2e/admin-foundation.spec.ts",
+        "tests/e2e/feedback-foundation.spec.ts",
+        "tests/e2e/login.spec.ts",
+        "tests/e2e/permission-center.spec.ts",
+        "tests/e2e/single-column-form-width.spec.ts",
+        "tests/e2e/store-level.spec.ts"
+      ],
+      "backendTests": [
+        "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+        "backend/src/test/java/com/zdm/platform/storeexit/StoreExitRemoteLedgerTest.java",
+        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+        "backend/src/test/java/com/zdm/platform/storeexit/StoreCacheExitControllerTest.java",
+        "backend/src/test/java/com/zdm/platform/security/SecurityAuditFilterTest.java"
+      ],
+      "supportFiles": [
+        "src/services/storeScopeValidity.test.ts",
+        "tests/e2e/admin-api-mocks.ts",
+        "tests/e2e/accessory-api-mocks.ts",
+        "src/services/storeCacheCleanup.test.ts",
+        "infrastructure/store-exit-ledger/server.mjs"
+      ],
+      "protectedTests": {
+        "tests/e2e/store-exit.spec.ts": "40ccc3d52c2e6b3ee78c9e654b5e1fbcb69eea8bd018c877f04fc9d7f3851bf9",
+        "tests/e2e/store-order-prototype.spec.ts": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+        "tests/e2e/pagination-responsive.spec.ts": "c3f87bb9f9682fda93a421651f806ca9becc7cfdee208ed03d042f9bc2db9738",
+        "tests/e2e/admin-foundation.spec.ts": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
+        "tests/e2e/feedback-foundation.spec.ts": "cad6465de30701955cff10f92344f4f0ab32d20fa3c4d0e6f51555c9ca4f816a",
+        "tests/e2e/login.spec.ts": "dad16c7d553f9645a821bf9fd79c7f08a3e944ccc5b02b10e8f97964bc81722c",
+        "tests/e2e/permission-center.spec.ts": "8f1a8204a784cc57bbd836094ec721f446c3dd1c0232a0d49a4925613a45f442",
+        "tests/e2e/single-column-form-width.spec.ts": "0ca5f0c4d3d306544c5bac60b70631cc2f256b262892b2cb783ca789e22dd50c",
+        "tests/e2e/store-level.spec.ts": "d0c444e848f1f1d2f84a3d9b6c5ef77df5ec30ad7c9f15971dc218acb458125a",
+        "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java": "6809305e39b45188d1cfd572fae900457673dc02e61d5059e09abcb0dce5c0ad",
+        "backend/src/test/java/com/zdm/platform/storeexit/StoreExitRemoteLedgerTest.java": "ec03cc12e15fd6abf6cd12cd8139a8e5c73a4bdb01085afeb191de2d1a585fb6",
+        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+        "backend/src/test/java/com/zdm/platform/storeexit/StoreCacheExitControllerTest.java": "091cacfb9f1cee3be151a86f5d85ec6615a48eaf07dae9c165d5b5bb1c3c0cad",
+        "backend/src/test/java/com/zdm/platform/security/SecurityAuditFilterTest.java": "2fe6aca87f39ffb67636aec5a614fe1d2e53b3139f67fc76fb1de169d21b6a2d",
+        "src/services/storeScopeValidity.test.ts": "796d13d822d30cddcfaaf81b2beb9b5811f9e1bd713e1f9d3dfbba6f02744444",
+        "tests/e2e/admin-api-mocks.ts": "22b59209f855b495a9cdf09b8fc1bf2fd1709b2002693cc818589c5af23c7aed",
+        "tests/e2e/accessory-api-mocks.ts": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
+        "src/services/storeCacheCleanup.test.ts": "7c2fa0912fc06d22191a9adbc3a66cd31b74b8c3e8d00ca34f07fd0adf8f1f21",
+        "infrastructure/store-exit-ledger/server.mjs": "22d69165149a6b4acc9116c185e0680821b59b2a27c215fe9987a6d7b0e324d5"
+      },
+      "testChanges": [
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "5152e4f860ca3eefa172dcd48f1d99baeb1110dd28ee8544da56c9f75a21d290",
+          "after": "6341e871bbcdfa4a92e118a5a2e7b3b11ff828ec8bbceef30a0ee65ebbf35fdb",
+          "reason": "已确认V1.3：补验有界重试、原计划幂等、租户自身数据范围与联删结果；保留原有回归断言，不削弱门禁。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "6341e871bbcdfa4a92e118a5a2e7b3b11ff828ec8bbceef30a0ee65ebbf35fdb",
+          "after": "9de47a0c3ebddc6904053339495faaa3ca4942444ca474155545ef62fa775f4b",
+          "reason": "V1.3复查修正：已应用迁移保留原文，以后继迁移升级；补齐历史账号恢复隔离和混合表新业务域阻断；修正旧迁移夹具的真实门店父对象，不移除或放宽断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "82382050d248c5f2ea9142530624535bf6971053627d4278bef58120c1742ffc",
+          "after": "e78954247e2599d84bd3ed82146e554ff9b8b2ceab00f7b31236819719c286a3",
+          "reason": "补齐既有成品与配件失效快照媒体域的跨店隔离、上游历史保护和迟到引用测试；保留此前有效断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "ad0a716ceac90d7a96e207f32d97a628b9e7745d85280598daefbee96f891f9c",
+          "after": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "reason": "用户已明确授权修正门店退出遗漏：已打开本地订单视图持续核验、跨端目标门店恢复保护和事务锁；保留正常门店、共享数据及原有效断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "e78954247e2599d84bd3ed82146e554ff9b8b2ceab00f7b31236819719c286a3",
+          "after": "c3f598e874d83f33639e4cbe7baf31bf4116bdadb4c6147eb22aab11e8c2cb01",
+          "reason": "用户已明确授权修正门店退出遗漏：已打开本地订单视图持续核验、跨端目标门店恢复保护和事务锁；保留正常门店、共享数据及原有效断言。"
+        },
+        {
+          "file": "src/services/storeScopeValidity.test.ts",
+          "before": "7362668a2eabfd8180ecb4bcf0c3c497db7253254bc24692b646ea4d52a883f5",
+          "after": "1358614891ed39126f0967df3764de35016dfc594b7e32707792c2b1a49602c9",
+          "reason": "用户已明确授权修正门店退出遗漏：已打开本地订单视图持续核验、跨端目标门店恢复保护和事务锁；保留正常门店、共享数据及原有效断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "c3f598e874d83f33639e4cbe7baf31bf4116bdadb4c6147eb22aab11e8c2cb01",
+          "after": "ba24caa2e603f79d839a722e592ec8f0a771f858cc4452483fa5e361c083a210",
+          "reason": "用户授权修正门店退出调用链遗漏：补充上游状态日志隔离及晚到核验响应的断网竞态测试，保留原有全部业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "e78954247e2599d84bd3ed82146e554ff9b8b2ceab00f7b31236819719c286a3",
+          "after": "ba24caa2e603f79d839a722e592ec8f0a771f858cc4452483fa5e361c083a210",
+          "reason": "用户授权修正门店退出调用链遗漏：补充上游状态日志隔离及晚到核验响应的断网竞态测试，保留原有全部业务断言。"
+        },
+        {
+          "file": "src/services/storeScopeValidity.test.ts",
+          "before": "1358614891ed39126f0967df3764de35016dfc594b7e32707792c2b1a49602c9",
+          "after": "796d13d822d30cddcfaaf81b2beb9b5811f9e1bd713e1f9d3dfbba6f02744444",
+          "reason": "用户授权修正门店退出调用链遗漏：补充上游状态日志隔离及晚到核验响应的断网竞态测试，保留原有全部业务断言。"
+        },
+        {
+          "file": "src/services/storeScopeValidity.test.ts",
+          "before": "7362668a2eabfd8180ecb4bcf0c3c497db7253254bc24692b646ea4d52a883f5",
+          "after": "796d13d822d30cddcfaaf81b2beb9b5811f9e1bd713e1f9d3dfbba6f02744444",
+          "reason": "用户授权修正门店退出调用链遗漏：补充上游状态日志隔离及晚到核验响应的断网竞态测试，保留原有全部业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "ba24caa2e603f79d839a722e592ec8f0a771f858cc4452483fa5e361c083a210",
+          "after": "c1ffe0f858862b1bdbd33b40493302824f3fde2ed165340c860503275e634906",
+          "reason": "用户授权修正门店退出历史预览后台路径：补齐五类业务域、恢复/未决/并发、共享预览重用、故障补齐与队列隔离测试；原有业务断言完整保留。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "c1ffe0f858862b1bdbd33b40493302824f3fde2ed165340c860503275e634906",
+          "after": "2e0f6158ebad52228835ec47f23dde1c3045d54539b512129cda686eb2f59815",
+          "reason": "用户批准修正邀请过期和账号冲突回读遗漏：新增四邀请入口退出核验、正常过期行为及独立连接真实重复插入的已退出/未决/正常/共享账号测试，保留原有全部断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "53b739a15d4767fef99f81dab56dd7a5773283d8897094028aeed73fe2333fc9",
+          "after": "a0a83974cd6262a49183221847ea3f89fc69fb3b34d00146e6f1b11389e40975",
+          "reason": "继续已批准门店删除修补：恢复实施前租户专属账号预期；新增无历史不留姓名、旧备份名称恢复、无门店及混合租户边界测试；保留其余断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "2e0f6158ebad52228835ec47f23dde1c3045d54539b512129cda686eb2f59815",
+          "after": "f2065e9816f248180c1c9abcf6b8a95b88c7c094d6223d4d1266e9bee912c339",
+          "reason": "继续已批准门店删除修补：恢复实施前租户专属账号预期；新增无历史不留姓名、旧备份名称恢复、无门店及混合租户边界测试；保留其余断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "after": "3649d790147b57b714c5a72f052f3a20340e6fcc12e140fbc5423423bbf11032",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "f2065e9816f248180c1c9abcf6b8a95b88c7c094d6223d4d1266e9bee912c339",
+          "after": "e0927c856da4ad6885cba7da4bc5db8eaed56ea02ca9ff428bb728c92bce3d85",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "2e0f6158ebad52228835ec47f23dde1c3045d54539b512129cda686eb2f59815",
+          "after": "e0927c856da4ad6885cba7da4bc5db8eaed56ea02ca9ff428bb728c92bce3d85",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitRemoteLedgerTest.java",
+          "before": "f1981a8e273b5412fc7e33dc41337048b2e4cbb4c63bb1623108c58c71a8ffc1",
+          "after": "ec03cc12e15fd6abf6cd12cd8139a8e5c73a4bdb01085afeb191de2d1a585fb6",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "a0a83974cd6262a49183221847ea3f89fc69fb3b34d00146e6f1b11389e40975",
+          "after": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "53b739a15d4767fef99f81dab56dd7a5773283d8897094028aeed73fe2333fc9",
+          "after": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+          "reason": "用户确认的门店彻底删除修正：匿名范围指纹只读校验及失效登录缓存清理；必要姓名独立凭证及缺失阻断；租户专属账号恢复原生命周期。仅适配新增只读POST分类并补充回归，保留其他业务断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "3649d790147b57b714c5a72f052f3a20340e6fcc12e140fbc5423423bbf11032",
+          "after": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "1241e9359ef274243403e8374bbfec015128f254eedcf75a51f7e31b0d81e27d",
+          "after": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "e0927c856da4ad6885cba7da4bc5db8eaed56ea02ca9ff428bb728c92bce3d85",
+          "after": "0b3694dacb30ddb662ee00b6685b61de01772ba115b730555028845c876c4c0c",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "2e0f6158ebad52228835ec47f23dde1c3045d54539b512129cda686eb2f59815",
+          "after": "0b3694dacb30ddb662ee00b6685b61de01772ba115b730555028845c876c4c0c",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreCacheExitControllerTest.java",
+          "before": "a3d208c944009147a39a01d1450da8ae054fa928fd8fde5bf57dc8eb626000ab",
+          "after": "091cacfb9f1cee3be151a86f5d85ec6615a48eaf07dae9c165d5b5bb1c3c0cad",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "src/services/storeCacheCleanup.test.ts",
+          "before": "26151f7c3d65bbc5d5c45f4e9b5dbd57f72652f331a90fbc0a2f1c59a564e11c",
+          "after": "a4f12261076c2f4a47ffeb75f3ef6b0fbc5b498e6716053e357d22287f76d9f3",
+          "reason": "本任务确认的删除门店规则：补充必要历史姓名保留、租户原生命周期、匿名指纹只读校验及离线/失效登录/异步回写缓存边界。保留原回归断言，仅将明确的只读POST单独分类。"
+        },
+        {
+          "file": "src/services/storeCacheCleanup.test.ts",
+          "before": "a4f12261076c2f4a47ffeb75f3ef6b0fbc5b498e6716053e357d22287f76d9f3",
+          "after": "0c2786954939bb68f1cfed9fbf514af2d4986398ed60b531f10fc9ca049be59e",
+          "reason": "用户确认的门店删除缓存核验及账号边界修正；补验跨标签页失效和异步旧响应，不削弱原订单、款项、账号及门店隔离断言。"
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "24694652f6305f664661c84aca7f31cd1d20b0e356e08697139b804bb3a78bed",
+          "after": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "0b3694dacb30ddb662ee00b6685b61de01772ba115b730555028845c876c4c0c",
+          "after": "d3b5a3cb1d965b88c11fae14f343b00b2e18a8f590cc073d2ecffd54c3467f05",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/admin-api-mocks.ts",
+          "before": "432f69db22e404466669c5b09e675b50a54a8de68210dc98e19e57c1b69492b5",
+          "after": "22b59209f855b495a9cdf09b8fc1bf2fd1709b2002693cc818589c5af23c7aed",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/accessory-api-mocks.ts",
+          "before": "2a94dec49e7f3e78114067beef0439c702ca6c68c7188e1068e0b5d13eab1cb8",
+          "after": "e04bbe74e5da6e19ed21df995634063672dee0ea079e162e000aba0cdff97dbc",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "src/services/storeCacheCleanup.test.ts",
+          "before": "0c2786954939bb68f1cfed9fbf514af2d4986398ed60b531f10fc9ca049be59e",
+          "after": "a52110a86449f08b351cbdb2cbd38e4251b1cd13a8757510983af177f5e85750",
+          "reason": "用户明确要求修复三处接入缺口：媒体任务真实等待/失败汇总、安全审计组织历史独立性和删除门店当前身份缓存。适配已批准的重新登录行为及匿名只读探针，保留其他业务断言和其他组织保护。"
+        },
+        {
+          "file": "tests/e2e/login.spec.ts",
+          "before": "76f9871821fdfefa3756e517c799bedfe0a8cd26026ac7d841485174111d89d7",
+          "after": "dad16c7d553f9645a821bf9fd79c7f08a3e944ccc5b02b10e8f97964bc81722c",
+          "reason": "合成选品源已核实注销API mock修复：保留原断言并阻止意外API调用，不代理共享后台；其原全量失败报告保留。"
+        },
+        {
+          "file": "tests/e2e/permission-center.spec.ts",
+          "before": "77d1184efc47481c0a2eb5c1e30ea6cee61be2be06091f864858cc7e59765e43",
+          "after": "8f1a8204a784cc57bbd836094ec721f446c3dd1c0232a0d49a4925613a45f442",
+          "reason": "合成已确认选品中心PRD：仅承接选品源已有入口名称断言，原权限授权与隔离断言保持。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "d3b5a3cb1d965b88c11fae14f343b00b2e18a8f590cc073d2ecffd54c3467f05",
+          "after": "fa9627e6518f5b24b2741f0817be19466b721adc95b85d495fd66695d89d9536",
+          "reason": "已授权选品与V1.3门店退出组合：保留原断言，新增三表全状态删留、身份范围、真实并发写入/删除及来源锁顺序回归；独立审查7文件补丁及75例验证对应精确变更。"
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java",
+          "before": "fa9627e6518f5b24b2741f0817be19466b721adc95b85d495fd66695d89d9536",
+          "after": "6809305e39b45188d1cfd572fae900457673dc02e61d5059e09abcb0dce5c0ad",
+          "reason": "672 accepted sequential cross-store account cleanup, managed UUID media fixture and logical-deletion/physical-cleanup completion tests; preserve original assertions and add scoped shared-store protection."
+        },
+        {
+          "file": "src/services/storeCacheCleanup.test.ts",
+          "before": "a52110a86449f08b351cbdb2cbd38e4251b1cd13a8757510983af177f5e85750",
+          "after": "7c2fa0912fc06d22191a9adbc3a66cd31b74b8c3e8d00ca34f07fd0adf8f1f21",
+          "reason": "672 accepted scoped selection technical-cache tests, preserving unrelated store and account data."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "reason": "PR121 CI43602325943: wait for disabled status tag rather than ambiguous action text before enable; strengthens async CRUD state assertion, no timeout or retry changes."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "c0d62252dcd8bc3f0784ce93412f851e9697bbf77acfc0d1884e93078a6c1633",
+          "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+          "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        },
+        {
+          "file": "tests/e2e/store-order-prototype.spec.ts",
+          "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
+          "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
+          "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        },
+        {
+          "file": "tests/e2e/admin-foundation.spec.ts",
+          "before": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
+          "after": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
+          "reason": "Preserve main commit 2ffca9bea: compare Chrome flex alias serialization with independent reference and verify pagination right-edge geometry; original remaining assertions are retained."
         }
       ]
     }

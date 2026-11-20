@@ -22,6 +22,7 @@ export interface TenantPayload {
 }
 
 export interface TenantPurgePreview {
+  storePlans: Record<string, string>;
   eligible: boolean;
   tenantName: string;
   storeCount: number;
@@ -34,6 +35,7 @@ export interface TenantPurgePreview {
 }
 
 export interface TenantPurgeResult {
+  storeResults: import('./stores').StoreExitResult[];
   tenantDeleteCount: number;
   storeDeleteCount: number;
   employeeDeleteCount: number;
@@ -79,9 +81,9 @@ export function getTenantPurgePreview(id: number) {
   return request<TenantPurgePreview>(`/admin/tenants/${id}/purge-preview`);
 }
 
-export function purgeTenant(id: number, confirmationName: string) {
+export function purgeTenant(id: number, confirmationName: string, storePlans: Record<string, string>) {
   return request<TenantPurgeResult>(`/admin/tenants/${id}/purge`, {
     method: 'POST',
-    body: JSON.stringify({ confirmationName }),
+    body: JSON.stringify({ confirmationName, storePlans }),
   });
 }

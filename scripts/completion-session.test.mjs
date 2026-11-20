@@ -464,3 +464,49 @@ test('only exact official generated Husky runtime is preservable; source hooks a
   symlinkSync(path.join(root, '.husky/pre-commit'), path.join(root, file));
   assert.equal(classify(file), 'blocked');
 });
+test('existing CI reader emits structured changes without extra API calls; failed advisory callback cannot replace final gates', async () => {
+  let clock = 0,
+    reads = 0;
+  const facts = [],
+    head = 'a'.repeat(40);
+  const result = await waitQuality({
+    runId: 42,
+    expectedHead: head,
+    now: () => clock,
+    readRun: async () => ({
+      id: 42,
+      head_sha: head,
+      run_attempt: 1,
+      path: '.github/workflows/quality.yml',
+      status: clock >= 140000 ? 'completed' : 'in_progress',
+      conclusion: clock >= 140000 ? 'success' : null,
+    }),
+    readJobs: async () => {
+      reads++;
+      return clock >= 140000
+        ? ['Frontend quality', 'Backend quality'].map((name) => ({ name, status: 'completed', conclusion: 'success' }))
+        : [
+            {
+              name: 'E2E',
+              status: 'in_progress',
+              conclusion: null,
+              steps: [{ name: clock < 60000 ? 'prepare' : 'test', status: 'in_progress' }],
+            },
+          ];
+    },
+    wait: async (ms) => {
+      clock += ms;
+    },
+    report: () => {},
+    onProgress: async (fact) => {
+      facts.push(fact);
+      if (fact.jobs?.[0]?.active?.includes('prepare')) throw Error('outbox temporarily unavailable');
+    },
+  });
+  assert.equal(result.conclusion, 'success');
+  assert.equal(reads, 4);
+  assert.equal(facts.filter((fact) => fact.jobs && !fact.terminalVerified).length, 2);
+  assert.ok(facts.every((fact) => fact.runId === '42' && fact.headSha === head && fact.attempt === 1));
+  assert.equal(facts.at(-1).terminalVerified, true);
+  assert.equal(facts.filter((fact) => fact.terminalVerified).length, 1);
+});

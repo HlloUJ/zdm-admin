@@ -42,6 +42,7 @@ jobs:
         run: node scripts/ci-browser-image.mjs resolve
       - id: scope
         run: node scripts/ci-quality-evidence.mjs scope
+      - run: node scripts/delivery-input-contracts.mjs
       - if: steps.scope.outputs.frontend == 'true' || steps.scope.outputs.engineering == 'true'
         run: node scripts/ci-quality-evidence.mjs run npm-ci -- npm ci
       - if: steps.scope.outputs.frontend == 'true' || steps.scope.outputs.engineering == 'true'
@@ -323,6 +324,10 @@ jobs:
         with:
           name: ci-engineering
           path: coverage/downloaded-ci-evidence/ci-engineering
+      - uses: actions/download-artifact@v4
+        with:
+          name: ci-formatting
+          path: coverage/downloaded-ci-evidence/ci-formatting
       - run: node scripts/ci-quality-evidence.mjs aggregate-frontend coverage/downloaded-ci-evidence
         env:
           NEEDS_JSON: ${{ toJSON(needs) }}

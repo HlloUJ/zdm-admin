@@ -18,7 +18,7 @@ const globals = [
     'publish',
     '发布商品',
   ]),
-  ...['finished-stock-management', 'accessory-management'].map((m) => [`store.${m}`, 'select', '商品中心']),
+  ...['finished-stock-management', 'accessory-management'].map((m) => [`store.${m}`, 'select', '选品中心']),
 ];
 describe('product global entry permissions', () => {
   for (const [prefix, action, label] of globals) {

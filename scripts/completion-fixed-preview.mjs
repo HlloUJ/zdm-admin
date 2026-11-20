@@ -191,10 +191,10 @@ export function createFixedCompletionPreviewControl({
     const owner = await assertOwner(plan);
     return { ready: true, reused: true, preservedFixedPreview: owner.preservedFixedPreview };
   }
-  async function prepare(plan) {
+  async function prepare(plan, { referenceEffect } = {}) {
     const owner = await assertOwner(plan);
     const task = registry(plan.anchor).resolve({ worktree: plan.task });
-    const snapshot = await references(task);
+    const snapshot = await references(task, { referenceEffect });
     assert.equal(
       snapshot.owned.length,
       0,

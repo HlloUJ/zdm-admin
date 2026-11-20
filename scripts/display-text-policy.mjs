@@ -1,5 +1,7 @@
 import { parse } from '@vue/compiler-sfc';
 import ts from 'typescript';
+import { controlFingerprint } from './button-color-policy.mjs';
+import selectionLayout from '../docs/ui/selection-center-extension.json' with { type: 'json' };
 import { parse as parseTemplate, NodeTypes } from '@vue/compiler-dom';
 
 const identityFields = /(?:^|\.)(?:name|title|id|code|[A-Za-z_$]\w*(?:Name|Title|No|Number|Code))$/;
@@ -46,7 +48,11 @@ function interactive(node) {
 }
 
 /** Ordinary record identity text is display-only; explicit actions and choice controls stay separate. */
-export function displayTextViolations(source) {
+export function displayTextViolations(source, file = '') {
+  const approvedCard = (node) =>
+    selectionLayout.cardNavigation.some(
+      (entry) => entry.file === file && entry.tag === node.tag && entry.fingerprint === controlFingerprint(node),
+    );
   const { descriptor, errors } = parse(source);
   if (errors.length) throw new Error('Invalid Vue source');
   const problems = [];
@@ -90,7 +96,7 @@ export function displayTextViolations(source) {
         ts.forEachChild(child, identityReferences);
       }
       identityReferences(expressionAst);
-      if ((slot || ordinaryIdentity) && ancestors.some(interactive))
+      if ((slot || ordinaryIdentity) && ancestors.some((node) => interactive(node) && !approvedCard(node)))
         problems.push(`line ${node.loc.start.line}: name/title/identifier must be display text (${expression})`);
     } else {
       for (const child of node.children ?? []) visit(child, ancestors, slot);

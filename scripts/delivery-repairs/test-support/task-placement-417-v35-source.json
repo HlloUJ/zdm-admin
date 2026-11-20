@@ -1,0 +1,6 @@
+{
+  "version": 1,
+  "source": "417 deployed v35 lib/task-placement.js",
+  "sha256": "17ddd9574fffe3769880447ee7925f8345936de063bad05920e548c4afa83afc",
+  "purpose": "Read-only exact next-card contract test fixture; no Site runtime change"
+}

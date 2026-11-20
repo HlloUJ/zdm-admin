@@ -105,11 +105,20 @@ export function validateChangedBusinessCoverage(root, files) {
   if (!root || !existsSync(path.join(root, CONTRACT_FILE))) return;
   const registry = validateContracts(root);
   const known = new Set(registry.contracts.flatMap((contract) => contract.consumers));
+  // A removed consumer cannot appear in current import discovery. Retain its
+  // association with the same validated contract from the trusted main baseline.
+  const retired = new Set(
+    (previousContracts(root)?.contracts ?? [])
+      .filter((previous) => registry.contracts.some((current) => current.id === previous.id))
+      .flatMap((contract) => contract.consumers),
+  );
   for (const file of files) {
     if (!/^(?:src\/.*\.(?:vue|ts|js)|backend\/src\/main\/java\/.*\.java)$/.test(file) || /\.(?:test|spec)\./.test(file))
       continue;
     assert.ok(
-      known.has(file) || businessImpact(root, [file]).length,
+      known.has(file) ||
+        (!existsSync(path.join(root, file)) && retired.has(file)) ||
+        businessImpact(root, [file]).length,
       `Unregistered business change: ${file}; register actual consumers and API/UI behavior regressions before changing it`,
     );
   }

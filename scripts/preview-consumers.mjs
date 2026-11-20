@@ -60,11 +60,40 @@ function observation(port, response) {
   };
 }
 
+export function matchesStoppedOwnPreview(port, response, lease, taskId, closingLeases) {
+  return (
+    response?.statusCode === 0 &&
+    response.errorCode === 'ECONNREFUSED' &&
+    Number.isInteger(port) &&
+    port >= 5177 &&
+    port <= 5199 &&
+    lease?.port === port &&
+    lease.resource === 'temporary-port-' + port &&
+    lease.task === taskId &&
+    lease.pid === process.pid &&
+    typeof lease.token === 'string' &&
+    lease.token.length > 0 &&
+    closingLeases.some(
+      (closing) =>
+        closing.resource === lease.resource &&
+        closing.task === lease.task &&
+        closing.pid === lease.pid &&
+        closing.token === lease.token,
+    )
+  );
+}
+
 // A failed probe is not evidence that a registered consumer disappeared. Only
 // the owner of the exact already-stopped temporary child can acknowledge its
 // closed port while retaining the lease until cleanup completes.
 export async function inspectPreviewConsumers(
-  { worktree, taskId, ports = [5175, 5176, ...Array.from({ length: 23 }, (_, i) => 5177 + i)], closingLeases = [] },
+  {
+    worktree,
+    taskId,
+    ports = [5175, 5176, ...Array.from({ length: 23 }, (_, i) => 5177 + i)],
+    closingLeases = [],
+    referenceEffect,
+  },
   { request = readPreviewResponse, readLeases } = {},
 ) {
   assert.equal(typeof readLeases, 'function', 'Explicit repository lease reader required');
@@ -74,22 +103,36 @@ export async function inspectPreviewConsumers(
   );
   const after = readLeases();
   assert.deepEqual(after, before, 'Preview leases changed during consumer checks; preserve all runtimes');
+  const ownClosures = after.filter((lease) =>
+    matchesStoppedOwnPreview(
+      lease.port,
+      observations.find((item) => item.port === lease.port),
+      lease,
+      taskId,
+      closingLeases,
+    ),
+  );
   for (const item of observations) {
     const lease = after.find((lease) => lease.port === item.port);
     if (item.metadata) continue;
     if (lease) {
-      const ownStopped =
-        item.closed &&
-        lease.task === taskId &&
-        lease.pid === process.pid &&
-        closingLeases.some(
-          (closing) =>
-            closing.resource === lease.resource &&
-            closing.task === lease.task &&
-            closing.pid === lease.pid &&
-            closing.token === lease.token,
-        );
-      assert.ok(ownStopped, `Preview consumer state is unknown on leased port ${item.port}; retain source and backend`);
+      const ownStopped = ownClosures.includes(lease);
+      let stoppedReference = null;
+      if (!ownStopped && item.closed && process.env.ZDM_CLOSED_PREVIEW_REFERENCE) {
+        const { verifyClosedPreviewReference } = await import('./delivery-repairs/preview-reference-proof.mjs');
+        stoppedReference = await verifyClosedPreviewReference({
+          worktree,
+          taskId,
+          lease,
+          effect: referenceEffect,
+          ownClosures,
+        });
+      }
+      assert.ok(
+        ownStopped || stoppedReference,
+        `Preview consumer state is unknown on leased port ${item.port}; retain source and backend`,
+      );
+      if (stoppedReference) item.stoppedReference = stoppedReference;
     } else
       assert.ok(
         item.closed || (item.port >= 5177 && item.responding),

@@ -1,13 +1,24 @@
 import { createRouter, createWebHistory } from 'vue-router';
 
 import { getLoginUser } from '@/services/auth';
+import { requireCurrentStoreScope } from '@/services/storeScopeValidity';
 import { getAuthToken, SESSION_EXPIRED_MESSAGE } from '@/services/http';
 import { adminFeedback } from '@/components/foundation/feedback/adminFeedback';
-import { getFirstAccessiblePath, hasMenuPermission, routePermissionPrefixMap } from '@/services/adminPermissions';
+import {
+  getFirstAccessiblePath,
+  hasMenuPermission,
+  hasAnyPermission,
+  routePermissionPrefixMap,
+} from '@/services/adminPermissions';
 
 const router = createRouter({
   history: createWebHistory(),
   routes: [
+    {
+      path: '/store/selection-center',
+      name: 'storeSelectionCenter',
+      component: () => import('@/pages/selection-center/index.vue'),
+    },
     {
       path: '/supplier-supply-type-management',
       name: 'supplierSupplyTypeManagement',
@@ -205,7 +216,7 @@ const router = createRouter({
 
 const publicPaths = new Set(['/login', '/employee-invite']);
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   if (publicPaths.has(to.path)) return true;
 
   const token = getAuthToken();
@@ -214,6 +225,11 @@ router.beforeEach((to) => {
   }
 
   const loginUser = getLoginUser();
+  if (to.path === '/store/selection-center') {
+    return hasAnyPermission(loginUser, ['store.finished-stock-management.select', 'store.accessory-management.select'])
+      ? true
+      : { path: '/dashboard' };
+  }
   const permissionPrefix = routePermissionPrefixMap[to.path] ?? (to.meta.permissionPrefix as string | undefined);
   if (!hasMenuPermission(loginUser, permissionPrefix)) {
     const nextPath = getFirstAccessiblePath(loginUser);
@@ -221,6 +237,15 @@ router.beforeEach((to) => {
     if (nextPath && nextPath !== to.path) return { path: nextPath };
   }
 
+  if (to.path.startsWith('/store/order-management') && loginUser.storeId) {
+    try {
+      await requireCurrentStoreScope();
+    } catch (error) {
+      if (!getAuthToken()) return { path: '/login' };
+      adminFeedback.error(error instanceof Error ? error.message : '门店身份核验失败');
+      return false;
+    }
+  }
   return true;
 });
 

@@ -148,8 +148,8 @@ export async function login(payload: LoginPayload) {
   return result;
 }
 
-export function listIdentityContexts() {
-  return request<IdentityContext[]>('/admin/auth/contexts');
+export function listIdentityContexts(signal?: AbortSignal) {
+  return request<IdentityContext[]>('/admin/auth/contexts', { signal });
 }
 
 export async function switchIdentity(identityId: number) {

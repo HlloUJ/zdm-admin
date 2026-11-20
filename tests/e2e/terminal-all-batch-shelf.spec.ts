@@ -213,7 +213,7 @@ for (const [terminal, client, modules, entry] of [
     ['finished-stock-management', 'accessory-management', 'slab-management'],
     '发布商品',
   ],
-  ['城市合伙人门店管理后台', 'store', ['finished-stock-management', 'accessory-management'], '商品中心'],
+  ['城市合伙人门店管理后台', 'store', ['finished-stock-management', 'accessory-management'], '选品中心'],
 ] as const) {
   test(`${client} saves shared shelf grants with state views and no duplicate batch grants`, async ({ page }) => {
     await installAdminApiMocks(page);

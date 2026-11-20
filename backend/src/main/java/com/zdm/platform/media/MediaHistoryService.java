@@ -11,6 +11,10 @@ import org.springframework.transaction.annotation.Transactional;
 /** History references never change business ownership and do not duplicate originals. */
 @Service
 public class MediaHistoryService {
+  @org.springframework.beans.factory.annotation.Autowired
+  private StoreMediaBusinessFence storeFence;
+  @org.springframework.beans.factory.annotation.Autowired
+  private MediaPreviewReferenceService previewReferences;
   private final JdbcTemplate jdbc;
   private final MediaAssetMapper assets;
   private final MediaStorageService storage;
@@ -25,6 +29,7 @@ public class MediaHistoryService {
 
   @Transactional
   public void retain(String domain, Long logId, Map<String, Long> media) {
+    storeFence.requireParent(domain, logId);
     media.entrySet().stream().filter(entry -> entry.getValue() != null)
         .sorted(Map.Entry.comparingByValue()).forEach(entry -> {
           MediaAsset asset = assets.selectByIdForUpdate(entry.getValue());
@@ -60,70 +65,84 @@ public class MediaHistoryService {
 
   public List<Long> pendingPreviews() {
     return jdbc.queryForList("""
-        SELECT a.id FROM media_assets a WHERE a.status <> 'deleted'
-          AND (a.history_preview_state IS NULL OR a.history_preview_state <> 'ready')
-          AND EXISTS (SELECT 1 FROM media_references r WHERE r.media_id=a.id AND r.reference_kind='HISTORY')
+        SELECT a.id FROM media_assets a WHERE (a.status <> 'deleted' OR (a.history_preview_state='ready'
+          AND EXISTS (SELECT 1 FROM media_assets p WHERE p.id=a.history_preview_media_id AND p.status<>'deleted')))
+          AND EXISTS (SELECT 1 FROM media_references r WHERE r.media_id=a.id AND r.reference_kind='HISTORY'
+            AND __SCOPE__ AND (a.history_preview_state IS NULL OR a.history_preview_state <> 'ready'
+              OR (EXISTS (SELECT 1 FROM media_assets p WHERE p.id=a.history_preview_media_id AND p.status<>'deleted')
+                AND NOT EXISTS (SELECT 1 FROM media_references p WHERE p.media_id=a.history_preview_media_id
+                  AND p.business_domain=r.business_domain AND p.business_id=r.business_id
+                  AND p.field_key=CONCAT(r.field_key,':preview') AND p.reference_kind='PREVIEW'))))
         ORDER BY a.updated_at, a.id LIMIT 100
-        """, Long.class);
+        """.replace("__SCOPE__", previewReferences.eligibleHistorySql()), Long.class);
   }
 
   @Transactional
   public void generatePreview(Long mediaId) {
+    // Never take the media lock before the store root and its business parents.
+    List<Long> references = previewReferences.lockHistoryReferences(mediaId);
+    if (references.isEmpty()) { return; }
     MediaAsset source = assets.selectByIdForUpdate(mediaId);
-    if (source == null || "deleted".equals(source.getStatus()) || "ready".equals(source.getHistoryPreviewState())) {
-      return;
-    }
-    if (retention.count(mediaId, "HISTORY") == 0) {
-      return;
-    }
+    if (source == null) { return; }
+    boolean reuse = "ready".equals(source.getHistoryPreviewState());
+    if ("deleted".equals(source.getStatus()) && !reuse) { return; }
     try {
-      MediaAsset input = source;
-      if ("video".equals(source.getMediaType())) {
-        List<Long> covers = jdbc.queryForList("SELECT id FROM media_assets WHERE derived_from_media_id=? AND media_type='image' AND status<>'deleted' ORDER BY id LIMIT 1", Long.class, mediaId);
-        if (covers.isEmpty()) {
-          throw new IllegalArgumentException("视频缺少可用封面，原文件继续保护");
+      MediaAsset preview;
+      if (reuse) {
+        preview = assets.selectByIdForUpdate(source.getHistoryPreviewMediaId());
+        if (preview == null || "deleted".equals(preview.getStatus())) { return; }
+      } else {
+        MediaAsset input = source;
+        if ("video".equals(source.getMediaType())) {
+          List<Long> covers = jdbc.queryForList("SELECT id FROM media_assets WHERE derived_from_media_id=? AND media_type='image' AND status<>'deleted' ORDER BY id LIMIT 1", Long.class, mediaId);
+          if (covers.isEmpty()) {
+            throw new IllegalArgumentException("视频缺少可用封面，原文件继续保护");
+          }
+          input = assets.selectByIdForUpdate(covers.getFirst());
         }
-        input = assets.selectByIdForUpdate(covers.getFirst());
+        MediaStorageService.StoredMedia stored = storage.createHistoryPreview(input.getStorageKey());
+        if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
+          org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+              new org.springframework.transaction.support.TransactionSynchronization() {
+                @Override
+                public void afterCompletion(int status) {
+                  if (status == STATUS_ROLLED_BACK) { storage.delete(stored.storageKey()); }
+                }
+              });
+        }
+        preview = new MediaAsset();
+        preview.setPublicId(stored.publicId());
+        preview.setStorageKey(stored.storageKey());
+        preview.setMediaType("image");
+        preview.setMimeType(stored.mimeType());
+        preview.setFileSize(stored.fileSize());
+        preview.setOriginalName(source.getOriginalName() + "-历史预览.jpg");
+        preview.setAccessLevel(source.getAccessLevel());
+        preview.setOwnerClientCode(source.getOwnerClientCode());
+        preview.setTenantId(source.getTenantId());
+        preview.setStoreId(source.getStoreId());
+        preview.setCreatedByAccountId(source.getCreatedByAccountId());
+        preview.setStatus("active");
+        preview.setUnreferencedSince(LocalDateTime.now());
+        try { assets.insert(preview); }
+        catch (RuntimeException exception) { storage.delete(stored.storageKey()); throw exception; }
       }
-      MediaStorageService.StoredMedia stored = storage.createHistoryPreview(input.getStorageKey());
-      if (org.springframework.transaction.support.TransactionSynchronizationManager.isSynchronizationActive()) {
-        org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
-            new org.springframework.transaction.support.TransactionSynchronization() {
-              @Override
-              public void afterCompletion(int status) {
-                if (status == STATUS_ROLLED_BACK) { storage.delete(stored.storageKey()); }
-              }
-            });
-      }
-      MediaAsset preview = new MediaAsset();
-      preview.setPublicId(stored.publicId());
-      preview.setStorageKey(stored.storageKey());
-      preview.setMediaType("image");
-      preview.setMimeType(stored.mimeType());
-      preview.setFileSize(stored.fileSize());
-      preview.setOriginalName(source.getOriginalName() + "-历史预览.jpg");
-      preview.setAccessLevel(source.getAccessLevel());
-      preview.setOwnerClientCode(source.getOwnerClientCode());
-      preview.setTenantId(source.getTenantId());
-      preview.setStoreId(source.getStoreId());
-      preview.setCreatedByAccountId(source.getCreatedByAccountId());
-      preview.setStatus("active");
-      preview.setUnreferencedSince(LocalDateTime.now());
-      try { assets.insert(preview); }
-      catch (RuntimeException exception) { storage.delete(stored.storageKey()); throw exception; }
+      List<Object> arguments = new java.util.ArrayList<>(); arguments.add(preview.getId()); arguments.add(mediaId); arguments.addAll(references);
       jdbc.update("""
           INSERT INTO media_references
             (media_id,business_domain,business_id,field_key,owner_client_code,tenant_id,store_id,reference_kind)
           SELECT ?,business_domain,business_id,CONCAT(field_key,':preview'),owner_client_code,tenant_id,store_id,'PREVIEW'
-          FROM media_references WHERE media_id=? AND reference_kind='HISTORY'
-          ON DUPLICATE KEY UPDATE media_id=VALUES(media_id)
-          """, preview.getId(), mediaId);
-      jdbc.update("UPDATE media_assets SET unreferenced_since=NULL WHERE id=?", preview.getId());
+          FROM media_references WHERE media_id=? AND reference_kind='HISTORY' AND id IN (
+          """ + String.join(",", java.util.Collections.nCopies(references.size(), "?"))
+          + ") ON DUPLICATE KEY UPDATE media_id=VALUES(media_id)", arguments.toArray());
+      if (retention.count(preview.getId(), "PREVIEW") > 0) {
+        jdbc.update("UPDATE media_assets SET unreferenced_since=NULL WHERE id=?", preview.getId());
+      } else { retention.released(preview.getId()); }
       source.setHistoryPreviewMediaId(preview.getId());
       source.setHistoryPreviewState("ready");
       source.setHistoryPreviewError(null);
     } catch (RuntimeException exception) {
-      source.setHistoryPreviewState("failed");
+      if (!reuse) { source.setHistoryPreviewState("failed"); }
       String message = exception.getMessage() == null ? "历史预览生成失败" : exception.getMessage();
       source.setHistoryPreviewError(message.substring(0, Math.min(500, message.length())));
     }

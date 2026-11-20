@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class MediaCleanupScheduler {
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MediaCleanupScheduler.class);
   private static final String LOCK_NAME = "zdm_platform_media_cleanup";
   private static final int BATCH_SIZE = 1000;
 
@@ -48,7 +49,7 @@ public class MediaCleanupScheduler {
   @Scheduled(fixedDelayString = "${zdm.media.retry-delay-ms:60000}")
   public void retryFailedCleanup() {
     historyService.deletedLogIds().forEach(id -> historyService.release("SLAB_LOG", id));
-    historyService.pendingPreviews().forEach(historyService::generatePreview);
+    generateHistoryPreviews();
     taskMapper.selectReady(LocalDateTime.now(), 100).forEach(task -> worker.processAsync(task.getId()));
   }
 
@@ -72,7 +73,7 @@ public class MediaCleanupScheduler {
     long releasedBytes = 0L;
     try {
       historyService.deletedLogIds().forEach(id -> historyService.release("SLAB_LOG", id));
-      historyService.pendingPreviews().forEach(historyService::generatePreview);
+      generateHistoryPreviews();
       Set<Long> candidates = new LinkedHashSet<>();
       assetMapper.selectExpiredTemporary(LocalDateTime.now().minusHours(24), BATCH_SIZE)
           .forEach(asset -> candidates.add(asset.getId()));
@@ -98,6 +99,16 @@ public class MediaCleanupScheduler {
       throw exception;
     } finally {
       releaseLock();
+    }
+  }
+
+  private void generateHistoryPreviews() {
+    for (Long id : historyService.pendingPreviews()) {
+      try { historyService.generatePreview(id); }
+      catch (org.springframework.security.access.AccessDeniedException scopeChanged) {
+        // The candidate's store became fenced after selection; the next pass rechecks it.
+        LOG.info("History preview scope changed; media {} remains pending", id);
+      }
     }
   }
 
