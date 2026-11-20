@@ -504,7 +504,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "b88480651bc82feafb44258da249d859b941ed07c892e72350d4cb4cad2f7d01",
+      "digest": "ba60c8be5dd500850b4f0cc5e542d4a79fbad7ca1daf53f3fd51a003e72674c0",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -520,6 +520,7 @@
         "scripts/delivery-repairs/completion-ci-diagnosis.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/delivery-repairs/preview-reference-source.mjs",
+        "scripts/delivery-repairs/published-ci-repair.mjs",
         "scripts/delivery-repairs/task-cleanup-npm.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
@@ -566,7 +567,7 @@
       "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
-      "digest": "b6e389ec6aa5f44dd52c87f255fa1d641cc1df59ca8b76ec885051b7b7861bb8",
+      "digest": "19f1e4c9c9b7624d5cbac513134f8c96e6f886237dedecdcf8180c8be1f9caca",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source.mjs",
@@ -575,6 +576,7 @@
         "scripts/delivery-repairs/completion-legacy-readiness.mjs",
         "scripts/delivery-repairs/pre-ci-composition.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
+        "scripts/delivery-repairs/published-ci-repair.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/resource-lease.mjs",
         "scripts/task-batch.mjs",
@@ -601,7 +603,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "c8d848b1c1319417f9a10753ac72e2cb3aec49ead169a0f759ac838340c6aefa",
+      "digest": "4ac723a76ddd0ee20b6eaaea1aca1338b1fcce94e36ae15fbec2bf3329e91800",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -612,6 +614,7 @@
         "scripts/completion-handoff.mjs",
         "scripts/completion-session.mjs",
         "scripts/delivery-repairs/pre-ci-composition.mjs",
+        "scripts/delivery-repairs/published-ci-repair.mjs",
         "scripts/dev-task.mjs",
         "scripts/new-helper.mjs",
         "scripts/published.mjs",
@@ -887,7 +890,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/pre-ci-composition.mjs": {
-      "digest": "b3a3c9c9bf8f2f81799061edb1c3bcc83f661ccdff4ff58d9f3c2547cb194830",
+      "digest": "33e09682c6e05edf6c4b119b48879784850689bd0eaaa05c1cd5d0f6ac6429fb",
       "imports": ["scripts/accepted-source-policy.mjs", "scripts/script-test-plan.mjs"],
       "dynamicImports": 0
     },
@@ -980,6 +983,11 @@
         "scripts/delivery-repairs/preview-reference-history.mjs",
         "scripts/delivery-repairs/preview-reference-source.mjs"
       ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/published-ci-repair.mjs": {
+      "digest": "fcd39292569ae727598ae071bd6abeec01d32ceae6fa9f98abf5dc8340d7a40a",
+      "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-status.mjs"],
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-410-initial-pause-correction.mjs": {
