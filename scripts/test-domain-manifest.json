@@ -1716,29 +1716,33 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "004891fbfd2ced504f2de6989b78bf01d5f4c04f67205400168acc8e6298d10e",
+      "digest": "a6820244724707de2a0234a28d3a6caf383820ca054a9703b3e4390631f8a778",
       "imports": [
         "scripts/dev-task.mjs",
+        "scripts/parallel-task-timing.mjs",
+        "scripts/task-board-intake.mjs",
         "scripts/task-completion.mjs",
         "scripts/task-data-scope.mjs",
         "scripts/task-development.mjs",
         "scripts/task-entry.mjs",
+        "scripts/task-execution-order-cli.mjs",
+        "scripts/task-monitor-registration.mjs",
+        "scripts/task-network.mjs",
         "scripts/task-preview-combination.mjs",
         "scripts/task-preview.mjs",
         "scripts/task-registry.mjs",
-        "scripts/task-resource-entry.mjs",
         "scripts/task-start.mjs"
       ],
-      "dynamicImports": 0
+      "dynamicImports": 1
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "0e9b0fc64b581c6aee83fbe0c1036b16112833782eb126e53d881eed50e66cb5",
+      "digest": "2b1d6df0a5629602f6afe33cb0806f148874729fecf0a97cb60ab3cdf58ebced",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-entry.mjs",
         "scripts/task-registry.mjs",
-        "scripts/task-resource-entry.mjs"
+        "scripts/task-start.mjs"
       ],
       "dynamicImports": 0
     },
@@ -1774,8 +1778,8 @@
       "dynamicImports": 0
     },
     "scripts/task-monitor-registration.mjs": {
-      "digest": "c509af93939bc1cced5314fc14e6cf4316f14e72cb5382d2a8041e06335c32de",
-      "imports": [],
+      "digest": "a17dbc4183405b3a46abeb6fb6e20ae2af70c4b757950b5dcd29b0841793ed1d",
+      "imports": ["scripts/task-execution-binding.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-preview-combination.mjs": {
