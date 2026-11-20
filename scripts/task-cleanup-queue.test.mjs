@@ -1,3 +1,4 @@
+import { runFixtureQueue } from './delivery-repairs/test-support/task-cleanup-scope-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -66,7 +67,7 @@ function fixture(t) {
   Object.assign(record, { carrier, path: target });
   writeFileSync(path.join(carrier, 'manifest.json'), JSON.stringify(record), { flag: 'wx', mode: 0o600 });
   const q = createCleanupQueue(common);
-  return { root, common, target, q, record, key, carrier };
+  return { root, common, target, q, queue: q, record, key, carrier };
 }
 const checks = { verify: async () => ({ ready: true }), unreferenced: async () => {} };
 const readPending = (f) => JSON.parse(readFileSync(path.join(f.q.base, 'pending', f.key + '.json')));
@@ -75,7 +76,7 @@ test('stable staging identity survives producer rename; plan does not mutate pen
   assert.deepEqual(cleanupIdentity(f.target), f.record.identity);
   f.q.handoff(f.record);
   const before = readPending(f);
-  const r = await f.q.run({ ...checks });
+  const r = await runFixtureQueue(f, { ...checks });
   assert.equal(r.processed[0].state, 'eligible');
   assert.ok(existsSync(f.target));
   assert.deepEqual(readPending(f), before);
@@ -83,20 +84,20 @@ test('stable staging identity survives producer rename; plan does not mutate pen
 test('descriptor deletion drains exact staged content and never claims physical disk bytes', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  const r = await f.q.run({ ...checks, apply: true });
+  const r = await runFixtureQueue(f, { ...checks, apply: true });
   assert.equal(r.remaining, 0);
   assert.equal(r.processed[0].state, 'cleaned');
   assert.equal(r.processed[0].deletedLogicalBytes, 9);
   assert.equal(r.processed[0].physicalBytes, null);
   assert.ok(!existsSync(f.target));
-  assert.equal((await f.q.run({ ...checks, apply: true })).processed.length, 0);
+  assert.equal((await runFixtureQueue(f, { ...checks, apply: true })).processed.length, 0);
   assert.equal(f.q.handoff(f.record).state, 'cleaned');
 });
 test('missing content is already-absent with zero deletion, not real deletion acceptance', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
   rmSync(f.target, { recursive: true });
-  const r = await f.q.run({ ...checks, apply: true });
+  const r = await runFixtureQueue(f, { ...checks, apply: true });
   assert.equal(r.processed[0].state, 'already-absent');
   assert.equal(r.processed[0].deletedLogicalBytes, 0);
 });
@@ -104,7 +105,7 @@ test('changed or newly unique content is retained', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
   writeFileSync(path.join(f.target, 'unique.txt'), 'keep');
-  const r = await f.q.run({ ...checks, apply: true });
+  const r = await runFixtureQueue(f, { ...checks, apply: true });
   assert.equal(r.processed[0].state, 'blocked');
   assert.ok(existsSync(f.target));
 });
@@ -118,7 +119,7 @@ test('unchanged repeated failure preserves first evidence and does not create an
       throw Error('same reference');
     },
   };
-  await f.q.run(failure);
+  await runFixtureQueue(f, failure);
   const first = readPending(f);
   const receipt = {
     provider: 'isolated',
@@ -127,13 +128,13 @@ test('unchanged repeated failure preserves first evidence and does not create an
     deliveredAt: new Date().toISOString(),
   };
   f.q.acknowledgeNotification({ key: f.key, id: first.notification.id, receipt });
-  await f.q.run({ ...failure, now: Date.now() + 13 * 3600000 });
+  await runFixtureQueue(f, { ...failure, now: Date.now() + 13 * 3600000 });
   const second = readPending(f);
   assert.deepEqual(second.firstError, first.firstError);
   assert.equal(second.notification.id, first.notification.id);
   assert.deepEqual(f.q.pendingNotifications(), []);
   assert.ok(existsSync(f.target));
-  await f.q.run({ ...checks, apply: true, now: Date.now() + 39 * 3600000 });
+  await runFixtureQueue(f, { ...checks, apply: true, now: Date.now() + 39 * 3600000 });
   assert.equal(f.q.compact({ detailsBefore: '2099-01-01T00:00:00Z' }).removed, 1);
   assert.equal(
     JSON.parse(readFileSync(path.join(f.q.base, 'failures', f.key + '.json'))).firstError.message,
@@ -143,7 +144,7 @@ test('unchanged repeated failure preserves first evidence and does not create an
 test('explicit detail capacity can compact recent successes while retaining provenance files', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  await f.q.run({ ...checks, apply: true });
+  await runFixtureQueue(f, { ...checks, apply: true });
   assert.equal(f.q.compact({ detailsBefore: '1970-01-01T00:00:00Z', keepLatest: 0 }).removed, 1);
   assert.ok(existsSync(path.join(f.carrier, 'manifest.json')));
   assert.ok(existsSync(f.record.proof.rebuild.record));
@@ -151,7 +152,7 @@ test('explicit detail capacity can compact recent successes while retaining prov
 test('success and detail compaction retain an unacknowledged notice until exact delivery readback ack', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  await f.q.run({
+  await runFixtureQueue(f, {
     ...checks,
     apply: true,
     unreferenced: async () => {
@@ -159,7 +160,7 @@ test('success and detail compaction retain an unacknowledged notice until exact 
     },
   });
   const first = f.q.pendingNotifications()[0];
-  await f.q.run({ ...checks, apply: true, now: Date.now() + 13 * 3600000 });
+  await runFixtureQueue(f, { ...checks, apply: true, now: Date.now() + 13 * 3600000 });
   assert.equal(readFileSync(path.join(f.q.base, 'index.json'), 'utf8').includes(first.id), true);
   assert.equal(f.q.pendingNotifications()[0].id, first.id);
   f.q.compact({ detailsBefore: '2099-01-01T00:00:00Z' });
@@ -192,7 +193,7 @@ test('success and detail compaction retain an unacknowledged notice until exact 
 test('interrupted compaction retains exact per-object audit and never double-counts recovery', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  await f.q.run({ ...checks, apply: true });
+  await runFixtureQueue(f, { ...checks, apply: true });
   f.q.compact({ detailsBefore: '2099-01-01T00:00:00Z' });
   const auditFile = path.join(f.q.base, 'audit', f.key.slice(0, 2), f.key + '.json'),
     audit = JSON.parse(readFileSync(auditFile));
@@ -218,7 +219,7 @@ test('notification outbox persists exact events and refuses stale or boolean ack
       throw Error('live reference');
     },
   };
-  await f.q.run(failed);
+  await runFixtureQueue(f, failed);
   const first = f.q.pendingNotifications()[0];
   assert.equal(first.reason, 'live reference');
   assert.deepEqual(createCleanupQueue(f.common).pendingNotifications(), [first]);
@@ -230,7 +231,7 @@ test('notification outbox persists exact events and refuses stale or boolean ack
     deliveredAt: new Date().toISOString(),
   };
   assert.equal(f.q.acknowledgeNotification({ key: f.key, id: 'stale', receipt }).acknowledged, false);
-  await f.q.run({
+  await runFixtureQueue(f, {
     ...failed,
     now: Date.now() + 13 * 3600000,
     unreferenced: async () => {
@@ -254,10 +255,14 @@ test('notification outbox persists exact events and refuses stale or boolean ack
 test('unclosed task is deferred while proof failure is blocked', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  const r = await f.q.run({ ...checks, apply: true, verify: async () => ({ ready: false, reason: 'not closed' }) });
+  const r = await runFixtureQueue(f, {
+    ...checks,
+    apply: true,
+    verify: async () => ({ ready: false, reason: 'not closed' }),
+  });
   assert.equal(r.processed[0].state, 'deferred');
   assert.equal(readPending(f).attempts, 0);
-  const later = await f.q.run({
+  const later = await runFixtureQueue(f, {
     ...checks,
     now: Date.now() + 13 * 3600000,
     apply: true,
@@ -283,7 +288,7 @@ test('future work is indexed and not read or processed', async (t) => {
   writeFileSync(path.join(f.carrier, 'manifest.json'), JSON.stringify(f.record));
   f.q.handoff(f.record);
   writeFileSync(path.join(f.q.base, 'pending', f.key + '.json'), 'invalid json');
-  assert.equal((await f.q.run({ ...checks, apply: true })).processed.length, 0);
+  assert.equal((await runFixtureQueue(f, { ...checks, apply: true })).processed.length, 0);
 });
 test('pending JSON cannot change producer ownership or timing beyond its sealed source manifest', async (t) => {
   const f = fixture(t);
@@ -293,7 +298,7 @@ test('pending JSON cannot change producer ownership or timing beyond its sealed 
   const record = readPending(f);
   record.notBefore = '2099-01-01T00:00:00Z';
   writeFileSync(path.join(f.q.base, 'pending', f.key + '.json'), JSON.stringify(record));
-  const r = await f.q.run({ ...checks, apply: true });
+  const r = await runFixtureQueue(f, { ...checks, apply: true });
   assert.equal(r.processed[0].state, 'blocked');
   assert.ok(existsSync(f.target));
 });
@@ -304,9 +309,9 @@ test('concurrent run or handoff retains existing owner lock', async (t) => {
   const gate = new Promise((r) => {
     release = r;
   });
-  const a = f.q.run({ ...checks, verify: () => gate });
-  await assert.rejects(f.q.run(checks), /EEXIST/);
-  assert.throws(() => f.q.handoff(f.record), /EEXIST/);
+  const a = runFixtureQueue(f, { ...checks, verify: () => gate });
+  await assert.rejects(runFixtureQueue(f, checks), /EEXIST/);
+  assert.throws(() => f.q.handoff(f.record), /Interrupted cleanup source differs/);
   release();
   await a;
 });
@@ -314,7 +319,7 @@ test('reference failure after rename preserves quarantine, and exact recovery re
   const f = fixture(t);
   f.q.handoff(f.record);
   let calls = 0;
-  let r = await f.q.run({
+  let r = await runFixtureQueue(f, {
     ...checks,
     apply: true,
     unreferenced: async () => {
@@ -324,14 +329,14 @@ test('reference failure after rename preserves quarantine, and exact recovery re
   assert.equal(r.processed[0].state, 'blocked');
   assert.ok(!existsSync(f.target));
   assert.ok(existsSync(path.join(f.carrier, 'deleting')));
-  r = await f.q.run({ ...checks, apply: true, now: Date.now() + 13 * 3600000 });
+  r = await runFixtureQueue(f, { ...checks, apply: true, now: Date.now() + 13 * 3600000 });
   assert.equal(r.processed[0].state, 'cleaned');
   assert.equal(r.remaining, 0);
 });
 test('partial deletion journal accepts missing old members, rejects any new member', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  let r = await f.q.run({
+  let r = await runFixtureQueue(f, {
     ...checks,
     apply: true,
     remove: async (directory) => {
@@ -342,14 +347,14 @@ test('partial deletion journal accepts missing old members, rejects any new memb
   assert.equal(r.processed[0].state, 'blocked');
   const quarantined = path.join(f.carrier, 'deleting');
   writeFileSync(path.join(quarantined, 'new-unique'), 'keep');
-  r = await f.q.run({ ...checks, apply: true, now: Date.now() + 13 * 3600000 });
+  r = await runFixtureQueue(f, { ...checks, apply: true, now: Date.now() + 13 * 3600000 });
   assert.equal(r.processed[0].state, 'blocked');
   assert.equal(readFileSync(path.join(quarantined, 'new-unique'), 'utf8'), 'keep');
 });
 test('partial deletion without new content can resume safely with truthful remaining-byte count', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  await f.q.run({
+  await runFixtureQueue(f, {
     ...checks,
     apply: true,
     remove: async (directory) => {
@@ -357,7 +362,7 @@ test('partial deletion without new content can resume safely with truthful remai
       throw Error('interrupted deletion');
     },
   });
-  const r = await f.q.run({ ...checks, apply: true, now: Date.now() + 13 * 3600000 });
+  const r = await runFixtureQueue(f, { ...checks, apply: true, now: Date.now() + 13 * 3600000 });
   assert.equal(r.processed[0].state, 'cleaned');
   assert.equal(r.processed[0].deletedLogicalBytes, 0);
 });
@@ -367,7 +372,7 @@ test('parent replacement after reference probe never follows a link to foreign f
   const victim = path.join(f.root, 'victim');
   mkdirSync(victim);
   writeFileSync(path.join(victim, 'unique'), 'keep');
-  const r = await f.q.run({
+  const r = await runFixtureQueue(f, {
     ...checks,
     apply: true,
     unreferenced: async () => {
@@ -385,14 +390,14 @@ test('queue tampering cannot redirect to another task or object', async (t) => {
   const r = readPending(f);
   r.task = 'another-task';
   writeFileSync(file, JSON.stringify(r));
-  const result = await f.q.run({ ...checks, apply: true });
+  const result = await runFixtureQueue(f, { ...checks, apply: true });
   assert.equal(result.processed[0].state, 'blocked');
   assert.ok(existsSync(f.target));
 });
 test('corrupt pending journal is preserved and emits a separate integrity notice without trusting forged ownership', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  await f.q.run({
+  await runFixtureQueue(f, {
     ...checks,
     apply: true,
     unreferenced: async () => {
@@ -401,7 +406,7 @@ test('corrupt pending journal is preserved and emits a separate integrity notice
   });
   const file = path.join(f.q.base, 'pending', f.key + '.json');
   writeFileSync(file, 'corrupt original journal');
-  const r = await f.q.run({ ...checks, apply: true, now: Date.now() + 13 * 3600000 });
+  const r = await runFixtureQueue(f, { ...checks, apply: true, now: Date.now() + 13 * 3600000 });
   assert.equal(r.processed[0].state, 'blocked');
   assert.equal(r.processed[0].task, null);
   assert.equal(readFileSync(file, 'utf8'), 'corrupt original journal');
@@ -415,17 +420,17 @@ test('corrupt pending journal is preserved and emits a separate integrity notice
       id: item.id,
       receipt: { provider: 'isolated', destination: 'fixture', messageId: '1', deliveredAt: new Date().toISOString() },
     });
-  await f.q.run({ ...checks, apply: true, now: Date.now() + 39 * 3600000 });
+  await runFixtureQueue(f, { ...checks, apply: true, now: Date.now() + 39 * 3600000 });
   assert.deepEqual(f.q.pendingNotifications(), []);
   assert.ok(existsSync(path.join(f.q.base, 'failures', 'integrity-' + f.key + '.json')));
 });
 test('oversized objects stay pending and explicit detail compaction never removes pending records', async (t) => {
   const f = fixture(t);
   f.q.handoff(f.record);
-  let r = await f.q.run({ ...checks, apply: true, maxLogicalBytes: 1 });
+  let r = await runFixtureQueue(f, { ...checks, apply: true, maxLogicalBytes: 1 });
   assert.equal(r.processed[0].state, 'blocked');
   assert.equal(f.q.compact({ detailsBefore: '2099-01-01T00:00:00Z' }).removed, 0);
-  r = await f.q.run({ ...checks, apply: true, now: Date.now() + 13 * 3600000 });
+  r = await runFixtureQueue(f, { ...checks, apply: true, now: Date.now() + 13 * 3600000 });
   assert.equal(r.processed[0].state, 'cleaned');
   assert.equal(f.q.compact({ detailsBefore: '2099-01-01T00:00:00Z' }).removed, 1);
   assert.equal(readdirSync(path.join(f.q.base, 'results')).length, 0);

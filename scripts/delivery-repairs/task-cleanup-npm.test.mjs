@@ -1,3 +1,4 @@
+import { runFixtureQueue } from './test-support/task-cleanup-scope-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -29,7 +30,7 @@ test('real archive audit stages only pristine private package and FD consumer su
   assert.ok(existsSync(f.cache));
   const registration = JSON.parse(readFileSync(audit.entries[0].registration));
   rmSync(f.root, { recursive: true });
-  const result = await f.queue.run(safe);
+  const result = await runFixtureQueue(f, safe);
   assert.equal(result.processed[0].state, 'cleaned');
   assert.ok(result.processed[0].deletedLogicalBytes > 0);
   assert.equal(result.processed[0].physicalBytes, null);
@@ -129,7 +130,7 @@ test('changed stable archive or active original references block cleanup without
   await handoff(f);
   const registration = JSON.parse(readFileSync(audit.entries[0].registration));
   writeFileSync(registration.audit.archive, 'changed');
-  const consumed = await f.queue.run(safe);
+  const consumed = await runFixtureQueue(f, safe);
   assert.equal(consumed.processed[0].state, 'blocked');
 });
 test('queue interruption preserves a single journaled object and resumes idempotently', async (t) => {
@@ -153,7 +154,7 @@ test('queue interruption preserves a single journaled object and resumes idempot
   const staged = await handoff(f),
     again = await handoff(f);
   assert.equal(staged.handedOff[0].object, again.handedOff[0].object);
-  assert.equal((await f.queue.run(safe)).processed[0].state, 'cleaned');
+  assert.equal((await runFixtureQueue(f, safe)).processed[0].state, 'cleaned');
 });
 test('independent consumer rejects a faulty metadata-only handoff that seals additional unique bytes', async (t) => {
   const f = fixture(t),
@@ -171,7 +172,7 @@ test('independent consumer rejects a faulty metadata-only handoff that seals add
   writeFileSync(index, JSON.stringify(audit));
   const staged = await handoff(f);
   assert.equal(staged.handedOff.length, 1);
-  const out = await f.queue.run(safe);
+  const out = await runFixtureQueue(f, safe);
   assert.equal(out.processed[0].state, 'blocked');
   const manifest = JSON.parse(readFileSync(staged.handedOff[0].manifest));
   assert.equal(readFileSync(path.join(manifest.path, 'unique.txt'), 'utf8'), 'do not delete');

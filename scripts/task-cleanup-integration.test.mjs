@@ -1,3 +1,4 @@
+import { runFixtureQueue } from './delivery-repairs/test-support/task-cleanup-scope-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, symlinkSync, readlinkSync, rmSync } from 'node:fs';
@@ -33,10 +34,10 @@ test('actual987 duplicate producer is accepted and consumed by actual683 queue o
   assert.equal(result.length, 1);
   const record = JSON.parse(readFileSync(result[0].manifest));
   assert.equal(record.proof.rebuild.kind, 'duplicate-preserved-v1');
-  const deferred = await f.queue.run({ apply: true, verify: async () => ({ ready: false }), unreferenced });
+  const deferred = await runFixtureQueue(f, { apply: true, verify: async () => ({ ready: false }), unreferenced });
   assert.equal(deferred.processed[0].state, 'deferred');
   assert.ok(existsSync(record.path));
-  const consumed = await f.queue.run({
+  const consumed = await runFixtureQueue(f, {
     apply: true,
     verify: async () => ({ ready: true }),
     unreferenced,
@@ -128,7 +129,7 @@ test('private package handoff precedes actual preservation; residual unique byte
   );
   rmSync(f.root, { recursive: true });
   assert.equal(
-    (await f.queue.run({ apply: true, verify: async () => ({ ready: true }), unreferenced })).processed[0].state,
+    (await runFixtureQueue(f, { apply: true, verify: async () => ({ ready: true }), unreferenced })).processed[0].state,
     'cleaned',
   );
   verifyPreservation(preserved.manifest, path.dirname(preserved.manifest));

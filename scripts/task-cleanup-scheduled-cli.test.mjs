@@ -12,6 +12,7 @@ function fixture(t, policyPatch = {}) {
   mkdirSync(path.join(commonDir, 'task-cleanup'), { recursive: true, mode: 0o700 });
   const policy = {
     version: 1,
+    ownershipV2: true,
     limit: 2,
     budgetMs: 10000,
     maxLogicalBytes: 1000,
@@ -114,4 +115,7 @@ test('a claimed running slot without matching archived ended-owner proof is neve
   assert.equal(result.status, 'unknown');
   assert.equal(f.calls.length, 0);
   assert.match(result.reason, /no exact ended-owner/);
+  const later = await runScheduledCleanup(f.root, { ...f.dependencies, now: now + 43200000 });
+  assert.equal(later.status, 'unknown');
+  assert.equal(f.calls.length, 0);
 });

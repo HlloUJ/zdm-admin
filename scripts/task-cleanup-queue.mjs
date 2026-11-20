@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { requireExactScope } from './delivery-repairs/task-cleanup-exact-scope.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import {
   existsSync,
@@ -91,12 +92,12 @@ function snapshot(directory) {
 // Metadata identity detects path/content mutations without rereading all file bytes.
 // ctime cannot be restored through ordinary utimes; the producer separately proves rebuildability.
 export const cleanupIdentity = (directory) => snapshot(directory).identity;
-function removeSealed(directory, entries) {
+function removeSealed(directory, entries, scopeProof) {
   const result = runCompletionProcess(
     'python3',
     ['-I', fileURLToPath(new URL('./task-cleanup-delete.py', import.meta.url))],
     {
-      input: JSON.stringify({ path: directory, entries }),
+      input: JSON.stringify({ path: directory, entries, scopeProof }),
       encoding: 'utf8',
       timeout: 60000,
       maxBuffer: 1024 * 1024,
@@ -155,8 +156,9 @@ export function createCleanupQueue(commonDir) {
     i.notifications ??= {};
     return i;
   }
-  function lock() {
-    const lease = acquireCleanupLock(base, 'run.lock', { source: LOCK_SOURCE });
+  function lock(scope = null) {
+    const source = scope ? hash({ source: LOCK_SOURCE, scope: scope.identity }) : LOCK_SOURCE;
+    const lease = acquireCleanupLock(base, 'run.lock', { source });
     return Object.assign(() => lease.release(), { scope: lease.scope });
   }
   function validate(r, phase = 'consume') {
@@ -223,6 +225,7 @@ export function createCleanupQueue(commonDir) {
     }
   }
   async function run({
+    scope,
     verify,
     unreferenced,
     now = Date.now(),
@@ -238,20 +241,32 @@ export function createCleanupQueue(commonDir) {
     assert.ok(Number.isSafeInteger(limit) && limit > 0 && limit <= 100);
     assert.ok(Number.isFinite(budgetMs) && budgetMs > 0 && budgetMs <= 300000);
     assert.ok(Number.isSafeInteger(maxLogicalBytes) && maxLogicalBytes > 0);
-    const release = lock();
+    requireExactScope(scope);
+    assert.ok(limit <= 10 && budgetMs <= 120000 && maxLogicalBytes <= 1073741824, 'Exact scope budget exceeded');
+    const release = lock(scope);
     try {
       const i = index(),
         result = {
+          cleanupScope: scope.identity,
           version: 1,
           runId: randomUUID(),
           startedAt: new Date(now).toISOString(),
           apply,
           processed: [],
+          observedMissing: [],
           remaining: 0,
         };
       const start = Date.now();
       let selectedBytes = 0;
-      const due = Object.entries(i.objects)
+      scope.recheck();
+      const scopedObjects = Object.entries(i.objects).filter(([key]) => {
+        if (!scope.has(key)) return false;
+        // Keep missing legacy records exactly as found. An observation earns no cleanup receipt.
+        if (!scope.observedMissing(key)) return true;
+        if (!Object.hasOwn(i.results, key)) result.observedMissing.push(key);
+        return false;
+      });
+      const due = scopedObjects
         .filter(([key, v]) => {
           assert.match(key, HEX);
           assert.ok(Number.isFinite(Date.parse(v.nextCheck)));
@@ -263,7 +278,9 @@ export function createCleanupQueue(commonDir) {
         const file = path.join(folders.pending, key + '.json'),
           done = path.join(folders.results, key + '.json');
         if (existsSync(done)) {
+          scope.assertRecord(key, read(file));
           const completed = read(done);
+          scope.assertResume(completed.cleanupScope);
           i.results[key] = { finishedAt: completed.finishedAt };
           delete i.objects[key];
           if (existsSync(file)) unlinkSync(file);
@@ -274,6 +291,7 @@ export function createCleanupQueue(commonDir) {
           trusted = false;
         try {
           r = read(file);
+          scope.assertRecord(key, r);
           const validated = validate(r),
             registration = validated.registration;
           assert.equal(validated.key, key);
@@ -314,7 +332,7 @@ export function createCleanupQueue(commonDir) {
               await unreferenced(r);
               assert.deepEqual(cleanupIdentity(r.path), r.identity, 'Object changed during reference check');
               if (apply) {
-                r = { ...r, state: 'moving' };
+                r = { ...r, cleanupScope: scope.identity, state: 'moving' };
                 save(file, r);
                 renameSync(r.path, quarantine);
                 r = { ...r, state: 'quarantined' };
@@ -352,13 +370,22 @@ export function createCleanupQueue(commonDir) {
               if (apply) {
                 const entries = read(path.join(folders.inventories, key + '.json'));
                 assert.equal(hash(entries), r.inventoryDigest, 'Deletion inventory changed');
-                const deleted = await release.scope(() => remove(quarantine, entries));
+                const scopeProof = await scope.verifyConsumer(key, r, {
+                  closed: verify,
+                  content: () => {
+                    validateCleanupTypeContent(r, registration, quarantine, commonDir, { partial: true });
+                    return true;
+                  },
+                  unreferenced: () => unreferenced({ ...r, path: quarantine }),
+                });
+                const deleted = await release.scope(() => remove(quarantine, entries, scopeProof));
                 assert.ok(!existsSync(quarantine), 'Deletion did not finish');
                 deletedLogicalBytes = deleted.deletedLogicalBytes;
               }
             } else absent = true;
           }
           const item = {
+            cleanupScope: scope.identity,
             key,
             task: r.task,
             state: apply ? (absent ? 'already-absent' : 'cleaned') : 'eligible',
@@ -470,7 +497,7 @@ export function createCleanupQueue(commonDir) {
           });
         }
       }
-      result.remaining = Object.keys(i.objects).length;
+      result.remaining = scopedObjects.filter(([key]) => Object.hasOwn(i.objects, key)).length;
       result.finishedAt = new Date().toISOString();
       save(path.join(base, 'last-run.json'), result);
       return result;
