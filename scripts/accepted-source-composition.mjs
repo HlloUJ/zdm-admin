@@ -100,13 +100,14 @@ function applyAcceptedConflictReview(root, { batch, accepted, main, base, tree, 
   );
   const reviewText = rawGit(root, ['cat-file', 'blob', reviewBlob]);
   const review = JSON.parse(reviewText);
-  assert.equal(review.version, 1);
+  assert.ok([1, 2].includes(review.version), 'Unknown protected conflict review version');
   assert.equal(review.batch, batch);
   assert.equal(review.accepted, accepted, 'Review refers to another original acceptance');
   assert.equal(review.integrationBase, base, 'Review refers to another original integration base');
   assert.match(review.reviewedMain, SHA);
   assert.equal(git(root, 'cat-file', '-t', review.reviewedMain), 'commit');
   rawGit(root, ['merge-base', '--is-ancestor', review.reviewedMain, main]);
+  if (review.version === 2) rawGit(root, ['merge-base', '--is-ancestor', base, review.reviewedMain]);
   assert.ok(Array.isArray(review.resolutions));
   assert.deepEqual(
     review.resolutions.map(({ file }) => file).sort(),
@@ -116,14 +117,18 @@ function applyAcceptedConflictReview(root, { batch, accepted, main, base, tree, 
   const replacements = review.resolutions.map(({ file, inputs, result, reason }) => {
     assert.ok(typeof reason === 'string' && reason.trim(), 'Reviewed preservation rationale required for ' + file);
     assertSourcePath(file);
+    // Only a v2 review may explicitly declare an absent base. ls-tree still
+    // rejects an existing entry of the wrong type or mode on any side.
+    const addAdd = review.version === 2 && inputs?.base === null;
     const actual = {
-      base: regularBlob(root, base, file),
+      base: regularBlob(root, base, file, !addAdd),
       frozen: regularBlob(root, accepted, file),
       main: regularBlob(root, main, file),
     };
     assert.deepEqual(inputs, actual, 'Published review inputs changed for ' + file);
     assert.equal(regularBlob(root, review.reviewedMain, file), actual.main, 'Review does not describe published main');
     for (const blob of Object.values(actual)) {
+      if (blob === null) continue;
       const bytes = rawGit(root, ['cat-file', 'blob', blob], { encoding: 'buffer' });
       assert.ok(
         !bytes.includes(0) && Buffer.from(bytes.toString('utf8')).equals(bytes),

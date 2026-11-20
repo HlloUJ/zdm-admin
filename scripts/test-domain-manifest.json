@@ -101,12 +101,12 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.mjs": {
-      "digest": "03d5c70cbf4ca5456eac6f67919e95abf85384db7de9ba2aad10477fd9c08a55",
+      "digest": "183f95919f38b9adc82b523994724fbcbd024142ebe2533c1bee9f008bd1b1be",
       "imports": ["scripts/accepted-source-policy.mjs"],
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.test.mjs": {
-      "digest": "a1830b950ada4ff6122234d41117bb73ef274f3f09a4fc0adc24445d41979f52",
+      "digest": "66763b1ce7acfdfc3313ad5366d68a34b2aba75aab24cc9ab6333c7d0c3bce79",
       "imports": [
         "scripts/accepted-source-ci.mjs",
         "scripts/accepted-source-composition.mjs",
