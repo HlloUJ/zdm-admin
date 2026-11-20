@@ -24,3 +24,9 @@
 5. 用准确组合编号停止预览，保留其数据库和媒体。不得对组合执行“任务完成”。
 
 不使用暂停任务作真实运行验收。先以独立验证任务证明组合、冲突拒绝、成员不变及隔离；未通过真实运行验收时明确标注尚未就绪。
+
+## 新建任务的监测上下文
+
+统一新建入口（包括 `task:entry start`、`task:start`、`task:micro`）要求准确 `--monitor-context '<JSON>'`，或仅为本次命令提供 `ZDM_TASK_MONITOR_CONTEXT`。JSON 必须含 `taskNumber`、`taskName`、`taskStableId`、`worker`、`rootThreadId`、`roomId`、`authorizationRef`；原 worker 的真实 `CODEX_THREAD_ID` 必须与 owner 一致。由根线程使用真实任务卡片与平台身份提供，不猜测或复制另一任务字段。
+
+缺失、格式错误或身份不符时在任何 Git 修改前拒绝，不创建工作区。工作流模板调用可通过本次命令环境变量提供，不修改持久环境或受保护配置。已有任务的准确 resume 路径不要求补字段，也不会批量回填旧任务。底层 registry 的兼容登记仍可能明确显示 pending-context，不算统一新建监测已覆盖。

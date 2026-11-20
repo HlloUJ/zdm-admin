@@ -36,7 +36,7 @@
 
 ### 新任务开工读回门槛
 
-根线程先从真实用户执行消息、任务总览已保存的任务及已分派的原 worker 获取上述字段，核验准确任务、owner、通知会话与授权，再向 claim 传 `monitorContext`，向 start 传相同 `--monitor-context`。正式 claim 将已验证上下文随原 admission 保存；通知会话和授权引用须等于原队列请求，start 核对同一 admission 绑定的全部上下文，不能换 worker 或通知对象。缺字段或来源不可核实则不 claim、不开工，不猜编号、worker 或授权。当前正式新任务 `taskStableId` 与登记 slug 一致；已登记历史接续保持原映射，不自动改写。
+根线程先从真实用户执行消息、任务总览已保存的任务及已分派的原 worker 获取上述字段，核验准确任务、owner、通知会话与授权，再向 claim 传 `monitorContext`，向 start 传相同 `--monitor-context`。新任务通过 `task:entry start`、`task:start` 或 `task:micro` 开工时，也可仅为该次调用设置 `ZDM_TASK_MONITOR_CONTEXT`（完整 JSON）。显式参数优先，空环境等同缺失，已有任务恢复不读取这个回退。正式 claim 将已验证上下文随原 admission 保存；通知会话和授权引用须等于原队列请求，start 核对同一 admission 绑定的全部上下文，不能换 worker 或通知对象。缺字段或来源不可核实则不 claim、不开工，不猜编号、worker 或授权。当前正式新任务 `taskStableId` 与登记 slug 一致；已登记历史接续保持原映射，不自动改写。
 
 任务登记和 monitoring 在同一记录写入后，start 必须读回准确 id、owner、worktree、branch、revision 和完整 monitoring 并核对，才返回就绪并准备任务产物。写入/读回结果未知时保留现场，先 `registry resolve` 核对已保存记录、工作区与启动 intent；不重新 enqueue、claim 或新建任务，也不自动清锁。既有记录核实后沿原入口恢复，不重复创建分支/工作区。读回不成功不得派发实际开发。
 

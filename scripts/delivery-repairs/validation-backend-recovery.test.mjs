@@ -33,8 +33,9 @@ const task = {
   worktree: root,
   branch: 'codex/fixture',
   recordedHead: 'a'.repeat(40),
-  frozen: { accepted: 'b'.repeat(40) },
+  frozen: { accepted: 'b'.repeat(40), tree: 'c'.repeat(40), businessDigest: 'd'.repeat(64) },
 };
+const acceptedRecordDigest = 'e'.repeat(64);
 const evidence = {
   backend: { id: 'c'.repeat(64), port: 8098, startedAt: '2025-03-01T11:00:00Z' },
   formerPort: 5196,
@@ -62,7 +63,17 @@ const fixture = () => ({
         id: 'fixture-final',
         status: 'consumed',
         admission: 'fixture-historical-scope',
-        sourceProof: { head: task.recordedHead, accepted: task.frozen.accepted },
+        sourceProof: {
+          head: task.recordedHead,
+          accepted: referenceHash(
+            JSON.stringify({
+              accepted: task.frozen.accepted,
+              tree: task.frozen.tree,
+              businessDigest: task.frozen.businessDigest,
+            }),
+          ),
+          acceptedRecord: acceptedRecordDigest,
+        },
         input: { task: task.id, lane: 'delivery', phase: 'final', owner: task.owner, executor: task.owner },
         ticketBefore: structuredClone(originalTicket),
       },
@@ -96,6 +107,7 @@ const fixture = () => ({
     cleanupFailure: 'Unknown other frontend consumer',
   },
   archivedTicket: { order: 4 },
+  acceptedRecordDigest,
   host: 'fixture.local',
 });
 
@@ -111,6 +123,15 @@ for (const [name, change] of Object.entries({
   },
   'changed frozen object': (x) => {
     x.task.frozen.accepted = 'd'.repeat(40);
+  },
+  'raw frozen commit in place of the dispatched digest': (x) => {
+    x.state.dynamicDecisions[0].sourceProof.accepted = x.task.frozen.accepted;
+  },
+  'changed frozen tree': (x) => {
+    x.task.frozen.tree = 'f'.repeat(40);
+  },
+  'changed accepted record': (x) => {
+    x.acceptedRecordDigest = 'f'.repeat(64);
   },
   'foreign process': (x) => {
     x.journal.lease.pid = 32;
