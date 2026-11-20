@@ -324,7 +324,7 @@ describe('store order prototype business boundaries', () => {
   it('requires a reason before making a new same-phone customer', () => {
     const s = fixture(),
       o = order(s);
-    const next = blankOrder(c);
+    const next = blankOrder(c, s.orders);
     next.customerName = '同号不同客户';
     next.phone = o.phone;
     addProduct(next, s.products[0]!);
