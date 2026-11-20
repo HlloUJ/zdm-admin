@@ -42,6 +42,7 @@ export function assertOriginalValidationFailure({
   attempt,
   journal,
   archivedTicket,
+  acceptedRecordDigest,
   host,
 }) {
   assert.equal(ticket?.task, task.id);
@@ -54,7 +55,18 @@ export function assertOriginalValidationFailure({
   assert.equal(decision?.status, 'consumed');
   assert.ok(decision.admission && ticket.admission === decision.admission);
   assert.equal(decision.sourceProof.head, task.recordedHead);
-  assert.equal(decision.sourceProof.accepted, task.frozen.accepted);
+  assert.equal(
+    decision.sourceProof.accepted,
+    referenceHash(
+      JSON.stringify({
+        accepted: task.frozen.accepted,
+        tree: task.frozen.tree,
+        businessDigest: task.frozen.businessDigest,
+      }),
+    ),
+  );
+  assert.match(acceptedRecordDigest, /^[a-f0-9]{64}$/);
+  assert.equal(decision.sourceProof.acceptedRecord, acceptedRecordDigest);
   assert.equal(decision.input.phase, 'final');
   assert.equal(decision.input.lane, 'delivery');
   assert.equal(decision.input.task, task.id);
@@ -167,6 +179,9 @@ export function readInterruptedValidationEvidence(task, common, archive) {
     attempt,
     journal,
     archivedTicket: manifest.ticket,
+    acceptedRecordDigest: referenceHash(
+      JSON.stringify(regularReferenceFile(path.join(directory, 'accepted-source.json')).bytes),
+    ),
     host: os.hostname(),
   });
   assert.ok(
@@ -247,7 +262,10 @@ export function readInterruptedValidationEvidence(task, common, archive) {
   );
   assert.equal(git(task.worktree, 'rev-parse', 'HEAD'), task.recordedHead);
   assert.equal(git(task.worktree, 'status', '--porcelain'), '');
-  assert.equal(readAcceptance(task.worktree, task.id).commit, task.frozen.accepted);
+  const acceptance = readAcceptance(task.worktree, task.id);
+  assert.equal(acceptance.commit, task.frozen.accepted);
+  assert.equal(acceptance.tree, task.frozen.tree);
+  assert.equal(acceptance.businessDigest, task.frozen.businessDigest);
   return {
     archive,
     manifestHash,

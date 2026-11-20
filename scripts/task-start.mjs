@@ -4,6 +4,7 @@ import './task-network.mjs';
 import { assertTaskExecutor, executionBinding } from './task-execution-binding.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import {
+  parseStartMonitoringContext,
   requireStartMonitoring,
   verifyStartMonitoringReadback,
   verifyMonitoringInstruction,
@@ -73,6 +74,8 @@ export function startParallelTask(
   root = realpathSync(root);
   const owner = options.owner || process.env.CODEX_THREAD_ID;
   const registered = options.slug ? registry.readTask(options.slug) : registry.resolve({ worktree: root });
+  if (!registered && !options.resume && options.monitorContext === undefined)
+    options = { ...options, monitorContext: parseStartMonitoringContext() };
   const binding = registered && executionBinding(registered);
   if (binding) {
     assertTaskExecutor(registered);
@@ -235,7 +238,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseTaskStart(args);
   if (options.help) {
     console.log(
-      'Usage: task:start -- --slug <task-id> --owner <owner> --monitor-context <json> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services.',
+      'Usage: task:start -- --slug <task-id> --owner <owner> --monitor-context <json> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services. New starts may supply ZDM_TASK_MONITOR_CONTEXT for this invocation instead of --monitor-context.',
     );
     return;
   }

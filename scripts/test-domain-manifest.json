@@ -1174,7 +1174,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/validation-backend-recovery.test.mjs": {
-      "digest": "6ab786fd3ca088634769363fad2fc6f7180f92a3fde1130c55a69082c0c394f3",
+      "digest": "8cbc5098c8f63bf07aa2fb2912bf5e8a50ff46a8e2be8cf4faf19b2152989dbb",
       "imports": [
         "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
@@ -1224,7 +1224,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/validation-recovery-evidence.mjs": {
-      "digest": "23afb72d799f11a4baec0b65215928fc05f17ff146a8772910b8a1f5a6a1d047",
+      "digest": "a08a679bd28e8bbcd7a10403cc3e26f5198f60a26254c8b96f61e2a48f5cad79",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
@@ -2884,7 +2884,7 @@
       "dynamicImports": 0
     },
     "scripts/task-entry.mjs": {
-      "digest": "4d82089450b332a7995acd662ccf7badba621c4d7a090317126d00201b90160e",
+      "digest": "a6820244724707de2a0234a28d3a6caf383820ca054a9703b3e4390631f8a778",
       "imports": [
         "scripts/dev-task.mjs",
         "scripts/parallel-task-timing.mjs",
@@ -2904,7 +2904,7 @@
       "dynamicImports": 1
     },
     "scripts/task-entry.test.mjs": {
-      "digest": "1eee2dc0fa936a0ded1c534210f9e7751a825d551d18eed4b0cdfdbffe8ae516",
+      "digest": "2b1d6df0a5629602f6afe33cb0806f148874729fecf0a97cb60ab3cdf58ebced",
       "imports": [
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
@@ -2994,7 +2994,7 @@
       "dynamicImports": 0
     },
     "scripts/task-monitor-registration.mjs": {
-      "digest": "df4a3b835a7773a0bc3e69f547b6eca69f92556e20dbc1acdb9f452f627602cb",
+      "digest": "a17dbc4183405b3a46abeb6fb6e20ae2af70c4b757950b5dcd29b0841793ed1d",
       "imports": ["scripts/task-execution-binding.mjs"],
       "dynamicImports": 0
     },
@@ -3274,7 +3274,7 @@
       "dynamicImports": 0
     },
     "scripts/task-start.mjs": {
-      "digest": "422c87f0fcba8b9da4a245d5bbcf2e6c6af1e2809a9e6fca04132904b67299ac",
+      "digest": "83609083c2495aa67a7fcd38b44a437bd673762c7f538b82906901b288d3357c",
       "imports": [
         "scripts/batch-timing-store.mjs",
         "scripts/parallel-task-timing.mjs",
@@ -3291,7 +3291,7 @@
       "dynamicImports": 2
     },
     "scripts/task-start.test.mjs": {
-      "digest": "b5408ce228f18293db117c5548f3b46f3054ffa08fdc37cc5787df9a6b45fdc9",
+      "digest": "176e3f6956dae9eb3f7ae53a9e9e93bcefebafc311f127e562586c5cd61f0f07",
       "imports": [
         "scripts/task-board-intake.mjs",
         "scripts/task-coordination.mjs",

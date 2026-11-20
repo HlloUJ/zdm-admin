@@ -236,6 +236,31 @@ test('two task starts create independent worktrees without switching preview or 
   assert.equal(a.task.branch, 'codex/a');
   assert.equal(b.task.branch, 'codex/b');
 });
+test('new starts use invocation context only when explicit context is omitted', (t) => {
+  const f = fixture(t),
+    explicit = options('env-task', f.parent),
+    { monitorContext, ...input } = explicit,
+    prior = process.env.ZDM_TASK_MONITOR_CONTEXT;
+  t.after(() => {
+    if (prior === undefined) delete process.env.ZDM_TASK_MONITOR_CONTEXT;
+    else process.env.ZDM_TASK_MONITOR_CONTEXT = prior;
+  });
+  const noGit = () => assert.fail('Invalid context must not mutate Git');
+  process.env.ZDM_TASK_MONITOR_CONTEXT = '{';
+  assert.throws(() => startParallelTask(input, { root: f.root, git: noGit }), SyntaxError);
+  process.env.ZDM_TASK_MONITOR_CONTEXT = JSON.stringify(monitorContext);
+  assert.throws(
+    () => startParallelTask({ ...input, monitorContext: null }, { root: f.root, git: noGit }),
+    /Monitoring context must be an object/,
+  );
+  assert.equal(f.registry.readTask(input.slug), null);
+  const created = startParallelTask(input, { root: f.root });
+  assert.equal(created.task.monitoring.taskStableId, input.slug);
+  assert.equal(created.task.monitoring.authorizationRef, monitorContext.authorizationRef);
+  process.env.ZDM_TASK_MONITOR_CONTEXT = '{';
+  assert.equal(startParallelTask({ ...input, resume: true }, { root: f.root, git: noGit }).resumed, true);
+});
+
 test('exact resume does not fetch or perform a Git mutation', (t) => {
   const f = fixture(t);
   startParallelTask(options('a', f.parent), { root: f.root });
