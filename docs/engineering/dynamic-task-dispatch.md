@@ -84,3 +84,9 @@ task.progressWriteAssessment 由当前真实协调者根据原客户端轨迹提
 关闭来源不是用户传入的同形 JSON。正式恢复入口完成原生失败、空闲、无绑定/开工/资源及准确票据核验后，封存 contract=known-failed-native-intake-unsubmitted-v1/state=closed-known-failed，绑定原 nonce、完整原包 entryDigest 清单和实际证据摘要。只读 readClosedCreationAttempt 从私有不可变归档重验原始记录字节、完整 native 来源与追加输入失败、关闭状态和全部清单；原 creation-unknown 本身不能归档。未投递保全只消费该 reader，不借用 stale/invalid 路径。
 
 归档先 fsync 保全原 outbox 字节、包、序号、时间、客户端拒绝和完整原生读回；本地事务仅将它们登记为 retired-attempt-not-delivered，不加入 acknowledged、不删除首次事实。原序号不重排，只生成新的真实 queued 投影。相同恢复决定不重复生成；归档后、发布新计划前发生本地锁冲突时，保留首份归档和新 nonce，重新核验后续接同一决定；新计划索引持久化后才暴露 native create，结果未知则只读回原结果。准备过的新进展仍阻断，不能跨过未知写入。新受理任务须仍为 queued/awaitingNativeWorker/admission:null、请求为同一用户且晚于明确 initialize/pause 围栏，才仅报告 queued；后续明确用户 pause 继续产生 paused 并阻断旧恢复授权。未知围栏、旧请求、已绑定或占位不适用。
+
+## 原验证后端停用后的准备准入
+
+任务原 final 验证停止后，若 OS 仍显示 Docker Desktop 持有其目录句柄，只有已发布的准备守卫可以消费该任务原恢复回执。对同一原受阻票据申请新的 `dispatch` 后，在 `dispatch-start` 消费前再次执行完整两轮本机观察。回执、准确候选、容器的停止身份以及证明摘要必须一致。
+
+守卫复用已发布的 Docker 端点、签名代码、实际文件描述符与目录 vnode 核验。仅接受观察中实际读到的数字、只读 DIR 句柄，且没有任何运行中源挂载或重叠挂载。写句柄、普通文件、cwd、套接字、未知进程、状态变化或缺失证据仍阻断。此分支只用于原任务的新准备准入，开发、最终交付和取消继续使用各自的原守卫。目录仍被引用，证明不授权删除或清理。

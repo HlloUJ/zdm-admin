@@ -32,6 +32,14 @@ export function parseDockerVnodeInventory(raw) {
 // No observation/exec adapters: the public producer invokes real local tools.
 // A returned directory remains referenced and must never authorize cleanup.
 export function collectRetainedDockerDirectories(identity, inventory, record) {
+  return collectDockerDirectories(identity, inventory, record, false);
+}
+
+export function collectStoppedValidationDockerDirectories(identity, inventory, record) {
+  return collectDockerDirectories(identity, inventory, record, true);
+}
+
+function collectDockerDirectories(identity, inventory, record, stoppedValidation) {
   const matching = inventory.files.filter(
     (f) => f.name === identity.worktree || f.name.startsWith(identity.worktree + path.sep),
   );
@@ -92,8 +100,8 @@ export function collectRetainedDockerDirectories(identity, inventory, record) {
   const services = [];
   for (const pid of pids) {
     const targets = matching.filter((f) => f.pid === pid).sort((a, b) => Number(a.descriptor) - Number(b.descriptor));
-    // Endpoint owner must have an independently observed numeric directory FD.
-    assert.ok(targets.length, 'Endpoint owner has no retained source directory');
+    // The foreign running-backend contract still requires an endpoint-owned DIR.
+    if (!stoppedValidation) assert.ok(targets.length, 'Endpoint owner has no retained source directory');
     const kernel = JSON.parse(execute(binary, [String(pid), ...targets.map((f) => f.descriptor)]));
     const process = inventory.processes.find((p) => p.pid === pid);
     assert.ok(process && process.ppid === kernel.ppid && kernel.pid === pid && kernel.processStable);
