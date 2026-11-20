@@ -207,7 +207,8 @@ function sourceReady(task, state, registry, observe, request, lane, dispatch, ph
     assert.equal(start.state, 'registered');
     const validationRecovery = verifyPreparationIdle();
     if (validationRecovery) readiness = { sourceDigest: before.digest, validationRecovery };
-    else if (dispatch) readiness = { sourceDigest: before.digest, ...verifyDynamicDispatchHost(task, dispatch, observe) };
+    else if (dispatch)
+      readiness = { sourceDigest: before.digest, ...verifyDynamicDispatchHost(task, dispatch, observe) };
     else {
       assertHostIdle(observe(), task);
       assertHostIdle(observe(), task);
