@@ -20,7 +20,7 @@ static void json_string(const char *s) {
   putchar('"');
 }
 int main(int argc, char **argv) {
-  if (argc<3) return 2;
+  if (argc<2) return 2;
   int pid=atoi(argv[1]);
   if (pid<=0) return 2;
   struct proc_bsdinfo before, after;

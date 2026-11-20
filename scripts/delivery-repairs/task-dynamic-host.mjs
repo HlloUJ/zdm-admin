@@ -14,6 +14,7 @@ import {
 } from '../task-execution-binding.mjs';
 import { assertBoundResumeReady } from '../task-rebinding.mjs';
 import { assertHostIdle, observeCancellationHost } from '../task-cancellation-proof.mjs';
+import { preparationValidationIdle } from './validation-preparation-idle.mjs';
 import { captureSource } from '../verification-evidence.mjs';
 import { readAcceptance, assertAcceptedSource } from '../accepted-source.mjs';
 import { threadTitle } from '../task-thread-titles.mjs';
@@ -153,18 +154,19 @@ function completedDevelopmentSource(task, state, registry) {
     ownership,
   };
 }
-function sourceReady(task, state, registry, observe, request, lane, enrollPhase) {
+function sourceReady(task, state, registry, observe, request, lane, enrollPhase, phase) {
   const before = captureSource(task.worktree);
   assert.equal(git(task.worktree, 'branch', '--show-current'), task.branch);
   const binding = executionBinding(task);
   let readiness,
     checkpoint = null;
+  const verifyPreparationIdle = () => preparationValidationIdle(task, registry.commonDir, phase);
   if (binding) {
     const sourceRequest = request.sequence > binding.request.sequence ? request : binding.request;
     readiness = assertBoundResumeReady(
       task,
       state,
-      { request: sourceRequest, lane },
+      { request: sourceRequest, lane, phase },
       {
         registry,
         observe,
@@ -200,9 +202,12 @@ function sourceReady(task, state, registry, observe, request, lane, enrollPhase)
       assert.equal(start[key], task[key], 'Original registered start differs');
     assert.equal(start.task, task.id);
     assert.equal(start.state, 'registered');
-    assertHostIdle(observe(), task);
-    assertHostIdle(observe(), task);
-    readiness = { sourceDigest: before.digest };
+    const validationRecovery = verifyPreparationIdle();
+    if (!validationRecovery) {
+      assertHostIdle(observe(), task);
+      assertHostIdle(observe(), task);
+    }
+    readiness = { sourceDigest: before.digest, ...(validationRecovery ? { validationRecovery } : {}) };
   }
   const accepted = task.frozen ? frozenCheckpoint(task) : null;
   const after = captureSource(task.worktree);
@@ -220,6 +225,7 @@ function sourceReady(task, state, registry, observe, request, lane, enrollPhase)
         : null,
       boundSource: readiness.sourceDigest,
       checkpoint,
+      ...(readiness.validationRecovery ? { validationRecovery: readiness.validationRecovery } : {}),
     },
     readiness,
   };
@@ -322,7 +328,7 @@ async function taskProof(
       },
       readiness: { workNotStarted: true },
     };
-  } else source = sourceReady(task, state, registry, observe, grant.request, input.lane, false);
+  } else source = sourceReady(task, state, registry, observe, grant.request, input.lane, false, input.phase);
   const capacity = enrollPhase ? null : await host.readCapacity();
   const existing = [state.scopedAdmission, ...(state.scopedAdmissions ?? [])]
     .filter(Boolean)
