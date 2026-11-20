@@ -13,8 +13,8 @@ import { validationRuntimeHash } from './validation-recovery-evidence.mjs';
 const owner = 'execution-efficiency-dynamic-orchestration';
 const neighbor = 'finished-stock-selection-log-copy';
 const maintenanceTask = 'trusted-add-add-conflict-review-749';
-const authorization = '01a1f946-21b7-76c1-b8e4-8cbf990d97c3';
 const references = {
+  authorization: '99fa94347349418d53c6f056fcbf3c56faaa371b418c4159cb1476b9821cfb13',
   stop: '4e33241411f5505e029090b94e1437591ad7bdfa5de5e9810b570c5fe51b1587',
   selector: '9c789adc072675bc7dc06dd3c8228146fe747464d5d4d92cdba2d5aa3dcef294',
   window: 'edf631e45853276dde8ab4eeea1dcb46f3c0bd9c45c8685f1c1a6ce26280aa91',
@@ -86,7 +86,8 @@ export function readFollowingMaintenance({ scope, receipt, receiptDigest, mainte
     return bytes;
   };
   assert.equal(summary.task, maintenanceTask);
-  assert.equal(summary.authorization, authorization);
+  const authorization = summary.authorization;
+  assert.equal(referenceHash(authorization), references.authorization, 'Reviewed maintenance authorization changed');
   assert.equal(summary.status, 'restored-and-verified');
   assert.equal(summary.restartCount, 1);
   assert.equal(summary.stopped410, receipt.evidence.backend.id);
@@ -174,7 +175,7 @@ export function readFollowingMaintenance({ scope, receipt, receiptDigest, mainte
   );
   const registration = JSON.parse(verifiedBytes(registrationFile, references.registration));
   assert.equal(registration.task, neighbor);
-  assert.equal(registration.authority.userMessage, authorization);
+  assert.ok(registration.authority.userMessage === authorization, 'Registration has another maintenance authorization');
   assert.equal(registration.previousRecordSha256, next.binding.registeredSha256);
   assert.equal(registration.previousIdentity, next.binding.identity);
   const observed = readMaintenanceBackend(container, proof, runtime);
