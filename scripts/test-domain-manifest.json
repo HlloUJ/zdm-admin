@@ -1149,7 +1149,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/validation-backend-recovery.test.mjs": {
-      "digest": "6ab786fd3ca088634769363fad2fc6f7180f92a3fde1130c55a69082c0c394f3",
+      "digest": "8cbc5098c8f63bf07aa2fb2912bf5e8a50ff46a8e2be8cf4faf19b2152989dbb",
       "imports": [
         "scripts/delivery-repairs/preview-docker-vnode-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
@@ -1199,7 +1199,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/validation-recovery-evidence.mjs": {
-      "digest": "23afb72d799f11a4baec0b65215928fc05f17ff146a8772910b8a1f5a6a1d047",
+      "digest": "a08a679bd28e8bbcd7a10403cc3e26f5198f60a26254c8b96f61e2a48f5cad79",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",
