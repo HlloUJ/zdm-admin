@@ -105,6 +105,37 @@ function deliveryWaitBasis(state, ticket) {
     : null;
 }
 
+function blockedPreparationRequest(state, ticket) {
+  if (ticket.status !== 'blocked' || ticket.lane !== 'delivery' || !ticket.dynamicDecisionId) return null;
+  const relevant = (event) => event.task === ticket.task && event.lane === ticket.lane;
+  const event = state.events?.findLast((item) => relevant(item) && ['block', 'dispatch-applied'].includes(item.action));
+  if (event?.action !== 'block' || event.reason !== ticket.reason || event.decisionId !== ticket.dynamicDecisionId)
+    return null;
+  const decision = state.dynamicDecisions?.find((item) => item.id === event.decisionId);
+  if (
+    decision?.status !== 'consumed' ||
+    decision.input?.phase !== 'preparation' ||
+    decision.input.task !== ticket.task ||
+    decision.input.lane !== ticket.lane ||
+    decision.input.owner !== ticket.owner ||
+    !decision.admission ||
+    decision.admission !== ticket.admission ||
+    decision.ticketBefore?.order !== ticket.order ||
+    !isDeepStrictEqual(decision.ticketBefore?.request, ticket.request)
+  )
+    return null;
+  const applied = state.events.findLast((item) => relevant(item) && item.action === 'dispatch-applied');
+  if (
+    applied?.decisionId !== event.decisionId ||
+    applied.phase !== 'preparation' ||
+    applied.owner !== ticket.owner ||
+    applied.admission !== ticket.admission
+  )
+    return null;
+  const grant = state.dynamicAuthorities?.find((item) => item.id === decision.input.authorityId);
+  return grant && isDeepStrictEqual(applied.request, grant.request) ? grant.request : null;
+}
+
 export function captureQueueProgress(commonDir, state, previous) {
   const pausedFor = (current, ticket) => {
     if (!executionPausedFor(current, ticket)) return false;
@@ -128,7 +159,7 @@ export function captureQueueProgress(commonDir, state, previous) {
     const request =
       ticket.status === 'queued' && pendingNative && ticket.admission === null
         ? ticket.request
-        : deliveryWaitBasis(current, ticket)?.request;
+        : (blockedPreparationRequest(current, ticket) ?? deliveryWaitBasis(current, ticket)?.request);
     return !(
       Number.isSafeInteger(fence?.sequence) &&
       typeof fence.authorId === 'string' &&

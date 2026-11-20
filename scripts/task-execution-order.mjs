@@ -494,10 +494,21 @@ export function createExecutionOrder(commonDir) {
     return update((state) => {
       const current = ticket(state, lane, task, owner);
       assert.ok(occupied.has(current.status), 'Only an occupied slot can block');
+      const released =
+        current.status === 'running' &&
+        scopedAdmissions(state).find(
+          (scope) =>
+            scope.phase === 'preparation' &&
+            scope.task === task &&
+            scope.lane === lane &&
+            scope.owner === owner &&
+            scope.admission === current.admission &&
+            scope.decisionId === current.dynamicDecisionId,
+        );
       current.status = 'blocked';
       if (scopedFor(state, current)) removeScope(state, current);
       current.reason = reason;
-      state.events.push({ action: 'block', lane, task, reason });
+      state.events.push({ action: 'block', lane, task, reason, ...(released && { decisionId: released.decisionId }) });
       return structuredClone(current);
     });
   }

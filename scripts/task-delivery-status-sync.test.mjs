@@ -1,13 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
-import { mkdtempSync, rmSync, writeFileSync, realpathSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createProgressOutbox, flushProgress } from './task-progress-outbox.mjs';
 import { recordToolProgress, bestEffortProgress, captureQueueProgress } from './task-delivery-status-sync.mjs';
 import { captureDeliveryQueueProgress } from './delivery-repairs/task-delivery-queue-progress.mjs';
 import { openCompletion, completionStage, saveCompletion } from './completion-session.mjs';
+import { createExecutionOrder } from './task-execution-order.mjs';
 const payload = {
   observed_at: '2026-11-15T12:00:00.000Z',
   action: { id: 'verify-1', label: '验证' },
@@ -489,3 +490,141 @@ test('many Chinese CI jobs and long steps fit actual417 wire label bound while c
   assert.deepEqual(JSON.parse(readFileSync(result.receipt.evidence_refs[0])).jobs, jobs);
   assert.equal(captureCiProgress(common, 'fixture-task', fact).receipt_id, result.receipt_id);
 });
+
+function blockedPreparationFixture() {
+  const task = 'fixture-task',
+    owner = 'fixture-worker',
+    lane = 'delivery',
+    phase = 'preparation',
+    admission = 'fixture-admission',
+    decisionId = 'fixture-decision',
+    authorityId = 'fixture-authority';
+  const request = { sequence: 20, authorId: 'same-user', messageId: 'user-delegation' };
+  const queued = { task, owner, lane, status: 'queued', order: 5, request: { sequence: 5, authorId: 'same-user' } };
+  const running = { ...queued, status: 'running', admission, dynamicDecisionId: decisionId };
+  const unrelated = { task: 'other-task', owner: 'other-worker', lane, status: 'queued' };
+  const reason = '明确技术阻碍';
+  const before = {
+    revision: 2,
+    paused: true,
+    tickets: [running, unrelated],
+    scopedAdmissions: [{ task, owner, lane, phase, admission, decisionId, request }],
+    events: [
+      { action: 'pause-all', request: { sequence: 10, authorId: 'same-user', messageId: 'old-pause' } },
+      { action: 'dispatch-applied', task, owner, lane, phase, admission, decisionId, request },
+    ],
+    dynamicAuthorities: [{ id: authorityId, request }],
+    dynamicDecisions: [
+      {
+        id: decisionId,
+        input: { task, owner, lane, phase, authorityId },
+        status: 'consumed',
+        admission,
+        ticketBefore: queued,
+      },
+    ],
+  };
+  const after = {
+    ...before,
+    revision: 3,
+    tickets: [{ ...running, status: 'blocked', reason }, unrelated],
+    scopedAdmissions: [],
+    events: [...before.events, { action: 'block', task, lane, reason, decisionId }],
+  };
+  return { before, after, reason };
+}
+
+test('a technical block after a newer consumed preparation remains blocked until a real later pause', (t) => {
+  const root = fixture(t);
+  const { before, after, reason } = blockedPreparationFixture();
+  captureQueueProgress(root, after, before);
+  const unchanged = { ...after, revision: 4, events: [...after.events, { action: 'another-task-event' }] };
+  captureQueueProgress(root, unchanged, after);
+  const newerPause = { action: 'pause-all', request: { sequence: 30, authorId: 'same-user', messageId: 'new-pause' } };
+  const paused = { ...unchanged, revision: 5, events: [...unchanged.events, newerPause] };
+  captureQueueProgress(root, paused, unchanged);
+  const outbox = createProgressOutbox(path.join(root, 'task-progress', 'fixture-task')).read();
+  assert.deepEqual(
+    outbox.pending.map(({ receipt }) => [receipt.event, receipt.reason, receipt.next.label]),
+    [
+      ['blocked', reason, '等待执行'],
+      ['paused', reason, '等待恢复指令'],
+    ],
+  );
+  assert.equal(createProgressOutbox(path.join(root, 'task-progress', 'other-task')).read().pending.length, 0);
+});
+
+test('the execution-order block records only the exact active preparation it withdraws', (t) => {
+  const root = fixture(t);
+  const { before, reason } = blockedPreparationFixture();
+  const [running, unrelated] = before.tickets;
+  const [decision] = before.dynamicDecisions;
+  const [authority] = before.dynamicAuthorities;
+  const [scope] = before.scopedAdmissions;
+  const digest = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
+  const native = (request, messageId) => ({ roomId: 'fixture-room', messageId, ...request });
+  before.version = 1;
+  before.limit = 3;
+  before.events[0].request = native(before.events[0].request, 'old-pause');
+  running.request = native(running.request, 'original-receipt');
+  decision.ticketBefore = { ...decision.ticketBefore, request: running.request, admission: null };
+  unrelated.request = native({ sequence: 7, authorId: 'same-user' }, 'other-receipt');
+  unrelated.order = 7;
+  unrelated.admission = null;
+  authority.id = '11111111-1111-4111-8111-111111111111';
+  authority.request = native(authority.request, 'user-delegation');
+  authority.source = { request: authority.request, tasks: [{ task: running.task }] };
+  authority.digest = digest(authority.source);
+  decision.id = '22222222-2222-4222-8222-222222222222';
+  decision.input = { ...decision.input, decisionId: decision.id, authorityId: authority.id };
+  decision.inputDigest = digest(decision.input);
+  running.dynamicDecisionId = decision.id;
+  Object.assign(scope, { decisionId: decision.id, request: authority.request });
+  Object.assign(before.events[1], { decisionId: decision.id, request: authority.request });
+  const directory = path.join(root, 'task-registry', 'execution-order');
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(path.join(directory, 'state.json'), JSON.stringify(before));
+  const queue = createExecutionOrder(root);
+  const blocked = queue.block({ lane: running.lane, task: running.task, owner: running.owner, reason });
+  assert.equal(blocked.status, 'blocked');
+  assert.deepEqual(queue.read().events.at(-1), {
+    action: 'block',
+    lane: running.lane,
+    task: running.task,
+    reason,
+    decisionId: decision.id,
+  });
+  assert.equal(
+    createProgressOutbox(path.join(root, 'task-progress', running.task)).read().pending[0].receipt.event,
+    'blocked',
+  );
+});
+
+for (const [name, alter] of Object.entries({
+  'missing released decision': (after) => delete after.events.at(-1).decisionId,
+  'foreign applied admission': (after) => {
+    after.events.at(-2).admission = 'foreign-admission';
+  },
+  'different blocked reason': (after) => {
+    after.events.at(-1).reason = 'unrelated block';
+  },
+  'mismatched ticket provenance': (after) => {
+    after.dynamicDecisions[0].ticketBefore.order++;
+  },
+  'mismatched delegation': (after) => {
+    after.dynamicAuthorities[0].request = { ...after.dynamicAuthorities[0].request, roomId: 'other' };
+  },
+})) {
+  test('preparation block preserves ordinary pause for ' + name, (t) => {
+    const root = fixture(t);
+    const { before, after } = blockedPreparationFixture();
+    alter(after);
+    captureQueueProgress(root, after, before);
+    assert.deepEqual(
+      createProgressOutbox(path.join(root, 'task-progress', 'fixture-task'))
+        .read()
+        .pending.map(({ receipt }) => receipt.event),
+      ['paused'],
+    );
+  });
+}
