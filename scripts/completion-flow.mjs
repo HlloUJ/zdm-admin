@@ -11,6 +11,7 @@ import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
 import { applyTaskComposition } from './task-composition.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
+import { hasOriginalMergedReadiness } from './delivery-repairs/completion-legacy-readiness.mjs';
 import { withCandidateRuntime } from './task-candidate-runtime.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
 import {
@@ -291,7 +292,22 @@ export async function runCompletionFlow(
         );
         assert.ok(
           prior &&
-            state.events.some((e) => e.name === 'prepare' && e.key === head + ':readiness' && e.status === 'success'),
+            hasOriginalMergedReadiness({
+              batch,
+              head,
+              pr: merged[0],
+              readRegistration: () => ({
+                repository,
+                origin: git(batch.worktree, 'remote', 'get-url', 'origin'),
+                anchorCommon: git(anchor, 'rev-parse', '--path-format=absolute', '--git-common-dir'),
+                worktreeCommon: git(batch.worktree, 'rev-parse', '--path-format=absolute', '--git-common-dir'),
+                registration: tasks.readTask(batch.id),
+              }),
+              events: state.events,
+              common,
+              readCandidateCommand: () =>
+                JSON.parse(git(batch.worktree, 'show', head + ':package.json')).scripts['verify:delivery'],
+            }),
           'Merged recovery requires its original exact readiness and PR evidence',
         );
         assertCompletionQuality(prior.result, head, prior.result.runId);

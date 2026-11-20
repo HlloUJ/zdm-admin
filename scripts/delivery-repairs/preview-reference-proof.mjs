@@ -1,16 +1,25 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomUUID } from 'node:crypto';
-import { existsSync, mkdirSync, writeFileSync, lstatSync, realpathSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync, lstatSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { createTaskRegistry } from '../task-registry.mjs';
+import { taskProjectName } from '../dev-task.mjs';
 import { assertTaskExecutor, taskExecutor } from '../task-execution-binding.mjs';
 import { createExecutionOrder } from '../task-execution-order.mjs';
 import { collectRetainedDockerDirectories } from './preview-docker-directories.mjs';
 import { readAcceptance } from '../accepted-source.mjs';
+import {
+  assertMaintenanceNeighbor,
+  readMaintenanceBackend,
+  readValidationMaintenance,
+  recoveryReceiptFile,
+} from './validation-maintenance-lineage.mjs';
+import { privateJson } from './validation-recovery-evidence.mjs';
+import { captureReassignedClosedPeer } from './validation-closed-peer.mjs';
 import { parseWorktreePorcelain } from '../git-workflow-core.mjs';
 import {
   assertStoppedPreviewIdentity,
@@ -120,17 +129,23 @@ export function referenceConsumerAnchor(root, common) {
 
 function consumerScope(root, id = null, effect = 'final') {
   assert.ok(['preparation', 'final'].includes(effect), 'Exact delivery effect required');
+  return frozenConsumerScope(root, id, (registry, task) => {
+    const admission = createExecutionOrder(registry.commonDir).assertAdmission({
+      lane: 'delivery',
+      task: task.id,
+      owner: task.owner,
+      admission: process.env.ZDM_EXECUTION_ADMISSION,
+      effect,
+    });
+    assert.equal(admission.active, true, 'Read-only reference selection requires an active delivery scope');
+  });
+}
+
+function frozenConsumerScope(root, id, authorize) {
   const registry = createTaskRegistry(root);
   const task = id ? registry.readTask(id) : registry.resolve({ worktree: root });
   assertTaskExecutor(task, process.env.CODEX_THREAD_ID);
-  const admission = createExecutionOrder(registry.commonDir).assertAdmission({
-    lane: 'delivery',
-    task: task.id,
-    owner: task.owner,
-    admission: process.env.ZDM_EXECUTION_ADMISSION,
-    effect,
-  });
-  assert.equal(admission.active, true, 'Read-only reference selection requires an active delivery scope');
+  authorize?.(registry, task);
   assert.ok(task.frozen?.accepted, 'Reference proof requires an existing formal business freeze');
   const accepted = readAcceptance(root, task.id);
   assert.equal(task.frozen.accepted, accepted?.commit, 'Original acceptance ref required');
@@ -191,7 +206,7 @@ function leaseRecord(common, port) {
   };
 }
 
-async function captureIdentity(scope, selector, core, record) {
+async function captureIdentity(scope, selector, core, record, maintenance) {
   const { registry, task: consumer, anchor } = scope;
   const task = registry.readTask(selector.foreignTask);
   assert.notEqual(task.id, consumer.id, 'Stopped-foreign proof cannot replace own shutdown protocol');
@@ -267,10 +282,11 @@ async function captureIdentity(scope, selector, core, record) {
     recordedSourceIdentity: previous.sourceIdentity,
     observedSourceIdentity: runtime.taskBackendSourceIdentity({ root: task.worktree, migrationDirectory }),
   });
-  assert.ok(
-    containerIdentity && previous.version === 1 && previous.containerIdentity === containerIdentity,
-    'Retained backend identity mismatch',
-  );
+  assert.ok(containerIdentity && previous.version === 1, 'Retained backend identity mismatch');
+  if (maintenance) {
+    assert.equal(maintenance.backend.containerIdentity, containerIdentity);
+    assert.equal(maintenance.backend.recordDigest, referenceHash(backendRecord.bytes));
+  } else assert.equal(previous.containerIdentity, containerIdentity, 'Retained backend identity mismatch');
   assert.equal(
     previous.sourceIdentity,
     runtime.taskBackendSourceIdentity({ root: task.worktree, migrationDirectory }),
@@ -348,7 +364,7 @@ async function captureIdentity(scope, selector, core, record) {
   return identity;
 }
 
-async function observe(identity, scope, core, record, ownClosures) {
+async function observe(identity, scope, core, record, ownClosures, reassignedPeer) {
   const observedAt = Date.now();
   // Mandatory original published implementation, with no exec/env test adapter.
   const inventory = core['scripts/task-cancellation-proof.mjs'].observeCancellationHost();
@@ -369,7 +385,38 @@ async function observe(identity, scope, core, record, ownClosures) {
     leases,
     'Preview leases changed during observation',
   );
-  const backendConsumers = referenceBackendConsumers(responses, leases, identity, scope.task.id, ownClosures);
+  const ordinaryResponses = reassignedPeer ? responses.filter((r) => r.port !== reassignedPeer.port) : responses;
+  const backendConsumers = referenceBackendConsumers(ordinaryResponses, leases, identity, scope.task.id, ownClosures);
+  let reassignedClosed;
+  if (reassignedPeer) {
+    const { port, ...lease } = leases.find((item) => item.port === reassignedPeer.port) ?? {};
+    assert.equal(port, reassignedPeer.port);
+    assert.deepEqual(lease, reassignedPeer.lease);
+    const { response } = responses.find((r) => r.port === port);
+    const health = await readReferenceBackendHealth(`http://127.0.0.1:${reassignedPeer.backendPort}/actuator/health`);
+    const status = health.statusCode === 200 ? JSON.parse(health.body).status : null;
+    const retained = collectRetainedDockerDirectories(reassignedPeer, inventory, record);
+    const reassignedRound = {
+      ...inventory,
+      host: os.hostname(),
+      observedAt,
+      observerPid: process.pid,
+      wrapperAncestors: [],
+      retainedDirectoryReferences: retained,
+      frontend: { statusCode: response.statusCode, errorCode: response.errorCode },
+      backendHealth: { statusCode: health.statusCode, status },
+      backendConsumers: referenceBackendConsumers(
+        ordinaryResponses.filter((r) => r.port !== identity.port),
+        leases,
+        reassignedPeer,
+        scope.task.id,
+        ownClosures,
+      ),
+    };
+    assertStoppedPreviewRound(reassignedRound, reassignedPeer, Date.now());
+    record('reassigned-preview-round', reassignedRound);
+    reassignedClosed = { port, lease, retained };
+  }
   const response = responses.find((r) => r.port === identity.port).response;
   const health = await readReferenceBackendHealth(`http://127.0.0.1:${identity.backendPort}/actuator/health`);
   let status;
@@ -390,10 +437,11 @@ async function observe(identity, scope, core, record, ownClosures) {
     backendConsumers,
     previewLeases: leases,
     frontendObservations: responses,
+    ...(reassignedClosed ? { reassignedClosed } : {}),
   };
 }
 
-async function liveProof(scope, selector, expected = null, ownClosures = []) {
+async function liveProof(scope, selector, expected = null, ownClosures = [], maintenance = null) {
   const parent = path.join(scope.registry.commonDir, 'task-delivery', scope.task.id, 'reference-proofs');
   mkdirSync(parent, { recursive: true, mode: 0o700 });
   const evidenceDirectory = path.join(parent, 'observation-' + randomUUID());
@@ -401,18 +449,35 @@ async function liveProof(scope, selector, expected = null, ownClosures = []) {
   record('started', { selector, consumerTask: scope.task.id, observerPid: process.pid, ownClosures });
   try {
     const core = await publishedCore(scope, selector.publishedBaseline);
-    const identity = await captureIdentity(scope, selector, core, record);
-    if (expected) assert.deepEqual(identity, expected, 'Original lease/registry/source/history/data binding changed');
-    const first = await observe(identity, scope, core, record, ownClosures);
+    const identity = await captureIdentity(scope, selector, core, record, maintenance);
+    if (maintenance?.historicalExpected) assertMaintenanceNeighbor(expected, identity, maintenance);
+    else if (expected)
+      assert.deepEqual(identity, expected, 'Original lease/registry/source/history/data binding changed');
+    const captureReassigned = async () => {
+      if (!maintenance?.reassigned) return null;
+      const peer = maintenance.reassigned;
+      const preview = core['scripts/preview-consumers.mjs'];
+      if (!preview.temporaryPreviewLeases(scope.registry.commonDir).some((lease) => lease.port === peer.port))
+        return null;
+      const response = await preview.readPreviewResponse(`http://127.0.0.1:${peer.port}/__zdm_task_preview__`);
+      if (response.statusCode !== 0 || response.errorCode !== 'ECONNREFUSED') return null;
+      return captureReassignedClosedPeer(scope, peer, docker);
+    };
+    const reassigned = await captureReassigned();
+    if (reassigned) record('reassigned-preview-identity', reassigned);
+    const first = await observe(identity, scope, core, record, ownClosures, reassigned);
     record('round', first);
     assertStoppedPreviewRound(first, identity, Date.now());
-    const afterFirst = await captureIdentity(scope, selector, core, record);
+    const afterFirst = await captureIdentity(scope, selector, core, record, maintenance);
     assert.deepEqual(afterFirst, identity, 'Identity changed after first full observation');
-    const second = await observe(identity, scope, core, record, ownClosures);
+    assert.deepEqual(await captureReassigned(), reassigned, 'Reassigned preview identity changed');
+    const second = await observe(identity, scope, core, record, ownClosures, reassigned);
     record('round', second);
     assertStoppedPreviewRound(second, identity, Date.now());
-    const afterSecond = await captureIdentity(scope, selector, core, record);
+    const afterSecond = await captureIdentity(scope, selector, core, record, maintenance);
     assertStoppedPreviewPair({ identity, afterFirst, afterSecond, first, second }, Date.now());
+    assert.deepEqual(await captureReassigned(), reassigned, 'Reassigned preview identity changed');
+    assert.deepEqual(first.reassignedClosed, second.reassignedClosed, 'Reassigned preview observation changed');
     record('accepted', { finishedAt: Date.now() });
     return { identity, rounds: [first, second], finishedAt: Date.now(), evidenceDirectory };
   } catch (error) {
@@ -420,6 +485,49 @@ async function liveProof(scope, selector, expected = null, ownClosures = []) {
     error.message += '\nRead-only observation evidence: ' + evidenceDirectory;
     throw error;
   }
+}
+
+// Scope is always created by the ordinary active delivery admission checks.
+function stoppedValidationContinuation(scope, foreignTask) {
+  const { task, registry, accepted, anchor } = scope;
+  const receiptFile = recoveryReceiptFile(registry.commonDir, task);
+  if (!existsSync(receiptFile)) return null;
+  const { value: receipt } = privateJson(receiptFile);
+  const e = receipt.evidence;
+  assert.equal(e.task, task.id);
+  assert.equal(e.accepted, accepted.commit);
+  if (e.foreign.task !== foreignTask) return null;
+  assert.equal(e.worker, taskExecutor(task));
+  assert.match(e.head, /^[a-f0-9]{40}$/);
+  git(anchor, 'merge-base', '--is-ancestor', e.head, task.recordedHead);
+  assert.equal(path.dirname(e.archive), path.dirname(path.dirname(receiptFile)));
+  assert.equal(privateJson(path.join(e.archive, 'manifest.json')).hash, e.manifestHash);
+  const maintenance = readValidationMaintenance(registry.commonDir, task, e);
+  assert.equal(receipt.maintenance, maintenance.selectorDigest);
+  assert.equal(receipt.startedAt, maintenance.own.live.startedAt);
+  assert.equal(receipt.containerRetained, true);
+  assert.ok(Date.parse(receipt.stoppedAt) >= Date.parse(receipt.startedAt));
+  const observation = path.join(path.dirname(receiptFile), 'observation');
+  assert.equal(path.dirname(receipt.intent), observation);
+  const intent = privateJson(receipt.intent).value;
+  assert.equal(intent.kind, 'stop-intent');
+  for (const key of ['evidence', 'maintenance', 'startedAt', 'containerIdentity', 'assets'])
+    assert.deepEqual(intent.value[key], receipt[key]);
+  const events = readdirSync(observation).filter((file) => /^\d+-stopped\.json$/.test(file));
+  assert.equal(events.length, 1, 'Exact stopped validation receipt required');
+  const stopped = privateJson(path.join(observation, events[0])).value;
+  assert.equal(stopped.kind, 'stopped');
+  assert.deepEqual(stopped.value, receipt);
+
+  const neighbor = registry.readTask(foreignTask);
+  const containers = JSON.parse(docker('inspect', e.foreign.containerId));
+  assert.equal(containers.length, 1);
+  const backend = readMaintenanceBackend(containers[0], maintenance.foreign, {
+    root: neighbor.worktree,
+    project: taskProjectName({ root: neighbor.worktree, branch: neighbor.branch }),
+    port: e.foreign.backendPort,
+  });
+  return { proof: maintenance.foreign, backend, reassigned: maintenance.reassigned };
 }
 
 export async function collectPreviewReferenceProof(root, foreignTask, historyFile, options = {}) {
@@ -447,7 +555,9 @@ export async function collectPreviewReferenceProof(root, foreignTask, historyFil
   };
   const trusted = await publishedCore(scope, selector.publishedBaseline);
   trusted['scripts/accepted-source.mjs'].assertAcceptedSource(scope.task.worktree, scope.task.id, candidate);
-  const live = await liveProof(scope, selector);
+  const maintenance = stoppedValidationContinuation(scope, foreignTask);
+  const live = await liveProof(scope, selector, null, [], maintenance);
+  assert.deepEqual(stoppedValidationContinuation(scope, foreignTask), maintenance);
   const current = consumerScope(root, scope.task.id, effect);
   assert.deepEqual(current.task, scope.task, 'Consumer registration changed during real observation');
   assert.deepEqual(current.accepted, scope.accepted, 'Frozen source changed during real observation');
@@ -502,7 +612,7 @@ export async function collectPreviewReferenceProof(root, foreignTask, historyFil
   };
 }
 
-function loadSelection(root, file, { task, effect }) {
+function loadSelection(root, file, { task, effect }, resolveScope = consumerScope) {
   const { bytes, stat } = regularReferenceFile(file);
   assert.equal(stat.mode & 0o077, 0, 'Proof must be private');
   const packet = JSON.parse(bytes);
@@ -548,7 +658,7 @@ function loadSelection(root, file, { task, effect }) {
     assertStoppedPreviewRound(round, packet.identity, packet.finishedAt);
   }
   assert.equal(packet.consumer.task, task, 'Reference proof belongs to a different task');
-  const scope = consumerScope(root, task, effect);
+  const scope = resolveScope(root, task, effect);
   assertReferenceCollectorPublication(scope.anchor, packet.consumer, packet.collector);
   assert.equal(packet.consumer.executor, taskExecutor(scope.task));
   assert.equal(packet.consumer.common, scope.registry.commonDir);
@@ -575,6 +685,28 @@ function loadSelection(root, file, { task, effect }) {
   );
   const collector = currentCollector(scope, packet.consumer.candidate);
   return { scope, packet, collector, digest: referenceHash(bytes), file: path.resolve(file) };
+}
+
+// Evidence only. The recovery command supplies the exact preserved packet;
+// a caller never receives an activation selector or a general delivery effect.
+export async function observeInterruptedValidationReferences(root, task, file, digest, maintenance) {
+  const scope = frozenConsumerScope(root, task);
+  assert.equal(root, scope.task.worktree);
+  const resolveScope = (worktree, id) => frozenConsumerScope(worktree, id);
+  const loaded = loadSelection(root, file, { task }, resolveScope);
+  assert.equal(loaded.collector.kind, 'published-main');
+  assert.equal(loaded.digest, digest);
+  assert.equal(loaded.packet.consumer.candidate, scope.task.recordedHead);
+  assert.ok(maintenance);
+  const live = await liveProof(loaded.scope, loaded.packet.selector, loaded.packet.identity, [], {
+    ...maintenance,
+    historicalExpected: true,
+  });
+  const after = loadSelection(root, file, { task }, resolveScope);
+  assert.equal(after.digest, loaded.digest);
+  assert.deepEqual(after.collector, loaded.collector);
+  assert.deepEqual(after.scope.task, loaded.scope.task);
+  return live;
 }
 
 // Composition may change a candidate, never the meaning of its old packet.
@@ -633,10 +765,15 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease, ef
   // repositories. Returning null preserves their original unknown rejection.
   if (
     path.resolve(worktree) !== selection.consumerWorktree ||
-    (taskId !== undefined && taskId !== selection.consumerTask) ||
-    lease.task !== selection.foreignTask
+    (taskId !== undefined && taskId !== selection.consumerTask)
   )
     return null;
+  const secondary = lease.task !== selection.foreignTask;
+  if (secondary) {
+    const registry = createTaskRegistry(worktree);
+    const task = registry.readTask(selection.consumerTask);
+    if (!task || !existsSync(recoveryReceiptFile(registry.commonDir, task))) return null;
+  }
   const context = { task: selection.consumerTask, effect };
   const loaded = loadSelection(worktree, selection.file, context);
   assert.equal(loaded.digest, selection.digest, 'Reference selector changed');
@@ -644,11 +781,23 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease, ef
   assert.equal(loaded.packet.consumer.candidate, selection.consumerCandidate);
   assert.equal(path.resolve(worktree), loaded.scope.task.worktree, 'Foreign proof consumer');
   if (taskId !== undefined) assert.equal(taskId, loaded.scope.task.id);
-  assert.equal(lease.task, loaded.packet.selector.foreignTask, 'Unreviewed stopped lease');
+  assert.equal(selection.foreignTask, loaded.packet.selector.foreignTask);
+  const maintenance = stoppedValidationContinuation(loaded.scope, selection.foreignTask);
   const { port, ...original } = lease;
-  assert.equal(port, loaded.packet.identity.port);
-  assert.deepEqual(original, loaded.packet.identity.lease);
-  const live = await liveProof(loaded.scope, loaded.packet.selector, loaded.packet.identity, ownClosures);
+  if (secondary) {
+    if (lease.task !== maintenance?.reassigned?.task || port !== maintenance.reassigned.port) return null;
+  } else {
+    assert.equal(port, loaded.packet.identity.port);
+    assert.deepEqual(original, loaded.packet.identity.lease);
+  }
+  const live = await liveProof(loaded.scope, loaded.packet.selector, loaded.packet.identity, ownClosures, maintenance);
+  if (secondary) {
+    for (const round of live.rounds) {
+      assert.equal(round.reassignedClosed?.port, port);
+      assert.deepEqual(round.reassignedClosed.lease, original);
+    }
+  }
+  assert.deepEqual(stoppedValidationContinuation(loaded.scope, selection.foreignTask), maintenance);
   const after = loadSelection(worktree, selection.file, context);
   assert.equal(after.digest, loaded.digest, 'Selection changed during live proof');
   assert.deepEqual(after.collector, loaded.collector, 'Actual collector changed during live proof');
@@ -670,7 +819,7 @@ export async function verifyClosedPreviewReference({ worktree, taskId, lease, ef
   );
   return {
     kind: contract,
-    task: live.identity.task,
+    task: lease.task,
     port,
     leaseDigest: hash(original),
     observationDigests: live.rounds.map(hash),

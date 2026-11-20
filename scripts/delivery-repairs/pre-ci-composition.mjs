@@ -25,8 +25,8 @@ const gitArgs = (root, args) => ['--no-replace-objects', '-C', root, ...args];
 const options = { encoding: 'utf8', stdio: 'pipe', timeout: 30_000, maxBuffer: 32 * 1024 * 1024 };
 const git = (root, args, overrides) => execFileSync('git', gitArgs(root, args), { ...options, ...overrides });
 
-function manifestInputTree(root, tree) {
-  const records = git(root, ['ls-tree', '-r', '-z', tree, '--', 'scripts', ...ENGINEERING_EXTRA_INPUTS])
+function manifestInputTree(root, tree, extraInputs = ENGINEERING_EXTRA_INPUTS) {
+  const records = git(root, ['ls-tree', '-r', '-z', tree, '--', 'scripts', ...extraInputs])
     .split('\0')
     .filter(Boolean);
   const entries = new Map(
@@ -41,7 +41,7 @@ function manifestInputTree(root, tree) {
   );
   assert.equal(entries.get(manifest)?.mode, '100644', 'Engineering manifest must be an existing regular file');
   assert.ok(
-    ENGINEERING_EXTRA_INPUTS.every((file) => entries.has(file)),
+    extraInputs.every((file) => entries.has(file)),
     'Missing engineering input in Git tree',
   );
 
@@ -189,6 +189,52 @@ export function persistPreCiReview(root, proof, review) {
     });
 }
 
+// Older task parents can predate additions to the shared engineering input
+// list. The candidate's own manifest cannot decide which inputs to omit.
+export function verifyParentEngineeringManifests(root, taskHead, main) {
+  for (const revision of [taskHead, main]) assert.match(revision, sha);
+  const recorded = (revision) => JSON.parse(git(root, ['show', revision + ':' + manifest]));
+  assert.deepEqual(
+    manifestInputTree(root, main),
+    recorded(main),
+    'Parent engineering manifest is not current: ' + main,
+  );
+  const presentIn = (revision) =>
+    new Set(git(root, ['ls-tree', '-r', '--name-only', '-z', revision, '--', ...ENGINEERING_EXTRA_INPUTS]).split('\0'));
+  const oldPaths = presentIn(taskHead);
+  const missing = ENGINEERING_EXTRA_INPUTS.filter((file) => !oldPaths.has(file));
+  let taskInputs = ENGINEERING_EXTRA_INPUTS;
+  if (missing.length) {
+    const base = git(root, ['merge-base', '--all', taskHead, main]).trim();
+    assert.match(base, sha, 'Historical manifest requires one exact merge base');
+    const publishedHistory = git(root, ['rev-list', '--first-parent', main]).trim().split('\n');
+    assert.ok(publishedHistory.includes(base), 'Historical manifest baseline was not published on main');
+    const historical = recorded(base);
+    const historicalInputs = Object.keys(historical.files).filter((file) => !file.startsWith('scripts/'));
+    assert.deepEqual(
+      [...historicalInputs].sort(),
+      ENGINEERING_EXTRA_INPUTS.filter((file) => oldPaths.has(file)).sort(),
+      'Old task may omit only inputs added after its published main baseline',
+    );
+    const historicalPaths = presentIn(base);
+    assert.ok(
+      missing.every((file) => !historicalPaths.has(file)),
+      'An old task removed a published engineering input',
+    );
+    assert.deepEqual(
+      manifestInputTree(root, base, historicalInputs),
+      historical,
+      'Historical published input manifest is not current',
+    );
+    taskInputs = historicalInputs;
+  }
+  assert.deepEqual(
+    manifestInputTree(root, taskHead, taskInputs),
+    recorded(taskHead),
+    'Parent engineering manifest is not current: ' + taskHead,
+  );
+}
+
 // The exact merge tree supplies every cleanly merged path. The only generated
 // resolution is the manifest. An explicit review must account for all others.
 export function preCiCompositionTree(root, inputs, review) {
@@ -221,14 +267,7 @@ export function preCiCompositionTree(root, inputs, review) {
   assert.equal(Boolean(conflicts.length), review !== undefined, 'No non-manifest conflict requires review');
   const resolutions = review === undefined ? [] : reviewedFiles(root, inputs, review, conflicts);
 
-  for (const parent of [taskHead, main]) {
-    const recorded = JSON.parse(git(root, ['show', parent + ':' + manifest]));
-    assert.deepEqual(
-      manifestInputTree(root, parent),
-      recorded,
-      'Parent engineering manifest is not current: ' + parent,
-    );
-  }
+  verifyParentEngineeringManifests(root, taskHead, main);
   const scratch = mkdtempSync(path.join(tmpdir(), 'zdm-pre-ci-index-'));
   const env = { ...process.env, GIT_INDEX_FILE: path.join(scratch, 'index') };
   try {

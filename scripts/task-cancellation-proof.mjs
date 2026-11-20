@@ -5,6 +5,7 @@ import { existsSync, lstatSync, readFileSync, readdirSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { taskProjectName } from './dev-task.mjs';
+import { collectStoppedValidationDockerDirectories } from './delivery-repairs/preview-docker-directories.mjs';
 
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function safe(file) {
@@ -203,6 +204,52 @@ function otherWorktreeTestProcess(process, snapshot, task) {
   return false;
 }
 export function assertHostIdle(snapshot, task) {
+  assertIdleInventory(snapshot, task, new Set());
+}
+
+export function validationDockerDirectoryKeys(proof, worktree) {
+  if (!proof) return new Set();
+  assert.equal(proof.cleanupAuthorized, false);
+  const keys = new Set();
+  for (const service of proof.services) {
+    assert.equal(service.image.signatureVerified, true);
+    for (const fd of service.fds) {
+      assert.ok(fd.directory && [1, 0x8001].includes(fd.openFlags) && fd.guardFlags === 0, 'Unproved directory access');
+      assert.ok(fd.path === worktree || fd.path.startsWith(worktree + path.sep));
+      const key = JSON.stringify([service.pid, String(fd.fd), fd.path, 'DIR']);
+      assert.ok(!keys.has(key), 'Duplicate directory evidence');
+      keys.add(key);
+    }
+  }
+  return keys;
+}
+
+// Production always collects native evidence itself. The ordinary idle checker
+// and cancellation path never consume a directory exemption.
+export function assertStoppedValidationHostIdle(snapshot, task, backend, record) {
+  assertNoActiveValidationMount(snapshot, task.worktree);
+  const identity = { worktree: task.worktree, dockerEndpoint: snapshot.dockerEndpoint, backend };
+  const proof = collectStoppedValidationDockerDirectories(identity, snapshot, record);
+  assertIdleInventory(snapshot, task, validationDockerDirectoryKeys(proof, task.worktree));
+  return proof;
+}
+
+export function assertNoActiveValidationMount(snapshot, worktree) {
+  for (const container of snapshot.containers) {
+    assert.ok(Array.isArray(container.mounts), 'Active container mount inventory is incomplete');
+    for (const mount of container.mounts) {
+      if (mount.Type !== 'bind') continue;
+      assert.ok(path.isAbsolute(mount.Source), 'Unknown active bind mount');
+      const source = mount.Source.replace(/^\/host_mnt\//, '/');
+      assert.ok(
+        !under(source, worktree) && !under(worktree, source),
+        'Active container bind overlaps validation worktree',
+      );
+    }
+  }
+}
+
+function assertIdleInventory(snapshot, task, verifiedDirectories) {
   assert.ok(
     Array.isArray(snapshot.processes) &&
       snapshot.processes.length &&
@@ -231,7 +278,10 @@ export function assertHostIdle(snapshot, task) {
   }
   // Even the caller must be outside the target worktree. Includes cwd, executable,
   // open logs and deleted-but-open paths rather than only a process-name grep.
-  for (const f of snapshot.files) assert.ok(!under(f.name, task.worktree), 'Task files/cwd remain open');
+  for (const f of snapshot.files) {
+    const key = JSON.stringify([f.pid, f.descriptor, f.name, f.type]);
+    assert.ok(!under(f.name, task.worktree) || verifiedDirectories.has(key), 'Task files/cwd remain open');
+  }
   const project = taskProjectName({ root: task.worktree, branch: task.branch });
   for (const c of snapshot.containers) {
     assert.ok(c && c.labels && Array.isArray(c.mounts), 'Unknown container ownership');
