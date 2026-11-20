@@ -212,7 +212,7 @@ function safe(file) {
     if (cursor === path.dirname(cursor)) break;
   }
 }
-function resources(task) {
+export function readResumeResources(task) {
   const common = task.repository.commonDir,
     result = [];
   const add = (file) => {
@@ -511,7 +511,7 @@ export async function rebindHistoricalTask(
             'Project recovery review changed; re-read plan without rebasing',
           );
       }
-      const before = resources(record),
+      const before = readResumeResources(record),
         first = observe();
       assertHostIdle(first, record);
       const assertHistoricalWriterAbsent = (snapshot) => {
@@ -528,7 +528,7 @@ export async function rebindHistoricalTask(
       const second = observe();
       assertHostIdle(second, record);
       assertHistoricalWriterAbsent(second);
-      assert.deepEqual(resources(record), before, 'Resource evidence changed during observation');
+      assert.deepEqual(readResumeResources(record), before, 'Resource evidence changed during observation');
       if (project)
         assert.deepEqual(
           projectSource(record, state, input),
@@ -577,11 +577,17 @@ export function assertBoundResumeReady(
   task,
   state,
   input,
-  { registry, observe = observeCancellationHost, acceptFrozenCheckpoint, acceptRegisteredCheckpoint } = {},
+  {
+    registry,
+    observe = observeCancellationHost,
+    verifyDispatchHost,
+    acceptFrozenCheckpoint,
+    acceptRegisteredCheckpoint,
+  } = {},
 ) {
   const binding = executionBinding(task);
   assert.ok(binding, 'Historical execution binding required');
-  const before = resources(task);
+  const before = readResumeResources(task);
   const source = binding.sourceContentDigest ? projectSource(task, state, input) : null;
   const sourceDigest = (value) => digest({ head: value.head, index: value.index, entries: value.entries });
   const currentDigest = source ? sourceDigest(source) : null;
@@ -591,15 +597,17 @@ export function assertBoundResumeReady(
     assert.equal(verify(source), true, 'Registered checkpoint source is not verified');
   }
   const recovery = preparationValidationIdle(task, registry.commonDir, input.phase);
-  let observationsDigest;
-  if (!recovery) {
+  let hostProof;
+  if (recovery) hostProof = { validationRecovery: recovery };
+  else if (verifyDispatchHost) hostProof = verifyDispatchHost();
+  else {
     const first = observe();
     assertHostIdle(first, task);
     const second = observe();
     assertHostIdle(second, task);
-    observationsDigest = digest({ first, second });
+    hostProof = { observationsDigest: digest({ first, second }) };
   }
-  assert.deepEqual(resources(task), before, 'Resources changed before admission');
+  assert.deepEqual(readResumeResources(task), before, 'Resources changed before admission');
   if (source)
     assert.equal(
       sourceDigest(projectSource(task, state, input)),
@@ -610,7 +618,7 @@ export function assertBoundResumeReady(
   return {
     sourceDigest: currentDigest,
     resourcesDigest: digest(before),
-    ...(recovery ? { validationRecovery: recovery } : { observationsDigest }),
+    ...hostProof,
   };
 }
 export async function resumeBoundTask(
@@ -675,9 +683,13 @@ export async function resumeBoundTask(
     'Only a fenced historical task may resume; never replay a running task',
   );
   assert.equal(ticket.owner, task.owner);
-  if (task.dependsOn?.length) {
+  if (task.dependsOn?.length || task.actionDependencies?.length) {
     assert.equal(typeof host.dependenciesReady, 'function', 'Formal delivered dependency proof required');
-    assert.equal(host.dependenciesReady(task), true, 'Waiting for formally delivered task dependencies');
+    assert.equal(
+      host.dependenciesReady(task, input.lane === 'development' ? 'development' : 'final'),
+      true,
+      'Waiting for formally delivered task dependencies',
+    );
   }
   const assertResumeReady = () => assertBoundResumeReady(task, state, input, { registry, observe });
   if (input.lane === 'development') {
@@ -707,7 +719,11 @@ export async function resumeBoundTask(
   } else {
     assert.equal(input.lane, 'delivery');
     assert.equal(typeof host.dependenciesReady, 'function', 'Formal delivered dependency proof required');
-    assert.equal(host.dependenciesReady(task), true, 'Waiting for formally delivered task dependencies');
+    assert.equal(
+      host.dependenciesReady(task, input.lane === 'development' ? 'development' : 'final'),
+      true,
+      'Waiting for formally delivered task dependencies',
+    );
     assertResumeReady();
     queue.direct({
       action: 'resume-only',

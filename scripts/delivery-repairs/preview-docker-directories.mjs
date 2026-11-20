@@ -44,9 +44,32 @@ function collectDockerDirectories(identity, inventory, record, stoppedValidation
     (f) => f.name === identity.worktree || f.name.startsWith(identity.worktree + path.sep),
   );
   if (!matching.length) return null;
+  const sourceMounts = identity.backend.inventory.mounts.filter(
+    (m) => m.Type === 'bind' && observedHostMountPath(m.Source, 'darwin') === identity.worktree,
+  );
+  assert.equal(sourceMounts.length, 1, 'One exact retained backend source mount required');
+  assert.equal(sourceMounts[0].Destination, '/workspace');
+  const proof = inspectSignedDockerDirectories(identity, inventory, matching, record);
+  if (!stoppedValidation)
+    assert.ok(
+      proof.services.find((service) => service.pid === proof.endpoint.ownerPid).fds.length,
+      'Endpoint owner has no retained source directory',
+    );
+  const retained = {
+    ...proof,
+    kind: 'retained-docker-source-directories-v1',
+    backend: identity.backend.id,
+    sourceMount: sourceMounts[0],
+    cleanupAuthorized: false,
+  };
+  record('retained-directory-bindings', retained);
+  return retained;
+}
+
+export function inspectSignedDockerDirectories(identity, inventory, matching, record) {
   assert.equal(process.platform, 'darwin', 'Retained Docker directory proof requires native macOS identities');
   assert.ok(
-    matching.every((f) => f.type === 'DIR' && /^\d+$/.test(f.descriptor)),
+    matching.length && matching.every((f) => f.type === 'DIR' && /^\d+$/.test(f.descriptor)),
     'Non-directory task reference',
   );
   const file = record('docker-directory-start', { matching });
@@ -67,6 +90,7 @@ function collectDockerDirectories(identity, inventory, record, stoppedValidation
     assert.equal(r.signal, null);
     return r.stdout;
   };
+  assert.ok(identity.dockerEndpoint.startsWith('unix:///'), 'Local Docker Unix socket required');
   const endpoint = identity.dockerEndpoint.slice('unix://'.length);
   assert.ok(path.isAbsolute(endpoint));
   const endpointReal = realpathSync(endpoint),
@@ -85,23 +109,17 @@ function collectDockerDirectories(identity, inventory, record, stoppedValidation
   writeFileSync(source, nativeDockerVnodeSource, { flag: 'wx', mode: 0o600 });
   const binary = path.join(directory, 'vnode-probe');
   execute('/usr/bin/clang', ['-std=c11', '-Wall', '-Wextra', '-Werror', '-isysroot', sdk, source, '-o', binary]);
-  const details = parseDockerVnodeInventory(
-    execute('/usr/sbin/lsof', ['-nP', '-a', '-p', pids.join(','), '-F0pfaDint']),
+  const details = Map.groupBy(
+    parseDockerVnodeInventory(execute('/usr/sbin/lsof', ['-nP', '-a', '-p', pids.join(','), '-F0pfaDint'])),
+    (entry) => entry.pid + ':' + entry.descriptor,
   );
   const rootStat = lstatSync(identity.worktree, { bigint: true });
   assert.ok(
     rootStat.isDirectory() && !rootStat.isSymbolicLink() && realpathSync(identity.worktree) === identity.worktree,
   );
-  const sourceMounts = identity.backend.inventory.mounts.filter(
-    (m) => m.Type === 'bind' && observedHostMountPath(m.Source, 'darwin') === identity.worktree,
-  );
-  assert.equal(sourceMounts.length, 1, 'One exact retained backend source mount required');
-  assert.equal(sourceMounts[0].Destination, '/workspace');
   const services = [];
   for (const pid of pids) {
     const targets = matching.filter((f) => f.pid === pid).sort((a, b) => Number(a.descriptor) - Number(b.descriptor));
-    // The foreign running-backend contract still requires an endpoint-owned DIR.
-    if (!stoppedValidation) assert.ok(targets.length, 'Endpoint owner has no retained source directory');
     const kernel = JSON.parse(execute(binary, [String(pid), ...targets.map((f) => f.descriptor)]));
     const process = inventory.processes.find((p) => p.pid === pid);
     assert.ok(process && process.ppid === kernel.ppid && kernel.pid === pid && kernel.processStable);
@@ -114,7 +132,7 @@ function collectDockerDirectories(identity, inventory, record, stoppedValidation
     assert.equal(realpathSync(executable), executable);
     const before = lstatSync(executable, { bigint: true });
     assert.ok(before.isFile() && !before.isSymbolicLink() && (before.mode & 0o022n) === 0n);
-    const images = details.filter((f) => f.pid === pid && f.descriptor === 'txt' && f.n === executable);
+    const images = (details.get(pid + ':txt') ?? []).filter((f) => f.n === executable);
     assert.equal(images.length, 1, 'Actual loaded Docker image vnode required');
     assert.equal(BigInt(images[0].D), before.dev);
     assert.equal(BigInt(images[0].i), before.ino);
@@ -143,7 +161,7 @@ function collectDockerDirectories(identity, inventory, record, stoppedValidation
       // Native SDK FREAD, optionally O_EVTONLY. Neither grants write access.
       assert.ok([1, 0x8001].includes(fd.openFlags), 'Directory handle is not exclusively read-only');
       assert.equal(fd.guardFlags, 0);
-      const observed = details.filter((f) => f.pid === pid && f.descriptor === target.descriptor);
+      const observed = details.get(pid + ':' + target.descriptor) ?? [];
       assert.equal(observed.length, 1);
       assert.equal(observed[0].t, 'DIR');
       assert.equal(observed[0].a, 'r');
@@ -199,10 +217,11 @@ function collectDockerDirectories(identity, inventory, record, stoppedValidation
       },
     });
   }
-  const proof = {
-    kind: 'retained-docker-source-directories-v1',
-    backend: identity.backend.id,
-    sourceMount: sourceMounts[0],
+  const currentEndpoint = lstatSync(realpathSync(endpoint), { bigint: true });
+  assert.equal(realpathSync(endpoint), endpointReal, 'Docker endpoint moved during observation');
+  assert.equal(currentEndpoint.dev, endpointStat.dev, 'Docker endpoint device changed');
+  assert.equal(currentEndpoint.ino, endpointStat.ino, 'Docker endpoint inode changed');
+  return {
     sourceDevice: String(rootStat.dev),
     sourceInode: String(rootStat.ino),
     sourceUid: Number(rootStat.uid),
@@ -214,8 +233,5 @@ function collectDockerDirectories(identity, inventory, record, stoppedValidation
       ownerPid: backendPid,
     },
     services,
-    cleanupAuthorized: false,
   };
-  record('retained-directory-bindings', proof);
-  return proof;
 }

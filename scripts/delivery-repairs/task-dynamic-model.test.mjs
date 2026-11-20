@@ -1,3 +1,4 @@
+import { releaseIdleCapacity, validateReleasedCapacity } from '../task-capacity-release.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID, createHash } from 'node:crypto';
@@ -84,17 +85,19 @@ function phaseFixture() {
   };
   return { ...f, phase, phaseProof: proof };
 }
-test('derived delivery enrollment and preparation finish project queued before a later explicit pause', (t) => {
+test('derived delivery enrollment preserves review progress, preparation finish queues, and a later pause wins', (t) => {
   const f = phaseFixture();
   const progress = progressFixture(t, f);
   const beforeEnrollment = structuredClone(f.state);
   const phase = { ...f.phase('a'), expectedQueueRevision: f.state.revision };
   const ticket = enrollDynamicDelivery(f.state, phase, () => f.phaseProof(phase));
   assert.ok(ticket.request.sequence < 10);
+  const enrollment = progress.capture(beforeEnrollment);
   assert.deepEqual(
-    progress.capture(beforeEnrollment).map(({ event }) => event),
+    enrollment.map(({ event }) => event),
     ['queued'],
   );
+  assert.equal(enrollment[0].stage_fact, undefined);
 
   const input = f.input('a');
   reserveDynamicDecision(f.state, input, () => f.proof(input));
@@ -116,6 +119,7 @@ test('derived delivery enrollment and preparation finish project queued before a
     ['queued', 'queued'],
   );
   const receipts = progress.pause();
+  assert.ok(receipts.every(({ stage_fact }) => stage_fact === undefined));
   assert.deepEqual(
     receipts.map(({ event }) => event),
     ['queued', 'queued', 'paused'],
@@ -491,6 +495,27 @@ test('one decision ID cannot be repurposed; a changed pending decision can only 
     false,
   );
 });
+test('worker start needs a fresh observation of the same retained directory identities', () => {
+  const f = fixture();
+  const input = f.input('a');
+  const reserve = f.proof(input);
+  reserve.sourceProof.retainedDirectoryDigest = 'original-fd-digest';
+  reserve.readiness = { retainedDockerDirectories: { file: '/fixture/reserve-proof' } };
+  reserveDynamicDecision(f.state, input, () => reserve);
+  const command = { decisionId: input.decisionId, expectedQueueRevision: 10 };
+  const before = JSON.stringify(f.state);
+  const changed = f.proof(input);
+  changed.sourceProof.retainedDirectoryDigest = 'different-vnode-digest';
+  assert.throws(() => consumeDynamicDecision(f.state, command, () => changed), /changed before start/);
+  assert.equal(JSON.stringify(f.state), before);
+  const fresh = f.proof(input);
+  fresh.sourceProof.retainedDirectoryDigest = reserve.sourceProof.retainedDirectoryDigest;
+  fresh.readiness = { retainedDockerDirectories: { file: '/fixture/consume-proof' } };
+  const started = consumeDynamicDecision(f.state, command, () => fresh);
+  assert.equal(started.startAuthorized, true);
+  assert.deepEqual(started.readiness, reserve.readiness);
+  assert.deepEqual(started.consumedReadiness, fresh.readiness);
+});
 test('later pause revokes delegation, and a changed coordinator fences already consumed scopes', () => {
   const f = fixture(),
     input = f.input('a');
@@ -507,4 +532,55 @@ test('later pause revokes delegation, and a changed coordinator fences already c
     () => assertDynamicAdmission(f.state, scope, 'preparation', f.proof(input).task, f.coordination),
     /revoked/,
   );
+});
+
+test('a parked action keeps its original failure and needs a fresh owned dispatch with unchanged evidence', () => {
+  const f = fixture();
+  const original = f.input('a', 'final');
+  reserveDynamicDecision(f.state, original, () => f.proof(original));
+  consumeDynamicDecision(f.state, { decisionId: original.decisionId, expectedQueueRevision: 10 }, () =>
+    f.proof(original),
+  );
+  const ticket = f.state.tickets[0];
+  ticket.status = 'blocked';
+  ticket.reason = 'Original failure';
+  f.state.scopedAdmissions = [];
+  const head = 'a'.repeat(40);
+  const lane = { task: ticket.task, owner: ticket.owner, lane: ticket.lane, admission: ticket.admission };
+  releaseIdleCapacity(
+    f.state,
+    {
+      ...lane,
+      action: 'final',
+      expectedQueueRevision: 10,
+      recovery: { kind: 'dependency', task: 'upstream', reason: 'Required protected composition source is missing' },
+    },
+    () => ({
+      coordinator: f.coordinator,
+      idle: { ...lane, outcome: 'quiescent', originalHead: head },
+      checkpoint: { head, executor: ticket.owner, bindingRevision: 0 },
+    }),
+  );
+  validateReleasedCapacity(f.state, ticket);
+  const next = f.input('a', 'final');
+  const proof = f.proof(next);
+  proof.task.recordedHead = head;
+  proof.sourceProof.head = head;
+  assert.throws(() => reserveDynamicDecision(f.state, next, () => proof), /dependency has no fresh proof/);
+  proof.dependencies = [{ task: 'upstream', ready: true, evidence: 'delivery', proof: { main: 'b'.repeat(40) } }];
+  reserveDynamicDecision(f.state, next, () => proof);
+  const workerInput = { decisionId: next.decisionId, expectedQueueRevision: 10 };
+  assert.throws(
+    () =>
+      consumeDynamicDecision(f.state, workerInput, () => ({
+        ...proof,
+        dependencies: [{ ...proof.dependencies[0], proof: { main: 'c'.repeat(40) } }],
+      })),
+    /Evidence required by this action changed/,
+  );
+  const acquired = consumeDynamicDecision(f.state, workerInput, () => proof);
+  assert.equal(acquired.startAuthorized, true);
+  assert.equal(acquired.ticketBefore.reason, 'Original failure');
+  assert.notEqual(acquired.admission, lane.admission);
+  assert.equal(consumeDynamicDecision(f.state, workerInput, () => proof).startAuthorized, false);
 });

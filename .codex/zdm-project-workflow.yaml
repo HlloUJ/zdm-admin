@@ -154,15 +154,18 @@ delivery:
     cwd: task_worktree
     run: 'node scripts/delivery-launcher.mjs sync --task "{task_branch}" --reviewed-candidate "{task_head}"'
 
-# Task-level admission is explicit, distinct from the final main mutation queue.
+# Existing ledger and final main resource queue remain authoritative.
 execution_order:
   policy: docs/engineering/task-execution-order.md
   registry: git-common-dir/task-registry/execution-order/state.json
-  lanes:
+  ordering: actual-action-dependencies-and-capacity
+  original_receipt_tiebreak: true
+  final_main_concurrency: 1
+  blocked_slot: retained-until-proven-idle
+  legacy_fifo_compatibility:
     development: 3
     delivery: 3
-  ordering: explicit-user-receipt-fifo
-  blocked_slot: retained
-  activation: explicit-initialize-paused
+  activation: existing-authorized-coordination-only
   automatic_dispatch: false
   command: npm run task:entry -- execution-order
+  continuation: npm run task:entry -- continuation

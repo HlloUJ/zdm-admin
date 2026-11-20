@@ -21,6 +21,7 @@ import { threadTitle } from '../task-thread-titles.mjs';
 import { assertCompletionQuality } from '../completion-ci-evidence.mjs';
 import { assertTaskCommitOwnership } from '../task-commit-ownership.mjs';
 import { verifyDevelopmentCompletion } from '../task-execution-order-cli.mjs';
+import { assertDispatchProofCurrent, verifyDynamicDispatchHost } from './task-dispatch-host-proof.mjs';
 import { interruptedPreparation } from './interrupted-preparation.mjs';
 
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
@@ -155,8 +156,8 @@ function completedDevelopmentSource(task, state, registry) {
     ownership,
   };
 }
-function sourceReady(task, state, registry, observe, request, lane, enrollPhase, phase) {
-  const before = captureSource(task.worktree);
+function sourceReady(task, state, registry, observe, request, lane, dispatch, phase) {
+  const before = readOnlySource(task.worktree);
   assert.equal(git(task.worktree, 'branch', '--show-current'), task.branch);
   const binding = executionBinding(task);
   let readiness,
@@ -171,6 +172,7 @@ function sourceReady(task, state, registry, observe, request, lane, enrollPhase,
       {
         registry,
         observe,
+        ...(dispatch && { verifyDispatchHost: () => verifyDynamicDispatchHost(task, dispatch, observe) }),
         acceptFrozenCheckpoint: () => {
           frozenCheckpoint(task);
           return true;
@@ -178,7 +180,7 @@ function sourceReady(task, state, registry, observe, request, lane, enrollPhase,
         acceptRegisteredCheckpoint: () => {
           if (lane === 'delivery') {
             const ticket = state.tickets.find((item) => item.task === task.id && item.lane === 'delivery');
-            assert.ok(enrollPhase || ticket?.phaseOrigin, 'Unfrozen delivery needs its exact completed phase');
+            assert.ok(ticket?.phaseOrigin, 'Unfrozen delivery needs its exact completed phase');
             completedDevelopmentSource(task, state, registry);
             checkpoint = registeredDevelopmentCheckpoint(task, state, registry, 'development');
           } else checkpoint = registeredDevelopmentCheckpoint(task, state, registry, lane);
@@ -204,14 +206,17 @@ function sourceReady(task, state, registry, observe, request, lane, enrollPhase,
     assert.equal(start.task, task.id);
     assert.equal(start.state, 'registered');
     const validationRecovery = verifyPreparationIdle();
-    if (!validationRecovery) {
+    if (validationRecovery) readiness = { sourceDigest: before.digest, validationRecovery };
+    else if (dispatch)
+      readiness = { sourceDigest: before.digest, ...verifyDynamicDispatchHost(task, dispatch, observe) };
+    else {
       assertHostIdle(observe(), task);
       assertHostIdle(observe(), task);
+      readiness = { sourceDigest: before.digest };
     }
-    readiness = { sourceDigest: before.digest, ...(validationRecovery ? { validationRecovery } : {}) };
   }
   const accepted = task.frozen ? frozenCheckpoint(task) : null;
-  const after = captureSource(task.worktree);
+  const after = readOnlySource(task.worktree);
   assert.equal(after.digest, before.digest, 'Source changed during dispatch observation');
   assert.equal(after.head, before.head);
   assert.deepEqual(registry.readTask(task.id), task, 'Task changed during dispatch observation');
@@ -226,6 +231,9 @@ function sourceReady(task, state, registry, observe, request, lane, enrollPhase,
         : null,
       boundSource: readiness.sourceDigest,
       checkpoint,
+      ...(readiness.retainedDockerDirectories && {
+        retainedDirectoryDigest: readiness.retainedDockerDirectories.digest,
+      }),
       ...(readiness.validationRecovery ? { validationRecovery: readiness.validationRecovery } : {}),
     },
     readiness,
@@ -239,8 +247,7 @@ async function taskProof(
   queue,
   asWorker,
   observe,
-  requireDependencies = true,
-  enrollPhase = false,
+  { requireDependencies = true, enrollPhase = false, dispatchAction = null } = {},
 ) {
   const roleProof = await role(commonDir, input, host, !asWorker);
   const task = registry.resolve({ id: input.task });
@@ -291,23 +298,32 @@ async function taskProof(
   assert.ok(grant, 'Standing delegation must be published first');
   assert.equal(grant.request.authorId, roleProof.coordination.current.request.authorId);
   assert.equal(typeof host.dependenciesReady, 'function');
-  const dependenciesReady = host.dependenciesReady(task);
-  if (requireDependencies) assert.equal(dependenciesReady, true, 'Waiting for formally delivered task dependencies');
-  const dependencies = (task.dependsOn ?? []).map((id) => {
-    const dependency = registry.readTask(id);
-    return {
-      task: id,
-      revision: dependency?.revision ?? null,
-      stage: dependency?.stage ?? null,
-      main: dependency?.main?.local ?? null,
-      closedAt: dependency?.closedAt ?? null,
-    };
-  });
+  // Preparation depends on the exact actions it needs. Final work
+  // checks the prerequisites for its remaining composition as well.
+  const report = host.readActionDependencies?.(task, input.phase);
+  const dependenciesReady = report
+    ? report.ready
+    : requireDependencies
+      ? host.dependenciesReady(task, input.phase)
+      : true;
+  if (requireDependencies)
+    assert.equal(
+      dependenciesReady,
+      true,
+      'Waiting for required action dependencies: ' +
+        (report?.dependencies
+          .filter((entry) => !entry.ready)
+          .map((entry) => entry.task + ': ' + entry.reason)
+          .join(' / ') || input.phase),
+    );
+  const dependencies =
+    report?.dependencies ?? (task.dependsOn ?? []).map((task) => ({ task, ready: dependenciesReady }));
   const phaseTicket = state.tickets.find((item) => item.task === task.id && item.lane === 'delivery');
   const development =
     enrollPhase || (input.lane === 'delivery' && phaseTicket?.phaseOrigin && !task.frozen)
       ? completedDevelopmentSource(task, state, registry)
       : null;
+  const capacity = enrollPhase ? null : await host.readCapacity();
   let source;
   if (enrollPhase) {
     // Enrollment only appends metadata. Runtime quiescence/capacity remain at
@@ -329,8 +345,20 @@ async function taskProof(
       },
       readiness: { workNotStarted: true },
     };
-  } else source = sourceReady(task, state, registry, observe, grant.request, input.lane, false, input.phase);
-  const capacity = enrollPhase ? null : await host.readCapacity();
+  } else
+    source = sourceReady(
+      task,
+      state,
+      registry,
+      observe,
+      grant.request,
+      input.lane,
+      dispatchAction && {
+        decisionId: input.decisionId,
+        action: dispatchAction,
+      },
+      input.phase,
+    );
   const existing = [state.scopedAdmission, ...(state.scopedAdmissions ?? [])]
     .filter(Boolean)
     .find((scope) => scope.task === task.id && scope.lane === input.lane);
@@ -432,8 +460,7 @@ export async function dynamicHostAction(
       queue,
       false,
       observe,
-      true,
-      true,
+      { enrollPhase: true },
     );
     const ticket = queue.enrollDeliveryPhase(input, () => {
       assert.deepEqual(registry.readTask(input.task), proof.task);
@@ -449,10 +476,13 @@ export async function dynamicHostAction(
       const result = queue.reserveDecision(input, () => current);
       return { status: result.status, decision: result, startAuthorized: false, replay: true };
     }
-    const proof = await taskProof(commonDir, input, host, registry, queue, false, observe);
+    const proof = await taskProof(commonDir, input, host, registry, queue, false, observe, {
+      dispatchAction: 'dispatch',
+    });
     const result = queue.reserveDecision(input, () => {
       assert.deepEqual(registry.readTask(input.task), proof.task);
       assert.deepEqual(readTaskCoordination(commonDir), proof.coordination);
+      assertDispatchProofCurrent(proof.task, proof.readiness);
       return proof;
     });
     return {
@@ -474,16 +504,9 @@ export async function dynamicHostAction(
       const current = await role(commonDir, input, host, true);
       return queue.cancelDecision(input, () => current);
     }
-    const proof = await taskProof(
-      commonDir,
-      { ...decision.input, ...input },
-      host,
-      registry,
-      queue,
-      false,
-      observe,
-      false,
-    );
+    const proof = await taskProof(commonDir, { ...decision.input, ...input }, host, registry, queue, false, observe, {
+      requireDependencies: false,
+    });
     return queue.cancelDecision(input, () => {
       assert.deepEqual(registry.readTask(proof.task.id), proof.task);
       assert.deepEqual(readTaskCoordination(commonDir), proof.coordination);
@@ -504,10 +527,13 @@ export async function dynamicHostAction(
         decision: queue.consumeDecision(input, () => ({ ...current, actor: process.env.CODEX_THREAD_ID })),
       };
     }
-    const proof = await taskProof(commonDir, plan, host, registry, queue, true, observe);
+    const proof = await taskProof(commonDir, plan, host, registry, queue, true, observe, {
+      dispatchAction: 'dispatch-start',
+    });
     const result = queue.consumeDecision(input, () => {
       assert.deepEqual(registry.readTask(plan.task), proof.task);
       assert.deepEqual(readTaskCoordination(commonDir), proof.coordination);
+      assertDispatchProofCurrent(proof.task, proof.readiness);
       return proof;
     });
     return {

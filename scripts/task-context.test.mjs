@@ -1,3 +1,4 @@
+import { continuationPlan } from './task-continuation-plan.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
@@ -5,7 +6,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSy
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
-import { closeTaskBatch, selectedTaskBatch, withTaskContext } from './task-context.mjs';
+import { closeTaskBatch, selectedTaskBatch, taskActionDependencies, withTaskContext } from './task-context.mjs';
 import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 import { completionCommand } from './completion-cli.mjs';
 import { readAcceptance, assertAcceptedSource } from './accepted-source.mjs';
@@ -226,6 +227,64 @@ test('planning still requires clean source, the exact recorded head and assigned
   });
   assert.throws(() => planBatchDelivery(f.a), /Unassigned task commit/);
   assert.equal(readFileSync(path.join(f.b, 'src/feature.js'), 'utf8'), 'unfinished B');
+});
+
+test('continuation plan reports independent action readiness and leaves source, index and queue untouched', (t) => {
+  const f = fixture(t);
+  const a = f.registry.readTask('a');
+  f.registry.revise('a', a.revision, (record) => {
+    record.actionDependencies = [{ task: 'b', actions: ['combination', 'final'], evidence: 'delivery' }];
+  });
+  const branch = f.git(f.a, 'rev-parse', 'HEAD');
+  const index = f.git(f.a, 'ls-files', '--stage');
+  const before = f.registry.readTask('a');
+  const plan = continuationPlan(f.main, 'a');
+  assert.equal(plan.source.value.head, branch);
+  const development = plan.actions.find((item) => item.action === 'development');
+  assert.deepEqual(development.reasons, ['Missing development phase ticket']);
+  assert.match(plan.actions.find((item) => item.action === 'combination').reasons[0], /not formally delivered/);
+  assert.equal(plan.operationalAuthorization, false);
+  assert.equal(plan.requiresFreshChecks, true);
+  assert.deepEqual(f.registry.readTask('a'), before);
+  assert.equal(f.git(f.a, 'ls-files', '--stage'), index);
+  assert.equal(existsSync(path.join(f.registry.commonDir, 'task-registry', 'execution-order')), false);
+});
+
+test('a protected delete/modify conflict is visible before PR or final composition without writing an object', (t) => {
+  const f = fixture(t);
+  f.git(f.main, 'rm', 'src/feature.js');
+  f.git(f.main, 'commit', '-m', 'publish delete');
+  f.git(f.main, 'update-ref', 'refs/remotes/origin/main', 'HEAD');
+  const before = f.git(f.main, 'count-objects');
+  const report = continuationPlan(f.main, 'a');
+  assert.deepEqual(report.overlap.value.protectedDeleteModify, ['src/feature.js']);
+  assert.ok(
+    report.actions
+      .find((item) => item.action === 'combination')
+      .reasons.some((reason) => reason.includes('Protected delete/modify conflict')),
+  );
+  assert.equal(f.git(f.main, 'count-objects'), before);
+});
+
+test('a pinned source can prepare independently but must be present in exact combination ancestry', (t) => {
+  const f = fixture(t);
+  const provider = f.registry.readTask('a');
+  const consumer = f.registry.readTask('b');
+  const declared = f.registry.revise('b', consumer.revision, (task) => {
+    task.actionDependencies = [
+      { task: 'a', actions: ['preparation', 'combination'], evidence: 'source', head: provider.recordedHead },
+    ];
+  });
+  assert.equal(taskActionDependencies(f.main, declared, 'preparation').ready, true);
+  const missing = taskActionDependencies(f.main, declared, 'combination').dependencies[0];
+  assert.equal(missing.ready, false);
+  assert.match(missing.reason, /absent from the actual combination inputs/);
+  assert.equal(
+    taskActionDependencies(f.main, declared, 'combination', { candidate: provider.recordedHead }).ready,
+    true,
+  );
+  f.git(f.main, 'update-ref', 'refs/remotes/origin/main', provider.recordedHead);
+  assert.equal(taskActionDependencies(f.main, declared, 'combination').ready, true);
 });
 
 test('scheduled cleanup handoff closes the exact released task while retaining its Git carrier', (t) => {
