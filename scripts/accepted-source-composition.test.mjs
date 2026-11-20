@@ -42,7 +42,7 @@ function fixture(
   }
   for (const [file, versions] of Object.entries(files)) {
     mkdirSync(path.dirname(path.join(root, file)), { recursive: true });
-    writeFileSync(path.join(root, file), versions.base);
+    if (versions.base !== null) writeFileSync(path.join(root, file), versions.base);
   }
   git('add', '.');
   git('commit', '-m', 'base');
@@ -80,7 +80,10 @@ function fixture(
   const bGit = (...args) => git('-C', b, ...args);
   writeFileSync(path.join(b, 'src/task-b.js'), 'published B feature');
   if (conflictPath) writeFileSync(path.join(b, conflictPath), 'published main\n');
-  for (const [file, versions] of Object.entries(files)) writeFileSync(path.join(b, file), versions.main);
+  for (const [file, versions] of Object.entries(files)) {
+    mkdirSync(path.dirname(path.join(b, file)), { recursive: true });
+    writeFileSync(path.join(b, file), versions.main);
+  }
   if (overwritesA) writeFileSync(path.join(b, 'src/product.js'), 'price = 15;\n');
   bGit('add', '.');
   bGit('commit', '-m', 'published B');
@@ -384,23 +387,26 @@ const engineeringPaths = [
   'tests/e2e/store-order-prototype.spec.ts',
 ];
 
-function protectedFixture(t) {
+const addedFile = 'src/services/storeCacheCleanup.ts';
+const addedVersions = { base: null, frozen: 'order cache\n', main: 'selection cache\n', resolved: 'both caches\n' };
+
+function protectedFixture(t, paths = reviewedPaths, version = 1) {
   const f = fixture(t, {
     files: {
-      ...reviewedPaths,
+      ...paths,
       ...Object.fromEntries(engineeringPaths.map((file) => [file, { base: 'before\n', frozen: 'A\n', main: 'B\n' }])),
     },
   });
   const data = {
-    version: 1,
+    version,
     batch: 'a',
     accepted: f.original.commit,
     integrationBase: f.base,
     reviewedMain: f.main,
-    resolutions: Object.entries(reviewedPaths).map(([file, versions]) => ({
+    resolutions: Object.entries(paths).map(([file, versions]) => ({
       file,
       inputs: {
-        base: f.git('rev-parse', f.base + ':' + file),
+        base: versions.base === null ? null : f.git('rev-parse', f.base + ':' + file),
         frozen: f.git('rev-parse', f.original.commit + ':' + file),
         main: f.git('rev-parse', f.main + ':' + file),
       },
@@ -417,7 +423,7 @@ function protectedFixture(t) {
     record.frozen = { accepted: f.original.commit, tree: f.original.tree, businessDigest: f.original.businessDigest };
     record.stage = 'frozen';
   });
-  return { ...f, data };
+  return { ...f, data, paths };
 }
 function publishReview(f, receipt = f.data) {
   mkdirSync(path.join(f.b, path.dirname(reviewPath)), { recursive: true });
@@ -435,7 +441,7 @@ function resolvedCommit(f, main, { candidateReceipt = false } = {}) {
   assert.throws(() => git('merge', '--no-ff', '--no-commit', main), /Git operation failed/);
   assert.deepEqual(
     git('diff', '--name-only', '--diff-filter=U').split('\n').sort(),
-    [...Object.keys(reviewedPaths), ...engineeringPaths].sort(),
+    [...Object.keys(f.paths), ...engineeringPaths].sort(),
   );
   for (const entry of f.data.resolutions) writeFileSync(path.join(worktree, entry.file), entry.result.text);
   for (const file of engineeringPaths) writeFileSync(path.join(worktree, file), 'A and B\n');
@@ -448,16 +454,15 @@ function resolvedCommit(f, main, { candidateReceipt = false } = {}) {
   return git('rev-parse', 'HEAD');
 }
 
-test('published protected review composes nine conflict paths through owned recovery and independent remote CI', async (t) => {
-  const f = protectedFixture(t),
-    main = publishReview(f),
+async function verifyPublishedReview(f) {
+  const main = publishReview(f),
     candidate = resolvedCommit(f, main),
     baseline = readFileSync(path.join(f.registry.commonDir, 'task-delivery/a/accepted-source.json'));
   const proof = prepareAcceptedComposition(f.root, 'a', main, candidate);
   assert.equal(proof.version, 2);
   assert.equal(proof.accepted, f.original.commit);
   assert.equal(proof.candidateCommit, candidate);
-  assert.deepEqual(proof.review.files, Object.keys(reviewedPaths).sort());
+  assert.deepEqual(proof.review.files, Object.keys(f.paths).sort());
   assert.equal(f.git('rev-parse', 'HEAD'), f.head, 'Planning leaves the adopted source untouched');
 
   f.git('push', 'origin', candidate + ':refs/heads/codex/a');
@@ -494,6 +499,50 @@ test('published protected review composes nine conflict paths through owned reco
   assertAcceptedSource(f.root, 'a', final);
   assert.deepEqual(readFileSync(path.join(f.registry.commonDir, 'task-delivery/a/accepted-source.json')), baseline);
   assert.deepEqual(readAcceptance(f.root, 'a'), f.original);
+}
+
+test('published protected review composes nine conflict paths through owned recovery and independent remote CI', (t) =>
+  verifyPublishedReview(protectedFixture(t)));
+
+test('published mixed review preserves add/add and existing-base conflicts through independent remote CI and recovery', (t) =>
+  verifyPublishedReview(protectedFixture(t, { ...reviewedPaths, [addedFile]: addedVersions }, 2)));
+
+test('add/add review requires explicit proven absence and exact input and result objects', (t) => {
+  const emptyFile = 'src/empty-base.txt';
+  const f = protectedFixture(t, { [addedFile]: addedVersions, [emptyFile]: { ...addedVersions, base: '' } }, 2);
+  const [added, existing] = f.data.resolutions;
+  const emptyBlob = f.git('rev-parse', f.base + ':' + emptyFile);
+  const reject = (receipt, expected) => {
+    const main = publishReview(f, receipt);
+    assert.throws(() => acceptedCompositionTree(f.root, f.original.commit, main), expected);
+  };
+  const withAdded = (changes) => ({ ...f.data, resolutions: [{ ...added, ...changes }, existing] });
+  reject({ ...f.data, version: 1 }, /existing regular file/);
+  reject(withAdded({ inputs: { frozen: added.inputs.frozen, main: added.inputs.main } }), /existing regular file/);
+  reject(withAdded({ inputs: { ...added.inputs, base: emptyBlob } }), /existing regular file/);
+  reject(
+    { ...f.data, resolutions: [added, { ...existing, inputs: { ...existing.inputs, base: null } }] },
+    /inputs changed/,
+  );
+  reject(withAdded({ inputs: { ...added.inputs, frozen: added.inputs.main } }), /inputs changed/);
+  reject(withAdded({ inputs: { ...added.inputs, main: added.inputs.frozen } }), /inputs changed/);
+  reject(withAdded({ result: { ...added.result, mode: '100755' } }), /cannot change mode/);
+  reject(withAdded({ result: { ...added.result, text: 'different bytes' } }), /do not match reviewed blob/);
+  reject({ ...f.data, resolutions: [existing] }, /cover exactly/);
+  reject({ ...f.data, resolutions: [added, added] }, /cover exactly/);
+  const main = publishReview(f);
+  const tree = acceptedCompositionTree(f.root, f.original.commit, main);
+  for (const row of f.data.resolutions) assert.equal(f.git('rev-parse', tree + ':' + row.file), row.result.object);
+});
+
+test('an add/add conflict still requires regular UTF-8 originals on both sides', (t) => {
+  const f = protectedFixture(t, { [addedFile]: { ...addedVersions, frozen: Buffer.from([0xff]) } }, 2);
+  const main = publishReview(f);
+  assert.throws(() => acceptedCompositionTree(f.root, f.original.commit, main), /Binary conflict/);
+  f.bGit('update-index', '--chmod=+x', '--', addedFile);
+  f.bGit('commit', '-m', 'Executable published input');
+  const executableMain = f.bGit('rev-parse', 'HEAD');
+  assert.throws(() => acceptedCompositionTree(f.root, f.original.commit, executableMain), /existing regular file/);
 });
 
 test('existing reviewed inputs are independently rechecked when unrelated published main advances before CI', (t) => {
