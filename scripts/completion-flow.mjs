@@ -21,6 +21,11 @@ import {
   readPreCiReview,
   storedPreCiReview,
 } from './delivery-repairs/pre-ci-composition.mjs';
+import {
+  originalRepairPull,
+  publishedRepairKey,
+  verifyPublishedCiRepair,
+} from './delivery-repairs/published-ci-repair.mjs';
 
 // This command is invoked only after the human authorizes this exact batch's formal delivery.
 // Every phase awaits its predecessor directly; no extra sleep, watcher, test run or approval loop.
@@ -42,6 +47,7 @@ export async function runCompletionFlow(
     deferSettle = false,
     preparationOnly = false,
     engineeringReviewFile,
+    publishedRepairId,
     assertCurrentAdmission,
     readState = () => state,
   },
@@ -133,6 +139,7 @@ export async function runCompletionFlow(
   }
   // A persisted composition proves source, so recheck live references before
   // resuming its installation or publishing the newly registered candidate.
+  let publishedRepair;
   if (preparationOnly) await assertSelectedReferenceCurrent();
   if (parallel) {
     const accepted = readAcceptance(root, batch.id);
@@ -142,6 +149,28 @@ export async function runCompletionFlow(
       await runtimeReferences(tasks.readTask(batch.id), preparationReferences);
       await assertSelectedReferenceCurrent();
     }
+    if (proof) {
+      const plans = state.events.filter(
+        (event) =>
+          event.name === 'prepare' &&
+          event.status === 'success' &&
+          event.result?.publishedRepair?.taskHead === proof.taskHead &&
+          event.result.publishedRepair.main === proof.main &&
+          event.result.publishedRepair.accepted === proof.accepted &&
+          event.result.candidateTree === proof.candidateTree,
+      );
+      publishedRepair = plans.at(-1)?.result.publishedRepair;
+      if (publishedRepair) {
+        if (publishedRepairId !== undefined)
+          assert.equal(
+            publishedRepairId,
+            publishedRepair.repairId,
+            'Existing composition has another published repair',
+          );
+        const candidate = preCiCompositionCommit(batch.worktree, { ...proof, publishedRepair: true });
+        assert.equal(publishedRepair.candidate, candidate, 'Published repair candidate changed');
+      }
+    }
     if (proof && !proof.candidateCommit) {
       const current = git(batch.worktree, 'rev-parse', 'HEAD');
       const review = storedPreCiReview(batch.worktree, proof);
@@ -149,12 +178,22 @@ export async function runCompletionFlow(
         assertCurrentAdmission?.();
         const tree = preCiCompositionTree(
           batch.worktree,
-          { ...proof, protectedPaths: accepted.protectedPaths },
+          { ...proof, protectedPaths: accepted.protectedPaths, publishedRepair: Boolean(publishedRepair) },
           review,
         );
         if (tree) {
           assert.equal(tree, proof.candidateTree, 'Recovered candidate differs from the original composition proof');
-          installCompositionCandidate(proof, verifyCompositionCandidate(proof, accepted, review));
+          const candidate = verifyCompositionCandidate(
+            { ...proof, publishedRepair: Boolean(publishedRepair) },
+            accepted,
+            review,
+          );
+          if (preparationOnly && publishedRepair) {
+            const github = (...args) => JSON.parse(execute(root, 'gh', args));
+            const repository = github('repo', 'view', '--json', 'nameWithOwner').nameWithOwner;
+            originalRepairPull(github, repository, publishedRepair.pullRequest, batch.branch, [proof.taskHead]);
+          }
+          installCompositionCandidate(proof, candidate);
           engineeringReviewFile = undefined; // Recovery consumes the durable original review.
         }
       } else if (
@@ -177,13 +216,15 @@ export async function runCompletionFlow(
     head = batch.recordedHead;
     if (preparationOnly) await assertSelectedReferenceCurrent();
   }
+  if (publishedRepair?.candidate !== head) publishedRepair = undefined;
   let repository;
+  const github = (...args) => JSON.parse(execute(root, 'gh', args));
   if (preparationOnly) {
     assertCurrentAdmission?.();
     git(root, 'fetch', 'origin');
   }
   await phase('prepare', head, async () => {
-    repository = JSON.parse(execute(root, 'gh', ['repo', 'view', '--json', 'nameWithOwner'])).nameWithOwner;
+    repository = github('repo', 'view', '--json', 'nameWithOwner').nameWithOwner;
     if (!preparationOnly) git(root, 'fetch', 'origin');
     assert.equal(git(batch.worktree, 'rev-parse', 'HEAD'), head);
     assert.equal(git(batch.worktree, 'status', '--porcelain'), '');
@@ -227,6 +268,7 @@ export async function runCompletionFlow(
   });
   if (
     preparationOnly &&
+    !publishedRepair &&
     !state.events.some((event) => event.name === 'ci' && event.status === 'success' && event.result?.headSha === head)
   ) {
     assertCurrentAdmission?.();
@@ -241,14 +283,36 @@ export async function runCompletionFlow(
         main,
         protectedPaths: accepted.protectedPaths,
         rejectUnreviewed: true,
+        publishedRepair: publishedRepairId !== undefined,
       },
       review,
     );
     if (candidateTree) {
       assert.equal(batch.recordedHead, head, 'Original checkpointed candidate required');
+      const inputs = { batch: batch.id, accepted: accepted.commit, main, taskHead: head, candidateTree };
+      const candidate = verifyCompositionCandidate(
+        { ...inputs, publishedRepair: publishedRepairId !== undefined },
+        accepted,
+        review,
+      );
+      if (publishedRepairId !== undefined) {
+        const plan = await phase('prepare', head + publishedRepairKey + main, () => ({
+          candidateTree,
+          publishedRepair: verifyPublishedCiRepair({
+            ...inputs,
+            batch,
+            state,
+            registry: tasks,
+            git: (...args) => git(batch.worktree, ...args),
+            gh: github,
+            repository,
+            repairId: publishedRepairId,
+            candidate,
+          }),
+        }));
+        publishedRepair = plan.publishedRepair;
+      }
       await phase('prepare', head + ':pre-ci-composition:' + main, async () => {
-        const inputs = { batch: batch.id, accepted: accepted.commit, main, taskHead: head, candidateTree };
-        const candidate = verifyCompositionCandidate(inputs, accepted, review);
         await previewControl.prepareComposition(worktreePlan(main), preparationReferences);
         await assertSelectedReferenceCurrent();
         assertCurrentAdmission?.();
@@ -264,8 +328,11 @@ export async function runCompletionFlow(
       await assertSelectedReferenceCurrent();
     }
   }
+  if (publishedRepairId !== undefined)
+    assert.ok(publishedRepair, 'A failed original candidate and a new published repair are required');
   async function publishCandidate({ readiness = false } = {}) {
-    if (parallel) {
+    const original = preparationOnly && publishedRepair?.candidate === head ? publishedRepair : null;
+    if (parallel && !original) {
       const merged = JSON.parse(
         execute(root, 'gh', [
           'pr',
@@ -333,8 +400,13 @@ export async function runCompletionFlow(
       );
     }
     await phase('push', head, () => {
-      publishAcceptance(batch.worktree, batch.id);
       const remote = git(root, 'ls-remote', 'origin', 'refs/heads/' + batch.branch);
+      if (original) {
+        const remoteHead = remote.split(/\s/)[0];
+        assert.ok([original.taskHead, head].includes(remoteHead), 'Original PR branch moved');
+        originalRepairPull(github, repository, original.pullRequest, batch.branch, [original.taskHead, head]);
+      }
+      publishAcceptance(batch.worktree, batch.id);
       if (remote && !remote.startsWith(head + '\t')) {
         const before = remote.split(/\s/)[0];
         git(root, 'merge-base', '--is-ancestor', before, head);
@@ -344,6 +416,7 @@ export async function runCompletionFlow(
       return { head };
     });
     const pull = await phase('pr', head, () => {
+      if (original) return originalRepairPull(github, repository, original.pullRequest, batch.branch, [head]);
       const args = [
         'pr',
         'list',
