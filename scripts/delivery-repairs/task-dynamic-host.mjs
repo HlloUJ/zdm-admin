@@ -21,6 +21,7 @@ import { threadTitle } from '../task-thread-titles.mjs';
 import { assertCompletionQuality } from '../completion-ci-evidence.mjs';
 import { assertTaskCommitOwnership } from '../task-commit-ownership.mjs';
 import { verifyDevelopmentCompletion } from '../task-execution-order-cli.mjs';
+import { interruptedPreparation } from './interrupted-preparation.mjs';
 
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const git = (root, ...args) =>
@@ -355,17 +356,30 @@ async function taskProof(
     fencedScope,
   };
 }
+export function isDynamicHostAction(action) {
+  return [
+    'delegate',
+    'delivery-enroll',
+    'dispatch',
+    'dispatch-start',
+    'dispatch-cancel',
+    'preparation-finish',
+    'preparation-recovery-plan',
+    'preparation-recover',
+  ].includes(action);
+}
 export async function dynamicHostAction(
   action,
   input,
   host,
   { commonDir, registry, queue, observe = observeCancellationHost },
 ) {
-  assert.ok(
-    ['delegate', 'delivery-enroll', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(
-      action,
-    ),
-  );
+  assert.ok(isDynamicHostAction(action));
+  if (['preparation-recovery-plan', 'preparation-recover'].includes(action)) {
+    const planning = action === 'preparation-recovery-plan';
+    const current = await role(commonDir, input, host, planning);
+    return interruptedPreparation(input, host, { planning, current, registry, queue, observe, frozenCheckpoint });
+  }
   if (action === 'delegate') {
     const current = await role(commonDir, input, host, true);
     const source = await verifyCoordinatorSource(
