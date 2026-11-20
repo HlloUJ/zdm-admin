@@ -66,9 +66,10 @@ v2接受对象额外固定原任务base、冻结时origin/main及二者与任务
 
 ### 已发布的受保护文件冲突审阅
 
-当真实冲突涉及原冻结明确保护的普通 UTF-8 文件，先沿独立受信维护发布审阅记录 `.codex/accepted-source-conflict-reviews/<任务ID>.json`。逐文件对照原冻结、原合并基线和已经发布的 main，给出保留双方已授权行为的依据及准确结果。还存在互斥行为或无法证明完整保留时继续阻断。记录目录按既有策略属于保护内容。来源校验控制面、审阅记录自身、增删、模式变化和二进制冲突均不支持此路径。
+当真实冲突涉及原冻结明确保护的普通 UTF-8 文件，先沿独立受信维护发布审阅记录 `.codex/accepted-source-conflict-reviews/<任务ID>.json`。逐文件对照原冻结、原合并基线和已经发布的 main，给出保留双方已授权行为的依据及准确结果。还存在互斥行为或无法证明完整保留时继续阻断。记录目录按既有策略属于保护内容。来源校验控制面、审阅记录自身、单侧缺失、模式变化和二进制冲突继续阻断。
 
-- 记录包含 `version: 1`、`batch`、原接受提交 `accepted`、原 `integrationBase`、逐文件审阅时的已发布提交 `reviewedMain` 和 `resolutions`。每个冲突记录包含 `file`、保留依据 `reason`、`inputs: { base, frozen, main }` 三个原始 blob SHA 和 `result: { mode, object, text }`。只接受保留 `100644` 模式的准确结果，`object` 为 `text` 的 Git blob SHA。
+- 记录包含 `version`、`batch`、原接受提交 `accepted`、原 `integrationBase`、逐文件审阅时的已发布提交 `reviewedMain` 和 `resolutions`。每个冲突记录包含 `file`、保留依据 `reason`、`inputs: { base, frozen, main }` 和 `result: { mode, object, text }`。版本 1 要求三个输入均为原始 blob SHA。结果模式为 `100644`，`object` 为准确 `text` 的 Git blob SHA。
+- 版本 2 可在同一记录内审阅原有文件与两侧同路径新增的文件。后者须显式填写 `inputs.base: null`。校验器对原 `integrationBase` 的 Git 树按字面路径查证缺失，要求该基线是 `reviewedMain` 的祖先，再分别从原接受提交、审阅主线及当前可信主线读取真实的 `100644` 普通文本和对象编号。基线已有空文件也须填写它的 blob SHA。缺省字段、虚构空 blob、符号链接和可执行文件均拒绝。
 - 校验器从 GitHub 事件的准确 base 或本地已发布 main 的 Git 树读取审阅记录。原接受对象、原基线、当前受保护冲突路径集合、三侧输入和实际合并结果都重新核对。主线推进后，仅当审阅记录及冲突输入完全相同时可复用该审阅。工程路径仍按原策略核对及测试。
 - 原执行者在隔离载体准备无冲突的双亲候选，第一父为当前任务检查点，第二父为准确发布 main。使用已发布入口 `npm run task:entry -- --worktree <任务目录> complete compose-reviewed <main SHA> <候选 SHA>`，在现有交付准备准入下验证并保全组合意图，停本任务挂载监视器后快进并登记原候选。中断后恢复同一意图；原冻结、原接受标签、两个父提交和历史失败一并保留。继续正式交付时仍须正常 PR CI、最终准确 main 对齐、main CI、运行交接及关闭回执。
 - 远端在可信 base 独立验证真实双亲、审阅结果及完整保护清单，复用同一审阅时也重新比较 PR 实际合并树。已发布的精确审阅提供业务保留依据，代码证明其输入和结果的对象身份。独立 GitHub 发布账号和强制门禁的部署限制仍见上节。

@@ -17,6 +17,9 @@ export const referenceCollectorFiles = Object.freeze([
   'scripts/delivery-repairs/preview-reference-proof-core.mjs',
   'scripts/delivery-repairs/preview-reference-history.mjs',
   'scripts/delivery-repairs/preview-reference-source.mjs',
+  'scripts/delivery-repairs/validation-maintenance-followup.mjs',
+  'scripts/delivery-repairs/validation-maintenance-lineage.mjs',
+  'scripts/delivery-repairs/validation-recovery-evidence.mjs',
   'scripts/delivery-repairs/preview-docker-directories.mjs',
   'scripts/delivery-repairs/preview-docker-vnode-source.mjs',
 ]);

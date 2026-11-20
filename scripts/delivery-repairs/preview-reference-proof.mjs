@@ -19,6 +19,7 @@ import {
   recoveryReceiptFile,
 } from './validation-maintenance-lineage.mjs';
 import { privateJson } from './validation-recovery-evidence.mjs';
+import { needsFollowingMaintenance, readFollowingMaintenance } from './validation-maintenance-followup.mjs';
 import { captureReassignedClosedPeer } from './validation-closed-peer.mjs';
 import { parseWorktreePorcelain } from '../git-workflow-core.mjs';
 import {
@@ -492,7 +493,7 @@ function stoppedValidationContinuation(scope, foreignTask) {
   const { task, registry, accepted, anchor } = scope;
   const receiptFile = recoveryReceiptFile(registry.commonDir, task);
   if (!existsSync(receiptFile)) return null;
-  const { value: receipt } = privateJson(receiptFile);
+  const { value: receipt, hash: receiptDigest } = privateJson(receiptFile);
   const e = receipt.evidence;
   assert.equal(e.task, task.id);
   assert.equal(e.accepted, accepted.commit);
@@ -522,11 +523,28 @@ function stoppedValidationContinuation(scope, foreignTask) {
   const neighbor = registry.readTask(foreignTask);
   const containers = JSON.parse(docker('inspect', e.foreign.containerId));
   assert.equal(containers.length, 1);
-  const backend = readMaintenanceBackend(containers[0], maintenance.foreign, {
+  const runtime = {
     root: neighbor.worktree,
     project: taskProjectName({ root: neighbor.worktree, branch: neighbor.branch }),
     port: e.foreign.backendPort,
-  });
+  };
+  if (
+    needsFollowingMaintenance(task.id, foreignTask, maintenance.foreign.live.startedAt, containers[0].State.StartedAt)
+  ) {
+    const retained = JSON.parse(docker('inspect', e.backend.id));
+    assert.equal(retained.length, 1);
+    const linked = readFollowingMaintenance({
+      scope,
+      receipt,
+      receiptDigest,
+      maintenance,
+      container: containers[0],
+      runtime,
+      stopped: retained[0],
+    });
+    return { ...linked, reassigned: maintenance.reassigned };
+  }
+  const backend = readMaintenanceBackend(containers[0], maintenance.foreign, runtime);
   return { proof: maintenance.foreign, backend, reassigned: maintenance.reassigned };
 }
 
