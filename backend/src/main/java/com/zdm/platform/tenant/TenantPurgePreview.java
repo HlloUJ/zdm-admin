@@ -11,8 +11,9 @@ public record TenantPurgePreview(
     int accountDeleteCount,
     int accountRetainCount,
     int phoneReleaseCount,
-    List<String> blockers) {
+    List<String> blockers, java.util.Map<Long, String> storePlans) {
   public TenantPurgePreview {
     blockers = List.copyOf(blockers);
+    storePlans = java.util.Map.copyOf(storePlans);
   }
 }

@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { executionPausedFor } from './task-execution-scope.mjs';
 import { notifyProgressHost } from './task-progress-host.mjs';
@@ -58,7 +59,53 @@ export function captureCompletionProgress(directory, state, previous) {
     bestEffortProgress(outboxDirectory, state.batch, `completion:${event.id}:${event.status}`, payload);
   }
 }
-export function captureQueueProgress(commonDir, state, previous, readDeliveryRequest = () => null) {
+function deliveryWaitBasis(state, ticket) {
+  if (ticket.lane !== 'delivery' || !['queued', 'blocked'].includes(ticket.status)) return null;
+  const event = state.events?.findLast(
+    (item) =>
+      item.task === ticket.task &&
+      (['delivery-phase-enrolled', 'preparation-finished'].includes(item.action) ||
+        (item.action === 'dispatch-applied' && item.lane === 'delivery')),
+  );
+  let authorityId;
+  if (event?.action === 'delivery-phase-enrolled') {
+    const phase = ticket.phaseOrigin;
+    if (
+      ticket.status !== 'queued' ||
+      ticket.admission !== null ||
+      !phase?.phaseId ||
+      !phase.authorityId ||
+      event.phaseId !== phase.phaseId ||
+      event.authorityId !== phase.authorityId ||
+      event.owner !== ticket.owner ||
+      event.order !== ticket.order ||
+      event.developmentEvidenceDigest !== phase.developmentEvidenceDigest ||
+      event.phaseDigest !== createHash('sha256').update(JSON.stringify(phase)).digest('hex')
+    )
+      return null;
+    authorityId = phase.authorityId;
+  } else if (event?.action === 'preparation-finished') {
+    const decision = state.dynamicDecisions?.find((item) => item.id === event.decisionId);
+    if (
+      decision?.status !== 'finished' ||
+      !decision.prepared ||
+      !decision.input ||
+      decision.input.phase !== 'preparation' ||
+      decision.input.lane !== 'delivery' ||
+      decision.input.task !== ticket.task ||
+      decision.input.owner !== ticket.owner ||
+      !isDeepStrictEqual(decision.ticketBefore, ticket)
+    )
+      return null;
+    authorityId = decision.input.authorityId;
+  } else return null;
+  const grant = state.dynamicAuthorities?.find((item) => item.id === authorityId);
+  return grant && isDeepStrictEqual(event.request, grant.request)
+    ? { action: event.action, request: grant.request }
+    : null;
+}
+
+export function captureQueueProgress(commonDir, state, previous) {
   const pausedFor = (current, ticket) => {
     if (!executionPausedFor(current, ticket)) return false;
     const fence = current.events?.findLast((event) => ['initialize', 'pause-all'].includes(event.action))?.request;
@@ -81,9 +128,7 @@ export function captureQueueProgress(commonDir, state, previous, readDeliveryReq
     const request =
       ticket.status === 'queued' && pendingNative && ticket.admission === null
         ? ticket.request
-        : readDeliveryRequest(current, ticket);
-    // Enrollment and preparation preserve the original ticket. Use the
-    // verified delegation only for progress projection.
+        : deliveryWaitBasis(current, ticket)?.request;
     return !(
       Number.isSafeInteger(fence?.sequence) &&
       typeof fence.authorId === 'string' &&
@@ -107,8 +152,6 @@ export function captureQueueProgress(commonDir, state, previous, readDeliveryReq
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
     // Admission is NOT proof of actual action start. No synthetic started event on claim.
     const paused = parked || pausedFor(state, ticket);
-    // Phase enrollment is internal metadata. Leave the existing review progress as-is.
-    if (!before && ticket.phaseOrigin && !paused) continue;
     const changed = parked || !before || before.status !== ticket.status || paused !== pausedFor(previous, before);
     if (!changed || (!['queued', 'blocked'].includes(ticket.status) && !paused)) continue;
     const event = paused ? 'paused' : ticket.status;

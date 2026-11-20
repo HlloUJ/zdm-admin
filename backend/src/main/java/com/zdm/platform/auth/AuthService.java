@@ -15,12 +15,15 @@ public class AuthService {
   private final SessionTokenService sessionTokenService;
   private final SecurityProperties securityProperties;
   private final EffectivePermissionResolver effectivePermissionResolver;
+  private final com.zdm.platform.storeexit.StoreExitRecoveryState recovery;
 
   public AuthService(
       AuthAccountMapper authAccountMapper,
       SessionTokenService sessionTokenService,
       SecurityProperties securityProperties,
-      EffectivePermissionResolver effectivePermissionResolver) {
+      EffectivePermissionResolver effectivePermissionResolver,
+      com.zdm.platform.storeexit.StoreExitRecoveryState recovery) {
+    this.recovery = recovery;
     this.authAccountMapper = authAccountMapper;
     this.sessionTokenService = sessionTokenService;
     this.securityProperties = securityProperties;
@@ -32,6 +35,10 @@ public class AuthService {
       throw new IllegalArgumentException("验证码错误");
     }
     AuthAccount account = authAccountMapper.findByPhone(request.phone());
+    if (account != null && recovery.blocks(account.getStoreId())) {
+      account = authAccountMapper.findAllEnabledByAccountId(account.getId()).stream()
+          .filter(context -> !recovery.blocks(context.getStoreId())).findFirst().orElse(null);
+    }
     if (account == null || !"enabled".equals(account.getStatus())) {
       if (authAccountMapper.countDisabledTenantIdentitiesByPhone(request.phone()) > 0) {
         throw new IllegalArgumentException("所属租户已归档，请联系平台运营");
@@ -47,6 +54,7 @@ public class AuthService {
 
   public List<IdentityContextResponse> listContexts(Long accountId) {
     return authAccountMapper.findAllEnabledByAccountId(accountId).stream()
+        .filter(account -> !recovery.blocks(account.getStoreId()))
         .map(account -> new IdentityContextResponse(
             account.getIdentityId(),
             account.getIdentityType(),
@@ -74,6 +82,7 @@ public class AuthService {
   }
 
   private LoginResponse responseFor(AuthAccount account) {
+    recovery.requireAvailable(account.getStoreId());
     List<String> roles = resolveRoles(account);
     if (roles.isEmpty()) {
       throw new IllegalArgumentException("账号未开通管理后台权限");

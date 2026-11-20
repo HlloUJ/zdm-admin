@@ -18,12 +18,14 @@ public class MediaReferenceService {
   private final MediaReferenceMapper referenceMapper;
   private final CurrentIdentityProvider identityProvider;
   private final MediaRetentionService retention;
+  private final StoreMediaBusinessFence storeFence;
 
   public MediaReferenceService(
       MediaAssetService assetService,
       MediaCleanupService cleanupService,
       MediaReferenceMapper referenceMapper,
-      CurrentIdentityProvider identityProvider, MediaRetentionService retention) {
+      CurrentIdentityProvider identityProvider, MediaRetentionService retention, StoreMediaBusinessFence storeFence) {
+    this.storeFence = storeFence;
     this.retention = retention;
     this.assetService = assetService;
     this.cleanupService = cleanupService;
@@ -33,6 +35,7 @@ public class MediaReferenceService {
 
   @Transactional
   public void replace(String domain, Long businessId, Map<String, Long> requested) {
+    storeFence.requireParent(domain, businessId);
     CurrentIdentity identity = identityProvider.require();
     Map<String, Long> desired = new LinkedHashMap<>();
     requested.forEach((field, mediaId) -> {

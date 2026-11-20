@@ -14,6 +14,7 @@ import {
 } from '../task-execution-binding.mjs';
 import { assertBoundResumeReady } from '../task-rebinding.mjs';
 import { assertHostIdle, observeCancellationHost } from '../task-cancellation-proof.mjs';
+import { preparationValidationIdle } from './validation-preparation-idle.mjs';
 import { captureSource } from '../verification-evidence.mjs';
 import { readAcceptance, assertAcceptedSource } from '../accepted-source.mjs';
 import { threadTitle } from '../task-thread-titles.mjs';
@@ -21,6 +22,7 @@ import { assertCompletionQuality } from '../completion-ci-evidence.mjs';
 import { assertTaskCommitOwnership } from '../task-commit-ownership.mjs';
 import { verifyDevelopmentCompletion } from '../task-execution-order-cli.mjs';
 import { assertDispatchProofCurrent, verifyDynamicDispatchHost } from './task-dispatch-host-proof.mjs';
+import { interruptedPreparation } from './interrupted-preparation.mjs';
 
 const hash = (value) => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const git = (root, ...args) =>
@@ -154,18 +156,19 @@ function completedDevelopmentSource(task, state, registry) {
     ownership,
   };
 }
-function sourceReady(task, state, registry, observe, request, lane, dispatch) {
+function sourceReady(task, state, registry, observe, request, lane, dispatch, phase) {
   const before = readOnlySource(task.worktree);
   assert.equal(git(task.worktree, 'branch', '--show-current'), task.branch);
   const binding = executionBinding(task);
   let readiness,
     checkpoint = null;
+  const verifyPreparationIdle = () => preparationValidationIdle(task, registry.commonDir, phase);
   if (binding) {
     const sourceRequest = request.sequence > binding.request.sequence ? request : binding.request;
     readiness = assertBoundResumeReady(
       task,
       state,
-      { request: sourceRequest, lane },
+      { request: sourceRequest, lane, phase },
       {
         registry,
         observe,
@@ -202,7 +205,9 @@ function sourceReady(task, state, registry, observe, request, lane, dispatch) {
       assert.equal(start[key], task[key], 'Original registered start differs');
     assert.equal(start.task, task.id);
     assert.equal(start.state, 'registered');
-    if (dispatch) readiness = { sourceDigest: before.digest, ...verifyDynamicDispatchHost(task, dispatch, observe) };
+    const validationRecovery = verifyPreparationIdle();
+    if (validationRecovery) readiness = { sourceDigest: before.digest, validationRecovery };
+    else if (dispatch) readiness = { sourceDigest: before.digest, ...verifyDynamicDispatchHost(task, dispatch, observe) };
     else {
       assertHostIdle(observe(), task);
       assertHostIdle(observe(), task);
@@ -228,6 +233,7 @@ function sourceReady(task, state, registry, observe, request, lane, dispatch) {
       ...(readiness.retainedDockerDirectories && {
         retainedDirectoryDigest: readiness.retainedDockerDirectories.digest,
       }),
+      ...(readiness.validationRecovery ? { validationRecovery: readiness.validationRecovery } : {}),
     },
     readiness,
   };
@@ -350,6 +356,7 @@ async function taskProof(
         decisionId: input.decisionId,
         action: dispatchAction,
       },
+      input.phase,
     );
   const existing = [state.scopedAdmission, ...(state.scopedAdmissions ?? [])]
     .filter(Boolean)
@@ -376,17 +383,30 @@ async function taskProof(
     fencedScope,
   };
 }
+export function isDynamicHostAction(action) {
+  return [
+    'delegate',
+    'delivery-enroll',
+    'dispatch',
+    'dispatch-start',
+    'dispatch-cancel',
+    'preparation-finish',
+    'preparation-recovery-plan',
+    'preparation-recover',
+  ].includes(action);
+}
 export async function dynamicHostAction(
   action,
   input,
   host,
   { commonDir, registry, queue, observe = observeCancellationHost },
 ) {
-  assert.ok(
-    ['delegate', 'delivery-enroll', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(
-      action,
-    ),
-  );
+  assert.ok(isDynamicHostAction(action));
+  if (['preparation-recovery-plan', 'preparation-recover'].includes(action)) {
+    const planning = action === 'preparation-recovery-plan';
+    const current = await role(commonDir, input, host, planning);
+    return interruptedPreparation(input, host, { planning, current, registry, queue, observe, frozenCheckpoint });
+  }
   if (action === 'delegate') {
     const current = await role(commonDir, input, host, true);
     const source = await verifyCoordinatorSource(

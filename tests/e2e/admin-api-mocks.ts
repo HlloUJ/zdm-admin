@@ -574,6 +574,7 @@ export async function setMockBusinessClient(page: Page, clientCode: 'admin' | 's
 
 export async function installAdminApiMocks(page: Page) {
   await mockEmployeeInvites(page);
+  await page.route('**/api/open/store-cache-exits', (route) => fulfillJson(route, []));
   await page.route('**/api/admin/auth/contexts', async (route) => {
     await fulfillJson(route, [
       {
@@ -602,6 +603,7 @@ export async function installAdminApiMocks(page: Page) {
       accountRetainCount: 1,
       phoneReleaseCount: 4,
       blockers: tenant.status === 'disabled' ? [] : ['请先归档租户'],
+      storePlans: { '2': 'reviewed-store-plan' },
     });
   });
   await page.route('**/api/admin/tenants/*/purge', async (route) => {
@@ -616,6 +618,20 @@ export async function installAdminApiMocks(page: Page) {
     });
   });
   await mockCollection(page, '**/api/admin/stores', stores);
+  await page.route('**/api/admin/stores/*/purge-preview', async (route) => {
+    const id = Number(new URL(route.request().url()).pathname.split('/').at(-2));
+    await fulfillJson(route, {
+      storeId: id,
+      tenantId: 1,
+      storeName: '已归档门店',
+      ruleVersion: 'V1.3',
+      planHash: 'reviewed-store-plan',
+      counts: { store_payment_names: 2 },
+      retained: ['共享商品及其他组织数据保留'],
+      blockers: [],
+      eligible: true,
+    });
+  });
   await page.route('**/api/admin/stores?scope=*', async (route) => {
     const scope = new URL(route.request().url()).searchParams.get('scope');
     await fulfillJson(route, scope === 'archived' ? archivedStores : stores);

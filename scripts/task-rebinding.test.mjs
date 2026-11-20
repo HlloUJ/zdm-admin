@@ -12,6 +12,9 @@ import {
   realpathSync,
   symlinkSync,
   readlinkSync,
+  existsSync,
+  renameSync,
+  readdirSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -33,6 +36,7 @@ import { dynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
 import { freezeAcceptedSource } from './accepted-source.mjs';
 import { readActiveBatch } from './task-batch.mjs';
 import { openCompletion, saveCompletion } from './completion-session.mjs';
+import { recoverInterrupted } from './completion-recovery.mjs';
 import { verifyDevelopmentCompletion } from './task-execution-order-cli.mjs';
 
 const old = '11111111-1111-4111-8111-111111111111';
@@ -188,7 +192,7 @@ function fixture(t, { collaboration = false } = {}) {
   return { dir, main, worktree, registry, queue, input, host, snapshots, observe, bind, task, board, git };
 }
 
-async function dynamicFrozenFixture(t, { withOldPause = false } = {}) {
+async function dynamicFrozenFixture(t, { previousPause = false, originalStatus = 'blocked' } = {}) {
   const f = fixture(t, { collaboration: true });
   process.env.CODEX_THREAD_ID = old;
   const accepted = freezeAcceptedSource(f.worktree, readActiveBatch(f.worktree));
@@ -202,10 +206,10 @@ async function dynamicFrozenFixture(t, { withOldPause = false } = {}) {
     owner: old,
     request: { ...f.input.request, messageId: 'original-delivery', sequence: 3 },
   });
-  if (withOldPause)
+  if (previousPause)
     f.queue.direct({
       action: 'pause-all',
-      request: { ...f.input.request, messageId: 'historical-pause', sequence: 4 },
+      request: { ...f.input.request, messageId: 'older-fence', sequence: 4 },
     });
   f.input.expectedRevision = f.registry.readTask('task').revision;
   f.input.queueRevision = f.queue.read().revision;
@@ -219,23 +223,25 @@ async function dynamicFrozenFixture(t, { withOldPause = false } = {}) {
   );
   const plan = await f.bind({ historicalRecovery: { mode: 'preserved-project-state' } }, { planOnly: true });
   await f.bind({ historicalRecovery: { mode: 'preserved-project-state', digest: plan.historicalRecoveryDigest } });
-  process.env.CODEX_THREAD_ID = worker;
-  await resumeBoundTask(
-    {
-      ...f.input,
-      taskRevision: f.registry.readTask('task').revision,
-      queueRevision: f.queue.read().revision,
+  if (originalStatus === 'blocked') {
+    process.env.CODEX_THREAD_ID = worker;
+    await resumeBoundTask(
+      {
+        ...f.input,
+        taskRevision: f.registry.readTask('task').revision,
+        queueRevision: f.queue.read().revision,
+        lane: 'delivery',
+      },
+      f.host,
+      { registry: f.registry, queue: f.queue },
+    );
+    f.queue.block({
       lane: 'delivery',
-    },
-    f.host,
-    { registry: f.registry, queue: f.queue },
-  );
-  f.queue.block({
-    lane: 'delivery',
-    task: 'task',
-    owner: old,
-    reason: 'Original 683-compatible exact failure retained',
-  });
+      task: 'task',
+      owner: old,
+      reason: 'Original 683-compatible exact failure retained',
+    });
+  }
   const request = { messageId: 'actual-standing-delegation', roomId: root, authorId: 'human', sequence: 20 };
   f.snapshots.get(root).turns[0].items.push({
     type: 'userMessage',
@@ -456,6 +462,17 @@ test('completed original development with no delivery ticket enters preparation 
   const ticket = f.queue.read().tickets.find((ticket) => ticket.lane === 'delivery');
   assert.equal(ticket.status, 'queued');
   assert.equal(ticket.admission, null);
+  const outbox = createProgressOutbox(path.join(f.registry.commonDir, 'task-progress/task'));
+  const receipts = outbox
+    .read()
+    .pending.map(({ receipt }) => receipt)
+    .filter((receipt) => receipt.evidence_refs.includes(`execution-order:${f.queue.read().revision}:delivery:task`));
+  assert.deepEqual(
+    receipts.map(({ event }) => event),
+    ['queued'],
+  );
+  assert.equal(Object.hasOwn(receipts[0], 'stage_fact'), false);
+  assert.equal(f.board.status, 'review');
   assert.deepEqual(
     f.queue.read().tickets.find((t) => t.lane === 'development'),
     before.tickets.find((t) => t.lane === 'development'),
@@ -641,8 +658,8 @@ test('683-shaped frozen carrier safely resumes after binding was already consume
   assert.equal(before.frozen.accepted, f.accepted.commit);
   assert.ok(state.dynamicDecisions.every((item) => item.ticketBefore.reason));
 });
-test('preparation finish verifies the original PR CI, restores its ticket and only a new pause projects paused', async (t) => {
-  const f = await dynamicFrozenFixture(t, { withOldPause: true });
+async function verifyPreparationProjection(t, originalStatus) {
+  const f = await dynamicFrozenFixture(t, { previousPause: true, originalStatus });
   const head = f.git(f.worktree, 'rev-parse', 'HEAD');
   f.registry.revise('task', f.registry.readTask('task').revision, (record) => {
     record.recordedHead = head;
@@ -715,7 +732,7 @@ test('preparation finish verifies the original PR CI, restores its ticket and on
       .read()
       .pending.find(({ receipt }) => receipt.evidence_refs.includes(`execution-order:${revision}:delivery:task`))
       ?.receipt;
-  assert.equal(receipt(before.revision)?.event, 'blocked');
+  assert.equal(receipt(before.revision)?.event, originalStatus);
   assert.equal(receipt(before.revision)?.reason, original.reason);
   await finish();
   assert.deepEqual(f.queue.read(), before);
@@ -752,7 +769,10 @@ test('preparation finish verifies the original PR CI, restores its ticket and on
     original,
   );
   await assert.rejects(() => f.call('dispatch', f.decision()), /delegation missing or revoked by pause/i);
-});
+}
+for (const originalStatus of ['queued', 'blocked'])
+  test(`preparation finish verifies original PR CI and restores the historical ${originalStatus} projection`, (t) =>
+    verifyPreparationProjection(t, originalStatus));
 test('preparation admission rejects final commands and generic measured shell effects before any session or main mutation', async (t) => {
   const f = await dynamicFrozenFixture(t),
     before = f.registry.readTask('task');
@@ -1991,3 +2011,377 @@ for (const status of ['paused', 'done', 'cancelled'])
     );
     assert.deepEqual(f.queue.read(), before);
   });
+
+async function pausedPreparationFixture(t) {
+  const f = await dynamicFrozenFixture(t);
+  const head = f.git(f.worktree, 'rev-parse', 'HEAD');
+  const decision = f.decision('preparation');
+  await f.call('dispatch', decision);
+  process.env.CODEX_THREAD_ID = worker;
+  await f.call('dispatch-start', {
+    decisionId: decision.decisionId,
+    coordinatorThreadId: root,
+    task: 'task',
+    owner: old,
+    executor: worker,
+    expectedQueueRevision: f.queue.read().revision,
+  });
+  f.registry.revise('task', f.registry.readTask('task').revision, (task) => {
+    task.stage = 'pr-pending';
+    task.recordedHead = head;
+  });
+  const common = f.registry.commonDir,
+    directory = path.join(common, 'task-delivery/task');
+  const number = 7,
+    runId = '42',
+    url = 'https://example.invalid/fixture/repo/pull/7';
+  const child = spawnSync(
+    process.execPath,
+    [
+      '--input-type=module',
+      '-e',
+      `
+    import { writeFileSync } from 'node:fs';
+    import os from 'node:os';
+    import path from 'node:path';
+    import { randomUUID } from 'node:crypto';
+    import { createResourceLeases } from ${JSON.stringify(new URL('./resource-lease.mjs', import.meta.url).href)};
+    import { openCompletion, saveCompletion, completionStage } from ${JSON.stringify(new URL('./completion-session.mjs', import.meta.url).href)};
+    const [common,directory,owner,head,url] = process.argv.slice(1);
+    createResourceLeases(common).acquire('task-delivery-task',owner);
+    const state=openCompletion(directory,'task'),save=() => saveCompletion(directory,state);
+    const token=randomUUID(), journal={token,host:os.hostname(),pgid:process.pid,status:'exited',exitCode:0,signal:null};
+    writeFileSync(path.join(directory,'process-'+token+'.json'),JSON.stringify(journal),{mode:0o600,flag:'wx'});
+    const first={id:randomUUID(),name:'repair',key:'original',startedAt:Date.now()-10,finishedAt:Date.now()-5,status:'failure',failure:{category:'stage-failure'},owner:{host:os.hostname(),pid:process.pid},processTracking:1,processes:[{token}]};
+    state.events.push(first);save();
+    for (const [name,key,result] of [
+      ['prepare',head,{head,protectionChecked:true,runtimePreflight:true}],
+      ['push',head,{head}],
+      ['pr',head,{headRefOid:head,number:7,state:'OPEN',url}],
+      ['discovery','pr:'+head,'42'],
+    ]) await completionStage(state,name,key,() => result,{save});
+    await completionStage(state,'ci',head+':42',() => process.exit(130),{save});
+  `,
+      common,
+      directory,
+      old,
+      head,
+      url,
+    ],
+    { encoding: 'utf8', detached: true },
+  );
+  assert.equal(child.status, 130, child.stderr);
+  const sessionFile = path.join(directory, 'completion-session.json'),
+    leaseFile = path.join(f.registry.directory, 'resource-leases/task-delivery-task/owner.json');
+  const session = JSON.parse(readFileSync(sessionFile)),
+    journalFile = path.join(directory, 'process-' + session.events[0].processes[0].token + '.json');
+
+  process.env.CODEX_THREAD_ID = root;
+  const request = (n, roomId) => ({ messageId: 'actual-recovery-' + n, roomId, authorId: 'human', sequence: n });
+  f.queue.direct({ action: 'pause-all', request: request(30, root) });
+  const coordinator = randomUUID(),
+    appointment = request(31, root);
+  f.snapshots.get(root).turns[0].items.push({ type: 'userMessage', id: appointment.messageId });
+  f.snapshots.set(coordinator, delegate(coordinator, root, 'Become coordinator ' + appointment.messageId));
+  process.env.CODEX_THREAD_ID = coordinator;
+  await authorizeTaskCoordinator(
+    common,
+    { rootThreadId: coordinator, request: appointment, expectedRevision: 1 },
+    f.host,
+  );
+  const direction = request(32, coordinator);
+  f.snapshots.get(coordinator).turns[0].items.push({
+    type: 'userMessage',
+    id: direction.messageId,
+    content: [{ type: 'text', text: 'Recover the stopped preparation of task with its original PR and ticket.' }],
+  });
+  const authorityId = randomUUID();
+  await f.call('delegate', {
+    coordinatorThreadId: coordinator,
+    authorityId,
+    request: direction,
+    taskIds: ['task'],
+    expectedQueueRevision: f.queue.read().revision,
+    expectedCoordinationRevision: 2,
+  });
+  const input = {
+    task: 'task',
+    owner: old,
+    executor: worker,
+    coordinatorThreadId: coordinator,
+    authorityId,
+    request: direction,
+    decisionId: decision.decisionId,
+    recoveryId: randomUUID(),
+    expectedQueueRevision: f.queue.read().revision,
+    expectedTaskRevision: f.registry.readTask('task').revision,
+    expectedCoordinationRevision: 2,
+    expectedBoardRevision: f.board.revision,
+    accepted: f.accepted.commit,
+    head,
+    pr: number,
+    runId,
+    eventId: session.events.at(-1).id,
+  };
+
+  // Exercise the production gh argument paths. The isolated remote accepts only GETs.
+  const bin = path.join(f.dir, 'bin'),
+    remoteFile = path.join(f.dir, 'remote.json');
+  mkdirSync(bin);
+  const repository = 'fixture/repo';
+  const remote = {
+    pull: { number, state: 'OPEN', url, headRefOid: head, headRefName: f.task.branch },
+    run: {
+      id: 42,
+      run_attempt: 1,
+      event: 'pull_request',
+      head_sha: head,
+      head_branch: f.task.branch,
+      repository: { full_name: repository },
+      path: '.github/workflows/quality.yml',
+      status: 'completed',
+      conclusion: 'success',
+    },
+  };
+  writeFileSync(remoteFile, JSON.stringify(remote));
+  writeFileSync(
+    path.join(bin, 'gh'),
+    '#!' +
+      process.execPath +
+      '\n' +
+      `
+    const fs=require('node:fs'), args=process.argv.slice(2), remote=JSON.parse(fs.readFileSync(${JSON.stringify(remoteFile)}));
+    const reads=[
+      [['repo','view','--json','nameWithOwner'],{nameWithOwner:'fixture/repo'}],
+      [['pr','view','7','--repo','fixture/repo','--json','number,state,url,headRefOid,headRefName'],remote.pull],
+      [['api','repos/fixture/repo/actions/runs/42'],remote.run],
+    ];
+    const response=reads.find(([input])=>JSON.stringify(input)===JSON.stringify(args));
+    if(!response)process.exit(2); console.log(JSON.stringify(response[1]));
+  `,
+    { mode: 0o700 },
+  );
+  const priorPath = process.env.PATH;
+  process.env.PATH = bin + path.delimiter + priorPath;
+  t.after(() => {
+    process.env.PATH = priorPath;
+  });
+  const invoke = async (action, task) => {
+    const now = new Date().toISOString();
+    const observations = [coordinator, worker].map((id) => ({
+      provider: 'codex-native-read_thread',
+      observedAt: now,
+      snapshot: f.snapshots.get(id),
+    }));
+    return (
+      await advanceTaskThread(
+        { action, task, nativeObservations: observations },
+        { commonDir: common, registry: f.registry, readTask: f.host.readTask, observe: f.observe },
+      )
+    ).result;
+  };
+  const plan = (task = input) => invoke('preparation-recovery-plan', task);
+  const apply = (task) => invoke('preparation-recover', task);
+  const asWorker = () => {
+    process.env.CODEX_THREAD_ID = worker;
+    f.snapshots.get(worker).thread.status = { type: 'active' };
+  };
+  return {
+    ...f,
+    coordinator,
+    input,
+    plan,
+    apply,
+    asWorker,
+    head,
+    remote,
+    remoteFile,
+    session,
+    sessionFile,
+    leaseFile,
+    journalFile,
+    directory,
+  };
+}
+
+test('paused preparation restores only the ended local CI wait and can reserve and consume the original delivery ticket', async (t) => {
+  const f = await pausedPreparationFixture(t);
+  const before = f.queue.read(),
+    registered = f.registry.readTask('task');
+  const bytes = readFileSync(f.sessionFile, 'utf8'),
+    lease = readFileSync(f.leaseFile, 'utf8'),
+    journal = readFileSync(f.journalFile, 'utf8'),
+    remote = readFileSync(f.remoteFile);
+  const next = {
+    ...f.decision('preparation'),
+    coordinatorThreadId: f.coordinator,
+    authorityId: f.input.authorityId,
+    expectedCoordinationRevision: 2,
+  };
+  await assert.rejects(f.call('dispatch', next), /lease remains/);
+  const plan = await f.plan();
+  assert.equal(plan.admission, null);
+  assert.equal(readFileSync(f.sessionFile, 'utf8'), bytes);
+  assert.equal(readFileSync(f.leaseFile, 'utf8'), lease);
+  assert.deepEqual(await f.plan(), plan);
+  await assert.rejects(f.apply(plan.workerInput), /Real bound executor/);
+  f.asWorker();
+  const result = await f.apply(plan.workerInput);
+  assert.equal(result.status, 'interrupted-preparation-recovered');
+  assert.equal(result.admission, null);
+  assert.equal(result.formalDeliveryComplete, false);
+  assert.deepEqual(f.queue.read(), before);
+  assert.deepEqual(f.registry.readTask('task'), registered);
+  assert.equal(existsSync(path.dirname(f.leaseFile)), false);
+  const after = JSON.parse(readFileSync(f.sessionFile));
+  assert.deepEqual(after.events.slice(0, -1), f.session.events.slice(0, -1));
+  assert.equal(after.events.at(-1).failure.category, 'interrupted');
+  assert.match(after.events.at(-1).durationBasis, /unknown/);
+  assert.deepEqual(readFileSync(f.remoteFile), remote);
+  const prefix = path.join(f.directory, 'preparation-recovery', f.input.recoveryId);
+  const archived = JSON.parse(readFileSync(prefix + '.plan.json'));
+  assert.equal(archived.original.session.raw, bytes);
+  assert.equal(archived.original.lease.raw, lease);
+  assert.equal(readFileSync(path.join(prefix + '.lease', 'owner.json'), 'utf8'), lease);
+  assert.equal(archived.original.journals[path.basename(f.journalFile)].raw, journal);
+  assert.equal(JSON.parse(readFileSync(f.journalFile)).status, 'quiescent');
+  const reordered = Object.fromEntries(Object.entries(plan.workerInput).reverse());
+  assert.deepEqual(await f.apply(reordered), result);
+  // If the final response/receipt publication was interrupted, re-read only the exact completed transition.
+  renameSync(prefix + '.receipt.json', path.join(f.dir, 'first-receipt'));
+  assert.deepEqual(await f.apply(plan.workerInput), result);
+  process.env.CODEX_THREAD_ID = f.coordinator;
+  f.snapshots.get(worker).thread.status = { type: 'idle' };
+  await f.call('dispatch', next);
+  await assert.rejects(
+    f.plan({ ...f.input, expectedQueueRevision: f.queue.read().revision }),
+    /already admitted or reserved/,
+  );
+  process.env.CODEX_THREAD_ID = worker;
+  const started = await f.call('dispatch-start', {
+    decisionId: next.decisionId,
+    coordinatorThreadId: f.coordinator,
+    task: 'task',
+    owner: old,
+    executor: worker,
+    expectedQueueRevision: f.queue.read().revision,
+  });
+  assert.equal(started.status, 'admitted-work-not-started');
+  const ticket = f.queue.read().tickets.find((t) => t.lane === 'delivery');
+  const original = before.tickets.find((t) => t.lane === 'delivery');
+  for (const key of ['task', 'owner', 'order', 'request']) assert.deepEqual(ticket[key], original[key]);
+  assert.notEqual(ticket.admission, original.admission);
+  assert.equal(f.registry.readTask('task').frozen.accepted, f.input.accepted);
+  await assert.rejects(f.apply(plan.workerInput), /Queue revision changed/);
+  await assert.rejects(
+    f.apply({ ...plan.workerInput, expectedQueueRevision: f.queue.read().revision }),
+    /Original ticket/,
+  );
+});
+
+test('paused preparation refuses active or reused process identities and incomplete evidence before changing the originals', async (t) => {
+  const f = await pausedPreparationFixture(t);
+  const owner = JSON.parse(readFileSync(f.leaseFile)),
+    group = JSON.parse(readFileSync(f.journalFile));
+  const rawLease = readFileSync(f.leaseFile),
+    rawSession = readFileSync(f.sessionFile),
+    rawJournal = readFileSync(f.journalFile);
+  const queue = f.queue.read();
+  for (const invalid of [
+    { owner: worker },
+    { executor: old },
+    { expectedTaskRevision: f.input.expectedTaskRevision - 1 },
+    { expectedCoordinationRevision: 1 },
+    { expectedQueueRevision: f.input.expectedQueueRevision - 1 },
+    { coordinatorThreadId: root },
+    { authorityId: f.authorityId },
+    { decisionId: randomUUID() },
+    { request: { ...f.input.request, messageId: 'missing-user' } },
+    { head: '0'.repeat(40) },
+    { eventId: randomUUID() },
+  ])
+    await assert.rejects(f.plan({ ...f.input, ...invalid }));
+  const state = structuredClone(f.session);
+  for (const e of state.events) e.owner.pid = process.pid;
+  writeFileSync(f.sessionFile, JSON.stringify(state));
+  writeFileSync(f.leaseFile, JSON.stringify({ ...owner, pid: process.pid }));
+  await assert.rejects(f.plan(), /Live, reused or unobservable/);
+  writeFileSync(f.sessionFile, rawSession);
+  writeFileSync(f.leaseFile, rawLease);
+  const pgid = Number(execFileSync('/bin/ps', ['-o', 'pgid=', '-p', String(process.pid)], { encoding: 'utf8' }).trim());
+  writeFileSync(f.journalFile, JSON.stringify({ ...group, status: 'quiescent', pgid }));
+  await assert.rejects(f.plan(), /Live, reused or unobservable/);
+  writeFileSync(f.journalFile, JSON.stringify({ ...group, host: 'unobservable.invalid' }));
+  await assert.rejects(f.plan(), /Unprovable process/);
+  writeFileSync(f.journalFile, rawJournal);
+  const other = path.join(f.dir, 'journal');
+  renameSync(f.journalFile, other);
+  await assert.rejects(f.plan(), /missing process journal/);
+  renameSync(other, f.journalFile);
+  const extra = path.join(f.directory, 'process-' + randomUUID() + '.json');
+  writeFileSync(extra, rawJournal, { mode: 0o600 });
+  await assert.rejects(f.plan(), /Unreferenced/);
+  rmSync(extra);
+  writeFileSync(f.leaseFile, JSON.stringify({ ...owner, task: worker }));
+  await assert.rejects(f.plan());
+  writeFileSync(f.leaseFile, rawLease);
+  writeFileSync(f.remoteFile, JSON.stringify({ ...f.remote, run: { ...f.remote.run, run_attempt: 2 } }));
+  await assert.rejects(f.plan(), /first-attempt/);
+  writeFileSync(f.remoteFile, JSON.stringify(f.remote));
+  assert.deepEqual(readFileSync(f.leaseFile), rawLease);
+  assert.deepEqual(readFileSync(f.sessionFile), rawSession);
+  assert.deepEqual(readFileSync(f.journalFile), rawJournal);
+  assert.deepEqual(f.queue.read(), queue);
+  assert.equal(existsSync(path.join(f.directory, 'preparation-recovery')), false);
+});
+
+test('paused preparation worker rechecks lease and session inode, native role, board revision and journal bytes', async (t) => {
+  const f = await pausedPreparationFixture(t),
+    plan = await f.plan();
+  f.asWorker();
+  await assert.rejects(f.apply({ ...plan.workerInput, planDigest: '0'.repeat(64) }), /digest changed/);
+  f.board.revision++;
+  await assert.rejects(f.apply(plan.workerInput), /Board revision changed/);
+  f.board.revision--;
+  for (const file of [f.leaseFile, f.sessionFile, f.journalFile]) {
+    const spare = path.join(f.dir, 'previous-inode');
+    renameSync(file, spare);
+    writeFileSync(file, readFileSync(spare), { mode: 0o600 });
+    await assert.rejects(f.apply(plan.workerInput), /identity changed|inode changed/);
+    renameSync(spare, file);
+  }
+  const initial = readFileSync(f.journalFile);
+  writeFileSync(f.journalFile, JSON.stringify({ ...JSON.parse(initial), status: 'quiescent' }));
+  await assert.rejects(f.apply(plan.workerInput), /Journal changed/);
+  writeFileSync(f.journalFile, initial);
+  assert.equal(readdirSync(path.join(f.directory, 'preparation-recovery')).length, 1);
+  const stored = f.snapshots.get(worker).turns[0].items[0];
+  stored.output.text = stored.output.text.replace('Execute task task', 'Execute an unrelated task-id');
+  await assert.rejects(f.apply(plan.workerInput), /creation/);
+  assert.equal(existsSync(f.leaseFile), true);
+  assert.deepEqual(JSON.parse(readFileSync(f.sessionFile)), f.session);
+});
+
+test('paused preparation resumes its own interrupted session save only with the intact plan and original lease', async (t) => {
+  const f = await pausedPreparationFixture(t),
+    plan = await f.plan();
+  const prefix = path.join(f.directory, 'preparation-recovery', f.input.recoveryId);
+  f.asWorker();
+  const intent = { planDigest: plan.workerInput.planDigest, decisionId: f.input.decisionId, at: Date.now() };
+  writeFileSync(prefix + '.intent.json', JSON.stringify(intent) + '\n', { mode: 0o600, flag: 'wx' });
+  // Reproduce interruption after the actual completion writer saved its result,
+  // before the lease directory move. Both files are inside this isolated repo.
+  recoverInterrupted(JSON.parse(readFileSync(f.sessionFile)), f.directory, { now: intent.at });
+  const after = readFileSync(f.sessionFile);
+  const altered = JSON.parse(after);
+  altered.events[0].failure.category = 'changed';
+  writeFileSync(f.sessionFile, JSON.stringify(altered, null, 2) + '\n');
+  await assert.rejects(f.apply(plan.workerInput), /Unexpected recovered session/);
+  assert.equal(existsSync(f.leaseFile), true);
+  assert.equal(existsSync(prefix + '.receipt.json'), false);
+  writeFileSync(f.sessionFile, after);
+  const result = await f.apply(plan.workerInput);
+  assert.equal(result.status, 'interrupted-preparation-recovered');
+  assert.deepEqual(readFileSync(f.sessionFile), after);
+  assert.equal(existsSync(f.leaseFile), false);
+});

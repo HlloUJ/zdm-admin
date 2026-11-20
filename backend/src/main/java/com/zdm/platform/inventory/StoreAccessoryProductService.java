@@ -95,6 +95,8 @@ public class StoreAccessoryProductService {
   @org.springframework.beans.factory.annotation.Autowired
   private AccessoryStateActivityService stateActivities;
   private final AccessoryInvalidationMedia invalidationMedia;
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.zdm.platform.storeexit.StoreExitTargetService exitTargets;
   private final JdbcTemplate jdbc;
   private final CityPartnerStoreScope scopes;
   private final AccessoryProductService products;
@@ -201,6 +203,16 @@ public class StoreAccessoryProductService {
     if (available == null || available == 0) {
       throw new IllegalArgumentException("商品不存在或不可挑选");
     }
+    return selectionCenterDetail(id);
+  }
+
+  /** Read-only shared catalog projection; callers enforce center access and scope. */
+  public PoolDetail selectionCenterDetail(Long id) {
+    var store = scopes.require();
+    Long available = jdbc.queryForObject("SELECT COUNT(*) FROM accessory_products WHERE id=?"
+        + " AND status='selling' AND source_status IN ('selling','soldOut')"
+        + " AND operations_deleted=FALSE AND operations_invalidated_at IS NULL", Long.class, id);
+    if (available == null || available == 0) { throw new IllegalArgumentException("商品当前不可用"); }
     AccessoryProduct product = publicProduct(id);
     String categoryName = poolCategoryPath(product.getCategoryId());
     List<PoolSku> skus = (product.getVariants() == null ? List.<AccessoryProductVariant>of()
@@ -564,6 +576,7 @@ public class StoreAccessoryProductService {
         JOIN accessory_products product ON product.id=listing.accessory_product_id
         WHERE listing.accessory_product_id=? AND listing.selection_generation=product.selection_generation
         """, productId)) {
+      if (!exitTargets.lockParent("store_accessory_products", number(row.get("id")))) { continue; }
       if (invalidated(row)) {
         jdbc.update("UPDATE store_accessory_products SET invalidated_reason=? WHERE id=?", reason, row.get("id"));
         continue;

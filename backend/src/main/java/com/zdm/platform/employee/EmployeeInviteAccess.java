@@ -16,13 +16,21 @@ import org.springframework.util.StringUtils;
 public class EmployeeInviteAccess {
   private final AuthAccountMapper accounts;
   private final EffectivePermissionResolver permissions;
+  private final com.zdm.platform.storeexit.StoreExitRecoveryState recovery;
 
-  public EmployeeInviteAccess(AuthAccountMapper accounts, EffectivePermissionResolver permissions) {
+  public EmployeeInviteAccess(AuthAccountMapper accounts, EffectivePermissionResolver permissions,
+      com.zdm.platform.storeexit.StoreExitRecoveryState recovery) {
+    this.recovery = recovery;
     this.accounts = accounts;
     this.permissions = permissions;
   }
 
+  public void requireAvailable(EmployeeInvite invite) {
+    recovery.requireAvailable(invite.getStoreId());
+  }
+
   public void requireValidIssuer(EmployeeInvite invite) {
+    requireAvailable(invite);
     if (invite.getCreatedByAccountId() == null
         || accounts.findAllEnabledByAccountId(invite.getCreatedByAccountId()).stream()
             .noneMatch(account -> canInvite(account, invite))) {

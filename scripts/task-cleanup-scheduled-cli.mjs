@@ -63,7 +63,7 @@ export async function runScheduledCleanup(
     }
     let recovered = null;
     if (state.status === 'running' && state.lockToken) {
-      recovered = readRecoveredCleanupLock(base, 'scheduler.lock', state.lockToken, manifest.sourceHead);
+      recovered = readRecoveredCleanupLock(base, 'scheduler.lock', state.lockToken, state.sourceHead);
       if (recovered) {
         const original = path.join(recovered.archive, 'scheduler-state.interrupted.json');
         if (existsSync(original)) assert.deepEqual(read(original), state, 'Interrupted scheduler state differs');
@@ -80,7 +80,9 @@ export async function runScheduledCleanup(
     }
     if (
       state.slot &&
-      (Date.parse(state.slot) > Date.parse(slot) || (state.slot === slot && !(state.status === 'running' && recovered)))
+      ((state.status === 'running' && !recovered) ||
+        Date.parse(state.slot) > Date.parse(slot) ||
+        (state.slot === slot && !recovered))
     )
       return {
         status: state.status === 'running' ? 'unknown' : 'already-ran',
@@ -100,7 +102,7 @@ export async function runScheduledCleanup(
     save(file, { ...state, ...started, status: 'running' });
     let summary;
     try {
-      const result = await lease.scope(() => runCleanup(manifest.root, ['run']));
+      const result = await lease.scope(() => runCleanup(manifest.root, [policy.ownershipV2 ? 'run-ownership' : 'run']));
       const notices = await notify(queue, { ...adapter, destination: policy.notification?.destination });
       const metadata = policy.metadata
         ? queue.compact({

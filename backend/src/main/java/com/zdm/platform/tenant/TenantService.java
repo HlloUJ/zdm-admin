@@ -25,14 +25,17 @@ public class TenantService extends CreatorAwareService<TenantMapper, Tenant> {
   private final JdbcTemplate jdbcTemplate;
   private final com.zdm.platform.account.AccountLifecycleService accountLifecycle;
   private final CurrentIdentityProvider identityProvider;
+  private final com.zdm.platform.storeexit.StoreExitCoordinator exits;
 
   public TenantService(
       JdbcTemplate jdbcTemplate,
       CurrentIdentityProvider identityProvider,
-      com.zdm.platform.account.AccountLifecycleService accountLifecycle) {
+      com.zdm.platform.account.AccountLifecycleService accountLifecycle,
+      com.zdm.platform.storeexit.StoreExitCoordinator exits) {
     this.jdbcTemplate = jdbcTemplate;
     this.identityProvider = identityProvider;
     this.accountLifecycle = accountLifecycle;
+    this.exits = exits;
   }
 
   public List<Tenant> listTenants() {
@@ -140,61 +143,81 @@ public class TenantService extends CreatorAwareService<TenantMapper, Tenant> {
 
   public TenantPurgePreview getPurgePreview(Long id) {
     Tenant existing = requireTenant(id);
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), existing.getCreatedByAccountId());
     return buildPurgePreview(existing);
   }
 
   @Transactional
-  public TenantPurgeResult purgeTenant(Long id, String confirmationName) {
+  public TenantPurgeResult purgeTenant(Long id, String confirmationName, Map<Long, String> storePlans) {
     Tenant existing = lockTenant(id);
+    com.zdm.platform.security.DataScope.requireAccess(identityProvider.require(), existing.getCreatedByAccountId());
     if (!existing.getName().equals(confirmationName)) {
       throw new IllegalArgumentException("请输入完整租户名称确认删除");
     }
+    exits.lockTenantStores(id);
     List<Long> candidateAccountIds = findTenantAccountIds(id);
+    Set<Long> relationshipAccountIds = new HashSet<>(findTenantRelationshipAccountIds(id));
     candidateAccountIds.forEach(accountLifecycle::lockAccount);
+    Set<Long> storeOnlyAccounts = candidateAccountIds.stream()
+        .filter(account -> accountLifecycle.isStoreOnlyExitAccount(account, id)).collect(java.util.stream.Collectors.toSet());
     TenantPurgePreview preview = buildPurgePreview(existing);
     if (!preview.eligible()) {
       throw new IllegalArgumentException(preview.blockers().getFirst());
     }
     Set<Long> protectedAccounts = new HashSet<>();
     candidateAccountIds.stream().filter(accountLifecycle::isProtected).forEach(protectedAccounts::add);
+    if (storePlans == null || !storePlans.equals(preview.storePlans())) {
+      throw new IllegalArgumentException("门店删除范围或规则已变化，请重新预检并确认");
+    }
+    for (var plan : new java.util.TreeMap<>(storePlans).entrySet()) {
+      exits.execute(plan.getKey(), plan.getValue(), true);
+    }
 
     jdbcTemplate.update(
-        "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE tenant_id = ?)",
+        "DELETE FROM auth_sessions WHERE identity_id IN (SELECT id FROM account_identities WHERE tenant_id = ? AND store_id IS NULL)",
         id);
-    jdbcTemplate.update("DELETE FROM account_roles WHERE tenant_id = ?", id);
+    jdbcTemplate.update("DELETE FROM account_roles WHERE tenant_id = ? AND store_id IS NULL", id);
     jdbcTemplate.update(
-        "DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE tenant_id = ?)",
+        "DELETE FROM role_permissions WHERE role_id IN (SELECT id FROM roles WHERE tenant_id = ? AND store_id IS NULL)",
         id);
-    jdbcTemplate.update("DELETE FROM account_identities WHERE tenant_id = ?", id);
+    jdbcTemplate.update("DELETE FROM account_identities WHERE tenant_id = ? AND store_id IS NULL", id);
     deleteTenantProductCategories(id);
-    jdbcTemplate.update("DELETE FROM employee_invites WHERE tenant_id = ?", id);
-    int employeeDeleteCount = jdbcTemplate.update("DELETE FROM employees WHERE tenant_id = ?", id);
-    int roleDeleteCount = jdbcTemplate.update("DELETE FROM roles WHERE tenant_id = ?", id);
-    deleteTenantStoreCategories(id);
-    int storeDeleteCount = jdbcTemplate.update("DELETE FROM stores WHERE tenant_id = ?", id);
+    jdbcTemplate.update("DELETE FROM employee_invite_acceptances WHERE invite_id IN (SELECT id FROM employee_invites WHERE tenant_id=? AND store_id IS NULL)", id);
+    jdbcTemplate.update("DELETE FROM employee_invites WHERE tenant_id = ? AND store_id IS NULL", id);
+    jdbcTemplate.update("DELETE FROM employees WHERE tenant_id = ? AND store_id IS NULL", id);
+    int employeeDeleteCount = preview.employeeCount();
+    jdbcTemplate.update("DELETE FROM roles WHERE tenant_id = ? AND store_id IS NULL", id);
+    int roleDeleteCount = preview.roleCount();
+    int storeDeleteCount = preview.storeCount();
     jdbcTemplate.update("DELETE FROM tenant_businesses WHERE tenant_id = ?", id);
     int tenantDeleteCount = jdbcTemplate.update("DELETE FROM tenants WHERE id = ?", id);
+    java.util.Set<Long> phoneAccounts = candidateAccountIds.stream().filter(accountLifecycle::hasPhoneCredential)
+        .collect(java.util.stream.Collectors.toSet());
     int deletedAccounts = 0;
+    int retainedAccounts = 0;
     int releasedPhones = 0;
     for (Long accountId : candidateAccountIds) {
       var disposition = protectedAccounts.contains(accountId)
           ? com.zdm.platform.account.AccountLifecycleService.Disposition.KEEP
-          : accountLifecycle.releaseIfUnbound(accountId);
+          : storeOnlyAccounts.contains(accountId) ? accountLifecycle.releaseForStoreExit(accountId)
+              : accountLifecycle.releaseIfUnbound(accountId);
       if (disposition == com.zdm.platform.account.AccountLifecycleService.Disposition.DELETE) {
         deletedAccounts++;
-      }
-      if (disposition != com.zdm.platform.account.AccountLifecycleService.Disposition.KEEP) {
+      } else if (relationshipAccountIds.contains(accountId)) { retainedAccounts++; }
+      if (disposition != com.zdm.platform.account.AccountLifecycleService.Disposition.KEEP && phoneAccounts.contains(accountId)) {
         releasedPhones++;
       }
     }
+    storePlans.keySet().forEach(storeId -> exits.recordAccountOutcome(storeId, candidateAccountIds));
     return new TenantPurgeResult(
         tenantDeleteCount,
         storeDeleteCount,
         employeeDeleteCount,
         roleDeleteCount,
         deletedAccounts,
-        candidateAccountIds.size() - deletedAccounts,
-        releasedPhones);
+        retainedAccounts,
+        releasedPhones,
+        storePlans.keySet().stream().sorted().map(storeId -> exits.resultForTenant(storeId, id)).toList());
   }
 
   public boolean hasEnabledBusiness(Long tenantId, String businessType) {
@@ -345,15 +368,24 @@ public class TenantService extends CreatorAwareService<TenantMapper, Tenant> {
       blockers.add("该租户存在暂不支持删除的跨组织业务数据");
     }
 
+    if (exits.hasForeignTenantRelations(tenantId)) { blockers.add("该租户存在归属不一致的门店关系，请先核实"); }
+    Map<Long, String> storePlans = new java.util.TreeMap<>();
+    for (Long storeId : jdbcTemplate.queryForList("SELECT id FROM stores WHERE tenant_id=? ORDER BY id", Long.class, tenantId)) {
+      var storePreview = exits.previewForTenant(storeId);
+      storePlans.put(storeId, storePreview.planHash());
+      blockers.addAll(storePreview.blockers());
+    }
     List<Long> candidateAccountIds = findTenantAccountIds(tenantId);
+    Set<Long> relationshipAccountIds = new HashSet<>(findTenantRelationshipAccountIds(tenantId));
     int accountDeleteCount = 0;
+    int accountRetainCount = 0;
     int phoneReleaseCount = 0;
     for (Long accountId : candidateAccountIds) {
-      var disposition = accountLifecycle.assess(accountId, tenantId);
+      var disposition = accountLifecycle.assessForTenantExit(accountId, storePlans.keySet(), tenantId);
       if (disposition == com.zdm.platform.account.AccountLifecycleService.Disposition.DELETE) {
         accountDeleteCount++;
-      }
-      if (disposition != com.zdm.platform.account.AccountLifecycleService.Disposition.KEEP) {
+      } else if (relationshipAccountIds.contains(accountId)) { accountRetainCount++; }
+      if (disposition != com.zdm.platform.account.AccountLifecycleService.Disposition.KEEP && accountLifecycle.hasPhoneCredential(accountId)) {
         phoneReleaseCount++;
       }
     }
@@ -364,12 +396,21 @@ public class TenantService extends CreatorAwareService<TenantMapper, Tenant> {
         count("SELECT COUNT(*) FROM employees WHERE tenant_id = ?", tenantId),
         count("SELECT COUNT(*) FROM roles WHERE tenant_id = ?", tenantId),
         accountDeleteCount,
-        candidateAccountIds.size() - accountDeleteCount,
+        accountRetainCount,
         phoneReleaseCount,
-        blockers);
+        blockers, storePlans);
   }
 
   private List<Long> findTenantAccountIds(Long tenantId) {
+    java.util.Set<Long> result = new java.util.TreeSet<>(findTenantRelationshipAccountIds(tenantId));
+    for (Long store : jdbcTemplate.queryForList("SELECT id FROM stores WHERE tenant_id=? ORDER BY id", Long.class, tenantId)) {
+      result.addAll(accountLifecycle.storeExitCandidates(
+          com.zdm.platform.storeexit.StoreExitScope.capture(jdbcTemplate, store, tenantId)));
+    }
+    return List.copyOf(result);
+  }
+
+  private List<Long> findTenantRelationshipAccountIds(Long tenantId) {
     return jdbcTemplate.queryForList(
         """
         SELECT DISTINCT account_id
@@ -419,21 +460,6 @@ public class TenantService extends CreatorAwareService<TenantMapper, Tenant> {
         remaining.remove(categoryId);
       }
     }
-  }
-
-  private void deleteTenantStoreCategories(Long tenantId) {
-    int deletedCount;
-    do {
-      deletedCount = jdbcTemplate.update(
-          """
-          DELETE category
-          FROM store_categories category
-          JOIN stores store ON store.id = category.store_id
-          LEFT JOIN store_categories child ON child.parent_id = category.id
-          WHERE store.tenant_id = ? AND child.id IS NULL
-          """,
-          tenantId);
-    } while (deletedCount > 0);
   }
 
   private int count(String sql, Object... args) {

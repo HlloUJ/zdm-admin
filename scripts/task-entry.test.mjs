@@ -45,7 +45,7 @@ function fixture(t) {
       encoding: 'utf8',
       // These dependency-free Git/entry fixtures never access a network. The
       // actual proxy-enabled Node 22/24 chain is covered by task-network tests.
-      env: { ...process.env, NODE_USE_ENV_PROXY: '0' },
+      env: { ...process.env, NODE_USE_ENV_PROXY: '0', ZDM_TASK_MONITOR_CONTEXT: '' },
     });
   return { main, a, git, run };
 }
@@ -157,10 +157,17 @@ for (const surface of ['codex-thread', 'collaboration-agent'])
         'native-new',
         '--owner',
         owner,
-        '--monitor-context',
-        JSON.stringify(context),
+        ...(surface === 'codex-thread' ? [] : ['--monitor-context', JSON.stringify(context)]),
       ],
-      { cwd: f.a, env: { ...process.env, CODEX_THREAD_ID: owner }, encoding: 'utf8' },
+      {
+        cwd: f.a,
+        env: {
+          ...process.env,
+          CODEX_THREAD_ID: owner,
+          ZDM_TASK_MONITOR_CONTEXT: surface === 'codex-thread' ? JSON.stringify(context) : 'not valid JSON',
+        },
+        encoding: 'utf8',
+      },
     );
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Board intake missing/);

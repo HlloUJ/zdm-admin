@@ -1,11 +1,12 @@
-import { captureDeliveryQueueProgress } from './delivery-repairs/task-delivery-queue-progress.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, rmSync, writeFileSync, realpathSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { createProgressOutbox, flushProgress } from './task-progress-outbox.mjs';
 import { recordToolProgress, bestEffortProgress, captureQueueProgress } from './task-delivery-status-sync.mjs';
+import { captureDeliveryQueueProgress } from './delivery-repairs/task-delivery-queue-progress.mjs';
 import { openCompletion, completionStage, saveCompletion } from './completion-session.mjs';
 const payload = {
   observed_at: '2026-11-15T12:00:00.000Z',
@@ -248,6 +249,59 @@ for (const scenario of [
       'paused',
     );
   });
+test('delivery enrollment projects only a verified phase and never invents an action start', (t) => {
+  const request = { messageId: 'standing-delegation', roomId: 'coordinator', authorId: 'human', sequence: 20 };
+  const phaseOrigin = {
+    phaseId: 'phase-a',
+    authorityId: 'delegate-a',
+    developmentEvidenceDigest: 'd'.repeat(64),
+  };
+  const ticket = {
+    task: 'fixture-task',
+    lane: 'delivery',
+    owner: 'original-owner',
+    request: { ...request, messageId: 'original-development', sequence: 5 },
+    order: 5,
+    status: 'queued',
+    admission: null,
+    phaseOrigin,
+  };
+  const enrollment = {
+    action: 'delivery-phase-enrolled',
+    task: ticket.task,
+    owner: ticket.owner,
+    order: ticket.order,
+    ...phaseOrigin,
+    phaseDigest: createHash('sha256').update(JSON.stringify(phaseOrigin)).digest('hex'),
+    request,
+  };
+  const previous = {
+    revision: 1,
+    paused: true,
+    events: [{ action: 'pause-all', request: { ...request, messageId: 'old-pause', sequence: 10 } }],
+    tickets: [],
+    dynamicAuthorities: [{ id: phaseOrigin.authorityId, request }],
+  };
+  for (const [event, expected] of [
+    [enrollment, ['queued']],
+    [{ ...enrollment, phaseDigest: '0'.repeat(64) }, ['paused']],
+    [{ ...enrollment, order: ticket.order + 1 }, ['paused']],
+    [{ ...enrollment, request: { ...request, roomId: 'other' } }, ['paused']],
+    [{ ...enrollment, request: { ...request, authorId: 'other' } }, ['paused']],
+  ]) {
+    const root = fixture(t);
+    const after = { ...previous, revision: 2, events: [...previous.events, event], tickets: [ticket] };
+    const original = structuredClone(after);
+    captureDeliveryQueueProgress(root, after, previous);
+    assert.deepEqual(after, original);
+    assert.deepEqual(
+      createProgressOutbox(path.join(root, 'task-progress', ticket.task))
+        .read()
+        .pending.map(({ receipt }) => receipt.event),
+      expected,
+    );
+  }
+});
 test('releasing capacity stays distinct from a later genuine pause', (t) => {
   const root = fixture(t);
   const before = {
@@ -277,7 +331,7 @@ test('releasing capacity stays distinct from a later genuine pause', (t) => {
   );
 });
 
-test('enrolling a verified delivery phase leaves the review card alone until an actual newer pause', (t) => {
+test('enrollment emits only queue progress before an actual newer pause', (t) => {
   const root = fixture(t);
   const fence = { messageId: 'prior-fence', sequence: 10, authorId: 'same-user' };
   const delegation = { messageId: 'delivery-delegation', sequence: 20, authorId: 'same-user' };
@@ -303,6 +357,7 @@ test('enrolling a verified delivery phase leaves the review card alone until an 
     authorityId: ticket.phaseOrigin.authorityId,
     order: ticket.order,
     developmentEvidenceDigest: ticket.phaseOrigin.developmentEvidenceDigest,
+    phaseDigest: createHash('sha256').update(JSON.stringify(ticket.phaseOrigin)).digest('hex'),
     request: delegation,
   };
   const before = {
@@ -315,10 +370,16 @@ test('enrolling a verified delivery phase leaves the review card alone until an 
   const enrolled = { ...before, revision: 2, events: [...before.events, enrollment], tickets: [ticket] };
   const box = createProgressOutbox(path.join(root, 'task-progress', ticket.task));
   captureDeliveryQueueProgress(root, enrolled, before);
-  assert.deepEqual(box.read().pending, []);
+  const initial = box.read().pending.map(({ receipt }) => receipt);
+  assert.equal(initial.length, 1);
+  assert.equal(initial[0].event, 'queued');
+  assert.equal(initial[0].stage_fact, undefined);
   const unchanged = { ...enrolled, revision: 3 };
   captureDeliveryQueueProgress(root, unchanged, enrolled);
-  assert.deepEqual(box.read().pending, []);
+  assert.deepEqual(
+    box.read().pending.map(({ receipt }) => receipt),
+    initial,
+  );
   const paused = {
     ...unchanged,
     revision: 4,
@@ -328,7 +389,10 @@ test('enrolling a verified delivery phase leaves the review card alone until an 
   captureDeliveryQueueProgress(root, { ...paused, revision: 5 }, paused);
   assert.deepEqual(
     box.read().pending.map((entry) => [entry.receipt.event, entry.receipt.next.label]),
-    [['paused', '等待恢复指令']],
+    [
+      ['queued', '等待执行'],
+      ['paused', '等待恢复指令'],
+    ],
   );
   for (const event of [null, { ...enrollment, owner: 'wrong-worker' }, { ...enrollment, request: fence }]) {
     const isolated = fixture(t);

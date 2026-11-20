@@ -195,8 +195,21 @@ test('public baseline arguments preserve the old form and reject observer paths,
     historyFile: '/native',
     publishedBaseline: undefined,
   });
+  for (const flags of [
+    ['--for-prepare'],
+    ['--for-prepare', '--published-baseline', 'a'.repeat(40)],
+    ['--published-baseline', 'a'.repeat(40), '--for-prepare'],
+  ]) {
+    assert.deepEqual(parseReferenceProofArguments(['foreign', '/native', ...flags]), {
+      foreignTask: 'foreign',
+      historyFile: '/native',
+      publishedBaseline: flags.length === 1 ? undefined : 'a'.repeat(40),
+      effect: 'preparation',
+    });
+  }
   for (const args of [
     ['foreign'],
+    ['foreign', '/native', '--for-prepare', '--for-prepare'],
     ['foreign', '/native', '--published-baseline', 'short'],
     ['foreign', '/native', '--observer', '/file'],
     ['foreign', '/native', '--published-baseline', 'a'.repeat(40), 'safe'],

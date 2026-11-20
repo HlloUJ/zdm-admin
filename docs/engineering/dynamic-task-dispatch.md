@@ -71,6 +71,14 @@ npm run task:entry -- --worktree "<准确任务目录>" complete prepare "<准�
 
 已消费 binding 后再 block 的任务可凭新的真实决定安全续接；不重放旧 bindingRef，不伪造用户消息。每次保留原票据快照、失败、新 admission、依赖、容量和现场证明。completed/cancelled 的同一 lane、closed 任务、越界任务、外部 worker、旧协调者、来源不明或仍运行的目标继续拒绝。
 
+### 暂停后恢复已退出的 PR 准备
+
+已重新委托的历史任务如果仍持有上一次准备的专属租约，且本地唯一未终结的阶段正在等待已成功的首次 PR CI，当前协调者可在已发布的同一宿主桥调用 `preparation-recovery-plan`。原执行对话须已空闲。输入包括当前 `coordinatorThreadId`、覆盖该任务的暂停后 `authorityId` 及其原样 `request`、工程 `task`、历史 `owner`、绑定的 `executor`、旧准备的 `decisionId`、本次唯一的 `recoveryId`，以及实际读回的 `expectedQueueRevision`、`expectedTaskRevision`、`expectedCoordinationRevision` 和 `expectedBoardRevision`。从原冻结和准备会话取 `accepted`、`head`、数字 `pr`、字符串 `runId` 和未终结等待的 `eventId`。宿主提供当前角色、工作对话的原生观察和真实看板读回。入口自行读取原 PR 和运行，检查本机进程、打开文件和容器。
+
+计划在任务私有交付目录的 `preparation-recovery` 下封存原租约、会话、全部进程日志、冻结记录、原票据和远端运行身份。协调者将返回的准确 `workerInput` 交给原执行对话。该对话以自己的身份调用 `preparation-recover`，重新核对版本、文件身份及进程组。成功回执记录原 PR、首次运行、原顺位和恢复后的会话摘要。本地等待按中断记账，停止时间保留为未知。任何活动或复用的进程标识、缺失或额外日志、文件被替换、另有预约或准入都要求保留现场。
+
+这两个动作的 `admission` 均为空。原执行对话结束恢复轮次后，总协调沿原 delivery 票据重新调用 `dispatch`，由原执行对话消费新的准备准入。原执行对话可在新准入下用既有的 `complete wait pr <原候选 SHA>` 读回该候选的完整门禁，核对结果中的 runId、headSha 和 attempt 与恢复回执及原运行相符。后续候选发生变化时沿正常准备流程验证新候选。操作结果未知时，按同一 `recoveryId` 和计划摘要查原回执。相同输入可接续已封存的中断步骤，来源或版本发生变化时须先重新核实。
+
 新策略仅在隔离 Git/队列/原生观察测试中验证，独立受信发布后才能用于真实任务。本地代码、账本和宿主观察不是独立账号或不可修改的安全边界，不宣称不可绕过。
 
 ## 已知创建失败的新尝试
@@ -88,3 +96,9 @@ task.progressWriteAssessment 由当前真实协调者根据原客户端轨迹提
 关闭来源不是用户传入的同形 JSON。正式恢复入口完成原生失败、空闲、无绑定/开工/资源及准确票据核验后，封存 contract=known-failed-native-intake-unsubmitted-v1/state=closed-known-failed，绑定原 nonce、完整原包 entryDigest 清单和实际证据摘要。只读 readClosedCreationAttempt 从私有不可变归档重验原始记录字节、完整 native 来源与追加输入失败、关闭状态和全部清单；原 creation-unknown 本身不能归档。未投递保全只消费该 reader，不借用 stale/invalid 路径。
 
 归档先 fsync 保全原 outbox 字节、包、序号、时间、客户端拒绝和完整原生读回；本地事务仅将它们登记为 retired-attempt-not-delivered，不加入 acknowledged、不删除首次事实。原序号不重排，只生成新的真实 queued 投影。相同恢复决定不重复生成；归档后、发布新计划前发生本地锁冲突时，保留首份归档和新 nonce，重新核验后续接同一决定；新计划索引持久化后才暴露 native create，结果未知则只读回原结果。准备过的新进展仍阻断，不能跨过未知写入。新受理任务只有仍为 `queued` 且 `admission: null`，并能证明请求属于同一用户且收件序号晚于准确的 `initialize` 或 `pause-all` 围栏，才适用此等待投影。它包括仍处于 `awaitingNativeWorker` 的任务，也包括已在开发队列绑定但尚未启动的任务。已绑定任务必须保有 `nativeLaunchReserved`，协调者与执行者必须不同，且账本中有该任务、协调者和执行者全部匹配的 `bind-native-worker` 事件。未知围栏、旧请求、已取得准入、缺预约或缺准确绑定事件的情况均不适用。后续真实用户暂停仍投影为 `paused`，并撤销旧启动许可。
+
+## 原验证后端停用后的准备准入
+
+任务原 final 验证停止后，若 OS 仍显示 Docker Desktop 持有其目录句柄，只有已发布的准备守卫可以消费该任务原恢复回执。对同一原受阻票据申请新的 `dispatch` 后，在 `dispatch-start` 消费前再次执行完整两轮本机观察。回执、准确候选、容器的停止身份以及证明摘要必须一致。
+
+守卫复用已发布的 Docker 端点、签名代码、实际文件描述符与目录 vnode 核验。仅接受观察中实际读到的数字、只读 DIR 句柄，且没有任何运行中源挂载或重叠挂载。写句柄、普通文件、cwd、套接字、未知进程、状态变化或缺失证据仍阻断。此分支只用于原任务的新准备准入，开发、最终交付和取消继续使用各自的原守卫。目录仍被引用，证明不授权删除或清理。

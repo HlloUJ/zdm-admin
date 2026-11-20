@@ -50,6 +50,11 @@ export function requireStartMonitoring(owner, taskId, context) {
   return registration;
 }
 
+// Resolve invocation input only for new starts, never historical resume.
+export function parseStartMonitoringContext(raw = process.env.ZDM_TASK_MONITOR_CONTEXT) {
+  return raw === undefined || raw === '' ? undefined : JSON.parse(raw);
+}
+
 export function checkStartMonitoringArgs(args, registry) {
   const value = (flag) => {
     const positions = args.flatMap((arg, index) => (arg === flag ? [index] : []));
@@ -59,11 +64,10 @@ export function checkStartMonitoringArgs(args, registry) {
   const slug = value('--slug');
   if (!slug || registry.readTask(slug) || args.includes('--resume')) return;
   const raw = value('--monitor-context');
-  requireStartMonitoring(
-    value('--owner') || process.env.CODEX_THREAD_ID,
-    slug,
-    raw === undefined ? undefined : JSON.parse(raw),
-  );
+  if (args.includes('--monitor-context')) assert.ok(raw && !raw.startsWith('--'), 'Missing --monitor-context value');
+  const context = parseStartMonitoringContext(raw);
+  requireStartMonitoring(value('--owner') || process.env.CODEX_THREAD_ID, slug, context);
+  return context;
 }
 
 export function verifyStartMonitoringReadback(registry, task, context) {

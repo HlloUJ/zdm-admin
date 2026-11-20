@@ -32,6 +32,14 @@ export function parseDockerVnodeInventory(raw) {
 // No observation/exec adapters: the public producer invokes real local tools.
 // A returned directory remains referenced and must never authorize cleanup.
 export function collectRetainedDockerDirectories(identity, inventory, record) {
+  return collectDockerDirectories(identity, inventory, record, false);
+}
+
+export function collectStoppedValidationDockerDirectories(identity, inventory, record) {
+  return collectDockerDirectories(identity, inventory, record, true);
+}
+
+function collectDockerDirectories(identity, inventory, record, stoppedValidation) {
   const matching = inventory.files.filter(
     (f) => f.name === identity.worktree || f.name.startsWith(identity.worktree + path.sep),
   );
@@ -42,10 +50,11 @@ export function collectRetainedDockerDirectories(identity, inventory, record) {
   assert.equal(sourceMounts.length, 1, 'One exact retained backend source mount required');
   assert.equal(sourceMounts[0].Destination, '/workspace');
   const proof = inspectSignedDockerDirectories(identity, inventory, matching, record);
-  assert.ok(
-    proof.services.find((service) => service.pid === proof.endpoint.ownerPid).fds.length,
-    'Endpoint owner has no retained source directory',
-  );
+  if (!stoppedValidation)
+    assert.ok(
+      proof.services.find((service) => service.pid === proof.endpoint.ownerPid).fds.length,
+      'Endpoint owner has no retained source directory',
+    );
   const retained = {
     ...proof,
     kind: 'retained-docker-source-directories-v1',

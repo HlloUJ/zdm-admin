@@ -333,10 +333,22 @@ await completionStage(state,'push','candidate',()=>{runCompletionProcess(process
     }
     assert.fail('Isolated process did not reach expected state');
   };
-  await until(() => existsSync(ready));
-  const state = JSON.parse(readFileSync(path.join(dir, 'completion-session.json')));
-  const journal = JSON.parse(readFileSync(path.join(dir, 'process-' + state.events[0].processes[0].token + '.json')));
-  pgid = journal.pgid;
+  let state;
+  await until(() => {
+    if (!existsSync(ready)) return false;
+    state = JSON.parse(readFileSync(path.join(dir, 'completion-session.json')));
+    const { token } = state.events[0].processes[0];
+    const journal = JSON.parse(readFileSync(path.join(dir, 'process-' + token + '.json')));
+    assert.equal(journal.token, token);
+    // The child can publish ready before the supervisor's spawn callback
+    // publishes the group that this test intends to keep alive.
+    if (journal.status === 'pending') return false;
+    assert.equal(journal.status, 'started');
+    assert.equal(journal.host, os.hostname());
+    assert.ok(Number.isSafeInteger(journal.pgid) && journal.pgid > 1);
+    pgid = journal.pgid;
+    return true;
+  });
   const exited = new Promise((resolve) => owner.once('exit', resolve));
   owner.kill('SIGKILL');
   await exited;

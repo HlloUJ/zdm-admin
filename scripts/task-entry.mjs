@@ -59,19 +59,13 @@ export function publishedTaskEntry(root, args) {
   assert.ok(existsSync(script) && lstatSync(script).isFile() && !lstatSync(script).isSymbolicLink());
   git(main, 'cat-file', '-e', published + ':' + entries[command]);
   if (command === 'start') {
-    checkStartMonitoringArgs(rest, targetRegistry);
+    const context = checkStartMonitoringArgs(rest, targetRegistry);
     const option = (flag) => {
       const index = rest.indexOf(flag);
       return index < 0 ? undefined : rest[index + 1];
     };
-    const slug = option('--slug'),
-      raw = option('--monitor-context');
-    const context = raw === undefined ? undefined : JSON.parse(raw);
-    if (
-      slug &&
-      !targetRegistry.readTask(slug) &&
-      ['codex-thread', 'collaboration-agent'].includes(context?.executionSurface)
-    )
+    const slug = option('--slug');
+    if (['codex-thread', 'collaboration-agent'].includes(context?.executionSurface))
       createBoardIntake(targetRegistry.commonDir).require(
         context,
         slug,

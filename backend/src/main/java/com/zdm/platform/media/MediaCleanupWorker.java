@@ -3,66 +3,118 @@ package com.zdm.platform.media;
 import java.time.LocalDateTime;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class MediaCleanupWorker {
+  private static final org.slf4j.Logger LOG = org.slf4j.LoggerFactory.getLogger(MediaCleanupWorker.class);
   private final MediaAssetMapper assetMapper;
   private final MediaCleanupTaskMapper taskMapper;
-  private final MediaStorageService storageService;
+  private final MediaDeletionQuarantine quarantine;
   private final MediaRetentionService retention;
+  private final org.springframework.transaction.support.TransactionTemplate transactions;
+  private final org.springframework.transaction.support.TransactionTemplate independent;
 
-  public MediaCleanupWorker(
-      MediaAssetMapper assetMapper,
-      MediaCleanupTaskMapper taskMapper,
-      MediaStorageService storageService, MediaRetentionService retention) {
+  public MediaCleanupWorker(MediaAssetMapper assetMapper, MediaCleanupTaskMapper taskMapper,
+      MediaDeletionQuarantine quarantine, MediaRetentionService retention,
+      org.springframework.transaction.PlatformTransactionManager manager) {
     this.retention = retention;
     this.assetMapper = assetMapper;
     this.taskMapper = taskMapper;
-    this.storageService = storageService;
+    this.quarantine = quarantine;
+    transactions = new org.springframework.transaction.support.TransactionTemplate(manager);
+    independent = new org.springframework.transaction.support.TransactionTemplate(manager);
+    independent.setPropagationBehavior(org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
   @Async
-  @Transactional
-  public void processAsync(Long taskId) {
-    process(taskId);
-  }
+  public void processAsync(Long taskId) { process(taskId); }
 
-  @Transactional
   public CleanupResult process(Long taskId) {
-    if (taskMapper.claim(taskId) == 0) {
-      return CleanupResult.ofSkipped();
-    }
-    MediaCleanupTask task = taskMapper.selectById(taskId);
-    MediaAsset asset = assetMapper.selectByIdForUpdate(task.getMediaId());
-    if (asset == null || "deleted".equals(asset.getStatus())) {
-      complete(task);
-      return CleanupResult.ofSkipped();
-    }
-    MediaRetentionPolicy.Decision decision = retention.evaluate(asset);
-    if (!decision.eligible() || !retention.deletionEnabled()) {
-      // Re-evaluated by the scheduler after the deadline or a reference change.
-      complete(task);
-      return CleanupResult.ofSkipped();
-    }
-
+    boolean outer = org.springframework.transaction.support.TransactionSynchronizationManager.isActualTransactionActive();
     try {
-      if (!storageService.load(asset.getStorageKey()).exists()) {
-        throw new IllegalStateException("媒体文件缺失，待核查");
-      }
-      asset.setStatus("pending_delete");
-      asset.setPendingDeleteAt(LocalDateTime.now());
-      assetMapper.updateById(asset);
-      long releasedBytes = storageService.delete(asset.getStorageKey());
-      asset.setStatus("deleted");
-      asset.setDeletedAt(LocalDateTime.now());
-      assetMapper.updateById(asset);
-      complete(task);
-      return CleanupResult.ofDeleted(releasedBytes);
+      boolean ready = Boolean.TRUE.equals(transactions.execute(status -> stage(taskId, outer)));
+      if (!ready || outer) { return CleanupResult.ofSkipped(); }
+      return independent.execute(status -> finish(taskId));
     } catch (RuntimeException exception) {
-      fail(task, exception);
+      if (outer) { throw exception; }
+      recordFailure(taskId, exception);
       return CleanupResult.ofFailed();
     }
+  }
+
+  private boolean stage(Long taskId, boolean outer) {
+    if (taskMapper.claim(taskId) == 0) { return false; }
+    MediaCleanupTask task = taskMapper.selectById(taskId);
+    MediaAsset asset = assetMapper.selectByIdForUpdate(task.getMediaId());
+    if (asset == null) { throw new IllegalStateException("媒体登记缺失，不能证明删除完成"); }
+    if ("deleted".equals(asset.getStatus())) {
+      if (!quarantine.hasRecord(asset)) {
+        // A previously completed legacy task is not a new deletion proof for a failed task.
+        throw new IllegalStateException("媒体隔离凭证缺失，待核查");
+      }
+    } else {
+      quarantine.restore(asset);
+      MediaRetentionPolicy.Decision decision = retention.evaluate(asset);
+      if (!decision.eligible() || !retention.deletionEnabled()) {
+        complete(task);
+        return false;
+      }
+      org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+          new org.springframework.transaction.support.TransactionSynchronization() {
+            @Override public void afterCompletion(int status) {
+              if (status == STATUS_ROLLED_BACK) { restoreAfterRollback(asset.getId()); }
+            }
+          });
+      quarantine.stage(asset);
+      asset.setStatus("deleted");
+      asset.setPendingDeleteAt(LocalDateTime.now());
+      asset.setDeletedAt(LocalDateTime.now());
+      assetMapper.updateById(asset);
+    }
+    task.setStatus("pending");
+    task.setNextRetryAt(LocalDateTime.now());
+    taskMapper.updateById(task);
+    if (outer) {
+      org.springframework.transaction.support.TransactionSynchronizationManager.registerSynchronization(
+          new org.springframework.transaction.support.TransactionSynchronization() {
+            @Override public void afterCommit() {
+              try { independent.execute(status -> finish(taskId)); }
+              catch (RuntimeException exception) { recordFailure(taskId, exception); }
+            }
+          });
+    }
+    return true;
+  }
+
+  private CleanupResult finish(Long taskId) {
+    if (taskMapper.claim(taskId) == 0) { return CleanupResult.ofSkipped(); }
+    MediaCleanupTask task = taskMapper.selectById(taskId);
+    MediaAsset asset = assetMapper.selectByIdForUpdate(task.getMediaId());
+    if (asset == null || !"deleted".equals(asset.getStatus())) {
+      throw new IllegalStateException("媒体删除提交状态不可确认");
+    }
+    long bytes = quarantine.finish(asset);
+    complete(task);
+    return CleanupResult.ofDeleted(bytes);
+  }
+
+  private void restoreAfterRollback(Long mediaId) {
+    try {
+      independent.executeWithoutResult(status -> {
+        MediaAsset asset = assetMapper.selectByIdForUpdate(mediaId);
+        if (asset != null && !"deleted".equals(asset.getStatus())) { quarantine.restore(asset); }
+      });
+    } catch (RuntimeException exception) {
+      LOG.error("Media rollback restoration pending for {}", mediaId, exception);
+    }
+  }
+
+  private void recordFailure(Long taskId, RuntimeException exception) {
+    independent.executeWithoutResult(status -> {
+      // Do not overwrite a success committed by another worker.
+      MediaCleanupTask task = taskMapper.selectByIdForUpdate(taskId);
+      if (task != null && !"success".equals(task.getStatus())) { fail(task, exception); }
+    });
   }
 
   private void complete(MediaCleanupTask task) {

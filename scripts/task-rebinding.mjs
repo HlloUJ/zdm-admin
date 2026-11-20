@@ -6,6 +6,7 @@ import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import { observeCancellationHost, assertHostIdle } from './task-cancellation-proof.mjs';
+import { preparationValidationIdle } from './delivery-repairs/validation-preparation-idle.mjs';
 import {
   assertTaskExecutor,
   executionBinding,
@@ -595,8 +596,10 @@ export function assertBoundResumeReady(
     assert.ok(verify, 'Project source changed since binding; preserve and review a new binding');
     assert.equal(verify(source), true, 'Registered checkpoint source is not verified');
   }
+  const recovery = preparationValidationIdle(task, registry.commonDir, input.phase);
   let hostProof;
-  if (verifyDispatchHost) hostProof = verifyDispatchHost();
+  if (recovery) hostProof = { validationRecovery: recovery };
+  else if (verifyDispatchHost) hostProof = verifyDispatchHost();
   else {
     const first = observe();
     assertHostIdle(first, task);

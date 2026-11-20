@@ -14,8 +14,11 @@ const control = new Set([
   'scripts/accepted-source-readiness.mjs',
   'docs/engineering/accepted-source-delivery.md',
 ]);
+export function isAcceptedSourceControlPath(file) {
+  return control.has(file);
+}
 export function isTechnicalPath(file) {
-  if (control.has(file)) return false;
+  if (isAcceptedSourceControlPath(file)) return false;
   return (
     /^(?:scripts\/|tests\/|backend\/src\/test\/|ci\/|\.github\/workflows\/|docs\/engineering\/)/.test(file) ||
     [
