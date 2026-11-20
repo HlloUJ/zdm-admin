@@ -19,7 +19,7 @@ import {
   readReferenceBackendHealth,
   referenceConsumerAnchor,
 } from './preview-reference-proof.mjs';
-import { readInterruptedValidationEvidence } from './validation-recovery-evidence.mjs';
+import { readInterruptedValidationEvidence, validationRuntimeHash } from './validation-recovery-evidence.mjs';
 import {
   assertMaintenanceStartup,
   readMaintenanceBackend,
@@ -28,8 +28,7 @@ import {
 } from './validation-maintenance-lineage.mjs';
 
 const source = fileURLToPath(import.meta.url);
-export const validationRuntimeHash = (c) =>
-  referenceHash(JSON.stringify([c.Id, c.Created, c.Image, c.Config, c.HostConfig, c.Mounts]));
+export { validationRuntimeHash };
 export { recoveryReceiptFile } from './validation-maintenance-lineage.mjs';
 const expectedPorts = [5175, 5176, ...Array.from({ length: 23 }, (_, i) => 5177 + i)];
 export function assertRecoveryConsumers(live, evidence, worktree, now, readTask) {

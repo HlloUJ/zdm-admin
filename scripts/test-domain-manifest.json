@@ -909,7 +909,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-proof.mjs": {
-      "digest": "e4474d2f40e695bb9bc398a1039cb6159dfff22f89dab41aa340e1bf82bc217b",
+      "digest": "a2b0af401c81098d84ea6dfafdd1b033e5540e40b7baeac3fb748ade794d6db6",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/delivery-repairs/preview-docker-directories.mjs",
@@ -917,6 +917,7 @@
         "scripts/delivery-repairs/preview-reference-proof-core.mjs",
         "scripts/delivery-repairs/preview-reference-source.mjs",
         "scripts/delivery-repairs/validation-closed-peer.mjs",
+        "scripts/delivery-repairs/validation-maintenance-followup.mjs",
         "scripts/delivery-repairs/validation-maintenance-lineage.mjs",
         "scripts/delivery-repairs/validation-recovery-evidence.mjs",
         "scripts/dev-task.mjs",
@@ -944,7 +945,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/preview-reference-source.mjs": {
-      "digest": "698db27a5c7da3af42a41ccc95b3b2316b5ecec878022cce30ab1b7c304a9234",
+      "digest": "54effa763fe3a9c91339012601ce0354efcc17867a212d0852c6ef33bba2a82c",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/delivery-repairs/preview-docker-directories.mjs",
@@ -953,6 +954,9 @@
         "scripts/delivery-repairs/preview-reference-proof-core.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/delivery-repairs/preview-reference-source.mjs",
+        "scripts/delivery-repairs/validation-maintenance-followup.mjs",
+        "scripts/delivery-repairs/validation-maintenance-lineage.mjs",
+        "scripts/delivery-repairs/validation-recovery-evidence.mjs",
         "scripts/preview-consumers.mjs",
         "scripts/task-completion.mjs"
       ],
@@ -1129,7 +1133,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/validation-backend-recovery.mjs": {
-      "digest": "7fdd9941efe9d3128a3fabbf06163b78154542617d22f16167b1fbe3a6980019",
+      "digest": "3b467428cc131ee7e149cfa8fb67de0ea496481fb61d297b42bfadbb88ce95c7",
       "imports": [
         "scripts/delivery-repairs/preview-reference-history.mjs",
         "scripts/delivery-repairs/preview-reference-proof-core.mjs",
@@ -1172,6 +1176,20 @@
       ],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/validation-maintenance-followup.mjs": {
+      "digest": "b46a5315381233b2cd882289b8735e4569d434190430cff4b4106ec50d6c34da",
+      "imports": [
+        "scripts/delivery-repairs/preview-reference-history.mjs",
+        "scripts/delivery-repairs/validation-maintenance-lineage.mjs",
+        "scripts/delivery-repairs/validation-recovery-evidence.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/validation-maintenance-followup.test.mjs": {
+      "digest": "d94c03473047f12f96c17062a1b2772a12bf83505f7a601c2ab4af9dcdbd0287",
+      "imports": ["scripts/delivery-repairs/validation-maintenance-followup.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/validation-maintenance-lineage.mjs": {
       "digest": "c323a3745a78f8621efe66f6d2b4f8260774ddb8b2e51f34644c4b91ffca15ff",
       "imports": [
@@ -1199,7 +1217,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/validation-recovery-evidence.mjs": {
-      "digest": "23afb72d799f11a4baec0b65215928fc05f17ff146a8772910b8a1f5a6a1d047",
+      "digest": "ac7ae89afb6d4290b200be5b880c5f5126692bddad4445d59455684bb3684ebc",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/delivery-repairs/preview-reference-history.mjs",

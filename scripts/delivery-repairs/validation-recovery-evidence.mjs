@@ -12,6 +12,8 @@ import { readAcceptance } from '../accepted-source.mjs';
 import { referenceHash, regularReferenceFile } from './preview-reference-history.mjs';
 
 const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/;
+export const validationRuntimeHash = (c) =>
+  referenceHash(JSON.stringify([c.Id, c.Created, c.Image, c.Config, c.HostConfig, c.Mounts]));
 const archiveName = /^temporary-port-(51(?:7[7-9]|8[0-9]|9[0-9]))$/;
 export const privateJson = (file) => {
   assert.equal(realpathSync(file), file);
