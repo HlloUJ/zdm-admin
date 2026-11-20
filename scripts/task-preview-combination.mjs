@@ -1,3 +1,4 @@
+import { assertDeliveredDependencies } from './task-context.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, mkdtempSync, rmSync, readFileSync, lstatSync } from 'node:fs';
@@ -177,6 +178,8 @@ export async function applyPreviewCombination(root, targetId, plan, owner, depen
         assert.equal(plan.previewOnly, true);
         assert.equal(git(root, ['rev-parse', plan.combined + '^{tree}']), plan.tree, 'Combination tree differs');
         verifyPreviewMembers(root, plan);
+        if (target.actionDependencies?.some(({ actions }) => actions.includes('combination')))
+          assertDeliveredDependencies(root, target, 'combination', { candidate: plan.combined });
         const marked = registry.revise(target.id, target.revision, (record) => {
           record.previewOnly = plan;
           record.resources.dataScope = 'isolated-task';

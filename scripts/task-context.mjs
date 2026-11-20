@@ -2,10 +2,13 @@ import assert from 'node:assert/strict';
 import { AsyncLocalStorage } from 'node:async_hooks';
 import { existsSync, realpathSync, mkdirSync, writeFileSync, readFileSync, lstatSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
 import path from 'node:path';
 import { assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
 import { deliveryStatus } from './completion-status.mjs';
+import { collectActionDependencies, requireActionDependencies } from './task-action-dependencies.mjs';
+import { assertTaskCommitOwnership } from './task-commit-ownership.mjs';
 const context = new AsyncLocalStorage();
 export const withTaskContext = (identity, action) => context.run(identity, action);
 export function closeTaskBatch(root, batch, { deferredCleanup } = {}) {
@@ -112,31 +115,134 @@ export function validateTaskBatch(root, batch) {
   assert.equal(task.branch, batch.branch, 'Task branch changed');
   return taskBatch(task, root);
 }
-export function assertDeliveredDependencies(root, batch) {
+function readDependencyRuntime(task, source) {
+  try {
+    return JSON.parse(
+      execFileSync(
+        process.execPath,
+        [fileURLToPath(new URL('./task-dependency-runtime-cli.mjs', import.meta.url)), task.id, source.head],
+        {
+          cwd: task.worktree,
+          encoding: 'utf8',
+          stdio: 'pipe',
+          timeout: 30_000,
+          env: { ...process.env, GIT_OPTIONAL_LOCKS: '0' },
+        },
+      ),
+    );
+  } catch {
+    throw new Error('Pinned dependency preview has no current health, API and data identity proof');
+  }
+}
+export function taskActionDependencies(root, batch, action, { runtime = readDependencyRuntime, candidate } = {}) {
+  if (!(batch.dependsOn ?? []).length && !(batch.actionDependencies ?? []).length)
+    return collectActionDependencies(batch, action, {});
   const registry = createTaskRegistry(root);
-  const git = (...args) =>
-    execFileSync('git', ['--no-replace-objects', '-C', root, ...args], { encoding: 'utf8' }).trim();
-  const originMain = git('rev-parse', 'origin/main');
-  for (const dependencyId of batch.dependsOn) {
-    const dependency = registry.readTask(dependencyId);
+  const git = (cwd, ...args) =>
+    execFileSync('git', ['--no-replace-objects', '--no-optional-locks', '-C', cwd, ...args], {
+      encoding: 'utf8',
+      stdio: 'pipe',
+    }).trim();
+  function checkpoint({ task: id, head }) {
+    const recorded = registry.readTask(id);
+    if (recorded?.stage === 'closed') {
+      const proof = delivered({ task: id });
+      assert.ok(
+        recorded.checkpoints.some((item) => item.commit === head),
+        'Dependency never owned the pinned SHA',
+      );
+      git(root, 'merge-base', '--is-ancestor', head, proof.main);
+      return { task: id, head, tree: git(root, 'rev-parse', head + '^{tree}') };
+    }
+    const dependency = registry.resolve({ id });
+    assert.equal(dependency.recordedHead, head, 'Dependency checkpoint changed');
+    assert.ok(
+      dependency.checkpoints.some((item) => item.commit === head),
+      'No owned checkpoint at the pinned SHA',
+    );
+    assert.equal(git(dependency.worktree, 'rev-parse', 'HEAD'), head, 'Dependency source is on a different SHA');
+    assert.equal(git(dependency.worktree, 'status', '--porcelain'), '', 'Dependency source has local changes');
+    assertTaskCommitOwnership(dependency.worktree, dependency, head);
+    return { task: dependency.id, head, tree: git(dependency.worktree, 'rev-parse', head + '^{tree}') };
+  }
+  function delivered({ task: id }) {
+    const dependency = registry.readTask(id);
     assert.ok(
       dependency?.stage === 'closed' && dependency.closedAt && dependency.main?.local,
-      'Declared dependency is not formally delivered: ' + dependencyId,
+      'Declared dependency is not formally delivered: ' + id,
     );
     assert.equal(
-      deliveryStatus(path.join(registry.commonDir, 'task-delivery', dependencyId), dependencyId, dependency)
-        .formalDeliveryComplete,
+      deliveryStatus(path.join(registry.commonDir, 'task-delivery', id), id, dependency).formalDeliveryComplete,
       true,
-      'Declared dependency has no complete formal receipt: ' + dependencyId,
+      'Declared dependency has no complete formal receipt: ' + id,
     );
-    git('merge-base', '--is-ancestor', dependency.main.local, originMain);
+    const main = git(root, 'rev-parse', 'origin/main');
+    try {
+      git(root, 'merge-base', '--is-ancestor', dependency.main.local, main);
+    } catch {
+      assert.fail('Dependent delivery is absent from origin/main: ' + id);
+    }
+    return { task: id, main: dependency.main.local, closedAt: dependency.closedAt };
   }
-  return true;
+  return collectActionDependencies(batch, action, {
+    source(dependency) {
+      const proof = checkpoint(dependency);
+      if (['combination', 'final'].includes(action)) {
+        // An available checkpoint is useful for preparation. A combination
+        // must also carry that input in its exact ancestry.
+        const heads = candidate ? [candidate] : [batch.recordedHead, git(root, 'rev-parse', 'origin/main')];
+        assert.ok(
+          heads.some((head) => {
+            if (!head) return false;
+            try {
+              git(root, 'merge-base', '--is-ancestor', proof.head, head);
+              return true;
+            } catch {
+              return false;
+            }
+          }),
+          'Pinned source is absent from the actual combination inputs',
+        );
+      }
+      return proof;
+    },
+    runtime(dependency) {
+      const source = checkpoint(dependency);
+      assert.equal(typeof runtime, 'function', 'Current runtime identity must be verified by the action entry');
+      const proof = runtime(registry.readTask(dependency.task), source);
+      assert.equal(proof?.head, source.head, 'Runtime proof does not match the pinned source');
+      assert.equal(proof.runtimeReady, true, 'Dependency runtime has not passed its original health checks');
+      assert.deepEqual(checkpoint(dependency), source, 'Dependency source changed during runtime proof');
+      return { source, runtime: proof };
+    },
+    delivery: delivered,
+  });
 }
-export function planTaskDelivery(root, batch) {
+export function taskDispatchDependencies(root, task, phase) {
+  const report = taskActionDependencies(root, task, phase);
+  if (phase !== 'final' || ['merged', 'main-verified', 'handoff-verified', 'closed'].includes(task.stage))
+    return report;
+  const composition = taskActionDependencies(root, task, 'combination');
+  const dependencies = [
+    ...report.dependencies,
+    ...composition.dependencies.filter(
+      (item) =>
+        !report.dependencies.some(
+          (other) => other.task === item.task && other.evidence === item.evidence && other.head === item.head,
+        ),
+    ),
+  ];
+  return { action: phase, ready: report.ready && composition.ready, dependencies };
+}
+export function assertDeliveredDependencies(root, batch, action = 'final', adapters) {
+  return requireActionDependencies(taskActionDependencies(root, batch, action, adapters));
+}
+export function planTaskDelivery(root, batch, { action = 'final' } = {}) {
   batch = validateTaskBatch(root, batch);
   const git = (...args) =>
-    execFileSync('git', ['--no-replace-objects', '-C', batch.worktree, ...args], { encoding: 'utf8' }).trim();
+    execFileSync('git', ['--no-replace-objects', '--no-optional-locks', '-C', batch.worktree, ...args], {
+      encoding: 'utf8',
+    }).trim();
   assert.equal(git('status', '--porcelain'), '', 'Task must be clean before delivery planning');
   if (batch.frozen) {
     assert.equal(
@@ -149,7 +255,7 @@ export function planTaskDelivery(root, batch) {
   const head = git('rev-parse', 'HEAD'),
     originMain = git('rev-parse', 'origin/main');
   assert.equal(head, batch.recordedHead, 'Checkpoint the exact current task head');
-  assertDeliveredDependencies(root, batch);
+  assertDeliveredDependencies(root, batch, action);
   const commits = git('rev-list', '--reverse', batch.base + '..' + head, '--not', originMain)
     .split('\n')
     .filter(Boolean);

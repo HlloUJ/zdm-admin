@@ -25,6 +25,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { withPreviewDataLease } from './runtime-resource.mjs';
 import { assertDevelopmentApi } from './preview-policy.mjs';
+import { readPreviewResponse, temporaryPreviewLeases } from './preview-consumers.mjs';
+import { validationRuntimeHash } from './delivery-repairs/validation-recovery-evidence.mjs';
 
 import {
   ensureTaskData,
@@ -46,7 +48,9 @@ import {
 } from './integration-handoff-state.mjs';
 import { compatibleTaskDependencies, validateTaskDependencies } from './task-dependencies.mjs';
 import {
+  assertNoValidationBackendConsumers,
   createLatestChangeQueue,
+  retainedValidationBackend,
   runtimeDigest,
   taskBackendAction,
   taskBackendContainerIdentity,
@@ -1154,17 +1158,104 @@ function inspectTaskBackend(context) {
   }
 }
 
-function readBackendRecord(root) {
+function readBackendRecord(root, recordFile) {
   try {
-    return JSON.parse(readFileSync(path.join(root, '.task-runtime/backend-state.json'), 'utf8'));
+    if (recordFile && lstatSync(recordFile).isSymbolicLink()) throw new Error('Unsafe backend state');
+    return JSON.parse(readFileSync(recordFile ?? path.join(root, '.task-runtime/backend-state.json'), 'utf8'));
   } catch {
     return null;
   }
 }
 
-function writeBackendRecord(root, record) {
+function writeBackendRecord(root, record, recordFile) {
   mkdirSync(path.join(root, '.task-runtime'), { recursive: true });
-  writeFileSync(path.join(root, '.task-runtime/backend-state.json'), `${JSON.stringify(record)}\n`);
+  if (recordFile)
+    assert.ok(!lstatSync(recordFile, { throwIfNoEntry: false })?.isSymbolicLink(), 'Unsafe backend state');
+  writeFileSync(recordFile ?? path.join(root, '.task-runtime/backend-state.json'), `${JSON.stringify(record)}\n`);
+}
+
+function deliveryValidationBackend(root, project, port, { task, head } = {}) {
+  if (!head && !(port >= TEMPORARY_FRONTEND_PORT_START && port <= FRONTEND_PORT_END)) return null;
+  const registry = createTaskRegistry(root);
+  const current = task ?? registry.list().find((entry) => entry.worktree === root);
+  if (!current?.frozen) return null;
+  return retainedValidationBackend({
+    task: current,
+    leases: createResourceLeases(registry.commonDir),
+    port,
+    project,
+    head: head ?? gitCapture(root, ['rev-parse', 'HEAD']),
+    starting: Boolean(head),
+  });
+}
+
+function assertRetainedValidationBackend(root, project, validation) {
+  const [original] = JSON.parse(capture('docker', ['inspect', validation.retainedId], { cwd: root }));
+  assert.equal(original?.Id, validation.retainedId, 'Original retained backend is missing');
+  assert.equal(original.State.Running, false, 'Original validation backend must remain stopped');
+  assert.equal(original.State.StartedAt, validation.retainedSource.startedAt);
+  assert.equal(original.State.FinishedAt, validation.retainedSource.stoppedAt);
+  assert.equal(original.Config.Labels['com.docker.compose.project'], project);
+  assert.equal(validationRuntimeHash(original), validation.retainedSource.containerIdentity);
+}
+
+export async function stopRetainedValidationBackend(root, validation, data) {
+  const context = composeContext({ root, project: validation.project, backendPort: BACKEND_PORT_START });
+  const ids = composeCapture(context, ['ps', '--all', '--quiet', 'backend']).split(/\s+/).filter(Boolean);
+  if (!ids.length) return;
+  assert.equal(ids.length, 1, 'Ambiguous temporary backend; retain all runtimes');
+  const [id] = ids;
+  assert.match(id, /^[a-f0-9]{64}$/);
+  assert.notEqual(id, validation.retainedId);
+  const [backend] = JSON.parse(capture('docker', ['inspect', id], { cwd: root }));
+  assert.equal(backend?.Id, id);
+  assert.equal(backend.Config.Labels['com.docker.compose.project'], validation.project);
+  assert.equal(backend.Config.Labels['com.docker.compose.service'], 'backend');
+  assert.equal(backend.Config.Labels['com.zdm.task.preview'], 'true');
+  assert.ok(
+    backend.Mounts.some(
+      (mount) => mount.Type === 'bind' && mount.Destination === '/workspace' && mount.Source === root,
+    ),
+  );
+  assert.ok(
+    backend.Config.Env.some((item) =>
+      item.startsWith(`ZDM_DB_URL=jdbc:mysql://zdm-platform-mysql:3306/${data.database}?`),
+    ) &&
+      backend.Mounts.some(
+        (mount) =>
+          mount.Type === 'volume' && mount.Destination === '/data/zdm/craft-images' && mount.Name === data.mediaVolume,
+      ),
+    'Temporary backend lost its isolated data binding',
+  );
+  const bindings = backend.HostConfig.PortBindings['8080/tcp'];
+  assert.ok(bindings.length === 1 && bindings[0].HostIp === '127.0.0.1');
+  const port = parseBackendPortBindings(JSON.stringify(backend.HostConfig.PortBindings));
+  assert.ok(port && port !== validation.retainedPort, 'Temporary backend does not own a private port');
+  const ports = Array.from({ length: FRONTEND_PORT_END - FRONTEND_PORT_START + 1 }, (_, i) => i + FRONTEND_PORT_START);
+  const common = createTaskRegistry(root).commonDir;
+  const leases = temporaryPreviewLeases(common);
+  const observations = await Promise.all(
+    ports.map(async (entry) => {
+      const response = await readPreviewResponse(`http://127.0.0.1:${entry}${TASK_PREVIEW_CONTROL_PATH}`);
+      return {
+        ...response,
+        port: entry,
+        leased: leases.some((lease) => lease.port === entry),
+        metadata: response.statusCode === 200 ? parseTaskPreviewMetadata(response.body) : null,
+      };
+    }),
+  );
+  assert.deepEqual(temporaryPreviewLeases(common), leases, 'Preview leases changed; retain the temporary backend');
+  assertNoValidationBackendConsumers(observations, port);
+  if (backend.State.Running) capture('docker', ['stop', id], { cwd: root });
+  // Keep the original startup log and a separate backend log in the candidate journal.
+  const logFile = validation.backendRecord + '-' + id + '.log';
+  if (!lstatSync(logFile, { throwIfNoEntry: false })) {
+    const logs = spawnSync('docker', ['logs', id], { cwd: root, encoding: 'utf8', maxBuffer: 16 * 1024 * 1024 });
+    assert.equal(logs.status, 0, 'Cannot preserve temporary backend log');
+    writeFileSync(logFile, logs.stdout + logs.stderr, { mode: 0o600, flag: 'wx' });
+  }
+  capture('docker', ['rm', id], { cwd: root });
 }
 
 export async function ensureTaskBackend(
@@ -1571,10 +1662,16 @@ export async function main(args = process.argv.slice(2), { independent = false }
       const response = await taskPreviewControlRequest(port);
       const current = response.statusCode === 200 ? parseTaskPreviewMetadata(response.body) : null;
       if (!current) throw new Error(previewProbeFailure(response));
+      const canonicalProject = taskProjectName({ branch, root: expectedWorkspaceRoot });
+      const validation = deliveryValidationBackend(expectedWorkspaceRoot, canonicalProject, port);
+      const project = validation?.project ?? canonicalProject;
+      if (validation) {
+        assert.equal(current.runtimeId, validation.runtimeId, 'Temporary validation frontend identity changed');
+        assertRetainedValidationBackend(expectedWorkspaceRoot, canonicalProject, validation);
+      }
       let registeredBackendPort = null;
       let registeredApiTarget = null;
       if (current?.apiTarget && current.apiTarget !== SHARED_API_TARGET) {
-        const project = taskProjectName({ branch, root: expectedWorkspaceRoot });
         registeredBackendPort = existingTaskBackendPort(
           composeContext({ root: expectedWorkspaceRoot, project, backendPort: BACKEND_PORT_START }),
           { runningOnly: true },
@@ -1586,7 +1683,7 @@ export async function main(args = process.argv.slice(2), { independent = false }
         if (previewServiceOwnsWorktree(status, expectedWorkspaceRoot))
           registeredApiTarget = parseTaskPreviewArgs(status.taskArgs ?? []).apiTarget;
       }
-      const data = readTaskData(expectedWorkspaceRoot, taskProjectName({ branch, root: expectedWorkspaceRoot }));
+      const data = readTaskData(expectedWorkspaceRoot);
       if (!data) throw new Error('任务尚未登记独立数据库与附件卷，不能声明隔离环境就绪');
       if (
         current?.mode === 'full' ||
@@ -1594,16 +1691,16 @@ export async function main(args = process.argv.slice(2), { independent = false }
       ) {
         const context = composeContext({
           root: expectedWorkspaceRoot,
-          project: taskProjectName({ branch, root: expectedWorkspaceRoot }),
+          project,
           backendPort: registeredBackendPort,
         });
         const backend = inspectTaskBackend(context);
         if (
           !taskBackendContainerIdentity(backend, {
             root: expectedWorkspaceRoot,
-            project: taskProjectName({ branch, root: expectedWorkspaceRoot }),
+            project,
             backendPort: registeredBackendPort,
-            migrationDirectory: taskMigrationDirectory(taskProjectName({ branch, root: expectedWorkspaceRoot })),
+            migrationDirectory: taskMigrationDirectory(project),
             database: data.database,
             username: data.username,
             mediaVolume: data.mediaVolume,
@@ -1659,12 +1756,20 @@ export async function main(args = process.argv.slice(2), { independent = false }
       },
     });
   }
-  const project = taskProjectName({ branch, root });
+  const canonicalProject = taskProjectName({ branch, root });
+  const validation =
+    (options.validationCandidate || options.stop) &&
+    deliveryValidationBackend(root, canonicalProject, options.port, {
+      task: registeredTask,
+      head: options.validationCandidate,
+    });
+  const project = validation?.project ?? canonicalProject;
   if (!options.pause && !options.stop && !options.handoff) {
     // Reject an unproved data target before dependency preparation, filesystem
     // watchers, port allocation or Docker. Backend preparation checks it again.
     selectTaskPreviewMode({ requestedMode: options.mode, apiTarget: options.apiTarget });
     requireTaskData(root);
+    if (validation) assertRetainedValidationBackend(root, canonicalProject, validation);
   }
   const integrationWorktree = integrationWorktreeFor(worktrees);
   const integrationRoot = integrationWorktree.path;
@@ -1699,6 +1804,12 @@ export async function main(args = process.argv.slice(2), { independent = false }
     const lock = readDatabaseLock(integrationRoot);
     const previewPort = options.port || CURRENT_TASK_FRONTEND_PORT;
     const managedPreview = await currentManagedPreview(previewPort);
+    if (validation) {
+      assert.ok(!managedPreview && !(await isPortOpen(previewPort)), 'Temporary validation frontend is still open');
+      await stopRetainedValidationBackend(root, validation, requireTaskData(root));
+      assertRetainedValidationBackend(root, canonicalProject, validation);
+      return;
+    }
     if (managedPreview && path.resolve(managedPreview.workspaceRoot) === path.resolve(root)) {
       await stopManagedPreview(previewPort);
     }
@@ -1741,6 +1852,7 @@ export async function main(args = process.argv.slice(2), { independent = false }
       const current = leases.inspect('temporary-port-' + frontendPort);
       if (options.validationCandidate) {
         if (current?.task !== registeredTask.id) throw new Error('验证端口不属于当前准确任务');
+        if (validation) runtimeId = validation.runtimeId;
       } else {
         const lease = leases.acquire('temporary-port-' + frontendPort, registeredTask.id);
         if (independent) runtimeId = lease.token;
@@ -1754,9 +1866,24 @@ export async function main(args = process.argv.slice(2), { independent = false }
     let backendContext = null;
     let apiTarget = options.apiTarget;
     if (mode === 'full') {
-      const backendPort = await chooseBackendPort({ root, project, requestedPort: options.backendPort });
+      const backendPort = validation
+        ? await findAvailablePort({
+            start: BACKEND_PORT_START,
+            end: BACKEND_PORT_END,
+            isOpen: (port) => port === validation.retainedPort || isPortOpen(port),
+          })
+        : await chooseBackendPort({ root, project, requestedPort: options.backendPort });
       backendContext = composeContext({ root, project, backendPort });
-      await ensureTaskBackend({ context: backendContext, integrationRoot, root, branch, project, riskFiles });
+      const verificationState = validation
+        ? {
+            readRecord: () => readBackendRecord(root, validation.backendRecord),
+            writeRecord: (_, state) => writeBackendRecord(root, state, validation.backendRecord),
+          }
+        : undefined;
+      await ensureTaskBackend(
+        { context: backendContext, integrationRoot, root, branch, project, riskFiles },
+        verificationState,
+      );
       apiTarget = `http://127.0.0.1:${backendPort}`;
     } else if (apiTarget) {
       const apiUrl = new URL(apiTarget);

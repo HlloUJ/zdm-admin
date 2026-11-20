@@ -668,7 +668,7 @@ async function verifyPreparationProjection(t, originalStatus) {
   const input = f.decision('preparation');
   await f.call('dispatch', input);
   process.env.CODEX_THREAD_ID = worker;
-  await f.call('dispatch-start', {
+  const started = await f.call('dispatch-start', {
     decisionId: input.decisionId,
     coordinatorThreadId: root,
     task: 'task',
@@ -726,26 +726,49 @@ async function verifyPreparationProjection(t, originalStatus) {
     original,
   );
   const before = f.queue.read();
-  const box = createProgressOutbox(path.join(f.registry.commonDir, 'task-progress/task'));
-  const receiptFor = (revision) =>
-    box
+  const outbox = createProgressOutbox(path.join(f.registry.commonDir, 'task-progress/task'));
+  const receipt = (revision) =>
+    outbox
       .read()
       .pending.find(({ receipt }) => receipt.evidence_refs.includes(`execution-order:${revision}:delivery:task`))
       ?.receipt;
-  assert.equal(receiptFor(before.revision)?.event, originalStatus);
-  assert.equal(receiptFor(before.revision)?.reason, original.reason);
+  assert.equal(receipt(before.revision)?.event, originalStatus);
+  assert.equal(receipt(before.revision)?.reason, original.reason);
   await finish();
   assert.deepEqual(f.queue.read(), before);
+  assert.throws(
+    () =>
+      f.queue.assertAdmission({
+        task: 'task',
+        owner: old,
+        lane: 'delivery',
+        effect: 'preparation',
+        admission: started.decision.admission,
+      }),
+    /All execution launches paused/,
+  );
   process.env.CODEX_THREAD_ID = root;
-  f.queue.direct({
-    action: 'pause-all',
-    request: { ...f.input.request, messageId: 'next-explicit-pause', sequence: 30 },
+  f.queue.enqueue({
+    lane: 'development',
+    task: 'unrelated',
+    owner: root,
+    request: { ...f.input.request, messageId: 'unrelated-development', sequence: 21 },
   });
-  assert.equal(receiptFor(f.queue.read().revision)?.event, 'paused');
+  f.queue.direct({
+    action: 'reorder',
+    lane: 'development',
+    tasks: ['unrelated', 'task'],
+    request: { ...f.input.request, messageId: 'unrelated-development-order', sequence: 22 },
+  });
+  assert.equal(f.queue.read().events.at(-1).action, 'reorder');
+  assert.equal(receipt(f.queue.read().revision), undefined);
+  f.queue.direct({ action: 'pause-all', request: { ...f.input.request, messageId: 'actual-new-pause', sequence: 30 } });
+  assert.equal(receipt(f.queue.read().revision)?.event, 'paused');
   assert.deepEqual(
     f.queue.read().tickets.find((ticket) => ticket.lane === 'delivery'),
     original,
   );
+  await assert.rejects(() => f.call('dispatch', f.decision()), /delegation missing or revoked by pause/i);
 }
 for (const originalStatus of ['queued', 'blocked'])
   test(`preparation finish verifies original PR CI and restores the historical ${originalStatus} projection`, (t) =>

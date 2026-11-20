@@ -362,7 +362,7 @@ function localEvidence(registry, task) {
   return evidence;
 }
 export function verifyCancellation(registry, ticket, { observe = observeCancellationHost } = {}) {
-  assert.equal(ticket.status, 'blocked', 'Cancellation requires fenced blocked admission');
+  assert.ok(['blocked', 'parked'].includes(ticket.status), 'Cancellation requires fenced blocked or parked admission');
   const task = registry.readTask(ticket.task);
   assert.ok(
     task && task.id === ticket.task && task.owner === ticket.owner,

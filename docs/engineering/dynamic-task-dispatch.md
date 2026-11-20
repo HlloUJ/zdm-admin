@@ -24,6 +24,8 @@
 
 该步骤只登记元数据，不启动、停止或清理环境，不预约准备容量或最终 main，不要求先 promote 再伪造 block。环境和数据仍完整保留；登记成功不表示旧运行环境可接管。之后仍走下节的 dispatch/dispatch-start，重新证明目标写入者空闲、资源、依赖和实际容量；未知或尚未安全恢复的运行引用仍会阻断实际准备。未冻结的完成源码仅在对应 phaseOrigin 和完整原开发完成来源一致时作为准备 checkpoint，worker 实际取得 preparation 准入后才由原 complete prepare 入口冻结业务并验证、推送及执行 PR CI。不会将已完成的开发 lane 重新改为运行。
 
+交付阶段入队只登记内部票据，保留已有待验收进度。看板暂停投影仍受真实用户暂停约束，更新的暂停指令会撤销早于它的委托。
+
 ## 预约与实际 worker 消费
 
 `action: "dispatch"` 由真实当前协调者调用：
@@ -42,6 +44,8 @@
 仅选择原清单中依赖已正式交付的任务；依赖须有关闭回执，且其 main 在 origin/main 祖先中。任务、绑定、票据、源码/索引、原冻结与资源前后稳定，worker 原生状态 idle/error，完整本机观察证明无目标写入者后才预约容量。历史来源沿用既有恢复证明；冻结后工程 checkpoint 只经原业务/控制面快照校验。
 
 未冻结任务在绑定后的源码变化，只接受合法开发准入下已登记的准确 checkpoint：工作区干净、HEAD 等于 recordedHead 且有该提交的 checkpoint，记录晚于当前 binding；原 resume-selected/bindingRef 或已消费动态决定证明准确 worker/owner/admission，全部非主线提交有本任务归属且不占用其他任务 checkpoint。决定保存 taskRevision、绑定版本、准确提交/树、checkpoint 及归属证明，消费前重新比对。未登记 HEAD、脏改动、归属或开发准入不明仍拒绝，不重写初始绑定摘要，也不重建冻结。
+
+macOS 的派发预约和消费可分别证明 Docker Desktop 保留的只读目录引用。每次都在当前本机 Unix socket 上核验已签名的 Docker 端点持有者、实际加载的可执行文件、启动身份、目录持有者和其内核目录句柄。两轮观察均须排除目标任务进程、其他文件或目录引用，以及运行和已停止容器的重叠挂载。挂载按实际设备和 inode 核对父子目录。证据变化或不完整时维持拒绝；消费须重新得到相同的引用身份。私有证据保留每个仍被引用的目录、实际挂载和资源证明。该证明的使用范围仅为动态派发，不提供取消、历史重绑、停止运行环境或物理清理许可。
 
 容量在原 limit/activeDevelopment/activeDelivery/activeOther 上增加 activePreparation。limit 来源须如实说明，项目预算不称为平台硬上限。运行中的开发、准备、最终交付、其他执行者及未消费决定、原生创建预约均计入，仍保留一个最终交付执行位。未知容量、依赖、资源或版本变化只阻断相应决定。
 
@@ -91,7 +95,7 @@ task.progressWriteAssessment 由当前真实协调者根据原客户端轨迹提
 
 关闭来源不是用户传入的同形 JSON。正式恢复入口完成原生失败、空闲、无绑定/开工/资源及准确票据核验后，封存 contract=known-failed-native-intake-unsubmitted-v1/state=closed-known-failed，绑定原 nonce、完整原包 entryDigest 清单和实际证据摘要。只读 readClosedCreationAttempt 从私有不可变归档重验原始记录字节、完整 native 来源与追加输入失败、关闭状态和全部清单；原 creation-unknown 本身不能归档。未投递保全只消费该 reader，不借用 stale/invalid 路径。
 
-归档先 fsync 保全原 outbox 字节、包、序号、时间、客户端拒绝和完整原生读回；本地事务仅将它们登记为 retired-attempt-not-delivered，不加入 acknowledged、不删除首次事实。原序号不重排，只生成新的真实 queued 投影。相同恢复决定不重复生成；归档后、发布新计划前发生本地锁冲突时，保留首份归档和新 nonce，重新核验后续接同一决定；新计划索引持久化后才暴露 native create，结果未知则只读回原结果。准备过的新进展仍阻断，不能跨过未知写入。新受理任务须仍为 queued/awaitingNativeWorker/admission:null、请求为同一用户且晚于明确 initialize/pause 围栏，才仅报告 queued；后续明确用户 pause 继续产生 paused 并阻断旧恢复授权。未知围栏、旧请求、已绑定或占位不适用。
+归档先 fsync 保全原 outbox 字节、包、序号、时间、客户端拒绝和完整原生读回；本地事务仅将它们登记为 retired-attempt-not-delivered，不加入 acknowledged、不删除首次事实。原序号不重排，只生成新的真实 queued 投影。相同恢复决定不重复生成；归档后、发布新计划前发生本地锁冲突时，保留首份归档和新 nonce，重新核验后续接同一决定；新计划索引持久化后才暴露 native create，结果未知则只读回原结果。准备过的新进展仍阻断，不能跨过未知写入。新受理任务只有仍为 `queued` 且 `admission: null`，并能证明请求属于同一用户且收件序号晚于准确的 `initialize` 或 `pause-all` 围栏，才适用此等待投影。它包括仍处于 `awaitingNativeWorker` 的任务，也包括已在开发队列绑定但尚未启动的任务。已绑定任务必须保有 `nativeLaunchReserved`，协调者与执行者必须不同，且账本中有该任务、协调者和执行者全部匹配的 `bind-native-worker` 事件。未知围栏、旧请求、已取得准入、缺预约或缺准确绑定事件的情况均不适用。后续真实用户暂停仍投影为 `paused`，并撤销旧启动许可。
 
 ## 原验证后端停用后的准备准入
 

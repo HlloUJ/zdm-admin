@@ -1,3 +1,4 @@
+import { CONTINUATION_HOST_ACTIONS, continuationHostAction } from './task-continuation-host.mjs';
 import assert from 'node:assert/strict';
 import { createBoardIntake } from './task-board-intake.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
@@ -91,7 +92,7 @@ export function taskHandoffFailure(error) {
 // This is a handoff contract, not an independent security boundary against its local owner.
 export async function advanceTaskThread(
   input,
-  { commonDir, readTask, start, registry, dependenciesReady, observe, now = Date.now() },
+  { commonDir, readTask, start, registry, dependenciesReady, readActionDependencies, observe, root, now = Date.now() },
 ) {
   assert.ok(
     [
@@ -104,6 +105,7 @@ export async function advanceTaskThread(
       'resume',
       'coordinate',
       'retry-creation',
+      ...CONTINUATION_HOST_ACTIONS,
       'correct-410-initial-pause',
     ].includes(input.action) || isDynamicHostAction(input.action),
   );
@@ -122,6 +124,7 @@ export async function advanceTaskThread(
     readTask,
     start,
     dependenciesReady,
+    readActionDependencies,
     readUnavailableThread: async (id) => {
       // Preserve the actual native error. This is absence of a readable chat,
       // never an idle observation or permission to skip resource checks.
@@ -215,7 +218,10 @@ export async function advanceTaskThread(
     },
   };
   let result;
-  if (isDynamicHostAction(input.action)) {
+  if (CONTINUATION_HOST_ACTIONS.includes(input.action)) {
+    assert.ok(registry && registry.commonDir === commonDir && root, 'Actual published registry root required');
+    result = await continuationHostAction(input.action, input.task, host, { registry, root, observe });
+  } else if (isDynamicHostAction(input.action)) {
     assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
     result = await dynamicHostAction(input.action, input.task, host, {
       commonDir,

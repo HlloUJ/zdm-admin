@@ -1,3 +1,4 @@
+import { assertParkedContinuation } from '../task-capacity-release.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 
@@ -255,7 +256,7 @@ function target(state, input, proof) {
   );
   const ticket = state.tickets.find((item) => item.task === input.task && item.lane === input.lane);
   assert.ok(ticket && !ticket.awaitingNativeWorker, 'Original enrolled task ticket required');
-  assert.ok(['queued', 'blocked', 'running'].includes(ticket.status), 'Terminal task lane cannot resume');
+  assert.ok(['queued', 'blocked', 'parked', 'running'].includes(ticket.status), 'Terminal task lane cannot resume');
   assert.notEqual(proof.task.stage, 'closed', 'Closed task cannot resume');
   assert.equal(proof.task.id, input.task);
   assert.equal(proof.task.owner, input.owner);
@@ -271,6 +272,7 @@ function target(state, input, proof) {
     'Task is outside the preserved user delegation',
   );
   assert.equal(ticket.request.authorId, grant.request.authorId, 'Original task user differs');
+  assertParkedContinuation(state, ticket, { ...proof, authoritySequence: grant.request.sequence }, input.phase);
   return ticket;
 }
 function assertCapacity(state, input, proof, self = null) {
@@ -373,6 +375,7 @@ export function consumeDynamicDecision(state, input, verify) {
   assert.equal(hash(ticket), record.ticketDigest, 'Original ticket changed before start');
   assert.deepEqual(proof.sourceProof, record.sourceProof, 'Task source/resources changed before start');
   assert.equal(proof.bindingRevision, record.bindingRevision, 'Execution binding changed');
+  assert.deepEqual(proof.dependencies, record.dependencies, 'Evidence required by this action changed before start');
   assertCapacity(state, record.input, proof, record.id);
   record.ticketBefore = structuredClone(ticket);
   record.admission = randomUUID();

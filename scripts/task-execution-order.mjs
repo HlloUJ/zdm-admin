@@ -1,3 +1,5 @@
+import { releaseIdleCapacity, validateReleasedCapacity } from './task-capacity-release.mjs';
+import { recordNextAction, recordCoordinationObservation } from './task-coordination-next.mjs';
 import { requireNativeIntake, createTaskThreadTitles } from './task-thread-titles.mjs';
 import { hasScopedAdmission, scopedAdmissions } from './task-execution-scope.mjs';
 import assert from 'node:assert/strict';
@@ -78,7 +80,8 @@ function validate(state) {
   const keys = new Set();
   for (const ticket of state.tickets) {
     assert.ok(EXECUTION_LANES.includes(ticket.lane) && id(ticket.task) && text(ticket.owner));
-    assert.ok(['queued', 'running', 'blocked', 'completed', 'cancelled'].includes(ticket.status));
+    assert.ok(['queued', 'running', 'blocked', 'parked', 'completed', 'cancelled'].includes(ticket.status));
+    validateReleasedCapacity(state, ticket);
     event(ticket.request);
     assert.ok(Number.isSafeInteger(ticket.order) && ticket.order > 0, 'Exact effective queue order required');
     const key = `${ticket.lane}:${ticket.task}`;
@@ -491,10 +494,21 @@ export function createExecutionOrder(commonDir) {
     return update((state) => {
       const current = ticket(state, lane, task, owner);
       assert.ok(occupied.has(current.status), 'Only an occupied slot can block');
+      const released =
+        current.status === 'running' &&
+        scopedAdmissions(state).find(
+          (scope) =>
+            scope.phase === 'preparation' &&
+            scope.task === task &&
+            scope.lane === lane &&
+            scope.owner === owner &&
+            scope.admission === current.admission &&
+            scope.decisionId === current.dynamicDecisionId,
+        );
       current.status = 'blocked';
       if (scopedFor(state, current)) removeScope(state, current);
       current.reason = reason;
-      state.events.push({ action: 'block', lane, task, reason });
+      state.events.push({ action: 'block', lane, task, reason, ...(released && { decisionId: released.decisionId }) });
       return structuredClone(current);
     });
   }
@@ -828,7 +842,7 @@ export function createExecutionOrder(commonDir) {
     const state = read();
     assert.ok(state, 'Execution-order policy not activated');
     const current = ticket(state, lane, task, owner);
-    assert.equal(current.status, 'blocked', 'Only a blocked original slot can be cancelled');
+    assert.ok(['blocked', 'parked'].includes(current.status), 'Only a fenced blocked or parked slot can be cancelled');
     assert.equal(current.admission, admission, 'Exact original admission required');
     return structuredClone(current);
   }
@@ -849,7 +863,10 @@ export function createExecutionOrder(commonDir) {
         assert.equal(current.status, 'cancelled');
         return structuredClone(current); // no write, probe, release or dispatch on replay
       }
-      assert.equal(current.status, 'blocked', 'Only a blocked original slot can be cancelled');
+      assert.ok(
+        ['blocked', 'parked'].includes(current.status),
+        'Only a fenced blocked or parked slot can be cancelled',
+      );
       assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
       assert.equal(source.authorId, current.request.authorId, 'Original user required');
       assert.ok(
@@ -993,6 +1010,17 @@ export function createExecutionOrder(commonDir) {
     });
   }
   return {
+    releaseCapacity: (input, verify) => update((state) => releaseIdleCapacity(state, input, verify)),
+    recordNextAction: (input, verify) =>
+      update((state) => {
+        verify(state);
+        return recordNextAction(state, input);
+      }),
+    recordCoordinationObservation: (input, verify) =>
+      update((state) => {
+        verify(state);
+        return recordCoordinationObservation(state, input);
+      }),
     enrollDeliveryPhase: (input, verify) => update((state) => enrollDynamicDelivery(state, input, verify)),
     registerDelegation: (input, verify) => update((state) => registerDynamicAuthority(state, input, verify)),
     reserveDecision: (input, verify) => update((state) => reserveDynamicDecision(state, input, verify)),
