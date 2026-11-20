@@ -238,7 +238,7 @@ export function verifyParentEngineeringManifests(root, taskHead, main) {
 // The exact merge tree supplies every cleanly merged path. The only generated
 // resolution is the manifest. An explicit review must account for all others.
 export function preCiCompositionTree(root, inputs, review) {
-  const { taskHead, main, protectedPaths, rejectUnreviewed = false } = inputs;
+  const { taskHead, main, protectedPaths, rejectUnreviewed = false, publishedRepair = false } = inputs;
   for (const revision of [taskHead, main]) assert.match(revision, sha);
   const merge = spawnSync(
     'git',
@@ -249,8 +249,23 @@ export function preCiCompositionTree(root, inputs, review) {
   assert.ok([0, 1].includes(merge.status), 'Cannot inspect the original candidate merge');
   if (merge.status === 0) {
     assert.equal(review, undefined, 'Engineering review no longer matches a conflict');
-    return null;
+    if (!publishedRepair) return null;
+    const tree = merge.stdout.split('\0')[0].trim();
+    assert.match(tree, sha);
+    assert.notEqual(
+      tree,
+      git(root, ['rev-parse', taskHead + '^{tree}']).trim(),
+      'Published repair must change the candidate tree',
+    );
+    verifyParentEngineeringManifests(root, taskHead, main);
+    assert.deepEqual(
+      manifestInputTree(root, tree),
+      JSON.parse(git(root, ['show', tree + ':' + manifest])),
+      'Clean composition does not carry a current engineering manifest',
+    );
+    return tree;
   }
+  assert.ok(!publishedRepair, 'Published repair requires a clean merge; use the existing conflict workflow');
   const [tree, ...records] = merge.stdout.split('\0');
   assert.match(tree, sha);
   const end = records.indexOf('');
@@ -291,11 +306,13 @@ export function preCiCompositionTree(root, inputs, review) {
   }
 }
 
-export function preCiCompositionCommit(root, { candidateTree, taskHead, main }) {
+export function preCiCompositionCommit(root, { candidateTree, taskHead, main, publishedRepair = false }) {
   for (const revision of [candidateTree, taskHead, main]) assert.match(revision, sha);
   const date = git(root, ['show', '-s', '--format=%cI', taskHead]).trim();
   return git(root, ['commit-tree', candidateTree, '-p', taskHead, '-p', main], {
-    input: 'Compose published main and regenerate the reviewed engineering manifest\n',
+    input: publishedRepair
+      ? 'Compose the independently repaired published main\n'
+      : 'Compose published main and regenerate the reviewed engineering manifest\n',
     env: {
       ...process.env,
       GIT_AUTHOR_NAME: 'Codex',
