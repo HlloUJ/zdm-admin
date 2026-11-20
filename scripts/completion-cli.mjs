@@ -58,6 +58,7 @@ import {
 } from './completion-recovery.mjs';
 import { inventoryAssets } from './task-completion.mjs';
 import { runCompletionFlow } from './completion-flow.mjs';
+import { hasAppliedPublishedCiRepair } from './delivery-repairs/published-ci-repair.mjs';
 import { finalHandoffPlan, finalHandoff } from './completion-handoff.mjs';
 import { createCompletionPreviewControl } from './completion-preview.mjs';
 import { parseWorktreePorcelain } from './git-workflow-core.mjs';
@@ -108,6 +109,12 @@ async function completionCommandLocked(
   let engineeringReviewFile;
   if (preparationOnly && args.length === 5 && args[3] === '--engineering-review') {
     engineeringReviewFile = args[4];
+    args = args.slice(0, 3);
+  }
+  let publishedRepairId;
+  if (preparationOnly && args.length === 5 && args[3] === '--published-repair') {
+    publishedRepairId = args[4];
+    assert.match(publishedRepairId, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     args = args.slice(0, 3);
   }
   if (preparationOnly) args = ['deliver', ...args.slice(1)];
@@ -361,6 +368,7 @@ async function completionCommandLocked(
     return runCompletionFlow(root, batch, rest[1], {
       preparationOnly,
       engineeringReviewFile,
+      publishedRepairId,
       assertCurrentAdmission,
       execute,
       state,
@@ -542,7 +550,8 @@ async function completionCommandLocked(
       .every(
         (e) =>
           state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)) ||
-          hasHistoricalCiDiagnosis(state, e, batch.frozen?.accepted, rest[1], rest[2]),
+          hasHistoricalCiDiagnosis(state, e, batch.frozen?.accepted, rest[1], rest[2]) ||
+          hasAppliedPublishedCiRepair(state, e, batch, rest[1], rest[2], git),
       ),
     'Record diagnosed repair cost for each failed CI before closing',
   );
@@ -912,16 +921,17 @@ export async function completionCommand(root, args, options = {}) {
     const baseLength = command === 'settle' ? 4 : 3;
     const base = args.slice(0, baseLength);
     const flags = args.slice(baseLength);
-    const reviewIndex = flags.indexOf('--engineering-review');
+    const preparationFlag = flags.includes('--engineering-review') ? '--engineering-review' : '--published-repair';
+    const reviewIndex = flags.indexOf(preparationFlag);
     assert.ok(
       flags.length === 2 || (command === 'prepare' && flags.length === 4 && [0, 2].includes(reviewIndex)),
       'Unexpected reference-proof arguments',
     );
     assert.ok([0, 2].includes(proofFlag - baseLength) && args[proofFlag + 1], 'Unexpected reference-proof arguments');
     if (flags.length === 4) {
-      assert.equal(reviewIndex + proofFlag - baseLength, 2, 'Exact engineering review and reference proof required');
-      assert.ok(flags[reviewIndex + 1], 'Engineering review file required');
-      base.push('--engineering-review', flags[reviewIndex + 1]);
+      assert.equal(reviewIndex + proofFlag - baseLength, 2, 'Exact preparation option and reference proof required');
+      assert.ok(flags[reviewIndex + 1], 'Preparation option value required');
+      base.push(preparationFlag, flags[reviewIndex + 1]);
     }
     const { withPreviewReferenceProof } = await import('./delivery-repairs/preview-reference-proof.mjs');
     return withPreviewReferenceProof(root, args[proofFlag + 1], { task, effect }, () =>

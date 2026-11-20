@@ -10,7 +10,7 @@ import { createProgressOutbox, progressSourceIdentity } from './task-progress-ou
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { correct410InitialPause } from './delivery-repairs/task-410-initial-pause-correction.mjs';
-import { dynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
+import { dynamicHostAction, isDynamicHostAction } from './delivery-repairs/task-dynamic-host.mjs';
 
 function recordReadiness(commonDir, input, result) {
   if (!['receive', 'continue-intake', 'start'].includes(input.action)) return;
@@ -103,15 +103,9 @@ export async function advanceTaskThread(
       'rebind-plan',
       'resume',
       'coordinate',
-      'delegate',
-      'delivery-enroll',
-      'dispatch',
-      'dispatch-start',
-      'dispatch-cancel',
-      'preparation-finish',
       'retry-creation',
       'correct-410-initial-pause',
-    ].includes(input.action),
+    ].includes(input.action) || isDynamicHostAction(input.action),
   );
   const coordination = readTaskCoordination(commonDir);
   if (input.action === 'start' && coordination)
@@ -221,11 +215,7 @@ export async function advanceTaskThread(
     },
   };
   let result;
-  if (
-    ['delegate', 'delivery-enroll', 'dispatch', 'dispatch-start', 'dispatch-cancel', 'preparation-finish'].includes(
-      input.action,
-    )
-  ) {
+  if (isDynamicHostAction(input.action)) {
     assert.ok(registry && registry.commonDir === commonDir, 'Actual published registry required');
     result = await dynamicHostAction(input.action, input.task, host, {
       commonDir,

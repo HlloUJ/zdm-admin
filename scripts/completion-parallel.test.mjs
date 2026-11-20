@@ -27,6 +27,7 @@ import { createResourceLeases } from './resource-lease.mjs';
 import { finalHandoffPlan } from './completion-handoff.mjs';
 import { completionCommand } from './completion-cli.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
+import { hasAppliedPublishedCiRepair } from './delivery-repairs/published-ci-repair.mjs';
 import {
   captureReviewedScriptInputs,
   engineeringDomainProof,
@@ -57,7 +58,10 @@ function writeEngineeringManifest(root) {
   writeFileSync(path.join(root, SCRIPT_INPUT_MANIFEST), JSON.stringify(captureReviewedScriptInputs(root)));
 }
 
-function fixture(t, { manifestConflict = false, reviewedConflict = false } = {}) {
+function fixture(
+  t,
+  { manifestConflict = false, reviewedConflict = false, cleanManifest = false, repairAlreadyInTask = false } = {},
+) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'completion-parallel-'))),
     main = path.join(dir, 'main'),
     a = path.join(dir, 'a'),
@@ -75,7 +79,7 @@ function fixture(t, { manifestConflict = false, reviewedConflict = false } = {})
   writeFileSync(path.join(main, 'base.txt'), 'base');
   mkdirSync(path.join(main, 'scripts'));
   writeFileSync(path.join(main, 'scripts/check.mjs'), '// original verifier\n');
-  if (manifestConflict) {
+  if (manifestConflict || cleanManifest) {
     for (const input of ENGINEERING_EXTRA_INPUTS) {
       mkdirSync(path.dirname(path.join(main, input)), { recursive: true });
       writeFileSync(path.join(main, input), '{}');
@@ -96,6 +100,7 @@ function fixture(t, { manifestConflict = false, reviewedConflict = false } = {})
   registry.register({ id: 'a', worktree: a, owner: 'chat-a' });
   registry.register({ id: 'b', worktree: b, owner: 'chat-b' });
   writeFileSync(path.join(a, 'feature-a.txt'), 'accepted A');
+  if (repairAlreadyInTask) writeFileSync(path.join(a, 'base.txt'), 'published correction');
   if (manifestConflict) {
     writeFileSync(path.join(a, 'scripts/check.mjs'), '// task verifier');
     writeEngineeringManifest(a);
@@ -1022,3 +1027,272 @@ test('pre-CI engineering review rejects uncovered conflicts, altered inputs and 
     /alters paths beyond/,
   );
 });
+
+function publishedRepairFixture(t, fixtureOptions = {}) {
+  const f = fixture(t, { cleanManifest: true, ...fixtureOptions });
+  const repairWorktree = path.join(f.dir, 'repair');
+  f.git(f.main, 'worktree', 'add', '-b', 'codex/repair', repairWorktree);
+  f.registry.register({ id: 'repair', worktree: repairWorktree, owner: 'chat-repair' });
+  writeFileSync(path.join(repairWorktree, 'base.txt'), 'published correction');
+  f.git(repairWorktree, 'commit', '-am', 'Correct independent fixture');
+  const repairHead = f.git(repairWorktree, 'rev-parse', 'HEAD');
+  f.git(f.main, 'merge', '--no-ff', '--no-edit', 'codex/repair');
+  const main = f.git(f.main, 'rev-parse', 'HEAD');
+  f.git(f.main, 'push', 'origin', 'main');
+  f.git(f.a, 'push', 'origin', 'codex/a');
+  publishAcceptance(f.a, 'a');
+  const failedAt = '2026-07-01T00:00:00.000Z';
+  const repairedAt = Date.parse(failedAt) + 60000;
+  const repairDirectory = path.join(f.registry.commonDir, 'task-delivery/repair');
+  const repair = openCompletion(repairDirectory, 'repair', { now: repairedAt - 2000 });
+  const key = main + ':12';
+  repair.events = [
+    {
+      id: 'repair-ci',
+      name: 'ci',
+      key,
+      status: 'success',
+      startedAt: repairedAt - 1000,
+      finishedAt: repairedAt,
+      result: ciEvidence('12', main, true, repairedAt),
+    },
+    ...['evidence', 'handoff', 'preserve', 'cleanup', 'close'].map((name) => ({
+      id: name,
+      name,
+      key,
+      status: 'success',
+      startedAt: repairedAt,
+      finishedAt: repairedAt,
+    })),
+  ];
+  repair.closedAt = repairedAt;
+  saveCompletion(repairDirectory, repair);
+  f.registry.revise('repair', f.registry.readTask('repair').revision, (record) => {
+    record.stage = 'closed';
+    record.recordedHead = repairHead;
+    record.closedAt = new Date(repairedAt).toISOString();
+    record.main = { local: main, remote: main };
+  });
+  writeFileSync(
+    path.join(repairDirectory, 'completion-receipt.json'),
+    JSON.stringify({
+      results: { close: { result: { batch: 'repair', main: { local: main } } } },
+    }),
+  );
+
+  const job = { id: 10, name: 'Frontend static checks', completedAt: failedAt, conclusion: 'failure' };
+  const failure = {
+    id: 'original-failure',
+    name: 'ci',
+    key: f.head + ':11',
+    status: 'failure',
+    startedAt: Date.parse(failedAt) - 1000,
+    finishedAt: Date.parse(failedAt),
+    failure: { ci: { runId: '11', headSha: f.head, attempt: 1, conclusion: 'failure', failedJob: job } },
+  };
+  const state = {
+    events: [
+      {
+        id: 'original-pull',
+        name: 'pr',
+        key: f.head,
+        status: 'success',
+        finishedAt: failure.startedAt - 1,
+        result: { number: 123, headRefOid: f.head },
+      },
+      structuredClone(failure),
+    ],
+  };
+  let quiesced = 0;
+  const options = {
+    preparationOnly: true,
+    publishedRepairId: 'repair',
+    common: f.registry.commonDir,
+    state,
+    save: () => {},
+    inventoryAssets: () => [],
+    checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+    runtimeReferences: async () => {},
+    previewControl: {
+      assertOwner: async () => {},
+      prepareComposition: async (plan, { referenceEffect }) => {
+        assert.equal(referenceEffect, 'preparation');
+        assert.equal(plan.main, main);
+        assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+        quiesced++;
+      },
+    },
+    execute(cwd, tool, args) {
+      if (tool === 'git') return f.git(cwd, ...args);
+      assert.equal(tool, 'gh');
+      if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'fixture/repo' });
+      if (args[0] === 'pr') {
+        assert.deepEqual(args.slice(1, 3), ['view', '123'], 'Stay on the original PR');
+        return JSON.stringify({
+          number: 123,
+          state: 'OPEN',
+          headRefName: 'codex/a',
+          baseRefName: 'main',
+          isCrossRepository: false,
+          headRefOid: f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a').split('\t')[0],
+          url: 'https://example.invalid/pull/123',
+        });
+      }
+      assert.equal(args[0], 'api');
+      if (args[1].endsWith('/attempts/1')) {
+        return JSON.stringify({
+          id: 11,
+          run_attempt: 1,
+          repository: { full_name: 'fixture/repo' },
+          head_repository: { full_name: 'fixture/repo' },
+          path: '.github/workflows/quality.yml',
+          event: 'pull_request',
+          head_branch: 'codex/a',
+          head_sha: f.head,
+          status: 'completed',
+          conclusion: 'failure',
+          pull_requests: [{ number: 123 }],
+        });
+      }
+      if (args[1].endsWith('/jobs/10')) {
+        return JSON.stringify({
+          id: 10,
+          name: job.name,
+          completed_at: failedAt,
+          status: 'completed',
+          conclusion: 'failure',
+          head_sha: f.head,
+          run_attempt: 1,
+          run_id: 11,
+        });
+      }
+      assert.equal(args[1], 'repos/fixture/repo/branches/main/protection');
+      return JSON.stringify({
+        enforce_admins: { enabled: true },
+        required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+      });
+    },
+    async dispatch(_cwd, args) {
+      const head = f.git(f.a, 'rev-parse', 'HEAD');
+      assert.notEqual(head, f.head, 'Never wait for the old failed run');
+      assert.deepEqual(args, ['wait', 'pr', head]);
+      return (
+        await completionStage(state, 'ci', head + ':13', async () => ciEvidence('13', head, false, repairedAt + 60000))
+      ).result;
+    },
+  };
+  return {
+    ...f,
+    state,
+    mainSha: main,
+    failure,
+    repairedAt,
+    options,
+    quiesced: () => quiesced,
+    run: () => runCompletionFlow(f.a, readActiveBatch(f.a), f.registry.readTask('a').recordedHead, options),
+  };
+}
+
+test('published repair composes a clean tree, recovers its exact intent and updates only the original PR', async (t) => {
+  const f = publishedRepairFixture(t);
+  const before = f.registry.readTask('b');
+  const originalExecute = f.options.execute;
+  let interrupt = true;
+  f.options.execute = (cwd, tool, args) => {
+    if (interrupt && tool === 'git' && args[0] === 'merge' && args[1] === '--ff-only')
+      throw Error('interrupted after recording the exact intent');
+    return originalExecute(cwd, tool, args);
+  };
+  await assert.rejects(f.run(), /interrupted after recording the exact intent/);
+  assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+  const proof = readAcceptedComposition(f.a, 'a', f.accepted.commit);
+  assert.equal(proof.taskHead, f.head);
+  assert.equal(proof.main, f.mainSha);
+  interrupt = false;
+  delete f.options.publishedRepairId;
+  const prepared = await f.run();
+  assert.equal(prepared.pullRequest, 123);
+  assert.equal(prepared.runId, '13');
+  assert.equal(f.quiesced(), 1);
+  assert.deepEqual(f.git(f.a, 'show', '-s', '--format=%P', prepared.head).split(' '), [f.head, f.mainSha]);
+  assert.equal(f.git(f.a, 'show', prepared.head + ':base.txt'), 'published correction');
+  assert.equal(f.git(f.a, 'show', prepared.head + ':feature-a.txt'), 'accepted A');
+  assert.deepEqual(readAcceptance(f.a, 'a'), f.accepted);
+  assert.deepEqual(
+    f.state.events.find((event) => event.id === f.failure.id),
+    f.failure,
+  );
+  assert.deepEqual(f.registry.readTask('b'), before);
+  assert.deepEqual(createTaskDeliveryQueue(f.registry.commonDir).inspect().tickets, []);
+
+  const batch = readActiveBatch(f.a);
+  const git = (...args) => f.git(f.a, ...args);
+  assert.throws(
+    () => hasAppliedPublishedCiRepair(f.state, f.failure, batch, f.mainSha, '14', git),
+    /successful CI event/,
+  );
+  f.git(f.main, 'merge', '--no-ff', '--no-edit', prepared.head);
+  const main = f.git(f.main, 'rev-parse', 'HEAD');
+  await completionStage(f.state, 'ci', main + ':14', async () => ciEvidence('14', main, true, f.repairedAt + 120000));
+  assert.equal(hasAppliedPublishedCiRepair(f.state, f.failure, batch, main, '14', git), true);
+});
+
+for (const scenario of [
+  'no delta',
+  'bad first attempt',
+  'foreign PR',
+  'unpublished repair',
+  'foreign failed job',
+  'repair already in old tree',
+]) {
+  test('published repair rejects ' + scenario + ' before issuing a new candidate', async (t) => {
+    const f = publishedRepairFixture(t, { repairAlreadyInTask: scenario === 'repair already in old tree' });
+    let expected;
+    switch (scenario) {
+      case 'no delta':
+        applyTaskComposition(f.a, 'a', f.mainSha);
+        f.git(f.a, 'push', 'origin', 'codex/a');
+        expected = /must change the candidate tree/;
+        break;
+      case 'bad first attempt':
+        f.state.events[1].failure.ci.attempt = 2;
+        expected = /first-attempt/;
+        break;
+      case 'foreign PR': {
+        const execute = f.options.execute;
+        f.options.execute = (cwd, tool, args) =>
+          tool === 'gh' && args[1]?.endsWith('/attempts/1')
+            ? JSON.stringify({ ...JSON.parse(execute(cwd, tool, args)), pull_requests: [{ number: 999 }] })
+            : execute(cwd, tool, args);
+        expected = /another PR/;
+        break;
+      }
+      case 'unpublished repair':
+        f.options.publishedRepairId = 'missing-repair';
+        expected = /must be formally delivered/;
+        break;
+      case 'repair already in old tree':
+        expected = /Published repair inputs differ from the failed candidate/;
+        break;
+      case 'foreign failed job':
+        // Change the remote job SHA to a different input while leaving the local failure intact.
+        {
+          const execute = f.options.execute;
+          f.options.execute = (cwd, tool, args) =>
+            tool === 'gh' && args[1]?.endsWith('/jobs/10')
+              ? JSON.stringify({ ...JSON.parse(execute(cwd, tool, args)), head_sha: f.mainSha })
+              : execute(cwd, tool, args);
+        }
+        expected = new RegExp(f.head);
+        break;
+    }
+    const before = f.git(f.a, 'rev-parse', 'HEAD');
+    const remote = f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a');
+    const proof = readAcceptedComposition(f.a, 'a', f.accepted.commit);
+    await assert.rejects(f.run(), expected);
+    assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a'), remote);
+    assert.deepEqual(readAcceptedComposition(f.a, 'a', f.accepted.commit), proof);
+    assert.equal(f.quiesced(), 0);
+  });
+}

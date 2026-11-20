@@ -60,3 +60,9 @@ npm run task:entry -- --worktree <exact-task-directory> preview stop --task <tas
 ## 原生隔离核验
 
 真实验收应使用各任务的实际数据库账号连接，核验只能访问自身逻辑库，无法访问另一任务或集成库；同时核对独立媒体卷。停止与恢复后保留数据绑定，并验证旧运行 nonce 无法停止新实例。
+
+## 新建任务的监测上下文
+
+统一新建入口（包括 `task:entry start`、`task:start`、`task:micro`）要求准确 `--monitor-context '<JSON>'`，或仅为本次命令提供 `ZDM_TASK_MONITOR_CONTEXT`。JSON 必须含 `taskNumber`、`taskName`、`taskStableId`、`worker`、`rootThreadId`、`roomId`、`authorizationRef`；原 worker 的真实 `CODEX_THREAD_ID` 必须与 owner 一致。由根线程使用真实任务卡片与平台身份提供，不猜测或复制另一任务字段。
+
+缺失、格式错误或身份不符时在任何 Git 修改前拒绝，不创建工作区。工作流模板调用可通过本次命令环境变量提供，不修改持久环境或受保护配置。已有任务的准确 resume 路径不要求补字段，也不会批量回填旧任务。底层 registry 的兼容登记仍可能明确显示 pending-context，不算统一新建监测已覆盖。
