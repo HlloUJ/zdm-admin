@@ -92,10 +92,12 @@ test('derived delivery enrollment preserves review progress, preparation finish 
   const phase = { ...f.phase('a'), expectedQueueRevision: f.state.revision };
   const ticket = enrollDynamicDelivery(f.state, phase, () => f.phaseProof(phase));
   assert.ok(ticket.request.sequence < 10);
+  const enrollment = progress.capture(beforeEnrollment);
   assert.deepEqual(
-    progress.capture(beforeEnrollment).map(({ event }) => event),
-    [],
+    enrollment.map(({ event }) => event),
+    ['queued'],
   );
+  assert.equal(enrollment[0].stage_fact, undefined);
 
   const input = f.input('a');
   reserveDynamicDecision(f.state, input, () => f.proof(input));
@@ -114,12 +116,13 @@ test('derived delivery enrollment preserves review progress, preparation finish 
   );
   assert.deepEqual(
     progress.capture(beforeFinish).map(({ event }) => event),
-    ['queued'],
+    ['queued', 'queued'],
   );
   const receipts = progress.pause();
+  assert.ok(receipts.every(({ stage_fact }) => stage_fact === undefined));
   assert.deepEqual(
     receipts.map(({ event }) => event),
-    ['queued', 'paused'],
+    ['queued', 'queued', 'paused'],
   );
   assert.equal(receipts.at(-1).next.label, '等待恢复指令');
 });
