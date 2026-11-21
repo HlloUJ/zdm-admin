@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { isDeepStrictEqual } from 'node:util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { executionPausedFor } from './task-execution-scope.mjs';
+import { captureFixedAcceptanceIntake } from './task-fixed-acceptance-intake.mjs';
 import { notifyProgressHost } from './task-progress-host.mjs';
 import assert from 'node:assert/strict';
 import path from 'node:path';
@@ -173,7 +174,7 @@ export function captureQueueProgress(commonDir, state, previous) {
   const lastPause = (ledger) => ledger?.events?.findLast((event) => event.action === 'pause-all')?.request;
   const pause = lastPause(state);
   for (const ticket of state.tickets) {
-    if (['completed', 'cancelled', 'deferred'].includes(ticket.status)) continue;
+    if (['cancelled', 'deferred'].includes(ticket.status)) continue;
     const parked = ticket.status === 'parked';
     if (
       parked &&
@@ -181,6 +182,14 @@ export function captureQueueProgress(commonDir, state, previous) {
     )
       continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
+    if (ticket.status === 'completed') {
+      try {
+        captureFixedAcceptanceIntake(commonDir, ticket, before);
+      } catch (error) {
+        console.error('Fixed acceptance notification pending; development receipt retained: ' + error.message);
+      }
+      continue;
+    }
     // Admission is NOT proof of actual action start. No synthetic started event on claim.
     const paused = parked || pausedFor(state, ticket);
     const changed = parked || !before || before.status !== ticket.status || paused !== pausedFor(previous, before);

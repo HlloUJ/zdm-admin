@@ -21,6 +21,7 @@ const entries = {
   temporary: 'scripts/dev-task.mjs',
   combination: 'scripts/task-preview-combination.mjs',
   continuation: 'scripts/task-continuation-plan.mjs',
+  acceptance: 'scripts/task-fixed-acceptance.mjs',
 };
 export function publishedTaskEntry(root, args) {
   const git = (cwd, ...flags) => execFileSync('git', ['-C', cwd, ...flags], { encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -37,7 +38,7 @@ export function publishedTaskEntry(root, args) {
   const [command, ...rest] = args;
   assert.ok(
     entries[command],
-    'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination|continuation> [args]',
+    'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination|continuation|acceptance> [args]',
   );
   const registry = createTaskRegistry(root),
     targetRegistry = createTaskRegistry(target);
@@ -92,7 +93,7 @@ export function publishedTaskEntry(root, args) {
 export function main(root = process.cwd(), args = process.argv.slice(2)) {
   if (args.includes('--help')) {
     console.log(
-      'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination|continuation> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
+      'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination|continuation|acceptance> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
     );
     return;
   }
