@@ -995,6 +995,31 @@
       "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-status.mjs"],
       "dynamicImports": 0
     },
+    "scripts/delivery-repairs/retained-489-migration-source.mjs": {
+      "digest": "fa45875f5c8dba37d1776ed87d12e7c98dfa350b1498246bdbf6c50b65120abf",
+      "imports": [
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/delivery-repairs/preview-reference-history.mjs",
+        "scripts/delivery-repairs/preview-reference-proof-core.mjs",
+        "scripts/delivery-repairs/preview-reference-proof.mjs",
+        "scripts/delivery-repairs/retained-489-migration-source.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/integration-resource.mjs",
+        "scripts/preview-consumers.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/runtime-resource.mjs",
+        "scripts/task-data-environment.mjs",
+        "scripts/task-execution-binding.mjs",
+        "scripts/task-registry.mjs",
+        "scripts/task-runtime-state.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/retained-489-migration-source.test.mjs": {
+      "digest": "cbb239225fac206fee820bfd289613b002f14265fb7fb7b1d2c431d23a21c3b2",
+      "imports": ["scripts/delivery-repairs/retained-489-migration-source.mjs"],
+      "dynamicImports": 0
+    },
     "scripts/delivery-repairs/task-410-initial-pause-correction.mjs": {
       "digest": "67323195fe9a73cfef5840c79f811fdce91f031871a833ad0be6e0b72a078df5",
       "imports": [
