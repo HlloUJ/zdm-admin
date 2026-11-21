@@ -138,7 +138,7 @@ export async function runCompletionWithProgress(
     } catch (error) {
       failure = error;
     } finally {
-      if (['deliver', 'settle'].includes(args[0]) && result?.status !== 'deferred') {
+      if (['deliver', 'settle', 'resume-post-merge'].includes(args[0]) && result?.status !== 'deferred') {
         try {
           placements.push({
             kind: 'delivery_complete',

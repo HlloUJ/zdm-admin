@@ -9,7 +9,7 @@ import { completionStage } from './completion-session.mjs';
 import { withIntegrationResource, integrationChildEnvironment } from './integration-resource.mjs';
 
 // Local, read-only target plan. The executing entry refreshes origin before planning.
-export function finalHandoffPlan(root, batch, main, { execute, state }) {
+export function finalHandoffPlan(root, batch, main, { execute, state, recovery }) {
   assert.match(main, /^[a-f0-9]{40}$/);
   planBatchDelivery(root);
   const git = (cwd, ...args) => execute(cwd, 'git', args);
@@ -36,10 +36,12 @@ export function finalHandoffPlan(root, batch, main, { execute, state }) {
   assert.equal(git(anchor, 'rev-parse', 'origin/main'), main);
   assert.equal(git(root, 'rev-parse', batch.branch), batch.recordedHead);
   assert.equal(git(root, 'rev-parse', 'origin/' + batch.branch), batch.recordedHead);
-  git(root, 'merge-base', '--is-ancestor', batch.recordedHead, main);
+  const candidateMain = recovery?.originalMain ?? main;
+  git(root, 'merge-base', '--is-ancestor', batch.recordedHead, candidateMain);
+  git(root, 'merge-base', '--is-ancestor', candidateMain, main);
   assert.equal(
     git(root, 'rev-parse', batch.recordedHead + '^{tree}'),
-    git(root, 'rev-parse', main + '^{tree}'),
+    git(root, 'rev-parse', candidateMain + '^{tree}'),
     'Candidate tree changed',
   );
   const integrationHead = git(integration, 'rev-parse', 'HEAD'),
@@ -91,13 +93,25 @@ export function finalHandoffPlan(root, batch, main, { execute, state }) {
 }
 
 export async function finalHandoff(root, batch, main, options) {
-  const { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common, previewControl, sourceOnly } =
-    options;
+  const {
+    execute,
+    runtimeSnapshot,
+    runtimeProof,
+    checkRuntime,
+    state,
+    save,
+    common,
+    previewControl,
+    sourceOnly,
+    recovery,
+  } = options;
+  const originalMain = recovery?.originalMain ?? main;
+  if (recovery) assert.equal(recovery.main, main);
   assert.ok(state.startedAt !== null, 'Begin formal completion before final handoff');
   // Use only the published entry, never execute a task candidate before its main CI succeeds.
   const ci = [...state.events]
     .reverse()
-    .find((e) => e.name === 'ci' && e.status === 'success' && e.result?.headSha === main);
+    .find((e) => e.name === 'ci' && e.status === 'success' && e.result?.headSha === originalMain);
   assert.ok(
     ci?.result?.eventName === 'push' &&
       ci.result.branch === 'main' &&
@@ -109,7 +123,7 @@ export async function finalHandoff(root, batch, main, options) {
     await completionStage(
       state,
       'handoff',
-      main + ':final',
+      originalMain + ':final',
       () =>
         withIntegrationResource(root, batch.id, async () => {
           execute(root, 'git', ['fetch', 'origin']);
@@ -249,6 +263,7 @@ export async function finalHandoff(root, batch, main, options) {
           }
           return {
             main,
+            ...(recovery ? { originalMain, maintenance: recovery.maintenance } : {}),
             ...(retainedRuntime ? { sourceOnly: true } : {}),
             launcherReused: reused || Boolean(retainedRuntime),
             previewReused: preview.reused,

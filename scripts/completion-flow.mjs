@@ -13,6 +13,7 @@ import { applyTaskComposition } from './task-composition.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
 import { hasOriginalMergedReadiness } from './delivery-repairs/completion-legacy-readiness.mjs';
+import { verifyMaintenanceCloseoutReadiness } from './delivery-repairs/historical-post-merge.mjs';
 import { withCandidateRuntime } from './task-candidate-runtime.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
 import {
@@ -405,7 +406,7 @@ export async function runCompletionFlow(
         );
         assert.ok(
           prior &&
-            hasOriginalMergedReadiness({
+            (hasOriginalMergedReadiness({
               batch,
               head,
               pr: merged[0],
@@ -420,7 +421,16 @@ export async function runCompletionFlow(
               common,
               readCandidateCommand: () =>
                 JSON.parse(git(batch.worktree, 'show', head + ':package.json')).scripts['verify:delivery'],
-            }),
+            }) ||
+              verifyMaintenanceCloseoutReadiness({
+                anchor,
+                registry: tasks,
+                batch,
+                head,
+                pr: merged[0],
+                state,
+                execute,
+              })),
           'Merged recovery requires its original exact readiness and PR evidence',
         );
         assertCompletionQuality(prior.result, head, prior.result.runId);
