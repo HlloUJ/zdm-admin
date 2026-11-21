@@ -198,3 +198,21 @@ test('mount inventory refuses equal, parent, child, physical aliases, and unprov
     /Running container inventory changed/,
   );
 });
+
+test('mount validation accepts an omitted configured list and refuses malformed or inherited mounts', (t) => {
+  const f = fixture(t);
+  const mount = { Type: 'bind', Source: f.other, Destination: '/outside' };
+  const row = { id: 'b'.repeat(64), running: false, labels: {}, mounts: [mount], binds: [f.other + ':/outside:ro'] };
+  const verify = (container) =>
+    assertDispatchMountsClear(f.task, f.assemble(), { containers: [container], volumes: [] });
+  for (const configuredMounts of [undefined, null, [], [{ Type: 'bind', Source: f.other, Target: '/outside' }]])
+    assert.equal(verify({ ...row, configuredMounts, volumesFrom: null }).length, 1);
+  for (const malformed of ['', {}, false, 0]) {
+    assert.throws(() => verify({ ...row, configuredMounts: malformed }), /Unknown Docker mount configuration/);
+    assert.throws(() => verify({ ...row, binds: malformed }), /Unknown Docker bind configuration/);
+    assert.throws(() => verify({ ...row, volumesFrom: malformed }), /Inherited container volumes/);
+  }
+  assert.throws(() => verify({ ...row, volumesFrom: ['another-container:ro'] }), /Inherited container volumes/);
+  assert.throws(() => verify({ ...row, binds: [f.other + ':/unobserved:ro'] }), /absent from the observed mounts/);
+  assert.throws(() => verify({ ...row, mounts: undefined }), /Unknown Docker container mount inventory/);
+});
