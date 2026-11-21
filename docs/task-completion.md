@@ -18,6 +18,8 @@
 
 原任务父提交早于主线新增工程输入时，入口从准确 Git 合并基线读取其已发布清单。基线须在受信 main 的第一父链上，原任务只可缺少基线中尚不存在的后来新增输入。历史清单和原任务清单都按各自准确的输入文件重算。当前 main 和最终组合树继续核对当前工程输入全集。
 
+原候选首轮 PR Quality CI 已成功且随后发布主线前进时，可在真实 preparation 准入下调用 `complete prepare <任务ID> <原登记HEAD> --recompose-manifest <准确origin/main SHA>`。入口核对原冻结、开放的原 PR、首轮成功 CI 和其原基线，只接受唯一工程清单冲突。沿用原引用保护、受信清单生成器和双亲组合登记，只追加一个自有 checkpoint，快进原 PR 并等待新 SHA 的首轮 CI。可附加 `--reference-proof`；组合变更 HEAD 后按原流程重新采集。已有组合证明的中断用普通 `complete prepare` 从准确登记 HEAD 接续。
+
 出现其他已知技术文件冲突时，原任务执行者可审阅准确双亲的组合提交，并为同一 `complete prepare` 追加 `--engineering-review <任务工作区 .task-verification 内的绝对路径>`。JSON 使用 `version: 1`、`accepted`、`taskHead`、`main`、`candidate` 和 `files`。每个实际冲突文件记录 `file`、`inputs: { base, task, main }`、`result`、`reason`，其中各版本记录 Git `mode` 和完整 blob `object`。原执行者在理由中说明保留两侧有效行为与测试的依据。入口从真实 Git 三方对象验证输入、候选双亲、输出和实际冲突清单，独立重算工程清单并核对完整候选树。业务、控制面、未知项、删除、模式变化、未经审阅的冲突或候选自行带入的其他变化继续拒绝。有效审阅随原组合证明留存供中断恢复，远端原有来源与 CI 门禁继续执行。
 
 独立任务获得准确“任务完成”授权后，首选 `npm run task:completion -- deliver <batch-id> <准确任务40位SHA>`。该入口绑定准确 task/owner/Worktree 并冻结实际源码；核对保护、备份与健康，推送并完成初始 PR CI，再进入 FIFO 正式交付队列。队列内刷新 main、按原始冻结与受信主线组合，在该准确组合候选自己的源码中执行本地就绪检查，必要运行验证使用当前任务独占的临时端口，不抢占正在展示其他任务的5175；变化候选重新推送和验证后才准确合并，随后完成本地 main 同步、main CI、最终交接和 settle；每个阶段直接await前一阶段，不靠人工休眠轮询再接命令。只有刚创建事件尚未出现时有限等待查询，绝不dispatch或重跑CI；多个候选、失败、重跑、主线变化或保护不符均停止。源码修改不授权调用deliver；PR创建输出URL后仍须由调用方附加到当前对话。
@@ -39,6 +41,24 @@
 100 通过已发布的准备准入冻结、提交 PR 并完成首轮候选 CI，随后正常结束准备准入。当前总协调另行独立核对准确变更、原待验收票据、候选、PR、父提交、首轮 CI 与实时分支保护。仅对该组证据出具一次性授权，保存在 100 的私有交付目录。授权经真实总协调对话回读，纳入对应的 `review` 观察及 `version,task,executor,base,head,accepted,preparation,pullRequest,prRunId`。赞同消息的正文为 `维护发布批准 <任务ID> PR #<编号> <head> <base> CI <候选run>`。本地宿主包装保留来源，实际 GitHub 保护继续独立执行。
 
 在原票为等待且主线、集成均空闲时，受审阅的宿主使用现有 main-delivery 资源互斥和普通 GitHub PR 合并校验，按准确 head 合并并快进 main。原 FIFO 票和执行账本未发生状态修改；候选源码在主线发布之前不能执行现场让位。主线快进后，以 100 原执行者从已发布入口运行 `complete handoff-deferred-maintenance <维护main> <授权文件绝对路径>`。入口独立核对准备记录、当前精确 PR/父提交、保护和首轮 main CI。随后在 main 和集成互斥内确认变更仅包含审阅过的交付源码，确认 100 无运行环境，并快进集成及保留预览源码。前后核验现有容器、实际健康、备份及固定 5179 运行身份。不启动或停止任务运行，不扫描或修改保留的 5177，100 的工作区与分支继续保全，待普通引用和清理条件满足后结项。之后由原 683 执行上面的 `defer-release`，待实际读回两层让位才派发下一项。
+
+### 590 合并后交接接续
+
+适用于 `trusted-749-single-parent-continuation` 已合并的 PR #162。登记候选为 `46349d67d40e89580a32ec24abd360a49b08680b`，原 main 为 `f8203f37825c59e29631ca9f2d459aa5bafd7af5`，两次首轮 Quality CI 分别为 `44889372275` 和 `44900850590`。维护任务 `historical-acceptance-postmerge-recovery-590` 先按普通准备流程获得独立 PR 和首轮 CI。总协调核对该 PR、已发布 base、准备记录、准确候选和全部实际必需检查，独立发表以下批准正文。
+
+```text
+维护发布批准 historical-acceptance-postmerge-recovery-590 PR #<187 PR> <187 head> f8203f37825c59e29631ca9f2d459aa5bafd7af5 CI <187 首轮 PR run>
+```
+
+首次维护发布由原 590 执行者办理。通过已发布的执行账本、原交付票及进程证据核对原 final 准入、失败记录、当前票和 main 租约，再以已发布的 `createTaskDeliveryQueue().wait` 复领同一票。持票期间用现有 GitHub 保护按准确 head 合并 187 PR，要求原 main 仍是最新基线，且候选以它为唯一父提交。核对独立批准、维护差异、前后端和受信来源检查、严格最新基线及管理员保护。只处理正常 merge commit 与本地 main 快进，运行交接留给已发布且首轮 main CI 成功的入口。保留原票和 main 租约至恢复命令结束。连接中断时先读实际 PR、远端 main 及原进程证据，再按原票接续。
+
+原 590 在自己的 `task-delivery/<590 task>/post-merge-maintenance.json` 保存上述真实原生批准的只读快照，文件权限应为 `0600`。字段为 `{version:1,task,owner,ticket,accepted,maintenance:{base,head,accepted,pullRequest,prRunId,executor,preparation},review:{provider:"codex-native-read_thread",threadId,turnId,observedAt,message:{id,phase:"commentary",text}}`，其中 `preparation` 为 187 已结束的准备决定 ID。任务、原票、冻结和批准由实际记录取值。来源端的私有运行引用证明仍由原持有人按正式入口重新核验。
+
+```text
+npm run task:entry -- --worktree <原590工作区> complete resume-post-merge trusted-749-single-parent-continuation <原票UUID> <维护main SHA> <维护main首轮run> [--reference-proof <590私有证明>]
+```
+
+该入口要求已发布主线、原执行者和现行 final 准入，复领同一 FIFO 票并独占集成资源。核对真实原冻结、原失败及租约、两次 PR 和两次 main 的首轮质量证据，并验证后继 main 是原 main 与已审阅维护候选的直接合并，差异限于审阅过的交付文件。先保留单独的 `post-merge-maintenance-publication.json`，再用维护 main 做真实运行交接。原 `completion-receipt.json` 仍以 590 原 main 和原 CI 结项，单列现场交接的维护 main。失败留在同一票，使用相同参数恢复。187 后续由其原执行者取得自己的 final 准入，再走普通 `complete deliver`。已合并分支的就绪检查可使用这份专项发布回执，条件是 590 已正式关闭，发布回执与原结项记录一致，且重新核对 187 的原准备、冻结、PR、候选及准确 main 的实时保护与首轮 CI。187 仍有自己的运行交接和关闭回执。
 
 调用方直接等待同一进程（可恢复终端会话），进度变化由它输出；不要另开watch、查询相同API或用45秒固定sleep轮询日志。若进程中断，从原准确参数恢复，已通过检查只核验原运行。数据库高风险保护锁仍走原受保护入口，不被普通自动链接管。首次自升级从已审查的准确本地候选进入PR流程，运行交接与清理仍只由已发布且main CI通过的版本承担。
 

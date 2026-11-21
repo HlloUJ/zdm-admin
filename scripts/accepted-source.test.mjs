@@ -1,10 +1,12 @@
 import test from 'node:test';
+import { createHash } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, existsSync } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {
   acceptedGit,
+  sourceEntries,
   freezeAcceptedSource,
   readAcceptance,
   assertAcceptedSource,
@@ -116,6 +118,67 @@ test('wrong source, wrong branch binding, record edits and acceptance-ref replac
   f.git('update-ref', 'refs/zdm/accepted/example', f.git('rev-parse', 'HEAD'));
   assert.throws(() => readAcceptance(f.root, 'example'), /ref changed/);
 });
+test('historical classification can drift without losing either generation of candidate protection', (t) => {
+  const f = fixture(t);
+  const newlyProtected = 'scripts/accepted-source-continuation.mjs';
+  const formerlyProtected = 'scripts/check.mjs';
+  writeFileSync(path.join(f.root, newlyProtected), '// frozen under an older policy\n');
+  const parent = f.commit();
+  const tree = f.git('rev-parse', 'HEAD^{tree}');
+  const entries = sourceEntries(f.root, tree).filter(({ file }) => file !== newlyProtected);
+  entries.push(sourceEntries(f.root, tree, true).find(({ file }) => file === formerlyProtected));
+  entries.sort((a, b) => a.file.localeCompare(b.file));
+  const sha256 = (value) => createHash('sha256').update(value).digest('hex');
+  const message =
+    'zdm-accepted-source-v1\n' +
+    JSON.stringify({
+      version: 1,
+      batch: f.batch.id,
+      branch: f.batch.branch,
+      tree,
+      parent,
+      protectedPaths: entries.map(({ file }) => file),
+      developmentState: [],
+    });
+  const commit = acceptedGit(f.root, ['commit-tree', tree, '-p', parent], { input: message });
+  f.git('update-ref', 'refs/zdm/accepted/example', commit);
+  const directory = path.join(f.root, '.git/task-delivery/example');
+  mkdirSync(directory, { recursive: true });
+  const record = {
+    version: 1,
+    batch: f.batch.id,
+    branch: f.batch.branch,
+    commit,
+    tree,
+    messageDigest: sha256(message),
+    businessDigest: sha256(JSON.stringify(entries)),
+  };
+  const recordFile = path.join(directory, 'accepted-source.json');
+  writeFileSync(recordFile, JSON.stringify(record));
+  assert.equal(readAcceptance(f.root, 'example').businessDigest, record.businessDigest);
+  const remote = (candidate) =>
+    verifyRemoteAcceptance(f.root, {
+      candidate,
+      accepted: commit,
+      branch: f.batch.branch,
+    });
+  assert.equal(remote(parent).businessDigest, record.businessDigest);
+  for (const file of [formerlyProtected, newlyProtected]) {
+    for (const edit of ['changed', null]) {
+      const absolute = path.join(f.root, file);
+      if (edit) writeFileSync(absolute, edit);
+      else rmSync(absolute);
+      const candidate = f.commit();
+      assert.throws(() => assertAcceptedSource(f.root, 'example', candidate), /differs from accepted/);
+      assert.throws(() => remote(candidate), /changed accepted/);
+      f.git('checkout', parent, '--', file);
+      f.commit();
+    }
+  }
+  writeFileSync(recordFile, JSON.stringify({ ...record, businessDigest: '0'.repeat(64) }));
+  assert.throws(() => readAcceptance(f.root, 'example'), /Frozen protected source digest changed/);
+});
+
 test('remote acceptance publication is idempotent and never overwrites an existing baseline', (t) => {
   const f = fixture(t),
     remote = path.join(f.root, '.task-verification/origin.git');

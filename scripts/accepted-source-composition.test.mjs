@@ -13,16 +13,24 @@ import {
   readAcceptance,
   assertAcceptedSource,
   prepareAcceptedComposition,
+  publishAcceptance,
+  reviewLocalAcceptedContinuation,
+  verifyLocalAcceptedContinuation,
   verifyRemoteAcceptance,
 } from './accepted-source.mjs';
 import {
+  acceptedComposition,
   acceptedCompositionTree,
   candidateCompositionTree,
   writeAcceptedComposition,
 } from './accepted-source-composition.mjs';
+import { CONTINUATION_BATCH, CONTINUATION_HOOK, projectAcceptedContinuation } from './accepted-source-continuation.mjs';
+import { captureReviewedScriptInputs, ENGINEERING_EXTRA_INPUTS } from './script-test-plan.mjs';
+import { REVIEWED_DELIVERY_INPUTS } from './engineering-impact.mjs';
+import { formatEngineeringManifest } from './delivery-repairs/pre-ci-composition.mjs';
 function fixture(
   t,
-  { legacy = false, overwritesA = false, freezeAfterMainSync = false, conflictPath = null, files = {} } = {},
+  { legacy = false, overwritesA = false, freezeAfterMainSync = false, conflictPath = null, files = {}, id = 'a' } = {},
 ) {
   const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'accepted-composition-')));
   t.after(() => rmSync(root, { recursive: true, force: true }));
@@ -51,13 +59,14 @@ function fixture(
   git('init', '--bare', remote);
   git('remote', 'add', 'origin', remote);
   git('push', 'origin', 'main');
-  git('switch', '-c', 'codex/a');
+  const branch = 'codex/' + id;
+  git('switch', '-c', branch);
   const registry = createTaskRegistry(root);
-  if (!legacy) registry.register({ id: 'a', owner: 'fixture-a', worktree: root });
+  if (!legacy) registry.register({ id, owner: 'fixture-a', worktree: root });
   const checkpoint = (commit) => {
     if (legacy) return;
-    const task = registry.readTask('a');
-    registry.revise('a', task.revision, (record) => {
+    const task = registry.readTask(id);
+    registry.revise(id, task.revision, (record) => {
       record.recordedHead = commit;
       record.checkpoints.push({
         commit,
@@ -73,7 +82,7 @@ function fixture(
   git('commit', '-m', 'task A approved feature');
   const head = git('rev-parse', 'HEAD');
   checkpoint(head);
-  const batch = { id: 'a', worktree: root, branch: 'codex/a', base, ...(legacy ? {} : { taskRegistryVersion: 2 }) };
+  const batch = { id, worktree: root, branch, base, ...(legacy ? {} : { taskRegistryVersion: 2 }) };
   let original = freezeAfterMainSync ? null : freezeAcceptedSource(root, batch);
   const b = path.join(root, '.task-runtime/b');
   git('worktree', 'add', '-b', 'codex/b', b, overwritesA ? head : base);
@@ -350,6 +359,7 @@ test('mixed exempt and protected conflicts cannot enter composition recovery', (
   assert.deepEqual(readAcceptance(f.root, 'a'), f.original);
 });
 
+const continuationRecord = '.codex/accepted-source-continuations/' + CONTINUATION_BATCH + '.json';
 const reviewPath = '.codex/accepted-source-conflict-reviews/a.json';
 // Reduced source from the 749 conflict shapes: four frozen paths and five
 // engineering paths with actual unmerged entries on both sides.
@@ -390,16 +400,18 @@ const engineeringPaths = [
 const addedFile = 'src/services/storeCacheCleanup.ts';
 const addedVersions = { base: null, frozen: 'order cache\n', main: 'selection cache\n', resolved: 'both caches\n' };
 
-function protectedFixture(t, paths = reviewedPaths, version = 1) {
+function protectedFixture(t, paths = reviewedPaths, version = 1, options = {}) {
   const f = fixture(t, {
+    ...options,
     files: {
       ...paths,
       ...Object.fromEntries(engineeringPaths.map((file) => [file, { base: 'before\n', frozen: 'A\n', main: 'B\n' }])),
+      ...options.files,
     },
   });
   const data = {
     version,
-    batch: 'a',
+    batch: f.batch.id,
     accepted: f.original.commit,
     integrationBase: f.base,
     reviewedMain: f.main,
@@ -418,7 +430,7 @@ function protectedFixture(t, paths = reviewedPaths, version = 1) {
       reason: 'Verify the exact frozen task changes and the behavior from published main',
     })),
   };
-  const task = f.registry.readTask('a');
+  const task = f.registry.readTask(f.batch.id);
   f.registry.revise(task.id, task.revision, (record) => {
     record.frozen = { accepted: f.original.commit, tree: f.original.tree, businessDigest: f.original.businessDigest };
     record.stage = 'frozen';
@@ -426,8 +438,9 @@ function protectedFixture(t, paths = reviewedPaths, version = 1) {
   return { ...f, data, paths };
 }
 function publishReview(f, receipt = f.data) {
-  mkdirSync(path.join(f.b, path.dirname(reviewPath)), { recursive: true });
-  writeFileSync(path.join(f.b, reviewPath), JSON.stringify(receipt) + '\n');
+  const destination = path.join(f.b, path.dirname(reviewPath), f.batch.id + '.json');
+  mkdirSync(path.dirname(destination), { recursive: true });
+  writeFileSync(destination, JSON.stringify(receipt) + '\n');
   f.bGit('add', '.');
   f.bGit('commit', '-m', 'Separately reviewed exact resolution');
   const main = f.bGit('rev-parse', 'HEAD');
@@ -653,4 +666,195 @@ test('approved protected bytes cannot mask candidate drift or a synthetic merge 
     /exact task and trusted main parents/,
   );
   assert.equal(existsSync(path.join(f.registry.commonDir, 'task-delivery/a/composition.json')), false);
+});
+
+function continuationFixture(t) {
+  const reviewedFile = 'src/reviewed-addition.js';
+  const files = Object.fromEntries(
+    [...ENGINEERING_EXTRA_INPUTS, ...REVIEWED_DELIVERY_INPUTS].map((file) => [
+      file,
+      { base: 'fixture\n', frozen: 'fixture\n', main: 'fixture\n' },
+    ]),
+  );
+  const impactFile = 'scripts/engineering-impact.json';
+  files[impactFile] = { base: '{}\n', frozen: '{}\n', main: '{}\n' };
+  files[CONTINUATION_HOOK] = { base: 'published hook\n', frozen: 'different hook\n', main: 'published hook\n' };
+  const f = protectedFixture(t, { [reviewedFile]: addedVersions }, 2, { id: CONTINUATION_BATCH, files });
+  const publish = (message) => {
+    f.bGit('add', '.');
+    f.bGit('commit', '-m', message);
+    const main = f.bGit('rev-parse', 'HEAD');
+    f.bGit('push', 'origin', main + ':refs/heads/main');
+    f.git('fetch', 'origin');
+    return main;
+  };
+  publishReview(f);
+  const manifest = 'scripts/test-domain-manifest.json';
+  writeFileSync(path.join(f.b, manifest), formatEngineeringManifest(captureReviewedScriptInputs(f.b)));
+  const reviewedBase = publish('Publish exact baseline manifest');
+  const expected = acceptedComposition(f.root, f.original.commit, reviewedBase);
+  const index = path.join(f.root, '.git', 'continuation-fixture-index');
+  const indexed = (...args) => acceptedGit(f.root, args, { env: { ...process.env, GIT_INDEX_FILE: index } });
+  indexed('read-tree', expected.tree);
+  const replace = (file, source, mode = '100644') =>
+    indexed('update-index', '--add', '--cacheinfo', mode, f.git('rev-parse', source + ':' + file), file);
+  const write = (file, bytes) => {
+    const blob = acceptedGit(f.root, ['hash-object', '-w', '--stdin'], { input: bytes });
+    indexed('update-index', '--add', '--cacheinfo', '100644', blob, file);
+  };
+  for (const file of [...engineeringPaths, CONTINUATION_HOOK]) replace(file, reviewedBase);
+  write(impactFile, '{"fixture":"previous reviewed engineering output"}\n');
+  write(manifest, '{"fixture":"previous reviewed manifest"}\n');
+  const commit = (tree, parents) =>
+    f.git('commit-tree', tree, ...parents.flatMap((parent) => ['-p', parent]), '-m', 'Isolated continuation fixture');
+  const reviewedTree = indexed('write-tree');
+  const originalCandidate = commit(reviewedTree, [reviewedBase]);
+  const record = reviewLocalAcceptedContinuation(f.root, f.batch.id, originalCandidate, reviewedBase);
+  const publishRecord = (value = record) => {
+    const destination = path.join(f.b, continuationRecord);
+    mkdirSync(path.dirname(destination), { recursive: true });
+    writeFileSync(destination, JSON.stringify(value) + '\n');
+    return publish('Independent maintenance record');
+  };
+  return {
+    ...f,
+    reviewedBase,
+    reviewedFile,
+    reviewedTree,
+    record,
+    commit,
+    replace,
+    write,
+    indexed,
+    publish,
+    publishRecord,
+  };
+}
+
+test('private completion rechecks the original freeze and the complete published continuation tree', async (t) => {
+  const f = continuationFixture(t);
+  f.publishRecord();
+  writeFileSync(path.join(f.b, 'src/published-later.js'), 'Unrelated main source\n');
+  const main = f.publish('Unrelated main change');
+  f.git('branch', '-f', 'main', main);
+  f.bGit('switch', 'main');
+  const { tree, reviewedTree } = projectAcceptedContinuation(f.root, main);
+  assert.equal(reviewedTree, f.reviewedTree);
+  assert.equal(f.git('show', tree + ':src/published-later.js'), 'Unrelated main source');
+  const candidate = f.commit(tree, [main]);
+  const original = readAcceptance(f.root, f.batch.id);
+  const check = (head, base = main) =>
+    completionCommand(f.root, ['check-source', head, '--continuation-main', base], { owner: 'fixture-a' });
+  assert.equal((await check(candidate)).accepted, original.commit);
+  assert.throws(() => publishAcceptance(f.root, f.batch.id), /retain its private acceptance/);
+  await assert.rejects(check(candidate, f.reviewedBase), /Exact fetched origin\/main/);
+
+  for (const [file, source, mode] of [
+    ['src/product.js', main, '100644'],
+    ['src/product.js', original.commit, '100755'],
+    ['src/obsolete.js', main, '100644'],
+    [CONTINUATION_HOOK, original.commit, '100644'],
+    [f.reviewedFile, main, '100644'],
+  ]) {
+    f.indexed('read-tree', tree);
+    f.replace(file, source, mode);
+    await assert.rejects(check(f.commit(f.indexed('write-tree'), [main])), /differs from the published continuation/);
+  }
+  f.indexed('read-tree', tree);
+  f.indexed('update-index', '--force-remove', '--', f.reviewedFile);
+  await assert.rejects(check(f.commit(f.indexed('write-tree'), [main])), /differs from the published continuation/);
+  await assert.rejects(check(f.commit(tree, [main, f.head])), /exact trusted base as its only parent/);
+  await assert.rejects(check(f.commit(tree, [f.reviewedBase])), /exact trusted base as its only parent/);
+  assert.deepEqual(readAcceptance(f.root, f.batch.id), original);
+  assert.equal(f.git('rev-parse', 'HEAD'), f.head);
+});
+
+test('published continuation refuses corrupt review identity, wrong freeze, hook drift and touched source drift', (t) => {
+  const f = continuationFixture(t);
+  const invalidFreeze = f.publishRecord({ ...f.record, accepted: f.reviewedBase });
+  assert.throws(() => projectAcceptedContinuation(f.root, invalidFreeze), /another original freeze/);
+  const invalidTree = f.publishRecord({ ...f.record, reviewedTree: f.reviewedBase });
+  assert.throws(() => projectAcceptedContinuation(f.root, invalidTree), /does not match its exact delta/);
+  const invalidDigest = f.publishRecord({ ...f.record, protectedDeletionDigest: '0'.repeat(64) });
+  const invalidCandidate = f.commit(projectAcceptedContinuation(f.root, invalidDigest).tree, [invalidDigest]);
+  assert.throws(
+    () => verifyLocalAcceptedContinuation(f.root, f.batch.id, invalidCandidate, invalidDigest),
+    /differs from the original private review/,
+  );
+  f.publishRecord();
+  writeFileSync(path.join(f.b, CONTINUATION_HOOK), 'Changed main hook\n');
+  const changedHook = f.publish('Unreviewed hook change on main');
+  assert.throws(() => projectAcceptedContinuation(f.root, changedHook), /Trusted main hook changed/);
+
+  writeFileSync(path.join(f.b, CONTINUATION_HOOK), 'published hook\n');
+  writeFileSync(path.join(f.b, f.reviewedFile), 'Third and unreviewed source\n');
+  const changedSource = f.publish('Unreviewed overlapping change on main');
+  assert.throws(() => projectAcceptedContinuation(f.root, changedSource), /Published source input changed/);
+});
+
+test('trusted GitHub verifier reads only the exact base and never needs the original private object', async (t) => {
+  const f = continuationFixture(t);
+  const verifier = path.join(f.root, '.task-runtime', 'public-verifier');
+  mkdirSync(verifier);
+  const git = (...args) => acceptedGit(verifier, args);
+  git('init');
+  git('remote', 'add', 'origin', f.git('remote', 'get-url', 'origin'));
+  const calls = [];
+  const options = {
+    repository: 'owner/repo',
+    token: 'fixture',
+    request: async (_url, init) => {
+      calls.push(JSON.parse(init.body));
+      return new Response(JSON.stringify({ id: 123 }), { status: 200 });
+    },
+  };
+  const event = (main, candidate, branch = f.batch.branch) => ({
+    pull_request: {
+      base: { ref: 'main', sha: main },
+      head: { ref: branch, sha: candidate, repo: { full_name: 'owner/repo' } },
+    },
+  });
+  const checkoutBase = (main) => {
+    git('fetch', '--no-tags', 'origin', main);
+    git('checkout', '--detach', main);
+  };
+
+  f.indexed('read-tree', f.reviewedTree);
+  f.write(continuationRecord, JSON.stringify(f.record));
+  const selfReview = f.commit(f.indexed('write-tree'), [f.reviewedBase]);
+  f.git('push', 'origin', selfReview + ':refs/heads/fixture/self-review');
+  checkoutBase(f.reviewedBase);
+  await assert.rejects(
+    runAcceptedSourceCI(verifier, event(f.reviewedBase, selfReview), options),
+    /ordinary file at .*accepted-source-continuations/,
+  );
+  assert.equal(calls.at(-1).conclusion, 'failure');
+
+  const main = f.publishRecord();
+  const { tree, recordBlob } = projectAcceptedContinuation(f.root, main);
+  const candidate = f.commit(tree, [main]);
+  f.git('push', 'origin', candidate + ':refs/heads/' + f.batch.branch);
+  checkoutBase(main);
+  const result = await runAcceptedSourceCI(verifier, event(main, candidate), options);
+  assert.equal(result.continuationReview, recordBlob);
+  assert.equal(result.candidateMergeTree, tree);
+  assert.equal(calls.at(-2).head_sha, candidate);
+  assert.equal(calls.at(-1).conclusion, 'success');
+  assert.throws(() => git('cat-file', '-t', f.original.commit), /Git operation failed/);
+  assert.throws(() => git('cat-file', '-t', f.head), /Git operation failed/);
+  assert.equal(git('rev-parse', 'HEAD'), main);
+  assert.equal(git('status', '--porcelain'), '');
+  await assert.rejects(
+    runAcceptedSourceCI(verifier, event(main, candidate, 'codex/other-task'), options),
+    /couldn't find remote ref/,
+  );
+
+  f.indexed('read-tree', tree);
+  f.write(continuationRecord, JSON.stringify({ ...f.record, accepted: f.head }));
+  const changed = f.commit(f.indexed('write-tree'), [main]);
+  f.git('push', 'origin', changed + ':refs/heads/fixture/changed-review');
+  await assert.rejects(
+    runAcceptedSourceCI(verifier, event(main, changed), options),
+    /differs from the published continuation/,
+  );
 });

@@ -13,6 +13,7 @@ import { applyTaskComposition } from './task-composition.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
 import { hasOriginalMergedReadiness } from './delivery-repairs/completion-legacy-readiness.mjs';
+import { verifyMaintenanceCloseoutReadiness } from './delivery-repairs/historical-post-merge.mjs';
 import { withCandidateRuntime } from './task-candidate-runtime.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
 import {
@@ -25,6 +26,7 @@ import {
 import {
   originalRepairPull,
   publishedRepairKey,
+  verifyPreparedManifestSource,
   verifyPublishedCiRepair,
 } from './delivery-repairs/published-ci-repair.mjs';
 
@@ -49,6 +51,7 @@ export async function runCompletionFlow(
     preparationOnly = false,
     engineeringReviewFile,
     publishedRepairId,
+    recomposeManifestMain,
     assertCurrentAdmission,
     readState = () => state,
   },
@@ -56,6 +59,7 @@ export async function runCompletionFlow(
   assert.equal(typeof deferSettle, 'boolean');
   assert.equal(typeof preparationOnly, 'boolean');
   assert.ok(!preparationOnly || !deferSettle, 'Preparation is a separate phase, not deferred settlement');
+  assert.ok(!recomposeManifestMain || (preparationOnly && !engineeringReviewFile && !publishedRepairId));
   assert.ok(
     !deferSettle || (!state.closedAt && !state.events.some((e) => ['preserve', 'cleanup', 'close'].includes(e.name))),
     'Deferred settlement cannot rewind already-started closeout',
@@ -140,17 +144,34 @@ export async function runCompletionFlow(
   }
   // A persisted composition proves source, so recheck live references before
   // resuming its installation or publishing the newly registered candidate.
-  let publishedRepair;
+  let publishedRepair, manifestRecomposition;
   if (preparationOnly) await assertSelectedReferenceCurrent();
   if (parallel) {
     const accepted = readAcceptance(root, batch.id);
     const proof = readAcceptedComposition(root, batch.id, accepted.commit);
+    assert.ok(!proof || !recomposeManifestMain, 'Resume the existing composition with ordinary prepare');
     if (preparationOnly && proof) {
       assertCurrentAdmission?.();
       await runtimeReferences(tasks.readTask(batch.id), preparationReferences);
       await assertSelectedReferenceCurrent();
     }
     if (proof) {
+      manifestRecomposition = state.events
+        .filter((event) => event.name === 'prepare' && event.status === 'success')
+        .map((event) => event.result?.manifestRecomposition)
+        .findLast(
+          (plan) =>
+            plan?.taskHead === proof.taskHead &&
+            plan.main === proof.main &&
+            plan.accepted === proof.accepted &&
+            plan.candidateTree === proof.candidateTree,
+        );
+      if (manifestRecomposition)
+        assert.equal(
+          manifestRecomposition.candidate,
+          preCiCompositionCommit(batch.worktree, proof),
+          'Registered manifest recomposition candidate changed',
+        );
       const plans = state.events.filter(
         (event) =>
           event.name === 'prepare' &&
@@ -189,10 +210,11 @@ export async function runCompletionFlow(
             accepted,
             review,
           );
-          if (preparationOnly && publishedRepair) {
+          const original = publishedRepair ?? manifestRecomposition;
+          if (preparationOnly && original) {
             const github = (...args) => JSON.parse(execute(root, 'gh', args));
             const repository = github('repo', 'view', '--json', 'nameWithOwner').nameWithOwner;
-            originalRepairPull(github, repository, publishedRepair.pullRequest, batch.branch, [proof.taskHead]);
+            originalRepairPull(github, repository, original.pullRequest, batch.branch, [proof.taskHead]);
           }
           installCompositionCandidate(proof, candidate);
           engineeringReviewFile = undefined; // Recovery consumes the durable original review.
@@ -218,6 +240,7 @@ export async function runCompletionFlow(
     if (preparationOnly) await assertSelectedReferenceCurrent();
   }
   if (publishedRepair?.candidate !== head) publishedRepair = undefined;
+  if (manifestRecomposition?.candidate !== head) manifestRecomposition = undefined;
   let repository;
   const github = (...args) => JSON.parse(execute(root, 'gh', args));
   if (preparationOnly) {
@@ -269,12 +292,29 @@ export async function runCompletionFlow(
   });
   if (
     preparationOnly &&
-    !publishedRepair &&
-    !state.events.some((event) => event.name === 'ci' && event.status === 'success' && event.result?.headSha === head)
+    (recomposeManifestMain ||
+      (!publishedRepair &&
+        !state.events.some(
+          (event) => event.name === 'ci' && event.status === 'success' && event.result?.headSha === head,
+        )))
   ) {
     assertCurrentAdmission?.();
     const main = git(root, 'rev-parse', 'origin/main');
     const accepted = readAcceptance(root, batch.id);
+    let preparedSource;
+    if (recomposeManifestMain) {
+      assert.equal(main, recomposeManifestMain, 'Requested manifest recomposition main is not current origin/main');
+      preparedSource = verifyPreparedManifestSource({
+        batch,
+        head,
+        main,
+        accepted: accepted.commit,
+        state,
+        repository,
+        git: (...args) => git(batch.worktree, ...args),
+        gh: github,
+      });
+    }
     const review = engineeringReviewFile ? readPreCiReview(batch.worktree, engineeringReviewFile) : undefined;
     const candidateTree = preCiCompositionTree(
       batch.worktree,
@@ -288,6 +328,7 @@ export async function runCompletionFlow(
       },
       review,
     );
+    if (recomposeManifestMain) assert.ok(candidateTree, 'Manifest recomposition requires an actual manifest conflict');
     if (candidateTree) {
       assert.equal(batch.recordedHead, head, 'Original checkpointed candidate required');
       const inputs = { batch: batch.id, accepted: accepted.commit, main, taskHead: head, candidateTree };
@@ -296,6 +337,10 @@ export async function runCompletionFlow(
         accepted,
         review,
       );
+      if (preparedSource) {
+        manifestRecomposition = { ...preparedSource, candidate, candidateTree };
+        await phase('prepare', head + ':post-ci-manifest:' + main, async () => ({ manifestRecomposition }));
+      }
       if (publishedRepairId !== undefined) {
         const plan = await phase('prepare', head + publishedRepairKey + main, () => ({
           candidateTree,
@@ -332,7 +377,8 @@ export async function runCompletionFlow(
   if (publishedRepairId !== undefined)
     assert.ok(publishedRepair, 'A failed original candidate and a new published repair are required');
   async function publishCandidate({ readiness = false } = {}) {
-    const original = preparationOnly && publishedRepair?.candidate === head ? publishedRepair : null;
+    const source = publishedRepair ?? manifestRecomposition;
+    const original = preparationOnly && source?.candidate === head ? source : null;
     if (parallel && !original) {
       const merged = JSON.parse(
         execute(root, 'gh', [
@@ -360,7 +406,7 @@ export async function runCompletionFlow(
         );
         assert.ok(
           prior &&
-            hasOriginalMergedReadiness({
+            (hasOriginalMergedReadiness({
               batch,
               head,
               pr: merged[0],
@@ -375,7 +421,16 @@ export async function runCompletionFlow(
               common,
               readCandidateCommand: () =>
                 JSON.parse(git(batch.worktree, 'show', head + ':package.json')).scripts['verify:delivery'],
-            }),
+            }) ||
+              verifyMaintenanceCloseoutReadiness({
+                anchor,
+                registry: tasks,
+                batch,
+                head,
+                pr: merged[0],
+                state,
+                execute,
+              })),
           'Merged recovery requires its original exact readiness and PR evidence',
         );
         assertCompletionQuality(prior.result, head, prior.result.runId);

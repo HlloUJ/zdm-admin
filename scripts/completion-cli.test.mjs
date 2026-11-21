@@ -257,6 +257,27 @@ function handoffFixture(t) {
   };
   return { ...f, launches: () => launches };
 }
+test('historical handoff plans the successor checkout while retaining the original candidate tree', async (t) => {
+  const f = handoffFixture(t);
+  await prepare(f);
+  const { finalHandoffPlan } = await import('./completion-handoff.mjs');
+  const { readActiveBatch } = await import('./task-batch.mjs');
+  const batch = readActiveBatch(f.task);
+  writeFileSync(path.join(f.anchor, 'maintenance-input'), 'fixture');
+  f.git(f.anchor, 'add', 'maintenance-input');
+  f.git(f.anchor, 'commit', '-m', 'maintenance');
+  f.git(f.anchor, 'push', 'origin', 'main');
+  const successor = f.git(f.anchor, 'rev-parse', 'HEAD');
+  const options = { execute: f.options.execute };
+  assert.throws(() => finalHandoffPlan(f.task, batch, successor, options), /Candidate tree changed/);
+  const plan = finalHandoffPlan(f.task, batch, successor, {
+    ...options,
+    recovery: { originalMain: f.main, main: successor },
+  });
+  assert.equal(plan.main, successor);
+  assert.equal(plan.taskHead, f.head);
+  assert.equal(plan.previewNeedsAdvance, true);
+});
 test('final handoff aligns all targets once, launches published handoff once and reuses unchanged runtime thereafter', async (t) => {
   const f = handoffFixture(t);
   await prepare(f);

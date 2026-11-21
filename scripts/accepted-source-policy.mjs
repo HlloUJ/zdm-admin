@@ -8,6 +8,8 @@ const control = new Set([
   'scripts/accepted-source-policy.mjs',
   'scripts/accepted-source.mjs',
   'scripts/accepted-source-composition.mjs',
+  'scripts/accepted-source-continuation.mjs',
+  '.codex/accepted-source-continuations/order-prototype-fixed-preview.json',
   'scripts/accepted-source-ci.mjs',
   'scripts/accepted-source-hook.mjs',
   ACCEPTED_SOURCE_WORKFLOW,
