@@ -161,7 +161,11 @@ export function continuationPlan(root, id) {
   const resources = check(() => {
     const leases = createResourceLeases(common);
     return {
-      finalQueue: finalQueue.tickets.map(({ task: ownerTask, status }) => ({ task: ownerTask, status })),
+      finalQueue: finalQueue.tickets.map(({ task: ownerTask, status, deferred }) => ({
+        task: ownerTask,
+        status,
+        externalAcceptancePending: Boolean(deferred?.release && status === 'waiting'),
+      })),
       finalLease: Boolean(leases.inspect('main-delivery')),
       integrationLease: Boolean(leases.inspect('integration-5173')),
       previewPorts: temporaryPreviewLeases(common)
@@ -219,6 +223,7 @@ export function continuationPlan(root, id) {
     if (task.stage === 'closed' || (action === 'development' && task.frozen))
       reasons.push('Task stage excludes this action');
     if (activeDispatch.length) reasons.push('Existing dispatch requires readback before planning another');
+    if (ticket?.status === 'deferred') reasons.push('Original delivery awaits its external acceptance');
     if (['development', 'preparation', 'final'].includes(action) && !ticket)
       reasons.push('Missing ' + lane + ' phase ticket');
     if (action === 'development' && ticket?.status === 'completed')
@@ -244,7 +249,10 @@ export function continuationPlan(root, id) {
     if (action === 'final' && !progress.ready) reasons.push(progress.reason);
     if (action === 'final' && progress.value?.pending.some((entry) => entry.event === 'paused' || entry.knownFailure))
       reasons.push('A pending pause or failed receipt needs exact readback before board placement');
-    if (action === 'final' && resources.value?.finalQueue.some((item) => item.task !== task.id))
+    if (
+      action === 'final' &&
+      resources.value?.finalQueue.some((item) => item.task !== task.id && !item.externalAcceptancePending)
+    )
       reasons.push('Another task remains in the final main queue');
     if (['preparation', 'final'].includes(action) && deliverySession.value?.hasRunning)
       reasons.push('Existing delivery action or CI still needs readback');

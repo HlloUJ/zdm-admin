@@ -176,11 +176,15 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
       return structuredClone(ticket);
     });
   }
-  function start(supplied, resume) {
+  function start(supplied, resume, purpose) {
     return update((state) => {
       const ticket = ticketFor(state, supplied);
-      if (state.tickets[0].id !== ticket.id)
-        return { waiting: true, ahead: state.tickets[0].task, blocked: state.tickets[0].status === 'blocked' };
+      const released = Boolean(ticket.deferred?.release);
+      assert.ok(!released || purpose !== 'delivery', 'Released ticket can only release again or settle');
+      assert.ok(purpose === 'delivery' || ticket.deferred, 'Exact deferred ticket required');
+      const ahead = state.tickets.find((item) => !item.deferred?.release || item.status !== 'waiting');
+      if (ahead && ahead.id !== ticket.id)
+        return { waiting: true, ahead: ahead.task, blocked: ahead.status === 'blocked' };
       const current = leases.inspect('main-delivery');
       if (current) {
         assert.equal(current.task, ticket.id, 'Main lease belongs to an unknown delivery; do not take over');
@@ -192,15 +196,17 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
       if (ticket.status === 'running' && !resume) return { waiting: true, ahead: ticket.task, blocked: false };
       ticket.lease = leases.acquire('main-delivery', ticket.id);
       ticket.status = 'running';
+      ticket.purpose = purpose;
       ticket.startedAt = new Date().toISOString();
       return { waiting: false, ticket: structuredClone(ticket) };
     });
   }
-  async function wait(supplied, { resume = true } = {}) {
+  async function wait(supplied, { resume = true, purpose = 'delivery', waitForTurn = true } = {}) {
     let previous;
     for (;;) {
-      const result = await start(supplied, resume);
+      const result = await start(supplied, resume, purpose);
       if (!result.waiting) return result.ticket;
+      assert.ok(waitForTurn, 'Main delivery is occupied; retain the original deferred ticket');
       const message = `正式交付排队：${supplied.task} 等待 ${result.ahead}${result.blocked ? ' 完成受保护的恢复' : ''}；其他任务仍可继续开发。`;
       if (message !== previous) {
         system.notify(message);
@@ -213,6 +219,7 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
     return update((state) => {
       const ticket = ticketFor(state, supplied);
       assert.equal(ticket.status, 'running');
+      assert.equal(ticket.purpose, 'delivery', 'Deferred settlement cannot mutate main');
       assert.equal(leases.inspect('main-delivery')?.token, supplied.lease.token);
       ticket.mainMutationStarted = true;
       return structuredClone(ticket);
@@ -240,6 +247,15 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
       if (success || !ticket.mainMutationStarted) {
         leases.release(current);
         state.tickets = state.tickets.filter((item) => item.id !== ticket.id);
+      } else if (
+        ticket.purpose === 'deferred-settle' ||
+        (ticket.purpose === 'deferred-release' && !ticket.deferred.release)
+      ) {
+        // Only this task's settlement was attempted. Preserve the failure and original ticket.
+        leases.release(current);
+        ticket.status = 'waiting';
+        ticket.lastFailure = history.failure;
+        delete ticket.lease;
       } else {
         ticket.status = 'blocked';
         ticket.lastFailure = history.failure;
@@ -265,5 +281,31 @@ export function createTaskDeliveryQueue(commonDir, dependencies = {}) {
       return structuredClone(ticket);
     });
   }
-  return { inspect: read, enqueue, wait, markMainMutation, finish, deferSettlement };
+  async function releaseDeferred(supplied, release, releaseCapacity) {
+    const retained = await update((state) => {
+      const ticket = ticketFor(state, supplied);
+      assert.equal(ticket.status, 'running');
+      assert.equal(ticket.purpose, 'deferred-release');
+      assert.equal(leases.inspect('main-delivery')?.token, supplied.lease.token);
+      assert.ok(ticket.deferred && ticket.mainMutationStarted);
+      assert.match(release.archive, /^[a-f0-9]{64}$/);
+      if (ticket.deferred.release) assert.deepEqual(ticket.deferred.release, release);
+      else ticket.deferred.release = release;
+      return structuredClone(ticket);
+    });
+    // While these two records are written, the original running main ticket keeps
+    // the queue fenced. Replaying the same identity completes an interrupted release.
+    releaseCapacity(retained);
+    return update((state) => {
+      const ticket = ticketFor(state, retained),
+        current = leases.inspect('main-delivery');
+      assert.equal(current?.token, supplied.lease.token);
+      assert.deepEqual(ticket.deferred.release, release);
+      ticket.status = 'waiting';
+      delete ticket.lease;
+      leases.release(current);
+      return structuredClone(ticket);
+    });
+  }
+  return { inspect: read, enqueue, wait, markMainMutation, finish, deferSettlement, releaseDeferred };
 }

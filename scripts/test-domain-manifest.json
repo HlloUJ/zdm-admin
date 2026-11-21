@@ -504,12 +504,14 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "ba60c8be5dd500850b4f0cc5e542d4a79fbad7ca1daf53f3fd51a003e72674c0",
+      "digest": "cf518ab3beb08b0139548216068eb9d7c3936390555e9e5d259eced500e867fc",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
         "scripts/batch-timing-store.mjs",
         "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-cli.mjs",
+        "scripts/completion-deferred.mjs",
         "scripts/completion-flow.mjs",
         "scripts/completion-handoff.mjs",
         "scripts/completion-preview.mjs",
@@ -524,6 +526,7 @@
         "scripts/delivery-repairs/task-cleanup-npm.mjs",
         "scripts/git-workflow-core.mjs",
         "scripts/integration-handoff-state.mjs",
+        "scripts/integration-resource.mjs",
         "scripts/resource-lease.mjs",
         "scripts/start-micro-task.mjs",
         "scripts/task-batch.mjs",
@@ -541,6 +544,7 @@
         "scripts/task-progress-host.mjs",
         "scripts/task-registry.mjs",
         "scripts/task-runtime-references.mjs",
+        "scripts/verification-policy.mjs",
         "scripts/wait-quality.mjs"
       ],
       "dynamicImports": 3
@@ -553,6 +557,57 @@
         "scripts/task-batch.mjs",
         "scripts/task-completion.mjs",
         "scripts/test-support/completion-preview-fixture.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-deferred.mjs": {
+      "digest": "6d465ca58626ba878e3133b645be51f21b7ecbea4050cd42c5e590b1258c612a",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-cli.mjs",
+        "scripts/completion-deferred.mjs",
+        "scripts/completion-deferred.test.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-recovery.mjs",
+        "scripts/completion-status.mjs",
+        "scripts/delivery-repairs/task-cleanup-exact-scope.mjs",
+        "scripts/dev-task.mjs",
+        "scripts/preview-consumers.mjs",
+        "scripts/runtime-file-scope.mjs",
+        "scripts/task-cleanup-scheduled-cli.mjs",
+        "scripts/task-completion-progress-cli.mjs",
+        "scripts/task-context.mjs",
+        "scripts/task-continuation-plan.mjs",
+        "scripts/task-coordination-next.mjs",
+        "scripts/task-coordination.mjs",
+        "scripts/task-delivery-queue.mjs",
+        "scripts/task-delivery-queue.test.mjs",
+        "scripts/task-delivery-status-sync.mjs",
+        "scripts/task-execution-binding.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/verification-policy.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/completion-deferred.test.mjs": {
+      "digest": "e9fb458267e22b21d03d87b6f4d1251ee9495c0bf5dfda3963176da55aa6ab33",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/completion-cli.mjs",
+        "scripts/completion-deferred.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-session.mjs",
+        "scripts/delivery-repairs/task-cleanup-exact-scope.mjs",
+        "scripts/preview-consumers.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/task-cleanup-scheduled-cli.mjs",
+        "scripts/task-context.mjs",
+        "scripts/task-coordination-next.mjs",
+        "scripts/task-delivery-queue.mjs",
+        "scripts/task-execution-order.mjs",
+        "scripts/task-registry.mjs",
+        "scripts/task-runtime-references.mjs"
       ],
       "dynamicImports": 0
     },
@@ -591,7 +646,7 @@
       "dynamicImports": 1
     },
     "scripts/completion-handoff.mjs": {
-      "digest": "69e993cda81d680efe9eea7a208481c6db3f180d6778a0166982108f3086e81d",
+      "digest": "a55f61b4182deae1fe022155d32da2b016210faa7ee51835b838b934094c1c46",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/delivery-launcher.mjs",
@@ -710,11 +765,12 @@
       "dynamicImports": 0
     },
     "scripts/completion-status.mjs": {
-      "digest": "45f74fb596abd3fe95b42db14c90115917011d0c383d41c0d199af0a0edac9d1",
+      "digest": "4f63fdd4b12effe6d1d0e007559caa230068c929ee64331eb564c2e0cb05784a",
       "imports": [
         "scripts/batch-timing-store.mjs",
         "scripts/completion-ci-evidence.mjs",
-        "scripts/completion-session.mjs"
+        "scripts/completion-session.mjs",
+        "scripts/task-delivery-queue.mjs"
       ],
       "dynamicImports": 0
     },
@@ -2764,7 +2820,7 @@
       "dynamicImports": 0
     },
     "scripts/task-completion-progress-cli.mjs": {
-      "digest": "e3dd7ea4e66ea9a3178d414b1811d12ce49d931d2bbd59d669c9b7335716a285",
+      "digest": "fc04e23f73b9a37d114bfece3cc0a319192c0f8fa31864cf43d1e609568bf021",
       "imports": ["scripts/task-board-transport.mjs", "scripts/task-completion-progress.mjs"],
       "dynamicImports": 0
     },
@@ -2812,7 +2868,7 @@
       "dynamicImports": 0
     },
     "scripts/task-context.mjs": {
-      "digest": "8e3398d9eadf4378e4b6e28f9540d5cdd926ef2f2d966ae2e9992f4ca32af498",
+      "digest": "4b14e51c8a9833d66f0777cf2789f34549f8448d52c7154b040ac37f1056c698",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-status.mjs",
@@ -2850,7 +2906,7 @@
       "dynamicImports": 0
     },
     "scripts/task-continuation-plan.mjs": {
-      "digest": "70eeb10df697c37f77682e8423da6cd6ada7d72338322588b0b273d2419fb564",
+      "digest": "2857ba3ff71cad572d370d0b3ac1ba78feaa089e9c90375e9ac664d7d95dafb7",
       "imports": [
         "scripts/accepted-source-policy.mjs",
         "scripts/accepted-source.mjs",
@@ -2917,7 +2973,7 @@
       "dynamicImports": 11
     },
     "scripts/task-coordination-next.mjs": {
-      "digest": "6f4c1cd2021f1bab06b9406002df04fccf41c330bd22af9cb6b4ea4f3e3dec6f",
+      "digest": "b2f71f82cea6261de6227df2e5b4aa29fe5e0b3a6947ab020a5a29c8a34a0dae",
       "imports": ["scripts/task-action-dependencies.mjs", "scripts/task-execution-scope.mjs"],
       "dynamicImports": 0
     },
@@ -2969,12 +3025,12 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-queue.mjs": {
-      "digest": "96205bcb869efa20539716724e20abcdd587361101d3ca109e1b6a85660e8736",
+      "digest": "1da47778fff22cfbbf154344719aa8123c3edae8285cb03a72aa937e1fe4e3e7",
       "imports": ["scripts/resource-lease.mjs"],
       "dynamicImports": 0
     },
     "scripts/task-delivery-queue.test.mjs": {
-      "digest": "bdbab025ebedeece5ba9c74a0b44ef7f33da4f5592bcbc1bf6243bae1cc695c0",
+      "digest": "f53e332e2e27e4ddc046051168fc314880cd625bd04059dd70faa80861393215",
       "imports": ["scripts/task-delivery-queue.mjs"],
       "dynamicImports": 0
     },
@@ -2988,7 +3044,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.mjs": {
-      "digest": "682f54a6fe21a5be610c3796622c473b151ca30e3b5fe247537411eaf78481b2",
+      "digest": "3a4e709cf24ab62d9300d6167f78b0936d69035a587cdef1f077e2d726336f08",
       "imports": [
         "scripts/task-execution-scope.mjs",
         "scripts/task-progress-host.mjs",
@@ -3112,7 +3168,7 @@
       "dynamicImports": 3
     },
     "scripts/task-execution-order.mjs": {
-      "digest": "b45754b9c5b30f5ade8262b5f2a178b6cb944ae825effae74514b3e5a3c2ad1b",
+      "digest": "c58ee1fdc36db1740a9b2349fdaaac3baedc2f23b96718a1a62da50e1f87bfec",
       "imports": [
         "scripts/delivery-repairs/task-delivery-queue-progress.mjs",
         "scripts/delivery-repairs/task-dynamic-model.mjs",

@@ -114,6 +114,7 @@ const COORDINATION_SOURCES = new Set([
   'complete',
   'preparation-finished',
   'capacity-released',
+  'defer-delivery',
   'coordinator-observation',
   'delivery-phase-enrolled',
 ]);

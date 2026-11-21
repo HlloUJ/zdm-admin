@@ -1,3 +1,4 @@
+import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
 import { readTimingSummary } from './batch-timing-store.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
@@ -49,7 +50,23 @@ export function deliveryStatus(directory, batch, registry) {
     batchTiming,
     timingComplete: batchTiming.status === 'completed',
   };
-  if (phase !== 'delivered') return result;
+  if (phase !== 'delivered') {
+    if (state.deferredSettlement && phase === 'handoff-verified-awaiting-settlement') {
+      const ticket = createTaskDeliveryQueue(common)
+        .inspect()
+        .tickets.find((item) => item.task === batch && item.deferred);
+      return {
+        ...result,
+        phase: 'external-acceptance-pending',
+        label:
+          ticket?.deferred.release && ticket.status === 'waiting'
+            ? '等待外部周期验收，已让出正式交付位'
+            : '等待外部周期验收，原交付票据仍受保护',
+        criticalResourcesReleased: Boolean(ticket?.deferred.release && ticket.status === 'waiting'),
+      };
+    }
+    return result;
+  }
   assert.ok(registry?.closedAt, 'Closure registry missing; retain pending state');
   assert.equal(registry.id, batch);
   const receiptFile = path.join(directory, 'completion-receipt.json');
