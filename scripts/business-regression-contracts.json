@@ -474,7 +474,7 @@
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryProductRichTextApiTest.java": "8d7ab48d39c5f13836ad577e079ebacc573c42f84f887dc77da585c41bcdd176",
         "backend/src/test/java/com/zdm/platform/inventory/FinishedPriceSourceApiTest.java": "5946c74ddb0e864931627ee7350c987ef4e2fb3aee41c1794793f6dff2b6b784",
         "backend/src/test/java/com/zdm/platform/inventory/AccessoryPriceSourceApiTest.java": "39fa0c7582d644489adf22fbcde69ce29b7833cc50a20fd5d0d85ac35c60c48b",
-        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1f8c212a4f3d457459d1edcbe60729e5e330548e9bac929383ae01baafc5af07",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryInformationTest.java": "bcf040fdc129036e0d3c35713ced07f474e5dbbe4f4f26ef84773f8ce8b49f0e",
         "backend/src/test/java/com/zdm/platform/inventory/WarehouseEntryMigrationTest.java": "2933e0202a0088396c118d4324137fd5ef20145c6996bf8ea90199554495e5e3",
         "backend/src/test/java/com/zdm/platform/inventory/ProductStateActivityMigrationTest.java": "bdb39af30d00d948cf1f6d2283590dcd0368bd0bb85235eb4ced7e2a73514783",
@@ -3067,6 +3067,12 @@
           "before": "d234182ab6867bc454f6e57a4b1d324db3c8d4eb03e9c6e883028bd7930aa625",
           "after": "6fc6ccf95c3303fc56fce99b0396bbc9854925978a3030c14faa9d715fcee924",
           "reason": "PR121 CI43604581061 authorized diagnosis only: log synthetic API method/path/status and dropdown click target; retain every assertion, timeout, retries and business source unchanged."
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+          "after": "1f8c212a4f3d457459d1edcbe60729e5e330548e9bac929383ae01baafc5af07",
+          "reason": "仅隔离冒烟测试上下文内与手动清理竞争的媒体后台触发，保留实际删除、访问失效和审计断言，并显式核验手动清理已取得锁。"
         }
       ],
       "routes": [
@@ -3671,7 +3677,7 @@
         "tests/e2e/store-level.spec.ts": "d0c444e848f1f1d2f84a3d9b6c5ef77df5ec30ad7c9f15971dc218acb458125a",
         "backend/src/test/java/com/zdm/platform/storeexit/StoreExitIntegrationTest.java": "6809305e39b45188d1cfd572fae900457673dc02e61d5059e09abcb0dce5c0ad",
         "backend/src/test/java/com/zdm/platform/storeexit/StoreExitRemoteLedgerTest.java": "ec03cc12e15fd6abf6cd12cd8139a8e5c73a4bdb01085afeb191de2d1a585fb6",
-        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+        "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java": "1f8c212a4f3d457459d1edcbe60729e5e330548e9bac929383ae01baafc5af07",
         "backend/src/test/java/com/zdm/platform/storeexit/StoreCacheExitControllerTest.java": "091cacfb9f1cee3be151a86f5d85ec6615a48eaf07dae9c165d5b5bb1c3c0cad",
         "backend/src/test/java/com/zdm/platform/security/SecurityAuditFilterTest.java": "2fe6aca87f39ffb67636aec5a614fe1d2e53b3139f67fc76fb1de169d21b6a2d",
         "src/services/storeScopeValidity.test.ts": "796d13d822d30cddcfaaf81b2beb9b5811f9e1bd713e1f9d3dfbba6f02744444",
@@ -3926,6 +3932,12 @@
           "before": "aac9890fd2fe752e705bc1ffd8bdb2e796a2cfc5d5f80ca664ad6cab7813fe0c",
           "after": "3a8b8a5167d1bf830da145ea5ebd4a5d032b8fe61bb7152fe75ec9a7ab47c456",
           "reason": "Preserve main commit 2ffca9bea: compare Chrome flex alias serialization with independent reference and verify pagination right-edge geometry; original remaining assertions are retained."
+        },
+        {
+          "file": "backend/src/test/java/com/zdm/platform/PlatformApiSmokeTest.java",
+          "before": "1b7a4fb1c30a43561c335b42a2b085337ce3b862c4a549bdfad138ba3ea3d190",
+          "after": "1f8c212a4f3d457459d1edcbe60729e5e330548e9bac929383ae01baafc5af07",
+          "reason": "仅隔离冒烟测试上下文内与手动清理竞争的媒体后台触发，保留实际删除、访问失效和审计断言，并显式核验手动清理已取得锁。"
         }
       ]
     }
