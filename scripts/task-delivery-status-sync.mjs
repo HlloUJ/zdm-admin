@@ -174,7 +174,7 @@ export function captureQueueProgress(commonDir, state, previous) {
   const lastPause = (ledger) => ledger?.events?.findLast((event) => event.action === 'pause-all')?.request;
   const pause = lastPause(state);
   for (const ticket of state.tickets) {
-    if (ticket.status === 'cancelled') continue;
+    if (['cancelled', 'deferred'].includes(ticket.status)) continue;
     const parked = ticket.status === 'parked';
     if (
       parked &&

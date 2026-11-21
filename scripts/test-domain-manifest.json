@@ -2933,7 +2933,7 @@
       "dynamicImports": 0
     },
     "scripts/task-delivery-status-sync.mjs": {
-      "digest": "6aaa561e445f48588ae38352cd604e9b4dfa592fee0e732f2c89f9848121116d",
+      "digest": "bf9e0d37fbc9fe28abd74dff5e83762ba936f746d8a63ab40d8e0fb1fe1fbbc7",
       "imports": [
         "scripts/task-execution-scope.mjs",
         "scripts/task-fixed-acceptance-intake.mjs",
