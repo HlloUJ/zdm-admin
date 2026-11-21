@@ -1,3 +1,4 @@
+import { runFixtureQueue } from './delivery-repairs/test-support/task-cleanup-scope-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
@@ -81,7 +82,7 @@ const ready = { apply: true, verify: async () => ({ ready: true }), unreferenced
 test('actual preserveAssets proof permits only the extra staged copy; original manifest/blob survive deletion', async (t) => {
   const f = fixture(t);
   f.queue.handoff(f.record);
-  const out = await f.queue.run(ready);
+  const out = await runFixtureQueue(f, ready);
   assert.equal(out.processed[0].state, 'cleaned');
   assert.deepEqual(readFileSync(f.blob), f.originalBytes);
   assert.ok(existsSync(f.preserved.manifest));
@@ -106,7 +107,7 @@ test('missing, changed or linked canonical preservation sources retain the extra
       renameSync(f.blob, other);
       symlinkSync(other, f.blob);
     }
-    assert.equal((await f.queue.run(ready)).processed[0].state, 'blocked');
+    assert.equal((await runFixtureQueue(f, ready)).processed[0].state, 'blocked');
     assert.ok(existsSync(f.record.path));
   }
 });
@@ -115,7 +116,7 @@ test('report duplicate proof cannot authorize regenerated data types or a stale 
   assert.throws(() => mislabeled.queue.handoff(mislabeled.record), /disposition/);
   const f = fixture(t);
   f.queue.handoff(f.record);
-  const out = await f.queue.run({
+  const out = await runFixtureQueue(f, {
     ...ready,
     unreferenced: async () => {
       throw Error('current report reader');

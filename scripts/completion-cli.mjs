@@ -1,8 +1,20 @@
+import {
+  assertDeferredMaintenanceGrant,
+  calendarRequirements,
+  liveMainQuality,
+  preserveDeferredHandoff,
+  readDeferredHandoff,
+  verifyCalendarAcceptance,
+  verifyDeferredLineage,
+  verifySourceOnlyMaintenance,
+} from './completion-deferred.mjs';
+import { deliveryCiCapability } from './verification-policy.mjs';
+import { withIntegrationResource } from './integration-resource.mjs';
 import { assertTaskExecutor } from './task-execution-binding.mjs';
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
 import { handoffAuditedDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
 import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
-import { assertCleanupUnreferenced, loadCleanupPolicy } from './task-cleanup-cli.mjs';
+import { assertCleanupUnreferenced, cleanupCommand, loadCleanupPolicy } from './task-cleanup-cli.mjs';
 import { captureCiProgress } from './task-delivery-status-sync.mjs';
 import { drainProgressHost } from './task-progress-host.mjs';
 import {
@@ -24,7 +36,8 @@ import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs'
 import { createHash, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { runCompletionProcess, completionPermission } from './completion-process.mjs';
-import { existsSync, lstatSync, readFileSync } from 'node:fs';
+import { existsSync, lstatSync, readFileSync, realpathSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import {
   openCompletion,
@@ -88,6 +101,23 @@ function run(root, command, args, options = {}) {
   return r.stdout.trim();
 }
 const read = (p) => JSON.parse(readFileSync(p, 'utf8'));
+function registeredMainAnchor(root, verifyPublished) {
+  const mains = parseWorktreePorcelain(run(root, 'git', ['worktree', 'list', '--porcelain'])).filter(
+    (entry) => entry.branch === 'main',
+  );
+  assert.equal(mains.length, 1);
+  const anchor = mains[0].path;
+  if (verifyPublished) {
+    assert.equal(
+      realpathSync(fileURLToPath(import.meta.url)),
+      path.join(anchor, 'scripts/completion-cli.mjs'),
+      'Use the published main completion entry',
+    );
+    assert.equal(run(anchor, 'git', ['rev-parse', 'HEAD']), run(anchor, 'git', ['rev-parse', 'origin/main']));
+    assert.equal(run(anchor, 'git', ['status', '--porcelain']), '');
+  }
+  return anchor;
+}
 async function completionCommandLocked(
   root,
   args,
@@ -102,6 +132,8 @@ async function completionCommandLocked(
     previewControl = createCompletionPreviewControl({ execute }),
     runtimeReferences = taskRuntimeReferences,
     deferSettle = false,
+    deferredTurn,
+    externalAcceptanceFile,
     assertCurrentAdmission,
   },
 ) {
@@ -133,6 +165,7 @@ async function completionCommandLocked(
     'resume-record': [1, 1],
     'handoff-plan': [1, 1],
     'final-handoff': [1, 1],
+    'handoff-deferred-maintenance': [2, 2],
     report: [1, 1],
     settle: [3, 3],
     wait: [2, 2],
@@ -405,6 +438,117 @@ async function completionCommandLocked(
     save(state);
     return { batch: batch.id, startedAt: new Date(state.startedAt).toISOString(), clockSource: state.clockSource };
   }
+  if (mode === 'handoff-deferred-maintenance') {
+    // The one-time bootstrap has already merged by the ordinary protected GitHub
+    // path. This entry only applies its Git-only runtime handoff.
+    assert.equal(batch.id, 'deferred-calendar-delivery-slot-release');
+    assert.equal(batch.kind, 'infrastructure');
+    const [main, grantFile] = rest;
+    assert.match(main, /^[a-f0-9]{40}$/);
+    const anchor = batch.repository.anchor;
+    assert.equal(registeredMainAnchor(root, execute === run), anchor);
+    const tasks = createTaskRegistry(root);
+    const prepared = state.preparedCandidates?.find((entry) => entry.head === batch.recordedHead);
+    assert.equal(prepared?.task, batch.id, 'Exact prepared maintenance PR required');
+    assert.equal(prepared.accepted, batch.frozen?.accepted);
+    const initialCi = state.events.findLast(
+      (e) => e.name === 'ci' && e.status === 'success' && e.key === prepared.head + ':' + prepared.runId,
+    );
+    assert.equal(initialCi?.result?.eventName, 'pull_request');
+    assertCompletionQuality(initialCi.result, prepared.head, prepared.runId);
+    const status = deliveryStatus(directory, batch.id, tasks.readTask(batch.id));
+    if (status.formalDeliveryComplete) {
+      assert.equal(status.main, main);
+      return { alreadyClosed: true, deliveryStatus: status };
+    }
+    return createResourceLeases(common).run('main-delivery', batch.id, async () => {
+      const grant = assertDeferredMaintenanceGrant(directory, batch, createExecutionOrder(common).read(), grantFile);
+      assert.equal(grant.pullRequest, prepared.pullRequest);
+      assert.equal(grant.prRunId, prepared.runId);
+      const held = createTaskDeliveryQueue(common)
+        .inspect()
+        .tickets.find((item) => !item.deferred?.release);
+      assert.ok(
+        held?.task === 'scheduled-manifest-cleanup' && held.deferred && held.status === 'waiting',
+        'Original deferred maintenance barrier is missing or not idle',
+      );
+      assert.equal(held.deferred.main, grant.base);
+      const capability = deliveryCiCapability(anchor, (command, args) => execute(anchor, command, args));
+      assert.equal(capability.verified, true, 'Protected main quality policy must be proven');
+      const pull = JSON.parse(
+        execute(anchor, 'gh', [
+          'pr',
+          'view',
+          String(prepared.pullRequest),
+          '--json',
+          'baseRefName,headRefName,headRefOid,state,mergeCommit',
+        ]),
+      );
+      assert.equal(pull.baseRefName, 'main');
+      assert.equal(pull.headRefName, batch.branch);
+      assert.equal(pull.headRefOid, prepared.head);
+      assert.equal(pull.state, 'MERGED');
+      assert.equal(pull.mergeCommit?.oid, main);
+      git('fetch', 'origin');
+      assert.equal(git('rev-parse', 'origin/main'), main);
+      assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), main);
+      assert.equal(git('rev-list', '--parents', '-n', '1', main), [main, held.deferred.main, prepared.head].join(' '));
+      assert.equal(git('rev-parse', main + '^{tree}'), git('rev-parse', prepared.head + '^{tree}'));
+      assert.equal(assertAcceptedSource(anchor, batch.id, main).accepted, prepared.accepted);
+      assertCurrentAdmission();
+      const dispatch = (args) =>
+        completionCommandLocked(root, args, {
+          preserveAssets,
+          checkRuntime,
+          execute,
+          runtimeSnapshot,
+          runtimeProof,
+          waitQuality,
+          verifyEvidence,
+          previewControl,
+          runtimeReferences,
+          assertCurrentAdmission,
+        });
+      const proof = state.events.findLast(
+        (e) => e.name === 'ci' && e.status === 'success' && e.result?.headSha === main && e.result?.branch === 'main',
+      );
+      const ci = proof?.result ?? (await dispatch(['wait', 'main', main]));
+      liveMainQuality(anchor, execute, capability.repository, main, ci.runId);
+      const refresh = (stage) => {
+        const current = tasks.readTask(batch.id);
+        if (
+          current.stage === 'closed' ||
+          current.stage === stage ||
+          (current.stage === 'handoff-verified' && stage === 'main-verified')
+        )
+          return;
+        tasks.revise(current.id, current.revision, (record) => {
+          record.stage = stage;
+          record.main = { local: main, remote: main, runId: String(ci.runId) };
+        });
+      };
+      refresh('main-verified');
+      const passed = openCompletion(directory, batch.id, { formal: false });
+      if (!passed.events.some((e) => e.name === 'handoff' && e.key === main + ':final' && e.status === 'success')) {
+        const current = selectedTaskBatch(root);
+        await finalHandoff(root, current, main, {
+          execute,
+          runtimeSnapshot,
+          runtimeProof,
+          checkRuntime,
+          state: passed,
+          save,
+          common,
+          previewControl,
+          sourceOnly: {
+            verify: (plan, owner) => verifySourceOnlyMaintenance(plan, current, grant.base, owner, execute),
+          },
+        });
+      }
+      refresh('handoff-verified');
+      return { status: 'maintenance-handoff-verified', main, runId: String(ci.runId), formalDeliveryComplete: false };
+    });
+  }
   if (mode === 'final-handoff') {
     const options = { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common, previewControl };
     return finalHandoff(root, batch, rest[0], options);
@@ -540,6 +684,8 @@ async function completionCommandLocked(
   }
   if (mode !== 'settle') throw Error('Unknown completion command');
   assert.ok(state.startedAt !== null, 'Begin formal completion before settle');
+  if (state.deferredSettlement && batch.id === 'scheduled-manifest-cleanup')
+    assert.ok(deferredTurn?.deferred.release, 'Release the original calendar ticket before settlement');
   assert.ok(
     state.events.every((e) => e.status !== 'running'),
     'A recorded stage is still running; preserve its process and evidence',
@@ -585,10 +731,26 @@ async function completionCommandLocked(
   const taskExists = existsSync(batch.worktree);
   assert.ok(taskExists || (cleanupStarted && preserved), 'Missing task without owned cleanup proof');
   if (!taskExists) verifyPreservation(preserved.result.manifest, path.join(common, 'task-assets', batch.id));
-  // One fresh remote snapshot before destructive steps; no force/reset, never infer a different batch.
-  git('fetch', 'origin');
-  assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), expectedMain);
-  assert.equal(git('rev-parse', 'origin/main'), expectedMain);
+  let lineage, calendarProof;
+  if (deferredTurn?.deferred.release) {
+    const taskRegistry = createTaskRegistry(root);
+    const { archive } = readDeferredHandoff(directory, batch, state, deferredTurn);
+    const { schedule } = await cleanupCommand(anchor, ['schedule-status']);
+    calendarProof = verifyCalendarAcceptance({
+      directory,
+      archive,
+      evidenceFile: externalAcceptanceFile,
+      schedule,
+      destination: existsSync(cleanupPolicy) ? loadCleanupPolicy(common).notification?.destination : undefined,
+    });
+    lineage = verifyDeferredLineage({ anchor, registry: taskRegistry, archive, execute });
+  } else {
+    // One fresh remote snapshot before destructive steps; never infer a different batch.
+    git('fetch', 'origin');
+    assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), expectedMain);
+    assert.equal(git('rev-parse', 'origin/main'), expectedMain);
+  }
+  const liveMain = lineage?.main ?? expectedMain;
   const local = git('for-each-ref', '--format=%(objectname)', 'refs/heads/' + batch.branch);
   const remote = git('ls-remote', 'origin', 'refs/heads/' + batch.branch);
   assert.ok(local === batch.recordedHead || (!local && cleanupStarted), 'Task local ref changed');
@@ -598,23 +760,17 @@ async function completionCommandLocked(
     planBatchDelivery(batch.worktree);
   }
   assert.equal(execute(anchor, 'git', ['status', '--porcelain']), '');
-  git('merge-base', '--is-ancestor', batch.recordedHead, expectedMain);
+  git('merge-base', '--is-ancestor', batch.recordedHead, liveMain);
   assertAcceptedSource(anchor, batch.id, expectedMain);
   // Exact business/control-plane identity is frozen; main CI validates the final technical tree.
   assert.ok(readAcceptance(anchor, batch.id), 'Missing accepted source');
   const ciEvent = [...state.events].reverse().find((e) => e.name === 'ci' && e.key === key && e.status === 'success');
   assert.ok(ciEvent, 'Use the single wait entry before settle');
   assertCompletionQuality(ciEvent.result, expectedMain, runId);
-  const repository = execute(root, 'gh', ['repo', 'view', '--json', 'nameWithOwner']);
-  const name = JSON.parse(repository).nameWithOwner;
-  const live = JSON.parse(execute(root, 'gh', ['api', `repos/${name}/actions/runs/${runId}`]));
-  assert.equal(live.head_sha, expectedMain);
-  assert.equal(live.run_attempt, 1);
-  assert.equal(live.conclusion, 'success');
-  assert.equal(live.status, 'completed');
-  assert.equal(live.path, '.github/workflows/quality.yml');
-  assert.equal(live.event, 'push');
-  assert.equal(live.head_branch, 'main');
+  if (!lineage) {
+    const repository = JSON.parse(execute(root, 'gh', ['repo', 'view', '--json', 'nameWithOwner'])).nameWithOwner;
+    liveMainQuality(root, execute, repository, expectedMain, runId);
+  }
   const evidence = path.join(directory, 'ci-' + runId),
     proofFile = path.join(directory, 'ci-' + runId + '-proof.json');
   const result = await settleCompletion(
@@ -635,9 +791,9 @@ async function completionCommandLocked(
             integrationProofMatches(proof, snapshot) && snapshot.worktreeClean,
             'Published runtime handoff must be completed first',
           );
-          assert.equal(proof.taskHead, batch.recordedHead);
+          assert.equal(proof.taskHead, lineage?.successors.at(-1)?.head ?? batch.recordedHead);
           assert.equal(proof.integrationHead, snapshot.integrationHead);
-          git('merge-base', '--is-ancestor', expectedMain, snapshot.integrationHead);
+          git('merge-base', '--is-ancestor', liveMain, snapshot.integrationHead);
           assert.ok(retainedPublishedPreview(root, preview), 'Retained preview must already match published main');
           assert.equal(
             existsSync(path.join(integration, 'backups/task-preview/active-database-task.json')),
@@ -648,7 +804,7 @@ async function completionCommandLocked(
             anchor,
             task: batch.worktree,
             preview,
-            main: expectedMain,
+            main: liveMain,
             common,
             taskRegistryVersion: batch.taskRegistryVersion,
           });
@@ -657,10 +813,11 @@ async function completionCommandLocked(
           assert.equal(runtime.backupRetained, true);
           if (state.previewFingerprint)
             assert.equal(runtime.profileFingerprint, state.previewFingerprint, 'Persistent data profile changed');
-          return runtime;
+          return lineage ? { ...runtime, lineage, calendar: calendarProof } : runtime;
         },
       },
       preserve: {
+        reuse: () => Boolean(lineage && cleanupStarted),
         run: async () => {
           if (previewControl.assertCleanupSafe)
             await previewControl.assertCleanupSafe({
@@ -668,7 +825,7 @@ async function completionCommandLocked(
               task: batch.worktree,
               preview,
               common,
-              main: expectedMain,
+              main: liveMain,
             });
           if (!existsSync(batch.worktree)) return preserved.result;
           if (deferCleanup) return { state: 'evidence-retained-for-scheduled-cleanup' };
@@ -695,7 +852,7 @@ async function completionCommandLocked(
                         task: batch.worktree,
                         preview,
                         common,
-                        main: expectedMain,
+                        main: liveMain,
                       });
                   },
                 })
@@ -723,7 +880,7 @@ async function completionCommandLocked(
                         task: batch.worktree,
                         preview,
                         common,
-                        main: expectedMain,
+                        main: liveMain,
                       });
                     assertCleanupUnreferenced(record);
                   },
@@ -756,7 +913,7 @@ async function completionCommandLocked(
                         task: batch.worktree,
                         preview,
                         common,
-                        main: expectedMain,
+                        main: liveMain,
                       });
                     assertCleanupUnreferenced(record);
                   },
@@ -787,7 +944,7 @@ async function completionCommandLocked(
                         task: batch.worktree,
                         preview,
                         common,
-                        main: expectedMain,
+                        main: liveMain,
                       });
                   },
                 })
@@ -819,6 +976,11 @@ async function completionCommandLocked(
         },
       },
       cleanup: {
+        reuse: (prior) => {
+          if (!lineage) return false;
+          if (deferCleanup) return JSON.stringify(prior) === JSON.stringify(cleanupDisposition);
+          return prior.worktreeRemoved && prior.branchRemoved && !taskExists && !local && !remote;
+        },
         run: async () => {
           if (previewControl.assertCleanupSafe)
             await previewControl.assertCleanupSafe({
@@ -826,7 +988,7 @@ async function completionCommandLocked(
               task: batch.worktree,
               preview,
               common,
-              main: expectedMain,
+              main: liveMain,
             });
           if (batch.taskRegistryVersion === 2) {
             const task = createTaskRegistry(anchor).readTask(batch.id);
@@ -839,6 +1001,10 @@ async function completionCommandLocked(
           requireBatchTimingForCleanup(common, batch.id);
           if (existsSync(batch.worktree)) assert.equal(execute(batch.worktree, 'git', ['status', '--porcelain']), '');
           process.chdir(anchor);
+          if (lineage) {
+            assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), liveMain);
+            assert.equal(git('ls-remote', 'origin', 'refs/heads/main'), liveMain + '\trefs/heads/main');
+          }
           if (deferCleanup) return cleanupDisposition;
           if (existsSync(batch.worktree)) execute(anchor, 'git', ['worktree', 'remove', batch.worktree]);
           if (git('for-each-ref', '--format=%(objectname)', 'refs/heads/' + batch.branch))
@@ -848,15 +1014,20 @@ async function completionCommandLocked(
           else execute(anchor, 'git', ['update-ref', '-d', 'refs/remotes/origin/' + batch.branch]);
           assert.equal(existsSync(batch.worktree), false);
           assert.equal(execute(anchor, 'git', ['ls-remote', 'origin', 'refs/heads/' + batch.branch]), '');
-          assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), expectedMain);
+          assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), liveMain);
           return { worktreeRemoved: true, branchRemoved: true };
         },
       },
       close: {
         run: () => {
-          const result = deferCleanup
-            ? closeTaskBatch(anchor, batch, { deferredCleanup: cleanupDisposition })
-            : closeBatch(anchor);
+          if (lineage) assert.equal(git('ls-remote', 'origin', 'refs/heads/main'), liveMain + '\trefs/heads/main');
+          const result =
+            batch.taskRegistryVersion === 2 && (deferCleanup || lineage)
+              ? closeTaskBatch(anchor, batch, {
+                  ...(deferCleanup ? { deferredCleanup: cleanupDisposition } : {}),
+                  ...(lineage ? { historicalMain: expectedMain, liveMain } : {}),
+                })
+              : closeBatch(anchor);
           return { batch: result.id, main: result.main };
         },
       },
@@ -867,6 +1038,7 @@ async function completionCommandLocked(
     main: expectedMain,
     checkedAt: new Date().toISOString(),
     source: 'fetch-and-exact-live-ci-identity',
+    ...(lineage ? { currentMain: liveMain, lineage, calendar: calendarProof } : {}),
   };
   if (readTimeline(common, batch.id)) result.batchTiming = refreshTimeline(common, batch.id).summary;
   result.summary.timingScope = 'formal-delivery-only';
@@ -942,6 +1114,7 @@ export async function completionCommand(root, args, options = {}) {
   const explicit = [
     'report',
     'settle',
+    'defer-release',
     'deliver',
     'prepare',
     'status',
@@ -957,25 +1130,46 @@ export async function completionCommand(root, args, options = {}) {
   // Even legacy/unregistered mutation is denied when the explicit policy is active.
   const executionOrder = createExecutionOrder(registry.commonDir);
   let effect = 'final';
+  const action = args[0];
+  const deferredAction = ['settle', 'defer-release'].includes(action);
+  const admission = () => ({
+    lane: 'delivery',
+    task: task.id,
+    owner: task.owner,
+    admission: process.env.ZDM_EXECUTION_ADMISSION,
+    effect,
+  });
+  const assertAdmission = () => {
+    if (action === 'handoff-deferred-maintenance') {
+      const current = registry.readTask(task.id);
+      return assertDeferredMaintenanceGrant(
+        path.join(registry.commonDir, 'task-delivery', task.id),
+        current,
+        executionOrder.read(),
+        args[2],
+      );
+    }
+    if (
+      deferredAction &&
+      executionOrder.read().tickets.some((t) => t.task === task.id && t.lane === 'delivery' && t.deferredDelivery)
+    )
+      return executionOrder.assertDeferredAdmission(admission());
+    return executionOrder.assertAdmission(admission());
+  };
   if (task && !orderReadOnly)
     assertTaskExecutor(
       task,
       options.owner ?? process.env.CODEX_THREAD_ID,
       'Completion must belong to the exact current chat/task',
     );
+  if (action === 'handoff-deferred-maintenance') assert.ok(executionOrder.read(), 'Execution order must be active');
   if (!orderReadOnly && executionOrder.read()) {
     assert.ok(task, 'No registered execution-order task; do not adopt legacy work');
     const preparationCommand =
       ['prepare', 'freeze', 'begin', 'repair-start', 'repair-finish', 'compose-reviewed'].includes(args[0]) ||
       (args[0] === 'wait' && args[1] === 'pr' && args[2] === task.recordedHead);
     effect = preparationCommand ? 'preparation' : 'final';
-    executionOrder.assertAdmission({
-      lane: 'delivery',
-      task: task.id,
-      owner: task.owner,
-      admission: process.env.ZDM_EXECUTION_ADMISSION,
-      effect,
-    });
+    assertAdmission();
   }
   const guardedOptions = orderReadOnly
     ? options
@@ -985,13 +1179,7 @@ export async function completionCommand(root, args, options = {}) {
           if (!executionOrder.read()) return;
           const current = registry.readTask(task.id);
           assertTaskExecutor(current, options.owner ?? process.env.CODEX_THREAD_ID);
-          executionOrder.assertAdmission({
-            lane: 'delivery',
-            task: current.id,
-            owner: current.owner,
-            admission: process.env.ZDM_EXECUTION_ADMISSION,
-            effect,
-          });
+          assertAdmission();
         },
       };
   if (task) {
@@ -1018,25 +1206,103 @@ export async function completionCommand(root, args, options = {}) {
         return true;
       });
       return leases.run('task-delivery-' + task.id, task.owner, async () => {
-        const queue = createTaskDeliveryQueue(registry.commonDir),
-          ticket =
-            args[0] === 'settle'
-              ? queue.inspect().tickets.find((item) => item.task === task.id && item.deferred)
-              : null;
-        if (!ticket) return completionCommandLocked(root, args, guardedOptions);
+        if (!deferredAction) return completionCommandLocked(root, args, guardedOptions);
+        const common = registry.commonDir;
+        const directory = path.join(common, 'task-delivery', task.id);
+        const queue = createTaskDeliveryQueue(common);
+        const ticket = queue.inspect().tickets.find((item) => item.task === task.id && item.deferred);
+        if (!ticket) {
+          assert.equal(action, 'settle', 'Original deferred FIFO ticket required');
+          if (task.stage === 'closed') {
+            const status = deliveryStatus(directory, task.id, task);
+            if (status.formalDeliveryComplete && task.id === 'scheduled-manifest-cleanup') {
+              assert.equal(status.main, args[2]);
+              assert.equal(openCompletion(directory, task.id, { formal: false }).deferredSettlement?.runId, args[3]);
+              return { alreadyClosed: true, deliveryStatus: status };
+            }
+          }
+          return completionCommandLocked(root, args, guardedOptions);
+        }
         assert.equal(ticket.owner, task.owner);
         assert.equal(ticket.accepted, task.frozen?.accepted);
         assert.equal(ticket.deferred.head, task.recordedHead);
         assert.equal(ticket.deferred.main, args[2]);
         assert.equal(ticket.deferred.runId, args[3]);
-        const turn = await queue.wait(ticket);
+        if (action === 'defer-release') {
+          assert.equal(
+            args.length,
+            7,
+            'defer-release <task> <original-main> <run-id> <schedule-source> <slot-1> <slot-2>',
+          );
+          assert.ok(executionOrder.read(), 'Execution order must be active');
+          const calendar = calendarRequirements(task.id, args.slice(5), args[4]);
+          const state = openCompletion(directory, task.id, { formal: false });
+          const anchor = registeredMainAnchor(root, !options.execute);
+          assert.ok(
+            state.events.every((event) => event.status !== 'running'),
+            'Completion work is still active',
+          );
+          const prior = executionOrder.read().tickets.find((t) => t.task === task.id && t.lane === 'delivery');
+          if (prior.deferredDelivery && ticket.status === 'waiting') {
+            const saved = readDeferredHandoff(directory, task, state, ticket);
+            assert.deepEqual(saved.archive.calendar, calendar, 'Original calendar requirements changed');
+            assert.equal(saved.release.archive, prior.deferredDelivery.archive);
+            return { status: 'deferred-released', queueTicket: ticket.id };
+          }
+          const turn = await queue.wait(ticket, { purpose: 'deferred-release', waitForTurn: false });
+          try {
+            const saved = await withIntegrationResource(anchor, task.id, async () => {
+              const execute = options.execute ?? run;
+              assert.equal(execute(anchor, 'git', ['status', '--porcelain']), '');
+              assert.equal(
+                execute(anchor, 'git', ['rev-parse', 'HEAD']),
+                execute(anchor, 'git', ['rev-parse', 'origin/main']),
+              );
+              execute(anchor, 'git', ['merge-base', '--is-ancestor', calendar.sourceHead, args[2]]);
+              const saved = preserveDeferredHandoff(directory, task, state, turn, calendar);
+              verifyDeferredLineage({ anchor, archive: saved.archive, registry, execute });
+              guardedOptions.assertCurrentAdmission();
+              return saved;
+            });
+            await queue.releaseDeferred(turn, saved.release, (retained) =>
+              executionOrder.deferDelivery(
+                { ...admission(), queueTicket: retained.id, archive: saved.release.archive },
+                (current) =>
+                  retained.owner === current.owner && retained.deferred.release.archive === saved.release.archive,
+              ),
+            );
+            return { status: 'deferred-released', queueTicket: ticket.id };
+          } catch (error) {
+            await queue.finish(turn, { success: false, error });
+            throw error;
+          }
+        }
+        const purpose = ticket.deferred.release ? 'deferred-settle' : 'delivery';
+        if (purpose === 'deferred-settle') {
+          const original = executionOrder.assertDeferredAdmission(admission());
+          assert.equal(original.deferredDelivery.archive, ticket.deferred.release.archive);
+          assert.equal(original.deferredDelivery.queueTicket, ticket.id);
+          assert.ok(options.externalAcceptanceFile, 'Original executor calendar receipt required');
+        }
+        const turn = await queue.wait(ticket, { purpose, waitForTurn: purpose === 'delivery' });
         try {
-          const result = await completionCommandLocked(root, args, guardedOptions);
+          const settle = () => completionCommandLocked(root, args, { ...guardedOptions, deferredTurn: turn });
+          const result =
+            purpose === 'deferred-settle'
+              ? await withIntegrationResource(registeredMainAnchor(root, !options.execute), task.id, settle)
+              : await settle();
           assert.equal(
             result.deliveryStatus?.formalDeliveryComplete,
             true,
             'Deferred settlement did not close formal delivery',
           );
+          if (purpose === 'deferred-settle')
+            executionOrder.completeDeferred(admission(), { task: task.id, main: args[2] }, () => {
+              const closed = registry.readTask(task.id);
+              return (
+                closed.main?.local === args[2] && deliveryStatus(directory, task.id, closed).formalDeliveryComplete
+              );
+            });
           await queue.finish(turn, { success: true });
           return result;
         } catch (error) {
