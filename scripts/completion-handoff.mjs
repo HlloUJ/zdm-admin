@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { parseWorktreePorcelain } from './git-workflow-core.mjs';
-import { integrationProofMatches } from './integration-handoff-state.mjs';
+import { integrationProofMatches, writeIntegrationProof } from './integration-handoff-state.mjs';
 import { retainedPublishedPreview } from './start-micro-task.mjs';
 import { planBatchDelivery } from './task-batch.mjs';
 import { completionStage } from './completion-session.mjs';
@@ -91,7 +91,8 @@ export function finalHandoffPlan(root, batch, main, { execute, state }) {
 }
 
 export async function finalHandoff(root, batch, main, options) {
-  const { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common, previewControl } = options;
+  const { execute, runtimeSnapshot, runtimeProof, checkRuntime, state, save, common, previewControl, sourceOnly } =
+    options;
   assert.ok(state.startedAt !== null, 'Begin formal completion before final handoff');
   // Use only the published entry, never execute a task candidate before its main CI succeeds.
   const ci = [...state.events]
@@ -121,7 +122,16 @@ export async function finalHandoff(root, batch, main, options) {
           );
           if (state.previewFingerprint)
             assert.equal(before.profileFingerprint, state.previewFingerprint, 'Persistent data profile changed');
-          if (plan.taskRegistryVersion === 2) {
+          let retainedRuntime;
+          if (sourceOnly) {
+            sourceOnly.verify({ ...plan, common }, owner);
+            retainedRuntime = runtimeSnapshot(plan.integration);
+            assert.ok(
+              retainedRuntime.worktreeClean && integrationProofMatches(runtimeProof(plan.integration), retainedRuntime),
+              'Original integration runtime proof does not match the live container',
+            );
+            assert.equal(retainedRuntime.integrationHead, plan.integrationHead);
+          } else if (plan.taskRegistryVersion === 2) {
             assert.equal(
               typeof previewControl.prepareHandoff,
               'function',
@@ -190,7 +200,17 @@ export async function finalHandoff(root, batch, main, options) {
           const beforeSnapshot = runtimeSnapshot(plan.integration);
           const taskSelected = owner.worktree && path.resolve(owner.worktree) === path.resolve(plan.task);
           const reused = snapshotReady(beforeSnapshot) && !taskSelected;
-          if (!reused)
+          if (retainedRuntime) {
+            // Prove the exact same source, configuration and container after the
+            // Git-only fast-forward. No task launcher, stop, restart or switch.
+            assert.ok(
+              beforeSnapshot.worktreeClean && integrationProofMatches(runtimeProof(plan.integration), beforeSnapshot),
+              'Source-only maintenance changed the runtime',
+            );
+            for (const key of ['sourceIdentity', 'configurationIdentity', 'containerIdentity'])
+              assert.equal(beforeSnapshot[key], retainedRuntime[key], 'Live integration identity changed: ' + key);
+            execute(root, 'git', ['merge-base', '--is-ancestor', main, beforeSnapshot.integrationHead]);
+          } else if (!reused)
             execute(
               plan.anchor,
               process.execPath,
@@ -199,17 +219,38 @@ export async function finalHandoff(root, batch, main, options) {
             );
           // Keep fresh before/after runtime checks, then use the final snapshot for ancestry too.
           const afterSnapshot = runtimeSnapshot(plan.integration);
-          assert.ok(snapshotReady(afterSnapshot), 'Published runtime handoff proof missing');
+          if (retainedRuntime)
+            assert.deepEqual(afterSnapshot, beforeSnapshot, 'Integration changed during observation');
+          else assert.ok(snapshotReady(afterSnapshot), 'Published runtime handoff proof missing');
           execute(root, 'git', ['merge-base', '--is-ancestor', main, afterSnapshot.integrationHead]);
           assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview differs from published main');
-          const preview = await previewControl.ensure({ ...plan, common });
+          const preview = retainedRuntime
+            ? await previewControl.check({ ...plan, common })
+            : await previewControl.ensure({ ...plan, common });
           assert.ok(retainedPublishedPreview(root, plan.preview), 'Retained preview changed during startup');
           const after = await checkRuntime(root, common);
           assert.ok(after.runtimeHealthy && after.backupRetained, 'Runtime health or backup changed');
           assert.equal(after.profileFingerprint, before.profileFingerprint, 'Persistent data profile changed');
+          if (retainedRuntime) {
+            sourceOnly.verify({ ...plan, common }, await previewControl.assertOwner({ ...plan, common }));
+            assert.deepEqual(
+              runtimeSnapshot(plan.integration),
+              afterSnapshot,
+              'Integration changed after the health check',
+            );
+            (options.writeRuntimeProof ?? writeIntegrationProof)(plan.integration, {
+              version: 1,
+              status: 'passed',
+              taskHead: batch.recordedHead,
+              ...afterSnapshot,
+              action: 'source-only',
+            });
+            assert.ok(snapshotReady(afterSnapshot), 'Source-only integration handoff did not read back');
+          }
           return {
             main,
-            launcherReused: reused,
+            ...(retainedRuntime ? { sourceOnly: true } : {}),
+            launcherReused: reused || Boolean(retainedRuntime),
             previewReused: preview.reused,
             integrationUpdated: plan.integrationNeedsMerge,
             previewUpdated: plan.previewNeedsAdvance,

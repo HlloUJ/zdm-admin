@@ -12,6 +12,7 @@ function fixture(t, policyPatch = {}) {
   mkdirSync(path.join(commonDir, 'task-cleanup'), { recursive: true, mode: 0o700 });
   const policy = {
     version: 1,
+    ownershipV2: true,
     limit: 2,
     budgetMs: 10000,
     maxLogicalBytes: 1000,

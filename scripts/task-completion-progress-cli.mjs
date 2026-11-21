@@ -23,6 +23,11 @@ process.stdin.on('data', async (chunk) => {
       input.deferSettle === undefined || typeof input.deferSettle === 'boolean',
       'deferSettle must be explicit boolean',
     );
+    assert.ok(
+      input.externalAcceptanceFile === undefined ||
+        (input.args[0] === 'settle' && path.isAbsolute(input.externalAcceptanceFile)),
+      'Use the original private calendar receipt for settle',
+    );
     const inside = (parent, child) => {
       const relative = path.relative(path.resolve(parent), path.resolve(child));
       return (
@@ -40,7 +45,10 @@ process.stdin.on('data', async (chunk) => {
       args: input.args,
       developmentEvidence: input.developmentEvidence ?? null,
       invalidSupersessions: input.invalidSupersessions ?? [],
-      completionOptions: { deferSettle: input.deferSettle ?? false },
+      completionOptions: {
+        deferSettle: input.deferSettle ?? false,
+        externalAcceptanceFile: input.externalAcceptanceFile,
+      },
       call,
     });
     console.log(JSON.stringify(result));

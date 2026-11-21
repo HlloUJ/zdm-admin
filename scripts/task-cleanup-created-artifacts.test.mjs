@@ -1,3 +1,4 @@
+import { runFixtureQueue } from './delivery-repairs/test-support/task-cleanup-scope-fixture.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync, readdirSync, chmodSync } from 'node:fs';
@@ -31,10 +32,10 @@ test('Git-template fixture is proved at creation, staged before close, consumed 
   const pending = JSON.parse(readFileSync(path.join(f.queue.base, 'pending', moved.handedOff[0].key + '.json')));
   assert.equal(pending.proof.rebuild.kind, 'generated-fixture-v1');
   assert.equal(
-    (await f.queue.run({ ...ready, apply: true, verify: async () => ({ ready: false }) })).processed[0].state,
+    (await runFixtureQueue(f, { ...ready, apply: true, verify: async () => ({ ready: false }) })).processed[0].state,
     'deferred',
   );
-  const result = await f.queue.run({ ...ready, apply: true, now: Date.now() + 13 * 3600000 });
+  const result = await runFixtureQueue(f, { ...ready, apply: true, now: Date.now() + 13 * 3600000 });
   assert.equal(result.processed[0].state, 'cleaned');
   assert.ok(result.processed[0].deletedLogicalBytes > 0);
   assert.ok(existsSync(pending.proof.rebuild.record));
@@ -71,7 +72,7 @@ test('exact Git source copy is removed without changing the original Git input',
   const f = fixture(t);
   f.producer.createSourceCopy({ sourceHead: f.proof.head });
   assert.equal((await f.producer.handoff({ proof: f.proof, assertUnreferenced: unreferenced })).handedOff.length, 1);
-  assert.equal((await f.queue.run({ ...ready, apply: true })).processed[0].state, 'cleaned');
+  assert.equal((await runFixtureQueue(f, { ...ready, apply: true })).processed[0].state, 'cleaned');
   assert.equal(readFileSync(path.join(f.root, 'src/app.ts'), 'utf8'), 'export const value = 1;');
 });
 test('fixture seeds are restricted data and cannot execute task text', (t) => {
@@ -100,7 +101,7 @@ test('existing E2E creator hook preserves proof contract and records a successfu
   assert.equal(f.producer.inventory()[0].kind, 'e2e-test-build-v1');
   assert.equal(f.producer.inventory()[0].state, 'ready');
   assert.equal((await f.producer.handoff({ proof: f.proof, assertUnreferenced: unreferenced })).handedOff.length, 1);
-  assert.equal((await f.queue.run({ ...ready, apply: true })).processed[0].state, 'cleaned');
+  assert.equal((await runFixtureQueue(f, { ...ready, apply: true })).processed[0].state, 'cleaned');
   assert.ok(existsSync(path.join(f.root, '.task-runtime/e2e-app-proof.json')));
 });
 test('failed or changing E2E generation remains protected', (t) => {
@@ -150,7 +151,7 @@ test('producer transfer recovery survives removal of its original task worktree'
     assertUnreferenced: unreferenced,
   };
   assert.equal((await handoffCreatedArtifacts(params)).handedOff[0].key, first.handedOff[0].key);
-  assert.equal((await f.queue.run({ ...ready, apply: true })).processed[0].state, 'cleaned');
+  assert.equal((await runFixtureQueue(f, { ...ready, apply: true })).processed[0].state, 'cleaned');
   assert.equal((await handoffCreatedArtifacts(params)).handedOff[0].state, 'cleaned');
   assert.ok(existsSync(f.common));
 });
@@ -168,7 +169,7 @@ test('externally created source capsules stay explicitly inventoried when the ta
   assert.equal(readCreatedArtifactInventory(params).artifacts[0].source, entry.source);
   assert.ok(existsSync(entry.source));
   assert.equal((await handoffCreatedArtifacts(params)).handedOff.length, 1);
-  assert.equal((await f.queue.run({ ...ready, apply: true })).processed[0].state, 'cleaned');
+  assert.equal((await runFixtureQueue(f, { ...ready, apply: true })).processed[0].state, 'cleaned');
 });
 test('concurrent producer transfer preserves the owner lock and referenced content', async (t) => {
   const f = fixture(t);
@@ -211,5 +212,5 @@ test('failed queue publication keeps the exact moving journal and resumes withou
   const recovered = await f.producer.handoff({ proof: f.proof, assertUnreferenced: unreferenced });
   assert.equal(recovered.handedOff.length, 1);
   assert.equal(f.producer.inventory()[0].state, 'staged');
-  assert.equal((await f.queue.run({ ...ready, apply: true })).processed[0].state, 'cleaned');
+  assert.equal((await runFixtureQueue(f, { ...ready, apply: true })).processed[0].state, 'cleaned');
 });

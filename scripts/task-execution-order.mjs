@@ -80,8 +80,23 @@ function validate(state) {
   const keys = new Set();
   for (const ticket of state.tickets) {
     assert.ok(EXECUTION_LANES.includes(ticket.lane) && id(ticket.task) && text(ticket.owner));
-    assert.ok(['queued', 'running', 'blocked', 'parked', 'completed', 'cancelled'].includes(ticket.status));
+    assert.ok(['queued', 'running', 'blocked', 'parked', 'deferred', 'completed', 'cancelled'].includes(ticket.status));
     validateReleasedCapacity(state, ticket);
+    if (ticket.deferredDelivery) {
+      assert.ok(ticket.lane === 'delivery' && ['deferred', 'completed'].includes(ticket.status));
+      assert.match(ticket.deferredDelivery.archive, /^[a-f0-9]{64}$/);
+      assert.ok(
+        state.events.some(
+          (e) =>
+            e.action === 'defer-delivery' &&
+            e.task === ticket.task &&
+            e.admission === ticket.admission &&
+            e.archive === ticket.deferredDelivery.archive &&
+            e.queueTicket === ticket.deferredDelivery.queueTicket,
+        ),
+        'Deferred delivery lacks its original release event',
+      );
+    } else assert.notEqual(ticket.status, 'deferred');
     event(ticket.request);
     assert.ok(Number.isSafeInteger(ticket.order) && ticket.order > 0, 'Exact effective queue order required');
     const key = `${ticket.lane}:${ticket.task}`;
@@ -488,6 +503,55 @@ export function createExecutionOrder(commonDir) {
       assertDynamicAdmission(state, scope, effect, registered, readTaskCoordination(commonDir));
     }
     return { active: true, ticket: structuredClone(current) };
+  }
+  function assertDeferredAdmission({ task, owner, admission }) {
+    const state = read();
+    const current = ticket(state, 'delivery', task, owner);
+    assert.ok(current.deferredDelivery, 'Deferred delivery has no release evidence');
+    assert.equal(current.admission, admission, 'Original deferred admission required');
+    assert.ok(['deferred', 'completed'].includes(current.status));
+    assert.ok(
+      lastPauseSequence(state) <= current.deferredDelivery.pauseSequence,
+      'A later user pause fences deferred settlement',
+    );
+    return structuredClone(current);
+  }
+  function deferDelivery(input, verify) {
+    const { task, owner, admission, archive, queueTicket } = input;
+    assert.match(archive, /^[a-f0-9]{64}$/);
+    assert.match(queueTicket, /^[a-f0-9-]{36}$/);
+    return update((state) => {
+      const current = ticket(state, 'delivery', task, owner);
+      assert.equal(current.admission, admission, 'Original deferred admission required');
+      assert.equal(verify(current), true, 'Original deferred main ticket and handoff must be proven');
+      if (current.deferredDelivery) {
+        assert.equal(current.deferredDelivery.archive, archive);
+        assert.equal(current.deferredDelivery.queueTicket, queueTicket);
+        return structuredClone(current);
+      }
+      assertAdmission({ lane: 'delivery', task, owner, admission });
+      current.deferredDelivery = { archive, queueTicket, pauseSequence: lastPauseSequence(state) };
+      current.status = 'deferred';
+      removeScope(state, current);
+      state.events.push({ action: 'defer-delivery', lane: 'delivery', task, admission, archive, queueTicket });
+      return structuredClone(current);
+    });
+  }
+  function completeDeferred(input, evidence, verify) {
+    return update((state) => {
+      assertDeferredAdmission(input);
+      const current = ticket(state, 'delivery', input.task, input.owner);
+      assert.equal(verify(current, evidence), true, 'Deferred closeout evidence not proven');
+      const completion = { digest: digest(evidence), evidence: structuredClone(evidence) };
+      if (current.status === 'completed') {
+        assert.deepEqual(current.completion, completion);
+        return structuredClone(current);
+      }
+      current.status = 'completed';
+      current.completion = completion;
+      state.events.push({ action: 'complete', lane: 'delivery', task: input.task, evidenceDigest: completion.digest });
+      return structuredClone(current);
+    });
   }
   function block({ lane, task, owner, reason }) {
     assert.ok(text(reason), 'Known blocker or explicit unknown required');
@@ -1035,6 +1099,9 @@ export function createExecutionOrder(commonDir) {
     bindNativeWorker,
     claim,
     assertAdmission,
+    assertDeferredAdmission,
+    deferDelivery,
+    completeDeferred,
     block,
     direct,
     complete,
