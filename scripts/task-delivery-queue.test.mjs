@@ -224,3 +224,37 @@ test('deferred settlement releases the critical lease but keeps the exact FIFO t
   await queue.finish(turn, { success: true });
   assert.equal(queue.inspect().tickets.length, 0);
 });
+
+test('an interrupted two-ledger release preserves the old queue head until an exact replay', async (t) => {
+  const queue = fixture(t);
+  const first = await queue.wait(await queue.enqueue(source('a')));
+  await queue.markMainMutation(first);
+  const original = await queue.deferSettlement(first, {
+    head: source('a').head,
+    main: 'c'.repeat(40),
+    runId: '42',
+    deferredAt: new Date().toISOString(),
+  });
+  const later = await queue.enqueue(source('b'));
+  const release = { archive: 'd'.repeat(64) };
+  const turn = await queue.wait(original, { purpose: 'deferred-release' });
+  const error = Error('isolated interruption after main ticket update');
+  await assert.rejects(
+    queue.releaseDeferred(turn, release, () => {
+      throw error;
+    }),
+    /isolated interruption/,
+  );
+  await queue.finish(turn, { success: false, error });
+  await assert.rejects(queue.wait(later, { waitForTurn: false }), /occupied/);
+  const replay = await queue.wait(original, { purpose: 'deferred-release', waitForTurn: false });
+  const released = await queue.releaseDeferred(replay, release, (ticket) => assert.equal(ticket.id, original.id));
+  assert.equal(released.id, original.id);
+  assert.equal(released.sequence, original.sequence);
+  assert.deepEqual(released.deferred.release, release);
+  const next = await queue.wait(later, { waitForTurn: false });
+  await queue.finish(next, { success: true });
+  const settlement = await queue.wait(original, { purpose: 'deferred-settle', waitForTurn: false });
+  await assert.rejects(queue.markMainMutation(settlement), /cannot mutate main/);
+  await queue.finish(settlement, { success: true });
+});
