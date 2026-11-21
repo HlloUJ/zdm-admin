@@ -1216,7 +1216,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-dispatch-host-proof.mjs": {
-      "digest": "df570ffa461a564584781bfe3e755eea546f1895d814ccf9392367d65760d1c2",
+      "digest": "a73b978b9758099c73a4182c0428aca4d6f484bcf2a8ff646704b424b69c70e8",
       "imports": [
         "scripts/delivery-repairs/preview-docker-directories.mjs",
         "scripts/dev-task.mjs",
@@ -1226,7 +1226,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/task-dispatch-host-proof.test.mjs": {
-      "digest": "0398cb349f28f1b0ad2040d6c6131d2f4263a5677155e143c62b626526f9a1df",
+      "digest": "23c8cb6720549f358840b1e139cfb847ec19db093041fbc50b31e84327171587",
       "imports": ["scripts/delivery-repairs/task-dispatch-host-proof.mjs", "scripts/task-cancellation-proof.mjs"],
       "dynamicImports": 0
     },

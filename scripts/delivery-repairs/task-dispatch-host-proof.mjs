@@ -62,6 +62,8 @@ export function assertDispatchMountsClear(task, snapshot, { containers, volumes 
       'Docker container belongs to the task',
     );
     assert.ok(Array.isArray(row.mounts), 'Unknown Docker container mount inventory');
+    assert.ok(Array.isArray(row.binds ?? []), 'Unknown Docker bind configuration');
+    assert.ok(Array.isArray(row.configuredMounts ?? []), 'Unknown Docker mount configuration');
     assert.deepEqual(row.volumesFrom ?? [], [], 'Inherited container volumes are not independently attributable');
     const sources = row.mounts.map((mount) => {
       assert.ok(path.isAbsolute(mount.Destination), 'Unknown Docker mount destination');
@@ -158,16 +160,17 @@ function readMountInventory(endpoint) {
   const containers = ids.map((id) => {
     assert.match(id, /^[a-f0-9]{64}$/);
     const fields = [
-      'Id',
-      'State.Running',
-      'Config.Labels',
-      'Mounts',
-      'HostConfig.Binds',
-      'HostConfig.Mounts',
-      'HostConfig.VolumesFrom',
+      '{{json .Id}}',
+      '{{json .State.Running}}',
+      '{{json .Config.Labels}}',
+      '{{json .Mounts}}',
+      '{{json .HostConfig.Binds}}',
+      // The Engine omits this optional key for an empty configured mount list.
+      '{{json (index .HostConfig "Mounts")}}',
+      '{{json .HostConfig.VolumesFrom}}',
     ];
     const [observedId, running, labels, mounts, binds, configuredMounts, volumesFrom] = inspect(
-      ['inspect', '--type', 'container', '--format', fields.map((key) => '{{json .' + key + '}}').join('\t'), id],
+      ['inspect', '--type', 'container', '--format', fields.join('\t'), id],
       fields.length,
     );
     assert.equal(observedId, id);
