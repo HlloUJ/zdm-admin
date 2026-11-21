@@ -8,6 +8,12 @@ import {
   verifyDeferredLineage,
   verifySourceOnlyMaintenance,
 } from './completion-deferred.mjs';
+import {
+  POST_MERGE_SOURCE,
+  assertOriginalPostMergeTurn,
+  verifyPostMergeMaintenance,
+} from './delivery-repairs/historical-post-merge.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
 import { deliveryCiCapability } from './verification-policy.mjs';
 import { withIntegrationResource } from './integration-resource.mjs';
 import { assertTaskExecutor } from './task-execution-binding.mjs';
@@ -134,6 +140,7 @@ async function completionCommandLocked(
     runtimeReferences = taskRuntimeReferences,
     deferSettle = false,
     deferredTurn,
+    historicalRecovery,
     externalAcceptanceFile,
     assertCurrentAdmission,
   },
@@ -754,7 +761,8 @@ async function completionCommandLocked(
   const taskExists = existsSync(batch.worktree);
   assert.ok(taskExists || (cleanupStarted && preserved), 'Missing task without owned cleanup proof');
   if (!taskExists) verifyPreservation(preserved.result.manifest, path.join(common, 'task-assets', batch.id));
-  let lineage, calendarProof;
+  let lineage = historicalRecovery,
+    calendarProof;
   if (deferredTurn?.deferred.release) {
     const taskRegistry = createTaskRegistry(root);
     const { archive } = readDeferredHandoff(directory, batch, state, deferredTurn);
@@ -767,7 +775,7 @@ async function completionCommandLocked(
       destination: existsSync(cleanupPolicy) ? loadCleanupPolicy(common).notification?.destination : undefined,
     });
     lineage = verifyDeferredLineage({ anchor, registry: taskRegistry, archive, execute });
-  } else {
+  } else if (!historicalRecovery) {
     // One fresh remote snapshot before destructive steps; never infer a different batch.
     git('fetch', 'origin');
     assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), expectedMain);
@@ -814,7 +822,7 @@ async function completionCommandLocked(
             integrationProofMatches(proof, snapshot) && snapshot.worktreeClean,
             'Published runtime handoff must be completed first',
           );
-          assert.equal(proof.taskHead, lineage?.successors.at(-1)?.head ?? batch.recordedHead);
+          assert.equal(proof.taskHead, lineage?.successors?.at(-1)?.head ?? batch.recordedHead);
           assert.equal(proof.integrationHead, snapshot.integrationHead);
           git('merge-base', '--is-ancestor', liveMain, snapshot.integrationHead);
           assert.ok(retainedPublishedPreview(root, preview), 'Retained preview must already match published main');
@@ -1109,11 +1117,11 @@ export async function completionCommand(root, args, options = {}) {
   if (proofFlag >= 0) {
     const [command, task] = args;
     assert.ok(
-      ['prepare', 'deliver', 'settle'].includes(command),
-      'Reference selection requires prepare, deliver or settle',
+      ['prepare', 'deliver', 'settle', 'resume-post-merge'].includes(command),
+      'Reference selection requires prepare, deliver, settle or resume-post-merge',
     );
     const effect = command === 'prepare' ? 'preparation' : 'final';
-    const baseLength = command === 'settle' ? 4 : 3;
+    const baseLength = command === 'resume-post-merge' ? 5 : command === 'settle' ? 4 : 3;
     const base = args.slice(0, baseLength);
     const flags = args.slice(baseLength);
     const preparationFlag = ['--engineering-review', '--published-repair', '--recompose-manifest'].find((flag) =>
@@ -1140,6 +1148,7 @@ export async function completionCommand(root, args, options = {}) {
     'report',
     'settle',
     'defer-release',
+    'resume-post-merge',
     'deliver',
     'prepare',
     'status',
@@ -1231,6 +1240,117 @@ export async function completionCommand(root, args, options = {}) {
         return true;
       });
       return leases.run('task-delivery-' + task.id, task.owner, async () => {
+        if (action === 'resume-post-merge') {
+          const [, id, ticketId, main, mainRunId] = args;
+          assert.equal(args.length, 5, 'resume-post-merge <task> <original-ticket> <maintenance-main> <main-run>');
+          assert.equal(id, POST_MERGE_SOURCE.task);
+          assert.ok(executionOrder.read(), 'Original final execution scope required');
+          const anchor = registeredMainAnchor(root, !options.execute);
+          const common = registry.commonDir;
+          const directory = path.join(common, 'task-delivery', id);
+          const publicationFile = path.join(directory, 'post-merge-maintenance-publication.json');
+          const queue = createTaskDeliveryQueue(common);
+          const published = () => {
+            const info = lstatSync(publicationFile);
+            assert.ok(info.isFile() && !info.isSymbolicLink() && !(info.mode & 0o077));
+            return read(publicationFile);
+          };
+          if (task.stage === 'closed' && !queue.inspect().tickets.some((item) => item.task === id)) {
+            const prior = published();
+            const status = deliveryStatus(directory, id, task);
+            assert.ok(status.formalDeliveryComplete);
+            assert.equal(prior.ticket, ticketId);
+            assert.equal(prior.originalMain, POST_MERGE_SOURCE.main);
+            assert.equal(prior.maintenance.main, main);
+            assert.equal(prior.maintenance.mainRunId, mainRunId);
+            return { alreadyClosed: true, maintenancePublication: prior, deliveryStatus: status };
+          }
+
+          const ticket = assertOriginalPostMergeTurn(queue, leases.inspect('main-delivery'), task, ticketId);
+          const turn = await queue.wait(ticket, { waitForTurn: false });
+          try {
+            const assertRecoveryTurn = () => {
+              guardedOptions.assertCurrentAdmission();
+              assertOriginalPostMergeTurn(queue, leases.inspect('main-delivery'), task, turn.id, { active: true });
+            };
+            const result = await withIntegrationResource(anchor, id, async (integrationLease) => {
+              assert.equal(integrationLease.task, id, 'Original integration scope required');
+              assertRecoveryTurn();
+              recoverWriter(directory);
+              const state = openCompletion(directory, id, { formal: false });
+              recoverInterrupted(state, directory);
+              trackStageRestoration(state, directory);
+              const execute = options.execute ?? run;
+              const recovery = verifyPostMergeMaintenance({
+                anchor,
+                common,
+                task,
+                ticket: turn,
+                state,
+                main,
+                mainRunId,
+                execute,
+                coordination: readTaskCoordination(common),
+                ledger: executionOrder.read(),
+              });
+              assertRecoveryTurn();
+              const publication = { version: 1, ticket: turn.id, ...recovery };
+              if (existsSync(publicationFile)) assert.deepEqual(published(), publication);
+              else writeReceipt(publicationFile, publication);
+
+              const originalMain = recovery.originalMain;
+              const handedOff = state.events.findLast(
+                (item) => item.name === 'handoff' && item.key === originalMain + ':final' && item.status === 'success',
+              );
+              if (handedOff) {
+                assert.equal(handedOff.result.main, main);
+                assert.deepEqual(handedOff.result.maintenance, recovery.maintenance);
+              } else {
+                Object.defineProperty(state, completionPermission, { value: assertRecoveryTurn });
+                await finalHandoff(anchor, selectedTaskBatch(anchor), main, {
+                  execute,
+                  runtimeSnapshot: options.runtimeSnapshot ?? integrationBackendSnapshot,
+                  runtimeProof: options.runtimeProof ?? readIntegrationProof,
+                  checkRuntime: options.checkRuntime,
+                  state,
+                  save: (current) => {
+                    saveCompletion(directory, current);
+                    finishStageRestorations(current, directory);
+                  },
+                  common,
+                  previewControl: options.previewControl ?? createCompletionPreviewControl({ execute }),
+                  recovery,
+                });
+              }
+              assertRecoveryTurn();
+              const current = registry.readTask(id);
+              if (current.stage === 'main-verified')
+                registry.revise(id, current.revision, (record) => {
+                  record.stage = 'handoff-verified';
+                });
+              const settled = await completionCommandLocked(
+                anchor,
+                ['settle', id, originalMain, POST_MERGE_SOURCE.mainRunId],
+                {
+                  ...guardedOptions,
+                  historicalRecovery: recovery,
+                  assertCurrentAdmission: assertRecoveryTurn,
+                },
+              );
+              assert.equal(
+                settled.deliveryStatus?.formalDeliveryComplete,
+                true,
+                'Original post-merge delivery remains open',
+              );
+              return { ...settled, maintenancePublication: publication };
+            });
+            await queue.finish(turn, { success: true });
+            return result;
+          } catch (error) {
+            await queue.finish(turn, { success: false, error });
+            throw error;
+          }
+        }
         if (!deferredAction) return completionCommandLocked(root, args, guardedOptions);
         const common = registry.commonDir;
         const directory = path.join(common, 'task-delivery', task.id);

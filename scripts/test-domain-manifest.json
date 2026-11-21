@@ -161,7 +161,7 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source.mjs": {
-      "digest": "1ed12660cabaf01b5cc3c4f23e4a5996993c80cbcab5d996ad4ceb24aa106785",
+      "digest": "258fecea9914d645284bb63ab1623215b09ce7f921931ff55b63774f28477908",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-continuation.mjs",
@@ -172,9 +172,10 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source.test.mjs": {
-      "digest": "9249287df7d1b13fc849d2b18b9bc2db1286e00c3fb92c2e6f32e33527595f85",
+      "digest": "b6f3923a5b6aed0566bc75db0797161c1fbfa5e1d4ca876b2b0f61517f7c5f74",
       "imports": [
         "scripts/accepted-source-ci.mjs",
+        "scripts/accepted-source-continuation.mjs",
         "scripts/accepted-source-hook.mjs",
         "scripts/accepted-source-policy.mjs",
         "scripts/accepted-source-readiness.mjs",
@@ -525,7 +526,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "5b88d363abbd13248e4aa0184fb605bfe7bef1f214c495346228b80f87680447",
+      "digest": "777136b98f70affe744d6e708fbbceb99c7109d0c2e383cf6a71ba8e2c8cf56e",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -541,6 +542,7 @@
         "scripts/completion-session.mjs",
         "scripts/completion-status.mjs",
         "scripts/delivery-repairs/completion-ci-diagnosis.mjs",
+        "scripts/delivery-repairs/historical-post-merge.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/delivery-repairs/preview-reference-source.mjs",
         "scripts/delivery-repairs/published-ci-repair.mjs",
@@ -557,6 +559,7 @@
         "scripts/task-completion.mjs",
         "scripts/task-composition.mjs",
         "scripts/task-context.mjs",
+        "scripts/task-coordination.mjs",
         "scripts/task-delivery-queue.mjs",
         "scripts/task-delivery-status-sync.mjs",
         "scripts/task-dependency-retention.mjs",
@@ -571,15 +574,16 @@
       "dynamicImports": 3
     },
     "scripts/completion-cli.test.mjs": {
-      "digest": "bc3c5ccbc3cc3cde71cefcc735d04f45b6dff586b90b327ce7f0e54dcc46089a",
+      "digest": "ab0283034f0e316280ddd61dc2c31d69196a5bdde83a33f89fd9a8c77af137ef",
       "imports": [
         "scripts/batch-timing-store.mjs",
         "scripts/completion-cli.mjs",
+        "scripts/completion-handoff.mjs",
         "scripts/task-batch.mjs",
         "scripts/task-completion.mjs",
         "scripts/test-support/completion-preview-fixture.mjs"
       ],
-      "dynamicImports": 0
+      "dynamicImports": 2
     },
     "scripts/completion-deferred.mjs": {
       "digest": "6d465ca58626ba878e3133b645be51f21b7ecbea4050cd42c5e590b1258c612a",
@@ -643,13 +647,14 @@
       "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
-      "digest": "3cfe4db3a8b60ecc8b82269581a98de0e1adad0c4bd02b422bab7a98e0b0d55b",
+      "digest": "e575d5ade7cb1f89527e69d6eb359362f995c010611fb03d34b45ce5a9afdc01",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source.mjs",
         "scripts/completion-ci-evidence.mjs",
         "scripts/completion-session.mjs",
         "scripts/delivery-repairs/completion-legacy-readiness.mjs",
+        "scripts/delivery-repairs/historical-post-merge.mjs",
         "scripts/delivery-repairs/pre-ci-composition.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/delivery-repairs/published-ci-repair.mjs",
@@ -667,7 +672,7 @@
       "dynamicImports": 1
     },
     "scripts/completion-handoff.mjs": {
-      "digest": "a55f61b4182deae1fe022155d32da2b016210faa7ee51835b838b934094c1c46",
+      "digest": "629df6258efa84a669a9dc710d81d5c9fc24372ae05699a0ecc3847a78cef37d",
       "imports": [
         "scripts/completion-session.mjs",
         "scripts/delivery-launcher.mjs",
@@ -948,6 +953,37 @@
       "imports": [
         "scripts/delivery-repairs/fixtures/timing-v2/batch-timing-core.mjs",
         "scripts/delivery-repairs/fixtures/timing-v2/batch-timing-observer.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/historical-post-merge.mjs": {
+      "digest": "0b9af773059444db0965aa5cff348f6a7e39345365195d7626fd10246cdcad23",
+      "imports": [
+        "scripts/accepted-source-policy.mjs",
+        "scripts/accepted-source.mjs",
+        "scripts/accepted-source.test.mjs",
+        "scripts/completion-ci-evidence.mjs",
+        "scripts/completion-cli.mjs",
+        "scripts/completion-cli.test.mjs",
+        "scripts/completion-flow.mjs",
+        "scripts/completion-handoff.mjs",
+        "scripts/completion-status.mjs",
+        "scripts/delivery-repairs/historical-post-merge.mjs",
+        "scripts/delivery-repairs/historical-post-merge.test.mjs",
+        "scripts/runtime-file-scope.mjs",
+        "scripts/task-completion-progress.mjs",
+        "scripts/task-completion.mjs",
+        "scripts/verification-policy.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/delivery-repairs/historical-post-merge.test.mjs": {
+      "digest": "7192aa0a4147dbab3cfdc69f3d64a28150f9dda893b613ebc5cb36fdc4e45061",
+      "imports": [
+        "scripts/accepted-source.mjs",
+        "scripts/delivery-repairs/historical-post-merge.mjs",
+        "scripts/resource-lease.mjs",
+        "scripts/task-delivery-queue.mjs"
       ],
       "dynamicImports": 0
     },
@@ -2846,7 +2882,7 @@
       "dynamicImports": 0
     },
     "scripts/task-completion-progress.mjs": {
-      "digest": "376481679bf550611d718ab7d56309e0e676625907a564f5f5245f5aaa7d65b7",
+      "digest": "50004f8a76754406941d1e7da3b390d1b0f396b0fe72c591fcb405b5bbcfb331",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/completion-cli.mjs",
@@ -2864,7 +2900,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "bf2f8b3154ce2a9d812af10349dc5ff1469f2189002ee17fe2d59195495241e8",
+      "digest": "c14e2ff2b18da5585766fbb1bb81161738b9d5b982dc8b852f5b72be653e80cf",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",

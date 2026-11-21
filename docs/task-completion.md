@@ -42,6 +42,24 @@
 
 在原票为等待且主线、集成均空闲时，受审阅的宿主使用现有 main-delivery 资源互斥和普通 GitHub PR 合并校验，按准确 head 合并并快进 main。原 FIFO 票和执行账本未发生状态修改；候选源码在主线发布之前不能执行现场让位。主线快进后，以 100 原执行者从已发布入口运行 `complete handoff-deferred-maintenance <维护main> <授权文件绝对路径>`。入口独立核对准备记录、当前精确 PR/父提交、保护和首轮 main CI。随后在 main 和集成互斥内确认变更仅包含审阅过的交付源码，确认 100 无运行环境，并快进集成及保留预览源码。前后核验现有容器、实际健康、备份及固定 5179 运行身份。不启动或停止任务运行，不扫描或修改保留的 5177，100 的工作区与分支继续保全，待普通引用和清理条件满足后结项。之后由原 683 执行上面的 `defer-release`，待实际读回两层让位才派发下一项。
 
+### 590 合并后交接接续
+
+适用于 `trusted-749-single-parent-continuation` 已合并的 PR #162。登记候选为 `46349d67d40e89580a32ec24abd360a49b08680b`，原 main 为 `f8203f37825c59e29631ca9f2d459aa5bafd7af5`，两次首轮 Quality CI 分别为 `44889372275` 和 `44900850590`。维护任务 `historical-acceptance-postmerge-recovery-590` 先按普通准备流程获得独立 PR 和首轮 CI。总协调核对该 PR、已发布 base、准备记录、准确候选和全部实际必需检查，独立发表以下批准正文。
+
+```text
+维护发布批准 historical-acceptance-postmerge-recovery-590 PR #<187 PR> <187 head> f8203f37825c59e29631ca9f2d459aa5bafd7af5 CI <187 首轮 PR run>
+```
+
+首次维护发布由原 590 执行者办理。通过已发布的执行账本、原交付票及进程证据核对原 final 准入、失败记录、当前票和 main 租约，再以已发布的 `createTaskDeliveryQueue().wait` 复领同一票。持票期间用现有 GitHub 保护按准确 head 合并 187 PR，要求原 main 仍是最新基线，且候选以它为唯一父提交。核对独立批准、维护差异、前后端和受信来源检查、严格最新基线及管理员保护。只处理正常 merge commit 与本地 main 快进，运行交接留给已发布且首轮 main CI 成功的入口。保留原票和 main 租约至恢复命令结束。连接中断时先读实际 PR、远端 main 及原进程证据，再按原票接续。
+
+原 590 在自己的 `task-delivery/<590 task>/post-merge-maintenance.json` 保存上述真实原生批准的只读快照，文件权限应为 `0600`。字段为 `{version:1,task,owner,ticket,accepted,maintenance:{base,head,accepted,pullRequest,prRunId,executor,preparation},review:{provider:"codex-native-read_thread",threadId,turnId,observedAt,message:{id,phase:"commentary",text}}`，其中 `preparation` 为 187 已结束的准备决定 ID。任务、原票、冻结和批准由实际记录取值。来源端的私有运行引用证明仍由原持有人按正式入口重新核验。
+
+```text
+npm run task:entry -- --worktree <原590工作区> complete resume-post-merge trusted-749-single-parent-continuation <原票UUID> <维护main SHA> <维护main首轮run> [--reference-proof <590私有证明>]
+```
+
+该入口要求已发布主线、原执行者和现行 final 准入，复领同一 FIFO 票并独占集成资源。核对真实原冻结、原失败及租约、两次 PR 和两次 main 的首轮质量证据，并验证后继 main 是原 main 与已审阅维护候选的直接合并，差异限于审阅过的交付文件。先保留单独的 `post-merge-maintenance-publication.json`，再用维护 main 做真实运行交接。原 `completion-receipt.json` 仍以 590 原 main 和原 CI 结项，单列现场交接的维护 main。失败留在同一票，使用相同参数恢复。187 后续由其原执行者取得自己的 final 准入，再走普通 `complete deliver`。已合并分支的就绪检查可使用这份专项发布回执，条件是 590 已正式关闭，发布回执与原结项记录一致，且重新核对 187 的原准备、冻结、PR、候选及准确 main 的实时保护与首轮 CI。187 仍有自己的运行交接和关闭回执。
+
 调用方直接等待同一进程（可恢复终端会话），进度变化由它输出；不要另开watch、查询相同API或用45秒固定sleep轮询日志。若进程中断，从原准确参数恢复，已通过检查只核验原运行。数据库高风险保护锁仍走原受保护入口，不被普通自动链接管。首次自升级从已审查的准确本地候选进入PR流程，运行交接与清理仍只由已发布且main CI通过的版本承担。
 
 首次工程自升级如被另一任务的旧关闭前端租约阻断，可按[只读运行引用证明](engineering/readonly-preview-reference-proof.md)通过公开 `reference-proof` 入口采集真实原生历史和两轮宿主证明。宿主核对准确候选及真实证明后，`prepare`、`deliver` 和 `settle` 可显式附加 `--reference-proof <当前任务私有证明文件>`；准备阶段采集附加 `--for-prepare`，可与既有工程审阅文件同时用于 `prepare`。每个引用边界仍重新独立核验。此入口只证明准确旧前端的当前引用状态，不恢复或释放另一任务租约，不跳过 unknown、冻结、CI、主线及交接保护。

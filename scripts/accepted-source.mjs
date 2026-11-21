@@ -63,6 +63,16 @@ export function sourceEntries(root, tree, technical = false, baselineTree = tree
     )
     .sort((a, b) => (a.file < b.file ? -1 : a.file > b.file ? 1 : 0));
 }
+function frozenProtectedEntries(root, { tree, protectedPaths }) {
+  assert.ok(Array.isArray(protectedPaths), 'Accepted protected paths missing');
+  const declared = new Set(protectedPaths);
+  assert.equal(declared.size, protectedPaths.length, 'Duplicate accepted protected path');
+  for (const file of declared) assertSourcePath(file);
+  // A freeze records its own projection. Use today's policy only when checking candidates.
+  const entries = sourceEntries(root, tree, true).filter(({ file }) => declared.has(file));
+  assert.equal(entries.length, declared.size, 'Declared protected source absent from snapshot');
+  return entries;
+}
 export function sourceDifference(expected, actual) {
   const before = new Map(expected.map((e) => [e.file, e])),
     after = new Map(actual.map((e) => [e.file, e]));
@@ -96,7 +106,11 @@ export function readAcceptance(root, batch) {
   assert.equal(metadata.branch, record.branch);
   assert.equal(metadata.tree, record.tree);
   assert.equal(acceptedGit(root, ['rev-parse', record.commit + '^{tree}']), record.tree);
-  assert.equal(digest(JSON.stringify(sourceEntries(root, record.tree))), record.businessDigest);
+  assert.equal(
+    digest(JSON.stringify(frozenProtectedEntries(root, metadata))),
+    record.businessDigest,
+    'Frozen protected source digest changed',
+  );
   return { ...record, protectedPaths: metadata.protectedPaths, developmentState: metadata.developmentState };
 }
 export function freezeAcceptedSource(root, batch) {
@@ -149,7 +163,8 @@ export function freezeAcceptedSource(root, batch) {
   } finally {
     rmSync(scratch, { recursive: true, force: true });
   }
-  for (const entry of sourceEntries(root, tree)) {
+  const protectedEntries = sourceEntries(root, tree);
+  for (const entry of protectedEntries) {
     assert.ok(['100644', '100755'].includes(entry.mode), 'Business links require an explicit freeze adapter');
     const bytes = readFileSync(path.join(root, entry.file));
     const rawObject = createHash('sha1')
@@ -169,7 +184,7 @@ export function freezeAcceptedSource(root, batch) {
         ? { taskRegistryVersion: 2, integrationBase, originalTaskBase: batch.base, originMainAtFreeze }
         : {}),
       tree,
-      protectedPaths: sourceEntries(root, tree).map((entry) => entry.file),
+      protectedPaths: protectedEntries.map((entry) => entry.file),
       developmentState: (batch.modules ?? []).map(({ id, status, dependsOn }) => ({
         id,
         status,
@@ -183,7 +198,7 @@ export function freezeAcceptedSource(root, batch) {
     branch: batch.branch,
     commit,
     tree,
-    businessDigest: digest(JSON.stringify(sourceEntries(root, tree))),
+    businessDigest: digest(JSON.stringify(protectedEntries)),
     messageDigest: digest(message),
   };
   const file = location(root, batch.id);
@@ -358,12 +373,7 @@ export function verifyRemoteAcceptance(root, { candidate, accepted, branch, trus
   assert.equal(acceptedGit(root, ['show', '-s', '--format=%P', accepted]), metadata.parent);
   acceptedGit(root, ['merge-base', '--is-ancestor', metadata.parent, candidate]);
   if (trustedMain) assert.match(trustedMain, oid);
-  assert.ok(Array.isArray(metadata.protectedPaths), 'Accepted protected paths missing');
-  const all = new Set(sourceEntries(root, metadata.tree, true).map((entry) => entry.file));
-  for (const file of metadata.protectedPaths) {
-    assertSourcePath(file);
-    assert.ok(all.has(file), 'Declared protected source absent from snapshot');
-  }
+  const protectedEntries = frozenProtectedEntries(root, metadata);
   const compose = trustedMain && metadata.taskRegistryVersion === 2;
   const expected = compose ? acceptedComposition(root, accepted, trustedMain) : { tree: metadata.tree };
   const candidateTree = compose ? candidateCompositionTree(root, candidate, trustedMain) : candidate;
@@ -384,7 +394,7 @@ export function verifyRemoteAcceptance(root, { candidate, accepted, branch, trus
     candidate,
     accepted,
     batch,
-    businessDigest: digest(JSON.stringify(sourceEntries(root, metadata.tree))),
+    businessDigest: digest(JSON.stringify(protectedEntries)),
     ...(compose ? { trustedMain, composedTree: expected.tree, candidateMergeTree: candidateTree } : {}),
     ...(reviewedMerge ? { reviewedMerge, review: expected.review } : {}),
   };

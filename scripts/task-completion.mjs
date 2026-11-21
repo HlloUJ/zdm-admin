@@ -243,6 +243,7 @@ async function main(args) {
       'recover',
       'handoff-plan',
       'final-handoff',
+      'resume-post-merge',
       'begin',
       'freeze',
       'check-source',
@@ -327,7 +328,7 @@ async function main(args) {
     console.log(JSON.stringify(await checkCompletionRuntime(root, commonDir), null, 2));
   } else
     throw new Error(
-      'Usage: task:completion -- deliver <batch> <task-head> | prepare <batch> <task-head> [--engineering-review <file> | --recompose-manifest <main-sha>] [--reference-proof <file>] | reference-proof <foreign-task> <native-history-file> [--published-baseline <sha>] [--for-prepare] | recover | begin [requested-at] | plan | wait <run|pr|main> <head> | handoff-plan <main> | final-handoff <main> | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> [code|environment|transport|unclassified] | repair-finish <id> | record-ci-diagnosis <failed-run> <evidence> | settle <batch> <main> <run> | report <batch> | status <batch> | backfill <batch> | pause-record <batch> | resume-record <batch> | preserve | runtime',
+      'Usage: task:completion -- deliver <batch> <task-head> | prepare <batch> <task-head> [--engineering-review <file> | --recompose-manifest <main-sha>] [--reference-proof <file>] | reference-proof <foreign-task> <native-history-file> [--published-baseline <sha>] [--for-prepare] | recover | begin [requested-at] | plan | wait <run|pr|main> <head> | handoff-plan <main> | final-handoff <main> | resume-post-merge <task> <original-ticket> <maintenance-main> <main-run> [--reference-proof <file>] | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> [code|environment|transport|unclassified] | repair-finish <id> | record-ci-diagnosis <failed-run> <evidence> | settle <batch> <main> <run> | report <batch> | status <batch> | backfill <batch> | pause-record <batch> | resume-record <batch> | preserve | runtime',
     );
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
