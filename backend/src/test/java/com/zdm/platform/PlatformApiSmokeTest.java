@@ -18,6 +18,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.zdm.platform.support.SpringContainerTestSupport;
 import com.zdm.platform.inventory.SlabPrice;
 import com.zdm.platform.inventory.SlabPriceService;
+import com.zdm.platform.media.MediaAssetMapper;
+import com.zdm.platform.media.MediaCleanupRunMapper;
+import com.zdm.platform.media.MediaCleanupScheduler;
+import com.zdm.platform.media.MediaCleanupService;
+import com.zdm.platform.media.MediaCleanupTaskMapper;
+import com.zdm.platform.media.MediaCleanupWorker;
+import com.zdm.platform.media.MediaHistoryService;
 import com.zdm.platform.security.CurrentIdentity;
 import com.zdm.platform.security.TokenAuthenticationFilter;
 import java.math.BigDecimal;
@@ -30,8 +37,11 @@ import org.junit.jupiter.api.Test;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.config.BeanFactoryPostProcessor;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -357,6 +367,39 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
         MEDIA_ROOT::toString);
   }
 
+  @TestConfiguration(proxyBeanMethods = false)
+  static class ManualMediaCleanupConfiguration {
+    @Bean
+    static BeanFactoryPostProcessor manualMediaCleanupScheduler() {
+      // The HTTP cleanup test owns the trigger. Background triggers in the same
+      // fixture could acquire its MySQL lock or process the queued media first.
+      return beans -> beans.getBeanDefinition("mediaCleanupScheduler")
+          .setBeanClassName(ManualMediaCleanupScheduler.class.getName());
+    }
+  }
+
+  static class ManualMediaCleanupScheduler extends MediaCleanupScheduler {
+    ManualMediaCleanupScheduler(
+        JdbcTemplate jdbcTemplate,
+        MediaAssetMapper assetMapper,
+        MediaCleanupRunMapper runMapper,
+        MediaCleanupService cleanupService,
+        MediaHistoryService historyService,
+        MediaCleanupTaskMapper taskMapper,
+        MediaCleanupWorker worker) {
+      super(jdbcTemplate, assetMapper, runMapper, cleanupService, historyService, taskMapper, worker);
+    }
+
+    @Override
+    public void runNightlyCleanup() {}
+
+    @Override
+    public void retryFailedCleanup() {}
+
+    @Override
+    public void compensateMissedRun() {}
+  }
+
   @Test
   void expiredTemporaryMediaIsCleanedAndAudited() throws Exception {
     MockMultipartFile image = new MockMultipartFile(
@@ -381,6 +424,7 @@ class PlatformApiSmokeTest extends SpringContainerTestSupport {
     mockMvc.perform(post("/api/admin/media/cleanup")
             .header("Authorization", "Bearer " + TokenAuthenticationFilter.DEV_TOKEN))
         .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.skippedByLock").value(false))
         .andExpect(jsonPath("$.data.deletedCount", greaterThanOrEqualTo(1)));
     jdbcTemplate.update("UPDATE media_lifecycle_control SET deletion_enabled=FALSE WHERE id=1");
     mockMvc.perform(get(mediaUrl)).andExpect(status().is4xxClientError());
