@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, writeFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cleanupCommand, loadCleanupPolicy } from './task-cleanup-cli.mjs';
+import { loadExactCleanupScope } from './delivery-repairs/task-cleanup-exact-scope.mjs';
 import { cleanupSlot, CLEANUP_TIMEZONE } from './task-cleanup-schedule.mjs';
 import { createCleanupQueue, safePath } from './task-cleanup-queue.mjs';
 import { verifyCleanupRuntime } from './task-cleanup-runtime.mjs';
@@ -35,16 +36,25 @@ export async function runScheduledCleanup(
     runCleanup = cleanupCommand,
     notify = flushCleanupNotifications,
     adapter,
+    scopeOnly = false,
     hostTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
   } = {},
 ) {
   const manifest = verifyRuntime(directory);
   assert.equal(hostTimezone, CLEANUP_TIMEZONE, 'Host timezone changed; scheduled deletion refused');
   const policy = loadCleanupPolicy(manifest.commonDir);
+  if (scopeOnly) assert.ok(policy.scope && !policy.ownershipV2, 'This schedule requires exact scope');
   assert.ok(policy.scheduler, 'Explicit scheduler history and summary budgets required');
   const queue = createCleanupQueue(manifest.commonDir),
     base = queue.base;
-  const lease = acquireCleanupLock(base, 'scheduler.lock', { source: manifest.sourceHead });
+  const scope = policy.ownershipV2 ? null : loadExactCleanupScope(manifest.commonDir, policy);
+  const lockSource = (sourceHead) =>
+    scope
+      ? createHash('sha256')
+          .update(JSON.stringify({ source: sourceHead, scope: scope.identity }))
+          .digest('hex')
+      : sourceHead;
+  const lease = acquireCleanupLock(base, 'scheduler.lock', { source: lockSource(manifest.sourceHead) });
   const file = path.join(base, 'scheduler-state.json'),
     slot = cleanupSlot(now).scheduledAt;
   try {
@@ -61,9 +71,13 @@ export async function runScheduledCleanup(
         'Unknown prior scheduler state',
       );
     }
+    if (state.cleanupScope || (scope && state.status === 'running')) {
+      assert.ok(scope, 'Scoped scheduler journal cannot enter whole-task ownership');
+      scope.assertResume(state.cleanupScope);
+    }
     let recovered = null;
     if (state.status === 'running' && state.lockToken) {
-      recovered = readRecoveredCleanupLock(base, 'scheduler.lock', state.lockToken, state.sourceHead);
+      recovered = readRecoveredCleanupLock(base, 'scheduler.lock', state.lockToken, lockSource(state.sourceHead));
       if (recovered) {
         const original = path.join(recovered.archive, 'scheduler-state.interrupted.json');
         if (existsSync(original)) assert.deepEqual(read(original), state, 'Interrupted scheduler state differs');
@@ -93,6 +107,7 @@ export async function runScheduledCleanup(
             : 'Latest slot already claimed; no duplicate or historical backlog execution',
       };
     const started = {
+      ...(scope ? { cleanupScope: scope.identity } : {}),
       slot,
       sourceHead: manifest.sourceHead,
       startedAt: new Date(now).toISOString(),
@@ -102,15 +117,27 @@ export async function runScheduledCleanup(
     save(file, { ...state, ...started, status: 'running' });
     let summary;
     try {
-      const result = await lease.scope(() => runCleanup(manifest.root, [policy.ownershipV2 ? 'run-ownership' : 'run']));
-      const notices = await notify(queue, { ...adapter, destination: policy.notification?.destination });
-      const metadata = policy.metadata
-        ? queue.compact({
-            detailsBefore: new Date(now - policy.metadata.retentionMs).toISOString(),
-            keepLatest: policy.metadata.maxDetails,
-            limit: policy.metadata.compactLimit,
-          })
-        : { status: 'retained', reason: 'No explicit metadata expiry policy' };
+      const result = await lease.scope(() =>
+        scope
+          ? runCleanup(manifest.root, ['run'], { expectedScope: scope.identity })
+          : runCleanup(manifest.root, ['run-ownership']),
+      );
+      if (scope) scope.assertResume(result.cleanupScope);
+      const notificationQueue = scope
+        ? {
+            ...queue,
+            pendingNotifications: (options) => queue.pendingNotifications({ ...options, scope }),
+          }
+        : queue;
+      const notices = await notify(notificationQueue, { ...adapter, destination: policy.notification?.destination });
+      const metadata =
+        scope || !policy.metadata
+          ? { status: 'retained' }
+          : queue.compact({
+              detailsBefore: new Date(now - policy.metadata.retentionMs).toISOString(),
+              keepLatest: policy.metadata.maxDetails,
+              limit: policy.metadata.compactLimit,
+            });
       summary = {
         ...started,
         status: result.processed.some((r) => r.state === 'blocked')
@@ -120,6 +147,7 @@ export async function runScheduledCleanup(
             : 'completed',
         processed: result.processed.map((r) => ({ key: r.key, state: r.state })),
         remaining: result.remaining,
+        ...(scope ? { observedMissing: result.observedMissing.length } : {}),
         notification: notices.status,
         metadata: metadata.removed ?? metadata.status,
       };
@@ -137,6 +165,7 @@ export async function runScheduledCleanup(
       slot,
       status: summary.status,
       sourceHead: manifest.sourceHead,
+      ...(scope ? { cleanupScope: scope.identity } : {}),
       recent,
       firstFailure:
         state.firstFailure ?? (['failed', 'blocked', 'notification-unknown'].includes(summary.status) ? summary : null),
@@ -153,10 +182,11 @@ export async function runScheduledCleanup(
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
-    assert.equal(process.argv.length, 3, 'scheduled cleanup requires its exact runtime directory');
+    const scopeOnly = process.argv[3] === '--exact-scope';
+    assert.equal(process.argv.length, scopeOnly ? 4 : 3, 'scheduled cleanup requires its exact runtime directory');
     const directory = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
     assert.equal(process.argv[2], directory, 'Foreign runtime directory refused');
-    const result = await runScheduledCleanup(directory);
+    const result = await runScheduledCleanup(directory, { scopeOnly });
     if (['failed', 'blocked', 'unknown', 'notification-unknown'].includes(result.status)) process.exitCode = 1;
   } catch (error) {
     // Bounded replacement journal if JS started; an OS/Node launch failure still needs launchd observation.

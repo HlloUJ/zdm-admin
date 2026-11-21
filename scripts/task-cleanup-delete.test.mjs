@@ -1,31 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import {
-  mkdtempSync,
-  realpathSync,
-  mkdirSync,
-  writeFileSync,
-  lstatSync,
-  existsSync,
-  readFileSync,
-  rmSync,
-} from 'node:fs';
-import os from 'node:os';
+import { mkdirSync, writeFileSync, lstatSync, existsSync, readFileSync, renameSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { scopeFixture } from './delivery-repairs/test-support/task-cleanup-scope-fixture.mjs';
 
-const helper = fileURLToPath(new URL('./task-cleanup-delete.py', import.meta.url));
-function fixture(t) {
-  const base = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'cleanup-fd-')));
-  t.after(() => rmSync(base, { recursive: true, force: true }));
-  const target = path.join(base, 'deleting'),
-    victim = path.join(base, 'foreign');
-  mkdirSync(target);
+async function fixture(t) {
+  const f = await scopeFixture(t);
+  const target = path.join(f.approved.record.carrier, 'deleting'),
+    victim = path.join(f.root, 'foreign');
+  renameSync(f.approved.target, target);
   mkdirSync(victim);
-  writeFileSync(path.join(target, 'generated'), 'generated');
   writeFileSync(path.join(victim, 'unique'), 'keep');
-  const entries = ['', 'generated'].map((relative) => {
+  const entries = ['', 'app.js'].map((relative) => {
     const s = lstatSync(path.join(target, relative), { bigint: true });
     return {
       path: relative,
@@ -38,7 +25,9 @@ function fixture(t) {
       mode: Number(s.mode),
     };
   });
-  return { base, target, victim, entries };
+  const record = { ...f.approved.record, key: f.approved.key, state: 'pending' };
+  const scopeProof = f.scope().assertRecord(f.approved.key, record);
+  return { helper: f.helper, target, victim, entries, scopeProof };
 }
 const injection = String.raw`
 import io,json,os,sys
@@ -62,30 +51,30 @@ os.unlink=unlink
 sys.stdin=io.StringIO(json.dumps(args['request']))
 namespace['main']()
 `;
-test('a file created during descriptor deletion remains and prevents successful completion', (t) => {
-  const f = fixture(t);
+test('a file created during descriptor deletion remains and prevents successful completion', async (t) => {
+  const f = await fixture(t);
   const result = spawnSync('python3', ['-I', '-c', injection], {
     encoding: 'utf8',
     input: JSON.stringify({
-      helper,
+      helper: f.helper,
       mode: 'new-file',
       victim: f.victim,
-      request: { path: f.target, entries: f.entries },
+      request: { path: f.target, entries: f.entries, scopeProof: f.scopeProof },
     }),
   });
   assert.notEqual(result.status, 0);
   assert.equal(readFileSync(path.join(f.target, 'new-unique'), 'utf8'), 'keep');
   assert.equal(readFileSync(path.join(f.victim, 'unique'), 'utf8'), 'keep');
 });
-test('a replaced deletion parent cannot redirect descriptor removal into foreign content', (t) => {
-  const f = fixture(t);
+test('a replaced deletion parent cannot redirect descriptor removal into foreign content', async (t) => {
+  const f = await fixture(t);
   const result = spawnSync('python3', ['-I', '-c', injection], {
     encoding: 'utf8',
     input: JSON.stringify({
-      helper,
+      helper: f.helper,
       mode: 'replace-parent',
       victim: f.victim,
-      request: { path: f.target, entries: f.entries },
+      request: { path: f.target, entries: f.entries, scopeProof: f.scopeProof },
     }),
   });
   assert.notEqual(result.status, 0);
@@ -93,13 +82,13 @@ test('a replaced deletion parent cannot redirect descriptor removal into foreign
   assert.equal(readFileSync(path.join(f.victim, 'unique'), 'utf8'), 'keep');
   assert.ok(existsSync(f.target + '-preserved'));
 });
-test('an inventory for a different directory refuses removal before touching files', (t) => {
-  const f = fixture(t);
-  const result = spawnSync('python3', ['-I', helper], {
+test('an inventory for a different directory refuses removal before touching files', async (t) => {
+  const f = await fixture(t);
+  const result = spawnSync('python3', ['-I', f.helper], {
     encoding: 'utf8',
-    input: JSON.stringify({ path: f.victim, entries: f.entries }),
+    input: JSON.stringify({ path: f.victim, entries: f.entries, scopeProof: f.scopeProof }),
   });
   assert.notEqual(result.status, 0);
   assert.equal(readFileSync(path.join(f.victim, 'unique'), 'utf8'), 'keep');
-  assert.equal(readFileSync(path.join(f.target, 'generated'), 'utf8'), 'generated');
+  assert.equal(readFileSync(path.join(f.target, 'app.js'), 'utf8'), 'approved');
 });

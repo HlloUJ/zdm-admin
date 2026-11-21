@@ -56,3 +56,23 @@ test('an explicit loopback SOCKS proxy only changes the scheduled process SSH en
   assert.match(proxied.plist, /&apos;\/usr\/bin\/nc -X 5 -x 127\.0\.0\.1:1082 %h %p&apos;/);
   assert.throws(() => cleanupLaunchAgentPlan({ ...options, gitSocksPort: '1082;cmd' }), /local SOCKS port/);
 });
+
+test('an exact-scope plan pins both calendar triggers to the protected scheduler mode', () => {
+  const runtime = '/fixture/common/task-cleanup/runtime/' + 'a'.repeat(40);
+  const result = cleanupLaunchAgentPlan({
+    root: '/fixture',
+    node: '/opt/node',
+    commonDir: '/fixture/common',
+    runtimeDirectory: runtime,
+    hostTimezone: 'Asia/Shanghai',
+    scopeOnly: true,
+  });
+  assert.deepEqual(result.hours, [1, 13]);
+  assert.deepEqual(result.command, [
+    '/opt/node',
+    runtime + '/scripts/task-cleanup-scheduled-cli.mjs',
+    runtime,
+    '--exact-scope',
+  ]);
+  assert.match(result.plist, /<string>--exact-scope<\/string>/);
+});

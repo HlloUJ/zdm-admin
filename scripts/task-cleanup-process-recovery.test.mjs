@@ -17,10 +17,9 @@ import {
 } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { createCleanupQueue, cleanupIdentity, cleanupObjectId } from './task-cleanup-queue.mjs';
-import { runScheduledCleanup } from './task-cleanup-scheduled-cli.mjs';
 import { inspectProcess } from './verification-process-identity.mjs';
+import { pinCleanupFixture } from './delivery-repairs/test-support/task-cleanup-scope-fixture.mjs';
 const sourceHead = 'a'.repeat(40),
   now = Date.parse('2026-11-17T01:00:00+08:00');
 async function until(predicate, label) {
@@ -40,7 +39,7 @@ const groupGone = (pid) => {
     throw error;
   }
 };
-function fixture(t) {
+async function fixture(t) {
   const root = realpathSync(mkdtempSync(path.join(os.tmpdir(), 'cleanup-real-interruption-'))),
     common = path.join(root, 'common');
   mkdirSync(common);
@@ -83,17 +82,6 @@ function fixture(t) {
   renameSync(source, record.path);
   const queue = createCleanupQueue(common);
   queue.handoff(record);
-  writeFileSync(
-    path.join(queue.base, 'policy.json'),
-    JSON.stringify({
-      version: 1,
-      limit: 10,
-      budgetMs: 120000,
-      maxLogicalBytes: 1073741824,
-      scheduler: { historyLimit: 20, maxSummaryBytes: 4096 },
-    }),
-    { mode: 0o600 },
-  );
   const marker = path.join(root, 'partial.json'),
     config = path.join(root, 'worker.json');
   writeFileSync(config, JSON.stringify({ root, common, sourceHead, now, marker }));
@@ -114,14 +102,15 @@ function fixture(t) {
     if (f.group) await until(() => groupGone(f.group), 'owned deletion group exit during cleanup');
     rmSync(root, { recursive: true, force: true });
   });
+  f.pinned = await pinCleanupFixture(root, common, record.task, [record]);
   return f;
 }
 for (const extra of [false, true])
   test(`real SIGTERM preserves both locks and resumes only after deletion group ends; extra unique=${extra}`, async (t) => {
-    const f = fixture(t);
+    const f = await fixture(t);
     f.child = spawn(
       process.execPath,
-      [fileURLToPath(new URL('./test-support/cleanup-interruption-worker.mjs', import.meta.url)), f.config],
+      [path.join(f.pinned.runtime, 'scripts/test-support/cleanup-interruption-worker.mjs'), f.config],
       { stdio: ['ignore', 'pipe', 'pipe'] },
     );
     let errors = '';
@@ -147,9 +136,15 @@ for (const extra of [false, true])
       verifyRuntime: () => ({ root: f.root, commonDir: f.common, sourceHead }),
       notify: async () => ({ status: 'idle' }),
       runCleanup: () =>
-        f.queue.run({ apply: true, verify: async () => ({ ready: true }), unreferenced: async () => {} }),
+        f.pinned.queue.run({
+          ...f.pinned.policy,
+          scope: f.pinned.scope(),
+          apply: true,
+          verify: async () => ({ ready: true }),
+          unreferenced: async () => {},
+        }),
     };
-    await assert.rejects(runScheduledCleanup(f.root, dependencies), /Subprocess group is alive/);
+    await assert.rejects(f.pinned.runScheduledCleanup(f.pinned.runtime, dependencies), /Subprocess group is alive/);
     assert.ok(existsSync(path.join(f.queue.base, 'scheduler.lock/owner.json')));
     assert.ok(existsSync(ownerFile));
     process.kill(f.deletion.pid, 'SIGTERM');
@@ -159,7 +154,7 @@ for (const extra of [false, true])
       remaining = readdirSync(quarantine).reduce((n, file) => n + statSync(path.join(quarantine, file)).size, 0);
     assert.ok(remaining > 0 && remaining < f.record.identity.bytes);
     if (extra) writeFileSync(path.join(quarantine, 'unique.txt'), 'retain new unique bytes');
-    const result = await runScheduledCleanup(f.root, dependencies);
+    const result = await f.pinned.runScheduledCleanup(f.pinned.runtime, dependencies);
     assert.equal(result.slot, new Date(now).toISOString());
     assert.ok(result.recoveredFrom);
     const state = JSON.parse(readFileSync(path.join(f.queue.base, 'scheduler-state.json')));
@@ -174,5 +169,5 @@ for (const extra of [false, true])
       const receipt = JSON.parse(readFileSync(path.join(f.queue.base, 'results', f.key + '.json')));
       assert.equal(receipt.deletedLogicalBytes, remaining);
     }
-    assert.equal((await runScheduledCleanup(f.root, dependencies)).status, 'already-ran');
+    assert.equal((await f.pinned.runScheduledCleanup(f.pinned.runtime, dependencies)).status, 'already-ran');
   });
