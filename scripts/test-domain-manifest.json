@@ -96,8 +96,12 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-ci.mjs": {
-      "digest": "c56cab4928d693d14b7c8aeb71825869b8a3a4574a6a3eef98dcb07f1c145e1f",
-      "imports": ["scripts/accepted-source-policy.mjs", "scripts/accepted-source.mjs"],
+      "digest": "244c7e7ed0e8b09029ec5cb69de227665a3926b9d84b2ecf2d1db19290da4adc",
+      "imports": [
+        "scripts/accepted-source-continuation.mjs",
+        "scripts/accepted-source-policy.mjs",
+        "scripts/accepted-source.mjs"
+      ],
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.mjs": {
@@ -106,15 +110,30 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-composition.test.mjs": {
-      "digest": "66763b1ce7acfdfc3313ad5366d68a34b2aba75aab24cc9ab6333c7d0c3bce79",
+      "digest": "b4f0bd83777b7591faca91c7866e3a94f6510c68b244f1071889f18c6b0a2380",
       "imports": [
         "scripts/accepted-source-ci.mjs",
         "scripts/accepted-source-composition.mjs",
+        "scripts/accepted-source-continuation.mjs",
         "scripts/accepted-source.mjs",
         "scripts/completion-cli.mjs",
+        "scripts/delivery-repairs/pre-ci-composition.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/script-test-plan.mjs",
         "scripts/shared-tool.mjs",
         "scripts/task-composition.mjs",
         "scripts/task-registry.mjs"
+      ],
+      "dynamicImports": 0
+    },
+    "scripts/accepted-source-continuation.mjs": {
+      "digest": "0f4c30c89be579f5c6528ca954e0581cedc8668adededbdcbe66cf68f8890add",
+      "imports": [
+        "scripts/accepted-source-hook.mjs",
+        "scripts/accepted-source-policy.mjs",
+        "scripts/delivery-repairs/pre-ci-composition.mjs",
+        "scripts/engineering-impact.mjs",
+        "scripts/script-test-plan.mjs"
       ],
       "dynamicImports": 0
     },
@@ -124,10 +143,11 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source-policy.mjs": {
-      "digest": "6cfa484ea36bf3ff9b5b731b5eacb572845449a65a23c598e7a9711e50c66b9f",
+      "digest": "08434ff26093da41a03dcb06cac22111591adc28904f2ea1ee7147ad2b37d634",
       "imports": [
         "scripts/accepted-source-ci.mjs",
         "scripts/accepted-source-composition.mjs",
+        "scripts/accepted-source-continuation.mjs",
         "scripts/accepted-source-hook.mjs",
         "scripts/accepted-source-policy.mjs",
         "scripts/accepted-source-readiness.mjs",
@@ -141,9 +161,10 @@
       "dynamicImports": 0
     },
     "scripts/accepted-source.mjs": {
-      "digest": "1ec5b06f528a4f1d70326ccd773465b9a8efa484839bee237b54d85c6b6ac455",
+      "digest": "1ed12660cabaf01b5cc3c4f23e4a5996993c80cbcab5d996ad4ceb24aa106785",
       "imports": [
         "scripts/accepted-source-composition.mjs",
+        "scripts/accepted-source-continuation.mjs",
         "scripts/accepted-source-policy.mjs",
         "scripts/task-commit-ownership.mjs",
         "scripts/task-registry.mjs"
@@ -504,7 +525,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "ba60c8be5dd500850b4f0cc5e542d4a79fbad7ca1daf53f3fd51a003e72674c0",
+      "digest": "685f87c25257a279601869211ca1870c860c3cfa33ea6826bc64dd08c62c51c8",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -891,7 +912,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/pre-ci-composition.mjs": {
-      "digest": "33e09682c6e05edf6c4b119b48879784850689bd0eaaa05c1cd5d0f6ac6429fb",
+      "digest": "c93866ae427bcbe008fe696ace1d546896efa4c0479fb7979462ef160bf9c474",
       "imports": ["scripts/accepted-source-policy.mjs", "scripts/script-test-plan.mjs"],
       "dynamicImports": 0
     },
@@ -1774,7 +1795,7 @@
       "dynamicImports": 0
     },
     "scripts/engineering-impact.mjs": {
-      "digest": "e96b6ad162e58d3b2cbf2eae9dc8326cfce7a79dd8751bab819a085d9ef96fae",
+      "digest": "6e66309539ce38ce7c514fece5a8a65b86c56e8a321feec34f5d6107d50d84cc",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-cli.test.mjs",
@@ -2732,7 +2753,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "ca77c7a290b0a5c6881f0710b850d299ffda2ab37ccc3262caff3b434d50ec05",
+      "digest": "9be04811b828bd2af3163d7a68842a5097ff8bbbce7b0d803dcb72f767c64571",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",

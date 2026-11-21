@@ -22,6 +22,13 @@ import {
   assertReviewedMergeParents,
   findReviewedMerge,
 } from './accepted-source-composition.mjs';
+import {
+  CONTINUATION_BATCH,
+  CONTINUATION_HOOK,
+  continuationDelta,
+  inspectContinuationCandidate,
+  projectAcceptedContinuation,
+} from './accepted-source-continuation.mjs';
 export function acceptedGit(root, args, options = {}) {
   const result = spawnSync('git', args, {
     cwd: root,
@@ -219,6 +226,61 @@ function assertComposedSource(root, record, expected, candidate, label) {
   assert.deepEqual(changed, [], label + ': ' + changed.join(', '));
 }
 
+function reviewContinuationTree(root, batch, reviewedTree, reviewedBase) {
+  assert.equal(batch, CONTINUATION_BATCH, 'Task outside the authorized continuation scope');
+  const record = readAcceptance(root, batch);
+  assert.ok(record, 'Continuation requires the unchanged original acceptance');
+  assert.equal(record.branch, 'codex/' + batch, 'Original acceptance belongs to a different branch');
+  const expected = acceptedComposition(root, record.commit, reviewedBase);
+  assert.ok(expected.review, 'Exact published protected-conflict review required');
+  const protectedEntries = (tree) => sourceEntries(root, tree, false, record.tree, record.protectedPaths);
+  const baseProjection = protectedEntries(expected.tree);
+  const hook = protectedEntries(reviewedBase).find(({ file }) => file === CONTINUATION_HOOK);
+  assert.equal(hook?.mode, '100644', 'Original trusted hook required');
+  assert.ok(
+    baseProjection.some(({ file }) => file === CONTINUATION_HOOK),
+    'Original hook protection missing',
+  );
+  const expectedProjection = baseProjection.map((entry) => (entry.file === CONTINUATION_HOOK ? hook : entry));
+  const changes = sourceDifference(expectedProjection, protectedEntries(reviewedTree));
+  assert.deepEqual(changes, [], 'Continuation differs from the original protected projection: ' + changes.join(', '));
+  const present = new Set(expectedProjection.map(({ file }) => file));
+  const { integrationBase } = JSON.parse(acceptedGit(root, ['cat-file', 'blob', expected.review.blob]));
+  const originallyProtected = protectedEntries(integrationBase).map(({ file }) => file);
+  const deleted = [...new Set([...originallyProtected, ...record.protectedPaths])]
+    .filter((file) => !present.has(file))
+    .sort();
+  return {
+    version: 1,
+    batch,
+    accepted: record.commit,
+    reviewedBase,
+    reviewedTree,
+    review: expected.review.blob,
+    hook: hook.object,
+    originalBusinessDigest: record.businessDigest,
+    protectedDigest: digest(JSON.stringify(expectedProjection)),
+    protectedDeletionDigest: digest(JSON.stringify(deleted)),
+    delta: continuationDelta(root, reviewedBase, reviewedTree),
+  };
+}
+
+// This discovery step is private. Only the independently reviewed record
+// published on main can authorize a candidate at either completion gate.
+export function reviewLocalAcceptedContinuation(root, batch, candidate, reviewedBase) {
+  return reviewContinuationTree(root, batch, inspectContinuationCandidate(root, candidate, reviewedBase), reviewedBase);
+}
+
+export function verifyLocalAcceptedContinuation(root, batch, candidate, trustedMain) {
+  assert.equal(batch, CONTINUATION_BATCH, 'Task outside the authorized continuation scope');
+  const tree = inspectContinuationCandidate(root, candidate, trustedMain);
+  const projection = projectAcceptedContinuation(root, trustedMain);
+  const reviewed = reviewContinuationTree(root, batch, projection.reviewedTree, projection.record.reviewedBase);
+  assert.deepEqual(projection.record, reviewed, 'Published continuation differs from the original private review');
+  assert.equal(tree, projection.tree, 'Candidate tree differs from the published continuation');
+  return { batch, accepted: reviewed.accepted, trustedMain, candidate, tree, review: projection.recordBlob };
+}
+
 export function prepareAcceptedComposition(root, batch, main, candidateCommit) {
   const record = readAcceptance(root, batch);
   assert.ok(record, 'Original accepted source required');
@@ -247,6 +309,11 @@ export function prepareAcceptedComposition(root, batch, main, candidateCommit) {
   });
 }
 export function publishAcceptance(root, batch) {
+  assert.notEqual(
+    batch,
+    CONTINUATION_BATCH,
+    'This continuation must use the published review; retain its private acceptance',
+  );
   const record = readAcceptance(root, batch);
   assert.ok(record, 'Missing acceptance');
   const ref = acceptedRef(record.branch.slice('codex/'.length)),
@@ -260,8 +327,24 @@ export function publishAcceptance(root, batch) {
 // Execute only from a trusted checkout (never import the candidate's verifier in CI).
 export function verifyRemoteAcceptance(root, { candidate, accepted, branch, trustedMain }) {
   assert.match(candidate, oid);
-  assert.match(accepted, oid);
   assert.match(branch, /^codex\/[a-z0-9]+(?:-[a-z0-9]+)*$/);
+  if (branch === 'codex/' + CONTINUATION_BATCH) {
+    const tree = inspectContinuationCandidate(root, candidate, trustedMain);
+    const { record, recordBlob, tree: expected } = projectAcceptedContinuation(root, trustedMain);
+    if (accepted !== undefined) assert.equal(accepted, record.accepted, 'Continuation acceptance changed');
+    assert.equal(tree, expected, 'Candidate tree differs from the published continuation');
+    const mergeTree = candidateCompositionTree(root, candidate, trustedMain);
+    assert.equal(mergeTree, expected, 'Actual PR merge tree differs from the published continuation');
+    return {
+      candidate,
+      accepted: record.accepted,
+      batch: record.batch,
+      trustedMain,
+      candidateMergeTree: mergeTree,
+      continuationReview: recordBlob,
+    };
+  }
+  assert.match(accepted, oid);
   const message = acceptedGit(root, ['show', '-s', '--format=%B', accepted]);
   assert.ok(message.startsWith('zdm-accepted-source-v1\n'), 'Unrecognized acceptance');
   const metadata = JSON.parse(message.slice('zdm-accepted-source-v1\n'.length));

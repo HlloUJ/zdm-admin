@@ -42,15 +42,17 @@ export function engineeringExternalReaders(root, consumers) {
   })
     .split('\0')
     .filter(Boolean);
+  return engineeringExternalReadersFromSources(files, consumers, (file) => readFileSync(path.join(root, file), 'utf8'));
+}
+export const engineeringExternalReaderPath = (file) =>
+  !file.startsWith('scripts/') &&
+  /\.(?:[cm]?[jt]sx?|vue|java|json|ya?ml|html|xml|sh|py|rb|go|rs|toml|properties|ps1)$/.test(file);
+export function engineeringExternalReadersFromSources(files, consumers, readSource) {
   const names = consumers.map((file) => path.posix.basename(file));
   const readers = {};
   for (const file of [...new Set(files)].sort()) {
-    if (
-      file.startsWith('scripts/') ||
-      !/\.(?:[cm]?[jt]sx?|vue|java|json|ya?ml|html|xml|sh|py|rb|go|rs|toml|properties|ps1)$/.test(file)
-    )
-      continue;
-    const source = readFileSync(path.join(root, file), 'utf8');
+    if (!engineeringExternalReaderPath(file)) continue;
+    const source = readSource(file);
     if (
       /\.(?:[cm]?[jt]sx?|vue)$/.test(file) &&
       /\bimport\s*\(\s*[^'"\s]|\bimport\.meta\.glob|(?<!\.)\brequire\s*\(\s*[^'"\s]/.test(source)
@@ -61,17 +63,22 @@ export function engineeringExternalReaders(root, consumers) {
   return readers;
 }
 export function reflectiveEngineeringReaders(root, manifest, inputs) {
+  return reflectiveEngineeringReadersFromSources(manifest, inputs, (file) =>
+    readFileSync(path.join(root, file), 'utf8'),
+  );
+}
+export function reflectiveEngineeringReadersFromSources(manifest, inputs, readSource) {
   return Object.fromEntries(
     Object.keys(manifest.files)
       .sort()
       .filter((file) => file.startsWith('scripts/') && file.endsWith('.mjs') && !inputs.includes(file))
       .filter((file) => {
-        const source = readFileSync(path.join(root, file), 'utf8');
+        const source = readSource(file);
         return (
           manifest.files[file].dynamicImports > 0 || /node:fs|readFile|readdir|execFile|spawn|node:vm/.test(source)
         );
       })
-      .map((file) => [file, hash(readFileSync(path.join(root, file)))]),
+      .map((file) => [file, hash(readSource(file))]),
   );
 }
 export function engineeringOnlyProof(root, files) {

@@ -15,6 +15,7 @@ import {
   freezeAcceptedSource,
   assertAcceptedSource,
   readAcceptance,
+  verifyLocalAcceptedContinuation,
   verifyRemoteAcceptance,
 } from './accepted-source.mjs';
 import { applyTaskComposition } from './task-composition.mjs';
@@ -123,7 +124,7 @@ async function completionCommandLocked(
   const limits = {
     begin: [0, 1],
     freeze: [0, 0],
-    'check-source': [1, 1],
+    'check-source': [1, 3],
     'compose-reviewed': [2, 2],
     deliver: [2, 2],
     recover: [0, 0],
@@ -277,7 +278,18 @@ async function completionCommandLocked(
     if (mode === 'freeze')
       return { acceptance, protection: 'local-content-addressed; remote-independent-enforcement-not-implied' };
   }
-  if (mode === 'check-source') return assertAcceptedSource(batch.worktree, batch.id, rest[0]);
+  if (mode === 'check-source') {
+    if (rest.length === 1) return assertAcceptedSource(batch.worktree, batch.id, rest[0]);
+    assert.equal(rest.length, 3, 'Use check-source <candidate> --continuation-main <exact-main>');
+    assert.equal(rest[1], '--continuation-main');
+    const main = rest[2];
+    assert.match(main, /^[a-f0-9]{40}$/);
+    assert.equal(git('rev-parse', 'refs/remotes/origin/main'), main, 'Exact fetched origin/main required');
+    assert.equal(git('ls-remote', 'origin', 'refs/heads/main'), main + '\trefs/heads/main', 'Published main moved');
+    const claims = verifyLocalAcceptedContinuation(batch.worktree, batch.id, rest[0], main);
+    assert.equal(claims.accepted, batch.frozen?.accepted, 'Registered original freeze changed');
+    return claims;
+  }
   if (['recover', 'deliver'].includes(mode)) recoverWriter(directory);
   const state = openCompletion(directory, batch.id, {
       requestedAt: mode === 'begin' ? rest[0] : undefined,

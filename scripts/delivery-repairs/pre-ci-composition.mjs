@@ -25,7 +25,7 @@ const gitArgs = (root, args) => ['--no-replace-objects', '-C', root, ...args];
 const options = { encoding: 'utf8', stdio: 'pipe', timeout: 30_000, maxBuffer: 32 * 1024 * 1024 };
 const git = (root, args, overrides) => execFileSync('git', gitArgs(root, args), { ...options, ...overrides });
 
-function manifestInputTree(root, tree, extraInputs = ENGINEERING_EXTRA_INPUTS) {
+export function manifestInputTree(root, tree, extraInputs = ENGINEERING_EXTRA_INPUTS) {
   const records = git(root, ['ls-tree', '-r', '-z', tree, '--', 'scripts', ...extraInputs])
     .split('\0')
     .filter(Boolean);

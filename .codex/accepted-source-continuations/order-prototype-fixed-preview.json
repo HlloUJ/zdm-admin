@@ -1,0 +1,124 @@
+{
+  "version": 1,
+  "batch": "order-prototype-fixed-preview",
+  "accepted": "606add2f41b51ea68a8554af3086131f3f89a4f8",
+  "reviewedBase": "b04d06ad6cfd2bd3e3795cc7ea43d65bd983356d",
+  "reviewedTree": "d86a8120570b6b496f7e8be8cab38485b7fb1cac",
+  "review": "3af3fe7a49b91dc372b5a5a99bb20e5689267677",
+  "hook": "d7053d2b4e7a4709cefe342651685c9dd7d58b27",
+  "originalBusinessDigest": "2c153b3acd269c9d88079a2ad709c740869a6776ce1b4f902a809a23d147521f",
+  "protectedDigest": "9d9f2f6b9028815295596c3e074863cd0d65b69796fbc09f8650d30e64a73e17",
+  "protectedDeletionDigest": "d16d4a00d836fcea7fbe5c45296c9be87a5c45612bead77bf0c19dc89bf18436",
+  "delta": [
+    {
+      "file": ".agents/skills/zdm-product-knowledge/references/notion-index.md",
+      "before": {
+        "mode": "100644",
+        "object": "29a5fd7949c916924d5f5e7a748aa1eab719b0bd"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "abe29fb853091a7e6a8880bb668abb920e1f4f98"
+      }
+    },
+    {
+      "file": "docs/product/store-deletion-implementation.md",
+      "before": {
+        "mode": "100644",
+        "object": "ee1a4cc5e91f6e779ca9d87f2ad49f2abe1080b1"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "ee2a2061ba308d9463b9a187e23438b9d73f9b41"
+      }
+    },
+    {
+      "file": "docs/product/store-order-prototype.md",
+      "before": {
+        "mode": "100644",
+        "object": "c15626e7071c8a55f00a0da8be3aa0abf537c502"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "f50e76d0b29ede55b4b1d46e1c84d2f4a3ea906a"
+      }
+    },
+    {
+      "file": "scripts/business-regression-contracts.json",
+      "before": {
+        "mode": "100644",
+        "object": "477fead2295d6fa744672620bc2a110a71782e4f"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "b3833a164b6745d55812c40933b736939908935e"
+      }
+    },
+    {
+      "file": "scripts/engineering-impact.json",
+      "before": {
+        "mode": "100644",
+        "object": "8a1dc6816858fe128706cd3f70373266e1e00bd9"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "fe7f83a67bc7504082e6ca62af5af8dd2fc57a21"
+      }
+    },
+    {
+      "file": "scripts/test-domain-manifest.json",
+      "before": {
+        "mode": "100644",
+        "object": "7d53d6d91082b698e4c3c33c3988dec77031376f"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "ff36c18bf439f2ceaff09f66fdef8b3097f32108"
+      }
+    },
+    {
+      "file": "src/pages/order/prototype/resources.ts",
+      "before": {
+        "mode": "100644",
+        "object": "ab3de4871b2f07f01a82c85dae19307b877f5218"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "b397a9a3308cd8a9a69a9365240cdb6f0ddec044"
+      }
+    },
+    {
+      "file": "src/services/orderPrototypePreview.test.ts",
+      "before": {
+        "mode": "100644",
+        "object": "67a02daa81e274071498a8de7e7b08c2e4adf522"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "cde8161a0dee3c58e4c4cc6724035312a9f99c4b"
+      }
+    },
+    {
+      "file": "src/services/orderPrototypePreview.ts",
+      "before": {
+        "mode": "100644",
+        "object": "31422c5fb0ebcee7f3e9c0af46ad6693cda124f6"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "87935d1fff874c3815a22a5c28f96eca75b9c0b0"
+      }
+    },
+    {
+      "file": "tests/e2e/store-order-prototype.spec.ts",
+      "before": {
+        "mode": "100644",
+        "object": "9cbd37f26aef7ca997e7cbc39c551ae8f711785b"
+      },
+      "after": {
+        "mode": "100644",
+        "object": "e2057f349bafab4572c92c5631f1ded0f74f597a"
+      }
+    }
+  ]
+}
