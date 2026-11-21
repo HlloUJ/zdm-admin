@@ -60,6 +60,15 @@ npm run task:entry -- --worktree <原590工作区> complete resume-post-merge tr
 
 该入口要求已发布主线、原执行者和现行 final 准入，复领同一 FIFO 票并独占集成资源。核对真实原冻结、原失败及租约、两次 PR 和两次 main 的首轮质量证据，并验证后继 main 是原 main 与已审阅维护候选的直接合并，差异限于审阅过的交付文件。先保留单独的 `post-merge-maintenance-publication.json`，再用维护 main 做真实运行交接。原 `completion-receipt.json` 仍以 590 原 main 和原 CI 结项，单列现场交接的维护 main。失败留在同一票，使用相同参数恢复。187 后续由其原执行者取得自己的 final 准入，再走普通 `complete deliver`。已合并分支的就绪检查可使用这份专项发布回执，条件是 590 已正式关闭，发布回执与原结项记录一致，且重新核对 187 的原准备、冻结、PR、候选及准确 main 的实时保护与首轮 CI。187 仍有自己的运行交接和关闭回执。
 
+### 187 引用采集器的第二次维护发布
+
+限同一 187 任务、原冻结和原分支。原 #166、`879bd045eb6b104e7417b90771b64141ca0d74c6`、首次 PR CI `44907343460`、首次 main CI `44909383673` 及 590 原结项保留。准备仍从真实决定消费后调用常规 `complete prepare <187 task> <新候选>`，新候选仅含本任务已登记的维护提交。若其他任务先发布，可保留原分支历史并合入一次最新受信 main；宿主须独立重算无冲突 Git 合并树。合并树与获批结果不同、主线已再次变化或新增受保护冲突时继续阻断。变化的候选重新准备、通过首轮 CI 并独立审阅。
+
+- 独立协调者检查该唯一准备决定、原冻结、第二个 PR 的准确最新 base/head、逐提交范围、三项必需检查、首轮 Quality CI 及实际严格分支保护。另审阅 `scripts/delivery-repairs/reference-repair-release.mjs` 的原始 Git blob 并计算 SHA-256。批准使用真实原生读回，正文为 `引用修复发布批准 187 PR #<新PR> <head> <base> CI <首轮PR run> 宿主 <宿主SHA-256> 初败 <首次采集日志SHA-256>`。原始首次失败私有留存在 187 交付目录的 `reference-repair-first-failure.log`。不使用候选评估自己。
+- 授权文件固定为 187 私有交付目录中的 `reference-repair-approval.json`，权限 `0600`。字段为 `{version:1,task,accepted,base,head,pr,prRun,preparation,hostDigest,failureDigest,review:{provider:"codex-native-read_thread",threadId,turnId,observedAt,message:{id,phase:"commentary",text}}}`，其中 `pr` 为数字，`prRun` 为字符串，`preparation` 为已完成的准备决定 ID。批准人须是当前总协调且独立于候选执行者。
+- 原执行者取得自己的 final 准入后，从批准 head 的 Git 对象提取已审阅宿主到 `task-delivery/<187 task>/reviewed-host/<head>/reference-repair-release.mjs`。先由独立宿主核对批准指纹，目录设为 `0700`，文件设为 `0400`。从稳定 main 锚点运行 `node <只读宿主副本> <main锚点绝对路径> <私有授权文件绝对路径>`，复用当前真正的执行环境与 final admission。宿主从当前已发布 main 加载现有控制模块。持原任务专属、下层 main 和集成互斥，以准确 head 触发受保护 GitHub 合并并只快进本地 main，保留独立发布意图、准确合并回执和原失败。没有浏览器、部署、服务切换、冻结重建或运行交接。合并结果未知按原参数读回同一 PR 和原意图，不重复合并已合入 PR；锁或进程无法证明结束时保留现场。
+- 宿主准确发布后，原执行者从已发布入口运行 `complete wait main <新main SHA>` 并确认首次主线 CI 成功。在自己的同一 final 准入下用发布版重新生成自己的正式 `reference-proof`，随后 `complete deliver <187 task> <新候选SHA> --reference-proof <187私有证明>`。已合并恢复重验独立批准、原失败、原 PR/原 CI、新 PR/首次 CI、准确候选树、发布意图、main 双亲和实时保护。普通交接、现场核验、清理和收尾门禁继续执行。若当前 main 或批准候选发生变化，先读回保全记录与真实主线。
+
 调用方直接等待同一进程（可恢复终端会话），进度变化由它输出；不要另开watch、查询相同API或用45秒固定sleep轮询日志。若进程中断，从原准确参数恢复，已通过检查只核验原运行。数据库高风险保护锁仍走原受保护入口，不被普通自动链接管。首次自升级从已审查的准确本地候选进入PR流程，运行交接与清理仍只由已发布且main CI通过的版本承担。
 
 首次工程自升级如被另一任务的旧关闭前端租约阻断，可按[只读运行引用证明](engineering/readonly-preview-reference-proof.md)通过公开 `reference-proof` 入口采集真实原生历史和两轮宿主证明。宿主核对准确候选及真实证明后，`prepare`、`deliver` 和 `settle` 可显式附加 `--reference-proof <当前任务私有证明文件>`；准备阶段采集附加 `--for-prepare`，可与既有工程审阅文件同时用于 `prepare`。每个引用边界仍重新独立核验。此入口只证明准确旧前端的当前引用状态，不恢复或释放另一任务租约，不跳过 unknown、冻结、CI、主线及交接保护。
