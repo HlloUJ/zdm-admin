@@ -928,3 +928,25 @@ test('advisory spawn observer only sees real execution; reuse and first-failure 
   assert.equal(second.executed, false);
   assert.equal(started.length, 2);
 });
+test('engineering outer proof tracks the same full Git configuration as inner diagnostics without bypassing failure history', async (t) => {
+  const { root, git } = fixture(t);
+  const command = task(root, failFirstScript);
+  command.args.push('--', 'test:engineering');
+  command.reuse = false;
+  const failed = await runVerificationTask(command, silent);
+  assert.equal(failed.exitCode, 1);
+  const original = record(failed);
+  const blocked = await runVerificationTask(command, silent);
+  assert.equal(blocked.executed, false);
+  git('config', 'branch.codex/fixture.remote', 'origin');
+  const changed = captureIdentity(command);
+  assert.notDeepEqual(changed.identity.environment.git, original.identity.environment.git);
+  const repaired = await runVerificationTask(command, silent);
+  assert.equal(repaired.exitCode, 0);
+  assert.notEqual(record(repaired).fingerprint, original.fingerprint);
+  assert.ok(
+    verificationAttempts(attemptsDirectory(repaired)).some(
+      (a) => a.attemptId === original.attemptId && a.exitCode === 1,
+    ),
+  );
+});

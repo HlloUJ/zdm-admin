@@ -7,7 +7,12 @@ import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, realpathSync, rmSy
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createExecutionOrder } from './task-execution-order.mjs';
-import { verifyCancellation, observeCancellationHost, parseCancellationOpenFiles } from './task-cancellation-proof.mjs';
+import {
+  verifyCancellation,
+  observeCancellationHost,
+  parseCancellationOpenFiles,
+  assertHostIdle,
+} from './task-cancellation-proof.mjs';
 const event = (sequence) => ({ sequence, messageId: `user-${sequence}`, roomId: 'room', authorId: 'user' });
 function fixture(t) {
   const commonDir = mkdtempSync(path.join(realpathSync(tmpdir()), 'cancel-order-'));
@@ -298,12 +303,83 @@ test('host adapter requests NUL lsof inventory and parses its actual record patt
       if (command === '/bin/ps') return `${process.pid} 1 fixture-reader\n`;
       if (command === '/usr/sbin/lsof') return `p${process.pid}\0\nfcwd\0tDIR\0n/fixture\0\nf3u\0tREG\0n/file\0\n`;
       if (command === 'docker' && args[0] === 'ps') return '';
+      if (command === 'git')
+        return 'worktree /fixture\0HEAD ' + 'a'.repeat(40) + '\0branch refs/heads/codex/fixture\0\0';
       throw Error('unexpected command');
     },
     { DOCKER_HOST: 'unix:///fixture.sock' },
   );
   assert.deepEqual(calls.find(([command]) => command === '/usr/sbin/lsof')[1], ['-nP', '-F0pftn']);
   assert.equal(snapshot.files.length, 2);
+  assert.deepEqual(snapshot.worktrees, [{ worktree: '/fixture', branch: 'codex/fixture' }]);
+});
+
+test('real cross-worktree Node test command structure is not a target task command, including its child runner', (t) => {
+  const f = fixture(t);
+  f.task.id = 'task-delivery-status-sync';
+  const root = '/Users/uj/Documents/Codex/装点猫/管理后台-worktrees/parallel-task-timing';
+  const command = `/Users/uj/.local/node-v24.18.0-darwin-arm64/bin/node --test --test-concurrency=2 --test-reporter=spec --test-reporter=${root}/scripts/node-source-evidence-reporter.mjs ${root}/scripts/task-delivery-status-sync.test.mjs`;
+  f.snapshot.worktrees = [{ worktree: root, branch: 'codex/parallel-task-timing' }];
+  f.snapshot.processes.push(
+    { pid: 70521, ppid: 70361, command },
+    { pid: 70522, ppid: 70521, command: `/bin/node ${root}/scripts/task-delivery-status-sync.test.mjs` },
+  );
+  for (const pid of [70521, 70522]) f.snapshot.files.push({ pid, descriptor: 'cwd', type: 'DIR', name: root });
+  assert.doesNotThrow(() => assertHostIdle(f.snapshot, f.task));
+});
+
+test('a filename match alone never bypasses target commands, descendants, open files or unknown worktree ownership', async (t) => {
+  for (const variant of [
+    'missing cwd',
+    'unregistered worktree',
+    'duplicate cwd',
+    'different parent cwd',
+    'unknown parent',
+    'not Node',
+    'not test mode',
+    'explicit task',
+    'explicit target path',
+    'target child',
+    'target open file',
+    'ambiguous quoting',
+    'path traversal',
+    'duplicate registration',
+  ])
+    await t.test(variant, (t) => {
+      const f = fixture(t),
+        root = '/registered/other-task';
+      f.snapshot.worktrees = [{ worktree: root, branch: 'codex/other-task' }];
+      const runner = { pid: 70521, ppid: 70361, command: `/bin/node --test ${root}/scripts/${f.task.id}.test.mjs` };
+      const child = { pid: 70522, ppid: runner.pid, command: `/bin/node ${root}/scripts/${f.task.id}.test.mjs` };
+      f.snapshot.processes.push(runner, child);
+      for (const pid of [runner.pid, child.pid])
+        f.snapshot.files.push({ pid, descriptor: 'cwd', type: 'DIR', name: root });
+      if (variant === 'missing cwd') f.snapshot.files = f.snapshot.files.filter((file) => file.pid !== child.pid);
+      if (variant === 'unregistered worktree') f.snapshot.worktrees = [];
+      if (variant === 'duplicate cwd')
+        f.snapshot.files.push({ pid: child.pid, descriptor: 'cwd', type: 'DIR', name: root });
+      if (variant === 'different parent cwd')
+        f.snapshot.files.find((file) => file.pid === runner.pid).name = '/unknown';
+      if (variant === 'unknown parent') child.ppid = 99999;
+      if (variant === 'not Node') runner.command = runner.command.replace('/bin/node', '/bin/unknown');
+      if (variant === 'not test mode') runner.command = runner.command.replace('--test ', '');
+      if (variant === 'explicit task') runner.command += ` --task ${f.task.id}`;
+      if (variant === 'explicit target path') runner.command += ` --worktree ${f.task.worktree}`;
+      if (variant === 'target child') child.command = `/bin/node ${f.task.worktree}/scripts/run.mjs`;
+      if (variant === 'target open file')
+        f.snapshot.files.push({
+          pid: child.pid,
+          descriptor: '3w',
+          type: 'REG',
+          name: f.task.worktree + '/log (deleted)',
+        });
+      if (variant === 'ambiguous quoting') runner.command = runner.command.replace('--test ', '--test "') + '"';
+      if (variant === 'path traversal')
+        runner.command = runner.command.replace(`${root}/scripts/`, `${root}/../scripts/`);
+      if (variant === 'duplicate registration')
+        f.snapshot.worktrees.push({ worktree: root, branch: 'codex/duplicate' });
+      assert.throws(() => assertHostIdle(f.snapshot, f.task));
+    });
 });
 
 test('explicit macOS non-filesystem objects may have present empty n fields but remain in evidence', () => {

@@ -1,6 +1,16 @@
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
-import { existsSync, lstatSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, rmdirSync } from 'node:fs';
+import {
+  existsSync,
+  lstatSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  unlinkSync,
+  rmdirSync,
+  realpathSync,
+  renameSync,
+} from 'node:fs';
 import path from 'node:path';
 const fixed = new Set(['preview-5175', 'integration-5173', 'main-delivery', 'main-sync']);
 function safe(file) {
@@ -86,13 +96,29 @@ export function createResourceLeases(
       release(lease);
     }
   }
-  function recoverEndedTask(name, task, verifyEndedProcesses) {
+  function recoverEndedTask(name, task, verifyEndedProcesses, { recoveryId } = {}) {
     assert.ok(name.startsWith('task-delivery-'), 'Only the exact private completion lease can be recovered');
     const previous = inspect(name);
     if (!previous || alive(previous.pid)) return false;
     assert.equal(previous.task, task, 'Interrupted completion belongs to another task owner');
+    let archive;
+    if (recoveryId !== undefined) {
+      assert.match(recoveryId, /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/);
+      const parent = path.join(commonDir, 'task-delivery', name.slice('task-delivery-'.length), 'preparation-recovery');
+      assert.equal(realpathSync(parent), parent);
+      assert.equal(lstatSync(parent).mode & 0o077, 0);
+      archive = path.join(parent, recoveryId + '.lease');
+      assert.equal(lstatSync(archive, { throwIfNoEntry: false }), undefined, 'Retained lease already exists');
+    }
     assert.equal(verifyEndedProcesses(previous), true, 'Recorded foreground processes must be proved ended');
-    release(previous);
+    if (archive) {
+      assert.deepEqual(inspect(name), previous, 'Original preparation lease changed');
+      assert.equal(alive(previous.pid), false, 'Original PID is active or reused');
+      assert.equal(lstatSync(archive, { throwIfNoEntry: false }), undefined, 'Retained lease changed');
+      // Move the intact owner and directory in one step. A crash cannot leave
+      // an empty live lease whose original identity is no longer provable.
+      renameSync(path.join(directory, name), archive);
+    } else release(previous);
     return true;
   }
   return { inspect, acquire, release, run, recoverEndedTask };

@@ -1,10 +1,26 @@
+import { releaseIdleCapacity, validateReleasedCapacity } from './task-capacity-release.mjs';
+import { recordNextAction, recordCoordinationObservation } from './task-coordination-next.mjs';
+import { requireNativeIntake, createTaskThreadTitles } from './task-thread-titles.mjs';
 import { hasScopedAdmission, scopedAdmissions } from './task-execution-scope.mjs';
 import assert from 'node:assert/strict';
 import { createHash, randomUUID } from 'node:crypto';
 import { existsSync, lstatSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
 import { withTaskRegistryWriteLock } from './task-registry.mjs';
-import { captureQueueProgress } from './task-delivery-status-sync.mjs';
+import { captureDeliveryQueueProgress } from './delivery-repairs/task-delivery-queue-progress.mjs';
+import { executionBinding, assertTaskExecutor } from './task-execution-binding.mjs';
+import { queuedProjectReference } from './task-board-intake.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
+import {
+  validateDynamicState,
+  registerDynamicAuthority,
+  reserveDynamicDecision,
+  consumeDynamicDecision,
+  finishDynamicPreparation,
+  cancelDynamicDecision,
+  assertDynamicAdmission,
+  enrollDynamicDelivery,
+} from './delivery-repairs/task-dynamic-model.mjs';
 
 export const EXECUTION_LANES = ['development', 'delivery'];
 const occupied = new Set(['running', 'blocked']);
@@ -64,12 +80,35 @@ function validate(state) {
   const keys = new Set();
   for (const ticket of state.tickets) {
     assert.ok(EXECUTION_LANES.includes(ticket.lane) && id(ticket.task) && text(ticket.owner));
-    assert.ok(['queued', 'running', 'blocked', 'completed', 'cancelled'].includes(ticket.status));
+    assert.ok(['queued', 'running', 'blocked', 'parked', 'completed', 'cancelled'].includes(ticket.status));
+    validateReleasedCapacity(state, ticket);
     event(ticket.request);
     assert.ok(Number.isSafeInteger(ticket.order) && ticket.order > 0, 'Exact effective queue order required');
     const key = `${ticket.lane}:${ticket.task}`;
     assert.ok(!keys.has(key), 'Duplicate task lane');
     keys.add(key);
+    if (ticket.awaitingNativeWorker !== undefined) {
+      assert.equal(ticket.awaitingNativeWorker, true);
+      assert.equal(ticket.lane, 'development');
+      assert.equal(ticket.status, 'queued');
+      assert.equal(ticket.admission, null);
+      assert.equal(ticket.nativeCoordinatorOwner, undefined);
+    }
+    if (ticket.nativeLaunchReserved !== undefined) assert.equal(ticket.nativeLaunchReserved, true);
+    if (ticket.nativeCoordinatorOwner !== undefined) {
+      assert.equal(ticket.lane, 'development');
+      assert.notEqual(ticket.nativeCoordinatorOwner, ticket.owner);
+      assert.ok(
+        state.events.some(
+          (e) =>
+            e.action === 'bind-native-worker' &&
+            e.task === ticket.task &&
+            e.coordinatorOwner === ticket.nativeCoordinatorOwner &&
+            e.workerOwner === ticket.owner,
+        ),
+        'Native binding event missing',
+      );
+    }
     if (ticket.recoveryAuthorization) recoveryAuthorization(state, ticket);
     if (ticket.derivedAuthorization) {
       assert.equal(ticket.lane, 'delivery');
@@ -102,14 +141,15 @@ function validate(state) {
               e.task === ticket.task &&
               e.owner === ticket.owner &&
               e.admission === ticket.admission,
-          ),
+          ) ||
+          state.dynamicDecisions?.some((d) => d.id === ticket.dynamicDecisionId && d.admission === ticket.admission),
         'Derived admission changed without an explicit resume',
       );
     }
   }
   for (const lane of EXECUTION_LANES)
     assert.ok(
-      state.tickets.filter((t) => t.lane === lane && occupied.has(t.status)).length <=
+      state.tickets.filter((t) => t.lane === lane && occupied.has(t.status) && !t.dynamicDecisionId).length <=
         (state.paused ? retainedLimit(state, lane) : laneLimit(state, lane)),
       'Capacity invariant violated',
     );
@@ -129,11 +169,17 @@ function validate(state) {
       state.events.some(
         (e) =>
           JSON.stringify(e.request) === JSON.stringify(scoped.request) &&
-          ((e.action === 'resume-only' &&
-            e.lane === scoped.lane &&
+          ((e.action === 'dispatch-applied' &&
+            e.decisionId === scoped.decisionId &&
             e.task === scoped.task &&
+            e.lane === scoped.lane &&
             e.owner === scoped.owner &&
             e.admission === scoped.admission) ||
+            (e.action === 'resume-only' &&
+              e.lane === scoped.lane &&
+              e.task === scoped.task &&
+              e.owner === scoped.owner &&
+              e.admission === scoped.admission) ||
             (e.action === 'promote-delivery' &&
               scoped.lane === 'delivery' &&
               e.task === scoped.task &&
@@ -151,7 +197,13 @@ function validate(state) {
       'Scoped admission lacks its exact user direction',
     );
   }
-  assert.ok(scopes.filter((s) => s.lane === 'delivery').length <= 1, 'Delivery must remain serial');
+  for (const scope of scopes)
+    if (scope.phase !== undefined) assert.ok(scope.decisionId, 'Preparation phase needs a verified dispatch decision');
+  validateDynamicState(state);
+  assert.ok(
+    scopes.filter((s) => s.lane === 'delivery' && s.phase !== 'preparation').length <= 1,
+    'Delivery must remain serial',
+  );
   return state;
 }
 const scopedFor = hasScopedAdmission;
@@ -190,7 +242,7 @@ export function createExecutionOrder(commonDir) {
     writeFileSync(temporary, JSON.stringify(state, null, 2) + '\n', { flag: 'wx', mode: 0o600 });
     renameSync(temporary, file);
     try {
-      captureQueueProgress(commonDir, state, previous);
+      captureDeliveryQueueProgress(commonDir, state, previous);
     } catch (error) {
       console.error('Progress capture failed; original queue retained: ' + error.message);
     }
@@ -231,15 +283,39 @@ export function createExecutionOrder(commonDir) {
     const found = state.tickets.find((t) => t.lane === lane && t.task === task);
     assert.ok(found, 'Task has no explicit execution instruction in this lane');
     assert.equal(found.owner, owner, 'Original execution owner required');
+    const registeredFile = path.join(commonDir, 'task-registry/tasks', task + '.json');
+    safe(registeredFile);
+    if (existsSync(registeredFile)) {
+      const registered = JSON.parse(readFileSync(registeredFile, 'utf8'));
+      if (executionBinding(registered)) assertTaskExecutor(registered);
+    }
     return found;
   }
-  function enqueue({ lane, task, owner, request }) {
+  function assertDirectionAuthority(current, source) {
+    const registryFile = path.join(commonDir, 'task-registry/tasks', current.task + '.json');
+    safe(registryFile);
+    const binding = existsSync(registryFile) ? executionBinding(JSON.parse(readFileSync(registryFile, 'utf8'))) : null;
+    if (binding) {
+      assert.equal(source.roomId, binding.request.roomId, 'Bound authorization room required');
+      assert.equal(source.authorId, binding.request.authorId, 'Bound authorization user required');
+      assert.ok(source.sequence >= binding.request.sequence, 'Direction predates current binding');
+    } else {
+      assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
+      assert.equal(source.authorId, current.request.authorId, 'Original user required');
+    }
+  }
+  function enqueue({ lane, task, owner, request, awaitingNativeWorker = false }) {
     assert.ok(EXECUTION_LANES.includes(lane) && id(task) && text(owner));
     const source = event(request);
+    if (awaitingNativeWorker) {
+      assert.equal(lane, 'development');
+      requireNativeIntake(commonDir, { taskId: task, rootThreadId: owner, request });
+    }
     return update((state) => {
       const old = state.tickets.find((t) => t.lane === lane && t.task === task);
       if (old) {
         assert.equal(old.owner, owner);
+        assert.equal(old.awaitingNativeWorker === true, awaitingNativeWorker);
         assert.deepEqual(old.request, source, 'Task already has a different immutable instruction');
         return structuredClone(old);
       }
@@ -255,14 +331,106 @@ export function createExecutionOrder(commonDir) {
         state.tickets.filter((t) => t.lane === lane).every((t) => t.request.sequence < source.sequence),
         'Late event cannot reorder registered instructions',
       );
-      const added = { lane, task, owner, request: source, order: source.sequence, status: 'queued', admission: null };
+      const added = {
+        lane,
+        task,
+        owner,
+        request: source,
+        order: source.sequence,
+        status: 'queued',
+        admission: null,
+        ...(awaitingNativeWorker ? { awaitingNativeWorker: true } : {}),
+      };
       state.tickets.push(added);
       return structuredClone(added);
+    });
+  }
+  function reserveNativeCreation({ task, owner, request, capacity, coordinatorThreadId }) {
+    requireNativeIntake(commonDir, { taskId: task, rootThreadId: owner, request, coordinatorThreadId });
+    assert.ok(capacity && Number.isSafeInteger(capacity.limit) && capacity.limit > 0);
+    assert.ok(Number.isSafeInteger(capacity.activePreparation ?? 0) && (capacity.activePreparation ?? 0) >= 0);
+    for (const key of ['activeDevelopment', 'activeDelivery', 'activeOther'])
+      assert.ok(Number.isSafeInteger(capacity[key]) && capacity[key] >= 0);
+    assert.ok(
+      capacity.activeDelivery <= 1 &&
+        capacity.activeDevelopment +
+          capacity.activeDelivery +
+          (capacity.activePreparation ?? 0) +
+          capacity.activeOther <=
+          capacity.limit,
+    );
+    return update((state) => {
+      const current = state.tickets.find((t) => t.lane === 'development' && t.task === task);
+      assert.ok(current?.status === 'queued' && current.admission === null);
+      assert.deepEqual(current.request, request);
+      assert.ok(current.owner === owner || current.nativeCoordinatorOwner === owner);
+      if (current.nativeLaunchReserved) return structuredClone(current);
+      assert.equal(current.awaitingNativeWorker, true);
+      const reservations = state.tickets.filter((t) => t.status === 'queued' && t.nativeLaunchReserved).length;
+      const dynamic = (state.dynamicDecisions ?? []).filter((d) => d.status === 'reserved');
+      assert.ok(
+        (capacity.activePreparation ?? 0) >= scopedAdmissions(state).filter((s) => s.phase === 'preparation').length,
+        'Capacity omits preparation',
+      );
+      assert.ok(
+        capacity.activeDevelopment +
+          (capacity.activePreparation ?? 0) +
+          capacity.activeDelivery +
+          capacity.activeOther +
+          reservations +
+          dynamic.length +
+          1 +
+          (capacity.activeDelivery || dynamic.some((d) => d.input.phase === 'final') ? 0 : 1) <=
+          capacity.limit,
+        'Reserve one executor for delivery, including outstanding native launches',
+      );
+      const active = state.paused
+        ? scopedAdmissions(state).filter((t) => t.lane === 'development').length
+        : state.tickets.filter((t) => t.lane === 'development' && occupied.has(t.status)).length;
+      assert.ok(active + reservations < laneLimit(state, 'development'), 'Development lane capacity exceeded');
+      current.nativeLaunchReserved = true;
+      return structuredClone(current);
+    });
+  }
+  function bindNativeWorker({ task, coordinatorOwner, workerOwner, request, context, coordinatorThreadId }) {
+    requireNativeIntake(commonDir, { taskId: task, rootThreadId: coordinatorOwner, request, coordinatorThreadId });
+    createTaskThreadTitles(commonDir).requireBinding(context, task, workerOwner);
+    assert.notEqual(coordinatorOwner, workerOwner);
+    return update((state) => {
+      const current = state.tickets.find((t) => t.lane === 'development' && t.task === task);
+      assert.ok(current, 'Original pending-native ticket required');
+      assert.deepEqual(current.request, request);
+      if (current.nativeCoordinatorOwner !== undefined) {
+        assert.equal(current.nativeCoordinatorOwner, coordinatorOwner);
+        assert.equal(current.owner, workerOwner);
+        return structuredClone(current);
+      }
+      assert.equal(current.owner, coordinatorOwner);
+      assert.equal(current.awaitingNativeWorker, true, 'Legacy/started owners cannot transfer');
+      assert.equal(current.status, 'queued');
+      assert.equal(current.admission, null);
+      assert.equal(
+        existsSync(path.join(commonDir, 'task-registry', 'tasks', task + '.json')),
+        false,
+        'Registered tasks cannot transfer owners',
+      );
+      current.nativeCoordinatorOwner = coordinatorOwner;
+      current.owner = workerOwner;
+      delete current.awaitingNativeWorker;
+      state.events.push({ action: 'bind-native-worker', task, coordinatorOwner, workerOwner });
+      return structuredClone(current);
     });
   }
   function claim({ lane, task, owner, monitorContext }, dependenciesReady) {
     return update((state) => {
       const current = ticket(state, lane, task, owner);
+      assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
+      if (current.phaseOrigin)
+        assert.ok(
+          current.dynamicDecisionId && scopedFor(state, current),
+          'Derived delivery phase requires its verified dispatch, not a generic claim',
+        );
+      if (current.nativeCoordinatorOwner) createTaskThreadTitles(commonDir).requireBinding(monitorContext, task, owner);
       assert.ok(!state.paused || scopedFor(state, current), 'All execution launches paused');
       if (current.status === 'running') {
         if (monitorContext !== undefined)
@@ -275,7 +443,11 @@ export function createExecutionOrder(commonDir) {
         assert.equal(dependenciesReady(structuredClone(current)), true, 'Task dependencies are not delivered');
       }
       assert.ok(
-        state.tickets.filter((t) => t.lane === lane && occupied.has(t.status)).length < laneLimit(state, lane),
+        state.tickets.filter(
+          (t) =>
+            t.lane === lane &&
+            (occupied.has(t.status) || (t !== current && t.status === 'queued' && t.nativeLaunchReserved)),
+        ).length < laneLimit(state, lane),
         'All lane slots occupied',
       );
       const next = state.tickets
@@ -292,13 +464,29 @@ export function createExecutionOrder(commonDir) {
       return structuredClone(current);
     });
   }
-  function assertAdmission({ lane, task, owner, admission }) {
+  function assertAdmission({ lane, task, owner, admission, effect = 'final' }) {
     const state = read();
     if (!state) return { active: false };
     const current = ticket(state, lane, task, owner);
+    assert.ok(
+      !(state.dynamicDecisions ?? []).some(
+        (d) => d.status === 'reserved' && d.input.task === task && d.input.lane === lane,
+      ),
+      'A reserved dispatch fences the previous admission',
+    );
     assert.ok(!state.paused || scopedFor(state, current), 'All execution launches paused');
     assert.equal(current.status, 'running', 'Task is not admitted; no automatic resume');
+    if (current.phaseOrigin) assert.ok(current.dynamicDecisionId, 'Derived delivery requires a verified dispatch');
     assert.ok(text(admission) && admission === current.admission, 'Exact current admission required');
+    if (current.dynamicDecisionId) {
+      const scope = scopedAdmissions(state).find((s) => s.task === task && s.lane === lane);
+      assert.ok(
+        scope?.decisionId === current.dynamicDecisionId,
+        'Dynamic admission is fenced; an explicit current decision is required',
+      );
+      const registered = JSON.parse(readFileSync(path.join(commonDir, 'task-registry/tasks', task + '.json')));
+      assertDynamicAdmission(state, scope, effect, registered, readTaskCoordination(commonDir));
+    }
     return { active: true, ticket: structuredClone(current) };
   }
   function block({ lane, task, owner, reason }) {
@@ -306,10 +494,21 @@ export function createExecutionOrder(commonDir) {
     return update((state) => {
       const current = ticket(state, lane, task, owner);
       assert.ok(occupied.has(current.status), 'Only an occupied slot can block');
+      const released =
+        current.status === 'running' &&
+        scopedAdmissions(state).find(
+          (scope) =>
+            scope.phase === 'preparation' &&
+            scope.task === task &&
+            scope.lane === lane &&
+            scope.owner === owner &&
+            scope.admission === current.admission &&
+            scope.decisionId === current.dynamicDecisionId,
+        );
       current.status = 'blocked';
       if (scopedFor(state, current)) removeScope(state, current);
       current.reason = reason;
-      state.events.push({ action: 'block', lane, task, reason });
+      state.events.push({ action: 'block', lane, task, reason, ...(released && { decisionId: released.decisionId }) });
       return structuredClone(current);
     });
   }
@@ -325,6 +524,8 @@ export function createExecutionOrder(commonDir) {
     monitorContext,
     members,
     capacity,
+    bindingRef,
+    expectedRevision,
   }) {
     const source = event(request);
     assert.ok(
@@ -334,7 +535,47 @@ export function createExecutionOrder(commonDir) {
       'Only explicit supported user directions',
     );
     return update((state) => {
-      const sameSource = state.events.filter((e) => e.request?.messageId === source.messageId);
+      if (expectedRevision !== undefined) assert.equal(state.revision, expectedRevision, 'Queue revision changed');
+      if (bindingRef !== undefined) {
+        assert.ok(['resume-only', 'resume-selected'].includes(action), 'Binding cannot authorize global changes');
+        if (bindingRef.kind === 'queued-native') {
+          assert.equal(
+            action,
+            'resume-selected',
+            'Queued native continuation cannot authorize delivery/global changes',
+          );
+          const actual = queuedProjectReference(
+            commonDir,
+            {
+              taskId: bindingRef.task,
+              owner: bindingRef.executor,
+              rootThreadId: bindingRef.originalRoot,
+              coordinatorThreadId: bindingRef.coordinator,
+              request: bindingRef.originalRequest,
+            },
+            state,
+          );
+          assert.deepEqual(actual, bindingRef, 'Queued project source changed');
+          assert.deepEqual(actual.executionRequest, source, 'Queued execution authority differs');
+          assert.ok(
+            members?.length === 1 && members[0].task === bindingRef.task && members[0].owner === bindingRef.executor,
+          );
+        } else {
+          const file = path.join(commonDir, 'task-registry/tasks', bindingRef.task + '.json');
+          safe(file);
+          const registered = JSON.parse(readFileSync(file, 'utf8')),
+            binding = executionBinding(registered);
+          assertTaskExecutor(registered);
+          assert.equal(binding?.revision, bindingRef.revision);
+          assert.deepEqual(binding.request, source);
+          if (action === 'resume-only') assert.equal(task, registered.id);
+          else assert.ok(members?.length === 1 && members[0].task === registered.id, 'One exact bound task required');
+        }
+        assert.ok(source.sequence > lastPauseSequence(state), 'A later pause revoked this direction');
+      }
+      const sameSource = state.events.filter(
+        (e) => e.request?.messageId === source.messageId && JSON.stringify(e.bindingRef) === JSON.stringify(bindingRef),
+      );
       const continuation =
         action === 'resume-only' &&
         sameSource.length === 1 &&
@@ -344,6 +585,7 @@ export function createExecutionOrder(commonDir) {
       const command = {
         action,
         request: source,
+        ...(bindingRef ? { bindingRef } : {}),
         ...(['resume-task', 'resume-only'].includes(action) ? { lane, task, owner } : {}),
         ...(action === 'resume-only' && monitorContext !== undefined ? { monitorContext } : {}),
         ...(action === 'reorder' ? { lane, tasks } : {}),
@@ -375,7 +617,15 @@ export function createExecutionOrder(commonDir) {
       assert.ok(
         state.events
           .filter((e) => e.request)
-          .every((e) => e.request.sequence < source.sequence || (continuation && e === sameSource[0])),
+          .every(
+            (e) =>
+              e.request.sequence < source.sequence ||
+              (continuation && e === sameSource[0]) ||
+              // Exact current binding was independently checked above, including
+              // actor, request and the latest pause. Unrelated later task events
+              // do not revoke this task's persistent takeover authorization.
+              bindingRef !== undefined,
+          ),
         'Stale user direction refused',
       );
       if (action === 'pause-all' || action === 'resume-all') {
@@ -410,11 +660,16 @@ export function createExecutionOrder(commonDir) {
           capacity && Number.isSafeInteger(capacity.limit) && capacity.limit > 0,
           'Actual executor capacity required',
         );
+        assert.ok(Number.isSafeInteger(capacity.activePreparation ?? 0) && (capacity.activePreparation ?? 0) >= 0);
         for (const key of ['activeDevelopment', 'activeDelivery', 'activeOther'])
           assert.ok(Number.isSafeInteger(capacity[key]) && capacity[key] >= 0);
         assert.ok(capacity.activeDelivery <= 1, 'Delivery must remain serial');
         assert.ok(
-          capacity.activeDevelopment + capacity.activeDelivery + capacity.activeOther <= capacity.limit,
+          capacity.activeDevelopment +
+            capacity.activeDelivery +
+            (capacity.activePreparation ?? 0) +
+            capacity.activeOther <=
+            capacity.limit,
           'Invalid capacity snapshot',
         );
         const existingScopes = [
@@ -426,8 +681,13 @@ export function createExecutionOrder(commonDir) {
           'Capacity omits current development',
         );
         assert.ok(
-          capacity.activeDelivery >= existingScopes.filter((s) => s.lane === 'delivery').length,
+          capacity.activeDelivery >=
+            existingScopes.filter((s) => s.lane === 'delivery' && s.phase !== 'preparation').length,
           'Capacity omits current delivery',
+        );
+        assert.ok(
+          (capacity.activePreparation ?? 0) >= existingScopes.filter((s) => s.phase === 'preparation').length,
+          'Capacity omits preparation',
         );
         const targets = members.map((m) => {
           assert.equal(
@@ -436,20 +696,36 @@ export function createExecutionOrder(commonDir) {
             'Selected restore only admits development; final delivery remains serial',
           );
           const current = ticket(state, m.lane, m.task, m.owner);
+          assert.ok(
+            !(state.dynamicDecisions ?? []).some(
+              (d) => d.status === 'reserved' && d.input.task === m.task && d.input.lane === m.lane,
+            ),
+            'Task has a reserved dispatch decision',
+          );
+          assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
           if (m.kind !== undefined) {
             assert.ok(['business', 'infrastructure', 'maintenance'].includes(m.kind), 'Unknown task kind');
             if (current.executionKind !== undefined)
               assert.equal(current.executionKind, m.kind, 'Task kind cannot be retagged');
           }
           assert.ok(['queued', 'running', 'blocked'].includes(current.status), 'Terminal task cannot resume');
-          assert.equal(current.request.roomId, source.roomId, 'Original user conversation required');
-          assert.equal(current.request.authorId, source.authorId, 'Original user required');
+          if (bindingRef?.kind !== 'queued-native') assertDirectionAuthority(current, source);
           assert.ok(current.request.sequence <= source.sequence, 'Stale selected direction refused');
           return { current, m };
         });
         const additions = targets.filter(({ current }) => !scopedFor(state, current));
         assert.ok(
-          capacity.activeDevelopment + additions.length <= capacity.limit - capacity.activeOther - 1,
+          capacity.activeDevelopment +
+            (capacity.activePreparation ?? 0) +
+            additions.length +
+            state.tickets.filter(
+              (t) =>
+                t.status === 'queued' &&
+                t.nativeLaunchReserved &&
+                !members.some((m) => m.task === t.task && m.lane === t.lane),
+            ).length +
+            (state.dynamicDecisions ?? []).filter((d) => d.status === 'reserved').length <=
+            capacity.limit - capacity.activeOther - 1,
           'Reserve one executor slot for delivery',
         );
         assert.ok(
@@ -488,19 +764,29 @@ export function createExecutionOrder(commonDir) {
           'Another scoped direction remains active',
         );
         const current = ticket(state, lane, task, owner);
-        assert.ok(['queued', 'blocked'].includes(current.status), 'Only queued or blocked tasks can resume alone');
-        assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
-        assert.equal(source.authorId, current.request.authorId, 'Original user required');
         assert.ok(
-          state.tickets.every(
-            (t) =>
-              t.request.sequence < source.sequence ||
-              (t === current && JSON.stringify(t.request) === JSON.stringify(source)),
+          !(state.dynamicDecisions ?? []).some(
+            (d) => d.status === 'reserved' && d.input.task === task && d.input.lane === lane,
           ),
+          'Task has a reserved dispatch decision',
+        );
+        assert.notEqual(current.awaitingNativeWorker, true, 'Native worker identity not bound');
+        assert.ok(
+          ['queued', 'blocked'].includes(current.status) || (bindingRef && current.status === 'running'),
+          'Only queued, blocked or verified fenced bound tasks can resume alone',
+        );
+        assertDirectionAuthority(current, source);
+        assert.ok(
+          bindingRef !== undefined ||
+            state.tickets.every(
+              (t) =>
+                t.request.sequence < source.sequence ||
+                (t === current && JSON.stringify(t.request) === JSON.stringify(source)),
+            ),
           'Stale scoped direction refused',
         );
         assert.ok(
-          current.status === 'blocked' ||
+          occupied.has(current.status) ||
             state.tickets.filter((t) => t.lane === lane && occupied.has(t.status)).length < retainedLimit(state, lane),
           'All lane slots occupied',
         );
@@ -556,7 +842,7 @@ export function createExecutionOrder(commonDir) {
     const state = read();
     assert.ok(state, 'Execution-order policy not activated');
     const current = ticket(state, lane, task, owner);
-    assert.equal(current.status, 'blocked', 'Only a blocked original slot can be cancelled');
+    assert.ok(['blocked', 'parked'].includes(current.status), 'Only a fenced blocked or parked slot can be cancelled');
     assert.equal(current.admission, admission, 'Exact original admission required');
     return structuredClone(current);
   }
@@ -577,7 +863,10 @@ export function createExecutionOrder(commonDir) {
         assert.equal(current.status, 'cancelled');
         return structuredClone(current); // no write, probe, release or dispatch on replay
       }
-      assert.equal(current.status, 'blocked', 'Only a blocked original slot can be cancelled');
+      assert.ok(
+        ['blocked', 'parked'].includes(current.status),
+        'Only a fenced blocked or parked slot can be cancelled',
+      );
       assert.equal(source.roomId, current.request.roomId, 'Original user conversation required');
       assert.equal(source.authorId, current.request.authorId, 'Original user required');
       assert.ok(
@@ -606,6 +895,12 @@ export function createExecutionOrder(commonDir) {
       const current = ticket(state, lane, task, owner);
       assert.equal(current.status, 'running', 'Blocked task must await explicit user decision');
       assert.equal(current.admission, admission);
+      if (current.dynamicDecisionId) {
+        const scope = scopedAdmissions(state).find((item) => item.task === task && item.lane === lane);
+        assert.ok(scope?.decisionId === current.dynamicDecisionId, 'Dynamic admission is fenced');
+        const registered = JSON.parse(readFileSync(path.join(commonDir, 'task-registry/tasks', task + '.json')));
+        assertDynamicAdmission(state, scope, 'final', registered, readTaskCoordination(commonDir));
+      }
       assert.equal(verify(structuredClone(current), evidence), true, 'Stage completion evidence not proven');
       current.status = 'completed';
       if (scopedFor(state, current)) removeScope(state, current);
@@ -715,10 +1010,29 @@ export function createExecutionOrder(commonDir) {
     });
   }
   return {
+    releaseCapacity: (input, verify) => update((state) => releaseIdleCapacity(state, input, verify)),
+    recordNextAction: (input, verify) =>
+      update((state) => {
+        verify(state);
+        return recordNextAction(state, input);
+      }),
+    recordCoordinationObservation: (input, verify) =>
+      update((state) => {
+        verify(state);
+        return recordCoordinationObservation(state, input);
+      }),
+    enrollDeliveryPhase: (input, verify) => update((state) => enrollDynamicDelivery(state, input, verify)),
+    registerDelegation: (input, verify) => update((state) => registerDynamicAuthority(state, input, verify)),
+    reserveDecision: (input, verify) => update((state) => reserveDynamicDecision(state, input, verify)),
+    consumeDecision: (input, verify) => update((state) => consumeDynamicDecision(state, input, verify)),
+    finishPreparation: (input, verify) => update((state) => finishDynamicPreparation(state, input, verify)),
+    cancelDecision: (input, verify) => update((state) => cancelDynamicDecision(state, input, verify)),
     commonDir,
     read,
     initialize,
     enqueue,
+    reserveNativeCreation,
+    bindNativeWorker,
     claim,
     assertAdmission,
     block,
@@ -727,5 +1041,6 @@ export function createExecutionOrder(commonDir) {
     promoteDelivery,
     cancel,
     cancellationTarget,
+    guard: (operation) => withTaskRegistryWriteLock(directory, operation),
   };
 }

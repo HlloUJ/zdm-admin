@@ -1,5 +1,7 @@
+import { assertDeliveredDependencies } from './task-context.mjs';
 import { assertCombinationRuntime } from './task-preview-combination.mjs';
 import assert from 'node:assert/strict';
+import { assertTaskExecutor } from './task-execution-binding.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { temporaryPreviewLeases } from './preview-consumers.mjs';
@@ -13,7 +15,7 @@ const leaseIdentity = (lease) => {
   delete value.port;
   return value;
 };
-async function inspectLeasedFrontend(task, lease, resources, inspect) {
+export async function inspectLeasedFrontend(task, lease, resources, inspect) {
   const unchanged = () =>
     assert.deepEqual(
       resources.inspect(lease.resource),
@@ -93,8 +95,14 @@ export async function independentTaskPreview(root, options, dependencies = {}) {
   );
   const registry = system.registry(root);
   const task = registry.resolve({ id, worktree: root });
-  assert.equal(owner, task.owner, 'Current chat must own this exact task');
-  if (command === 'start') assertCombinationRuntime(root, task);
+  assertTaskExecutor(task, owner);
+  if (command === 'start') {
+    // Preserve legacy preview eligibility. Only the declared runtime action
+    // introduces new preview prerequisites.
+    if (task.actionDependencies?.some(({ actions }) => actions.includes('runtime')))
+      assertDeliveredDependencies(root, task, 'runtime');
+    assertCombinationRuntime(root, task);
+  }
   const common = registry.commonDir;
   const resources = system.leases(common);
   const ownLeases = () => system.readLeases(common).filter((lease) => lease.task === task.id);

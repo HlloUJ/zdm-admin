@@ -24,12 +24,14 @@ public class SecurityAuditFilter extends OncePerRequestFilter {
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
+    boolean audited = shouldAudit(request);
+    SecurityAuditService.AuditContext context = audited ? auditService.capture(identityProvider.current().orElse(null)) : null;
     try {
       filterChain.doFilter(request, response);
     } finally {
-      if (shouldAudit(request)) {
-        auditService.record(
-            identityProvider.current().orElse(null),
+      if (audited) {
+        auditService.recordCaptured(
+            context,
             request.getMethod(),
             request.getRequestURI(),
             response.getStatus());
@@ -39,6 +41,7 @@ public class SecurityAuditFilter extends OncePerRequestFilter {
 
   private boolean shouldAudit(HttpServletRequest request) {
     return request.getRequestURI().startsWith("/api/admin/")
-        && AUDITED_METHODS.contains(request.getMethod());
+        && (AUDITED_METHODS.contains(request.getMethod())
+            || ("GET".equals(request.getMethod()) && request.getRequestURI().matches("/api/admin/(stores|tenants)/[0-9]+/purge-preview")));
   }
 }

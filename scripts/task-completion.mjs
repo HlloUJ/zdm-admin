@@ -1,3 +1,4 @@
+import './task-network.mjs';
 import { fixedPreviewConfigFile, hasFixedPreview, inspectFixedCompletionPreview } from './completion-fixed-preview.mjs';
 import assert from 'node:assert/strict';
 import { createHash } from 'node:crypto';
@@ -9,6 +10,7 @@ import { collectDeliveryChanges, createVerificationPlan } from './verify.mjs';
 import { readActiveBatch, planBatchDelivery } from './task-batch.mjs';
 import { requestResponse } from './dev-task.mjs';
 import { retainTaskDependencies } from './task-dependency-retention.mjs';
+import { registeredTaskWorktrees } from './task-registry.mjs';
 
 const sha = (value) => createHash('sha256').update(value).digest('hex');
 const knownOutput =
@@ -220,18 +222,34 @@ export async function checkCompletionRuntime(
 async function main(args) {
   const root = git(process.cwd(), ['rev-parse', '--show-toplevel']);
   const commonDir = path.resolve(root, git(root, ['rev-parse', '--git-common-dir']));
+  if (args[0] === 'compose-reviewed') {
+    const mains = registeredTaskWorktrees(root).filter((entry) => entry.branch === 'main');
+    assert.equal(mains.length, 1, 'Exact main anchor required');
+    const anchor = realpathSync(mains[0].worktree);
+    assert.equal(
+      realpathSync(fileURLToPath(import.meta.url)),
+      path.join(anchor, 'scripts/task-completion.mjs'),
+      'Use the published task:entry complete compose-reviewed command',
+    );
+    assert.equal(git(anchor, ['rev-parse', 'HEAD']), git(anchor, ['rev-parse', 'origin/main']));
+    assert.equal(git(anchor, ['status', '--porcelain']), '', 'Published main source must be clean');
+  }
   if (
     [
       'deliver',
+      'reference-proof',
+      'prepare',
       'recover',
       'handoff-plan',
       'final-handoff',
       'begin',
       'freeze',
       'check-source',
+      'compose-reviewed',
       'measure',
       'repair-start',
       'repair-finish',
+      'record-ci-diagnosis',
       'report',
       'settle',
       'wait',
@@ -308,7 +326,7 @@ async function main(args) {
     console.log(JSON.stringify(await checkCompletionRuntime(root, commonDir), null, 2));
   } else
     throw new Error(
-      'Usage: task:completion -- deliver <batch> <task-head> | recover | begin [requested-at] | plan | wait <run|pr|main> <head> | handoff-plan <main> | final-handoff <main> | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> [code|environment|transport|unclassified] | repair-finish <id> | settle <batch> <main> <run> | report <batch> | status <batch> | backfill <batch> | pause-record <batch> | resume-record <batch> | preserve | runtime',
+      'Usage: task:completion -- deliver <batch> <task-head> | prepare <batch> <task-head> [--engineering-review <file>] [--reference-proof <file>] | reference-proof <foreign-task> <native-history-file> [--published-baseline <sha>] [--for-prepare] | recover | begin [requested-at] | plan | wait <run|pr|main> <head> | handoff-plan <main> | final-handoff <main> | measure <stage> -- <command> | repair-start <id> <failed-run> <category> <evidence> [code|environment|transport|unclassified] | repair-finish <id> | record-ci-diagnosis <failed-run> <evidence> | settle <batch> <main> <run> | report <batch> | status <batch> | backfill <batch> | pause-record <batch> | resume-record <batch> | preserve | runtime',
     );
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

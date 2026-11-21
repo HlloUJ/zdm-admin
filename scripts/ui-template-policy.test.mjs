@@ -1000,7 +1000,7 @@ test('scheme one rejects superseded raster border skins', () => {
 test('ordinary record names titles and identifiers never act as navigation or action triggers', () => {
   const violations = files('src/pages')
     .filter((file) => file.endsWith('.vue'))
-    .flatMap((file) => displayTextViolations(read(file)).map((issue) => `${file}: ${issue}`));
+    .flatMap((file) => displayTextViolations(read(file), file).map((issue) => `${file}: ${issue}`));
   assert.deepEqual(violations, []);
   assert.match(read('AGENTS.md'), /display-text-standard\.md/);
   assert.match(read('docs/ui/standard.md'), /display-text-standard\.md/);
@@ -1903,5 +1903,16 @@ test('slot checks retain native key precedence and reject unresolved dynamic sel
   assert.ok(
     listSelectionViolations('src/pages/new/index.vue', source('<template #[unknownSlot]><t-checkbox /></template>'))
       .length > 0,
+  );
+});
+
+test('approved selection cards retain exact navigation without exempting other names or handlers', () => {
+  const file = 'src/pages/selection-center/index.vue';
+  const source = read(file);
+  assert.deepEqual(displayTextViolations(source, file), []);
+  assert.ok(displayTextViolations(source, 'another-page.vue').length);
+  assert.ok(displayTextViolations(source.replaceAll('openDetail(p)', 'otherDetail(p)'), file).length);
+  assert.ok(
+    displayTextViolations(source.replace('{{ p.name }}', '<a @click="otherDetail(p)">{{ p.name }}</a>'), file).length,
   );
 });

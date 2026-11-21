@@ -57,7 +57,24 @@ export async function expectPriceTableStable(table: Locator, before: Awaited<Ret
 export async function expectSpecTableFillsContainer(table: Locator) {
   await expect
     .poll(() =>
-      table.evaluate((element) => {
+      table.evaluate(async (element) => {
+        // ResizeObserver measures columns through nextTick + requestAnimationFrame.
+        // A filled table can still be an intermediate layout, so require actual
+        // geometry to remain equal across rendering frames before taking a baseline.
+        const geometry = () =>
+          JSON.stringify(
+            [element, ...element.querySelectorAll('table, th, td')].map((node) => {
+              const { x, y, width, height } = node.getBoundingClientRect();
+              return { x, y, width, height };
+            }),
+          );
+        let previous = geometry();
+        for (let frame = 0; frame < 3; frame += 1) {
+          await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+          const current = geometry();
+          if (current !== previous) return false;
+          previous = current;
+        }
         const content = element.querySelector('.t-table__content')!;
         content.scrollLeft = content.scrollWidth;
         const grid = content.querySelector('table')!;

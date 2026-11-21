@@ -1,4 +1,6 @@
-import { assertAcceptedSource, publishAcceptance, readAcceptance } from './accepted-source.mjs';
+import { assertDeliveredDependencies } from './task-context.mjs';
+import { assertAcceptedSource, publishAcceptance, readAcceptance, verifyRemoteAcceptance } from './accepted-source.mjs';
+import { readAcceptedComposition, writeAcceptedComposition } from './accepted-source-composition.mjs';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
@@ -10,7 +12,21 @@ import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
 import { applyTaskComposition } from './task-composition.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
+import { hasOriginalMergedReadiness } from './delivery-repairs/completion-legacy-readiness.mjs';
 import { withCandidateRuntime } from './task-candidate-runtime.mjs';
+import { taskRuntimeReferences } from './task-runtime-references.mjs';
+import {
+  persistPreCiReview,
+  preCiCompositionCommit,
+  preCiCompositionTree,
+  readPreCiReview,
+  storedPreCiReview,
+} from './delivery-repairs/pre-ci-composition.mjs';
+import {
+  originalRepairPull,
+  publishedRepairKey,
+  verifyPublishedCiRepair,
+} from './delivery-repairs/published-ci-repair.mjs';
 
 // This command is invoked only after the human authorizes this exact batch's formal delivery.
 // Every phase awaits its predecessor directly; no extra sleep, watcher, test run or approval loop.
@@ -27,12 +43,19 @@ export async function runCompletionFlow(
     common,
     inventoryAssets,
     previewControl,
+    runtimeReferences = taskRuntimeReferences,
     candidateRuntime = withCandidateRuntime,
     deferSettle = false,
+    preparationOnly = false,
+    engineeringReviewFile,
+    publishedRepairId,
+    assertCurrentAdmission,
     readState = () => state,
   },
 ) {
   assert.equal(typeof deferSettle, 'boolean');
+  assert.equal(typeof preparationOnly, 'boolean');
+  assert.ok(!preparationOnly || !deferSettle, 'Preparation is a separate phase, not deferred settlement');
   assert.ok(
     !deferSettle || (!state.closedAt && !state.events.some((e) => ['preserve', 'cleanup', 'close'].includes(e.name))),
     'Deferred settlement cannot rewind already-started closeout',
@@ -40,6 +63,7 @@ export async function runCompletionFlow(
   assert.match(head, /^[a-f0-9]{40}$/);
   const anchor = batch.repository.anchor;
   if (!existsSync(batch.worktree)) {
+    assert.equal(preparationOnly, false, 'Preparation cannot restore a closed task');
     assert.equal(deferSettle, false, 'Cannot defer after the task Git carrier is already missing');
     const ci = [...state.events]
       .reverse()
@@ -51,8 +75,23 @@ export async function runCompletionFlow(
     return dispatch(anchor, ['settle', batch.id, ci.result.headSha, String(ci.result.runId)]);
   }
   const git = (cwd, ...args) => execute(cwd, 'git', args);
-  const phase = async (name, key, fn) => (await completionStage(state, name, key, fn, { save })).result;
+  const phase = async (name, key, fn) => {
+    assertCurrentAdmission?.();
+    return (
+      await completionStage(
+        state,
+        name,
+        key,
+        () => {
+          assertCurrentAdmission?.();
+          return fn();
+        },
+        { save },
+      )
+    ).result;
+  };
   const parallel = batch.taskRegistryVersion === 2;
+  assert.ok(!preparationOnly || parallel, 'Preparation requires exact registered task identity');
   const tasks = parallel ? createTaskRegistry(root) : null;
   const refresh = (stage, detail = {}) => {
     if (!parallel) return;
@@ -74,22 +113,125 @@ export async function runCompletionFlow(
       taskRegistryVersion: 2,
     };
   };
-  // Complete an interrupted, already-proved merge before normal source checks.
-  // Runtime quiescence happened before that proof was written.
+  async function assertSelectedReferenceCurrent() {
+    if (!process.env.ZDM_CLOSED_PREVIEW_REFERENCE) return;
+    const { assertReferenceProofCurrent } = await import('./delivery-repairs/preview-reference-proof.mjs');
+    assertReferenceProofCurrent(batch.worktree, preparationOnly ? 'preparation' : 'final');
+  }
+  const preparationReferences = { referenceEffect: 'preparation' };
+  function verifyCompositionCandidate(proof, accepted, review) {
+    const candidate = review?.candidate ?? preCiCompositionCommit(batch.worktree, proof);
+    const checked = verifyRemoteAcceptance(batch.worktree, {
+      candidate,
+      accepted: accepted.commit,
+      branch: batch.branch,
+      trustedMain: proof.main,
+    });
+    assert.equal(checked.candidateMergeTree, proof.candidateTree, 'Manifest resolution changed the actual merge tree');
+    return candidate;
+  }
+  function installCompositionCandidate(proof, candidate) {
+    assertCurrentAdmission?.();
+    assert.equal(batch.recordedHead, proof.taskHead, 'Original checkpointed candidate required');
+    assert.equal(git(batch.worktree, 'rev-parse', 'HEAD'), proof.taskHead);
+    assert.equal(git(batch.worktree, 'status', '--porcelain'), '', 'Composition requires a clean owned task');
+    assertAcceptedSource(batch.worktree, batch.id, candidate);
+    git(batch.worktree, 'merge', '--ff-only', candidate);
+  }
+  // A persisted composition proves source, so recheck live references before
+  // resuming its installation or publishing the newly registered candidate.
+  let publishedRepair;
+  if (preparationOnly) await assertSelectedReferenceCurrent();
   if (parallel) {
+    const accepted = readAcceptance(root, batch.id);
+    const proof = readAcceptedComposition(root, batch.id, accepted.commit);
+    if (preparationOnly && proof) {
+      assertCurrentAdmission?.();
+      await runtimeReferences(tasks.readTask(batch.id), preparationReferences);
+      await assertSelectedReferenceCurrent();
+    }
+    if (proof) {
+      const plans = state.events.filter(
+        (event) =>
+          event.name === 'prepare' &&
+          event.status === 'success' &&
+          event.result?.publishedRepair?.taskHead === proof.taskHead &&
+          event.result.publishedRepair.main === proof.main &&
+          event.result.publishedRepair.accepted === proof.accepted &&
+          event.result.candidateTree === proof.candidateTree,
+      );
+      publishedRepair = plans.at(-1)?.result.publishedRepair;
+      if (publishedRepair) {
+        if (publishedRepairId !== undefined)
+          assert.equal(
+            publishedRepairId,
+            publishedRepair.repairId,
+            'Existing composition has another published repair',
+          );
+        const candidate = preCiCompositionCommit(batch.worktree, { ...proof, publishedRepair: true });
+        assert.equal(publishedRepair.candidate, candidate, 'Published repair candidate changed');
+      }
+    }
+    if (proof && !proof.candidateCommit) {
+      const current = git(batch.worktree, 'rev-parse', 'HEAD');
+      const review = storedPreCiReview(batch.worktree, proof);
+      if (current === proof.taskHead) {
+        assertCurrentAdmission?.();
+        const tree = preCiCompositionTree(
+          batch.worktree,
+          { ...proof, protectedPaths: accepted.protectedPaths, publishedRepair: Boolean(publishedRepair) },
+          review,
+        );
+        if (tree) {
+          assert.equal(tree, proof.candidateTree, 'Recovered candidate differs from the original composition proof');
+          const candidate = verifyCompositionCandidate(
+            { ...proof, publishedRepair: Boolean(publishedRepair) },
+            accepted,
+            review,
+          );
+          if (preparationOnly && publishedRepair) {
+            const github = (...args) => JSON.parse(execute(root, 'gh', args));
+            const repository = github('repo', 'view', '--json', 'nameWithOwner').nameWithOwner;
+            originalRepairPull(github, repository, publishedRepair.pullRequest, batch.branch, [proof.taskHead]);
+          }
+          installCompositionCandidate(proof, candidate);
+          engineeringReviewFile = undefined; // Recovery consumes the durable original review.
+        }
+      } else if (
+        review &&
+        git(batch.worktree, 'rev-parse', 'HEAD^{tree}') === proof.candidateTree &&
+        batch.recordedHead === proof.taskHead
+      ) {
+        assert.equal(current, review.candidate, 'Recovery must register the exact reviewed commit');
+      }
+      if (review && engineeringReviewFile && git(batch.worktree, 'rev-parse', 'HEAD') === review.candidate) {
+        const supplied = readPreCiReview(batch.worktree, engineeringReviewFile);
+        if (supplied.candidate === review.candidate) {
+          assert.deepEqual(supplied, review, 'Registered engineering review changed');
+          engineeringReviewFile = undefined;
+        }
+      }
+    }
     applyTaskComposition(root, batch.id, undefined, { recover: true });
     batch = readActiveBatch(root);
     head = batch.recordedHead;
+    if (preparationOnly) await assertSelectedReferenceCurrent();
   }
+  if (publishedRepair?.candidate !== head) publishedRepair = undefined;
   let repository;
-  await phase('prepare', head, async () => {
-    repository = JSON.parse(execute(root, 'gh', ['repo', 'view', '--json', 'nameWithOwner'])).nameWithOwner;
+  const github = (...args) => JSON.parse(execute(root, 'gh', args));
+  if (preparationOnly) {
+    assertCurrentAdmission?.();
     git(root, 'fetch', 'origin');
+  }
+  await phase('prepare', head, async () => {
+    repository = github('repo', 'view', '--json', 'nameWithOwner').nameWithOwner;
+    if (!preparationOnly) git(root, 'fetch', 'origin');
     assert.equal(git(batch.worktree, 'rev-parse', 'HEAD'), head);
     assert.equal(git(batch.worktree, 'status', '--porcelain'), '');
     assertAcceptedSource(batch.worktree, batch.id, head);
     assert.equal(git(anchor, 'status', '--porcelain'), '');
-    planBatchDelivery(root);
+    planBatchDelivery(root, { action: 'preparation' });
     const assets = inventoryAssets(batch.worktree);
     assert.ok(
       assets.every((a) => a.kind !== 'blocked'),
@@ -125,8 +267,73 @@ export async function runCompletionFlow(
     if (state.previewFingerprint) assert.equal(runtime.profileFingerprint, state.previewFingerprint);
     return { head, protectionChecked: true, runtimePreflight: true, assets };
   });
+  if (
+    preparationOnly &&
+    !publishedRepair &&
+    !state.events.some((event) => event.name === 'ci' && event.status === 'success' && event.result?.headSha === head)
+  ) {
+    assertCurrentAdmission?.();
+    const main = git(root, 'rev-parse', 'origin/main');
+    const accepted = readAcceptance(root, batch.id);
+    const review = engineeringReviewFile ? readPreCiReview(batch.worktree, engineeringReviewFile) : undefined;
+    const candidateTree = preCiCompositionTree(
+      batch.worktree,
+      {
+        accepted: accepted.commit,
+        taskHead: head,
+        main,
+        protectedPaths: accepted.protectedPaths,
+        rejectUnreviewed: true,
+        publishedRepair: publishedRepairId !== undefined,
+      },
+      review,
+    );
+    if (candidateTree) {
+      assert.equal(batch.recordedHead, head, 'Original checkpointed candidate required');
+      const inputs = { batch: batch.id, accepted: accepted.commit, main, taskHead: head, candidateTree };
+      const candidate = verifyCompositionCandidate(
+        { ...inputs, publishedRepair: publishedRepairId !== undefined },
+        accepted,
+        review,
+      );
+      if (publishedRepairId !== undefined) {
+        const plan = await phase('prepare', head + publishedRepairKey + main, () => ({
+          candidateTree,
+          publishedRepair: verifyPublishedCiRepair({
+            ...inputs,
+            batch,
+            state,
+            registry: tasks,
+            git: (...args) => git(batch.worktree, ...args),
+            gh: github,
+            repository,
+            repairId: publishedRepairId,
+            candidate,
+          }),
+        }));
+        publishedRepair = plan.publishedRepair;
+      }
+      await phase('prepare', head + ':pre-ci-composition:' + main, async () => {
+        await previewControl.prepareComposition(worktreePlan(main), preparationReferences);
+        await assertSelectedReferenceCurrent();
+        assertCurrentAdmission?.();
+        if (review) persistPreCiReview(batch.worktree, inputs, review);
+        const proof = writeAcceptedComposition(batch.worktree, inputs);
+        installCompositionCandidate(proof, candidate);
+        const composed = applyTaskComposition(root, batch.id, undefined, { recover: true });
+        assert.equal(composed.recordedHead, candidate, 'Composition must register its exact candidate');
+        return { head: candidate, main, originalHead: head, accepted: accepted.commit, candidateTree };
+      });
+      batch = readActiveBatch(root);
+      head = batch.recordedHead;
+      await assertSelectedReferenceCurrent();
+    }
+  }
+  if (publishedRepairId !== undefined)
+    assert.ok(publishedRepair, 'A failed original candidate and a new published repair are required');
   async function publishCandidate({ readiness = false } = {}) {
-    if (parallel) {
+    const original = preparationOnly && publishedRepair?.candidate === head ? publishedRepair : null;
+    if (parallel && !original) {
       const merged = JSON.parse(
         execute(root, 'gh', [
           'pr',
@@ -153,7 +360,22 @@ export async function runCompletionFlow(
         );
         assert.ok(
           prior &&
-            state.events.some((e) => e.name === 'prepare' && e.key === head + ':readiness' && e.status === 'success'),
+            hasOriginalMergedReadiness({
+              batch,
+              head,
+              pr: merged[0],
+              readRegistration: () => ({
+                repository,
+                origin: git(batch.worktree, 'remote', 'get-url', 'origin'),
+                anchorCommon: git(anchor, 'rev-parse', '--path-format=absolute', '--git-common-dir'),
+                worktreeCommon: git(batch.worktree, 'rev-parse', '--path-format=absolute', '--git-common-dir'),
+                registration: tasks.readTask(batch.id),
+              }),
+              events: state.events,
+              common,
+              readCandidateCommand: () =>
+                JSON.parse(git(batch.worktree, 'show', head + ':package.json')).scripts['verify:delivery'],
+            }),
           'Merged recovery requires its original exact readiness and PR evidence',
         );
         assertCompletionQuality(prior.result, head, prior.result.runId);
@@ -179,8 +401,13 @@ export async function runCompletionFlow(
       );
     }
     await phase('push', head, () => {
-      publishAcceptance(batch.worktree, batch.id);
       const remote = git(root, 'ls-remote', 'origin', 'refs/heads/' + batch.branch);
+      if (original) {
+        const remoteHead = remote.split(/\s/)[0];
+        assert.ok([original.taskHead, head].includes(remoteHead), 'Original PR branch moved');
+        originalRepairPull(github, repository, original.pullRequest, batch.branch, [original.taskHead, head]);
+      }
+      publishAcceptance(batch.worktree, batch.id);
       if (remote && !remote.startsWith(head + '\t')) {
         const before = remote.split(/\s/)[0];
         git(root, 'merge-base', '--is-ancestor', before, head);
@@ -190,6 +417,7 @@ export async function runCompletionFlow(
       return { head };
     });
     const pull = await phase('pr', head, () => {
+      if (original) return originalRepairPull(github, repository, original.pullRequest, batch.branch, [head]);
       const args = [
         'pr',
         'list',
@@ -202,9 +430,14 @@ export async function runCompletionFlow(
         '--json',
         'number,url,state,headRefOid,mergeCommit',
       ];
-      let pulls = JSON.parse(execute(root, 'gh', args)).filter((p) => p.headRefOid === head);
+      const observed = JSON.parse(execute(root, 'gh', args));
+      let pulls = observed.filter((p) => p.headRefOid === head);
       assert.ok(pulls.length <= 1, 'Ambiguous pull request');
       if (!pulls.length) {
+        assert.ok(
+          !observed.some((p) => p.state === 'OPEN'),
+          'Existing PR has not read back the exact pushed candidate',
+        );
         const title = batch.modules
           .map((m) => m.title)
           .join('；')
@@ -237,7 +470,38 @@ export async function runCompletionFlow(
   }
   const awaitRun = (selector, sha) => dispatch(root, ['wait', selector, sha]);
   let pull = await publishCandidate();
-  await awaitRun('pr', head);
+  const initialCi = await awaitRun('pr', head);
+  if (preparationOnly) {
+    assert.equal(parallel, true, 'Preparation requires exact registered task identity');
+    const preparedCi = [...readState().events]
+      .reverse()
+      .find(
+        (event) =>
+          event.name === 'ci' &&
+          event.status === 'success' &&
+          event.result?.headSha === head &&
+          String(event.result?.runId) === String(initialCi.runId),
+      )?.result;
+    assert.ok(preparedCi, 'Original completed PR CI event required');
+    assert.equal(preparedCi.eventName, 'pull_request');
+    assert.equal(preparedCi.branch, batch.branch);
+    assertCompletionQuality(preparedCi, head, initialCi.runId);
+    const prepared = {
+      version: 1,
+      task: batch.id,
+      head,
+      accepted: readAcceptance(root, batch.id).commit,
+      runId: String(initialCi.runId),
+      pullRequest: pull.number,
+      url: pull.url,
+    };
+    state.preparedCandidates ??= [];
+    const prior = state.preparedCandidates.find((item) => item.head === head);
+    if (prior) assert.deepEqual(prior, prepared, 'Prepared candidate proof changed');
+    else state.preparedCandidates.push(prepared);
+    save(state);
+    return { ...prepared, status: 'prepared', formalDeliveryComplete: false, finalMainAdmissionRequired: true };
+  }
   async function complete(turn, queue) {
     const main = await phase('merge', head, async () => {
       const current = JSON.parse(
@@ -331,7 +595,9 @@ export async function runCompletionFlow(
     return dispatch(anchor, ['settle', batch.id, main.sha, String(ci.runId)]);
   }
   if (!parallel) return complete();
+  assertDeliveredDependencies(root, batch, 'final');
   const queue = createTaskDeliveryQueue(common);
+  assertCurrentAdmission?.();
   refresh('queued');
   const ticket = await queue.enqueue({
     task: batch.id,
@@ -353,16 +619,19 @@ export async function runCompletionFlow(
       );
       // Stop this task's mounted watchers before changing its source. Another
       // selected task remains healthy and untouched.
+      assertDeliveredDependencies(root, batch, 'combination');
       await previewControl.prepareComposition(worktreePlan(latest));
       const composed = applyTaskComposition(root, batch.id, latest);
       batch = readActiveBatch(root);
       const changed = composed.recordedHead !== head;
       head = composed.recordedHead;
+      await assertSelectedReferenceCurrent();
       // Development proof and the initial exact PR CI precede this turn. Run
       // final local readiness from the composed candidate's own immutable tools.
       pull = await publishCandidate({ readiness: true });
       if (changed) await awaitRun('pr', head);
     } else assert.equal(current.state, 'MERGED');
+    assertDeliveredDependencies(root, batch, 'final');
     const result = await complete(turn, queue);
     if (result.status === 'deferred') {
       const retained = await queue.deferSettlement(turn, {

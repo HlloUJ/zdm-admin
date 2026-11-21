@@ -1,24 +1,67 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, rmSync, realpathSync, existsSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { createTaskRegistry } from './task-registry.mjs';
 import { readActiveBatch } from './task-batch.mjs';
-import { freezeAcceptedSource, prepareAcceptedComposition, readAcceptance } from './accepted-source.mjs';
+import {
+  assertAcceptedSource,
+  freezeAcceptedSource,
+  prepareAcceptedComposition,
+  publishAcceptance,
+  readAcceptance,
+} from './accepted-source.mjs';
 import { readAcceptedComposition } from './accepted-source-composition.mjs';
 import { applyTaskComposition } from './task-composition.mjs';
 import { captureSource } from './verification-evidence.mjs';
 import { runCompletionFlow } from './completion-flow.mjs';
 import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
-import { completionStage } from './completion-session.mjs';
+import { createExecutionOrder } from './task-execution-order.mjs';
+import { completionStage, openCompletion, saveCompletion } from './completion-session.mjs';
 import { frozenRestoreArgs } from './task-preview-service.mjs';
 import { assertFrozenValidationStart } from './dev-task.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
 import { finalHandoffPlan } from './completion-handoff.mjs';
+import { completionCommand } from './completion-cli.mjs';
+import { taskRuntimeReferences } from './task-runtime-references.mjs';
+import { hasAppliedPublishedCiRepair } from './delivery-repairs/published-ci-repair.mjs';
+import {
+  captureReviewedScriptInputs,
+  engineeringDomainProof,
+  ENGINEERING_EXTRA_INPUTS,
+  SCRIPT_INPUT_MANIFEST,
+} from './script-test-plan.mjs';
+import {
+  formatEngineeringManifest,
+  preCiCompositionTree,
+  storedPreCiReview,
+} from './delivery-repairs/pre-ci-composition.mjs';
 
-function fixture(t) {
+const productionGates = ['Frontend quality', 'Backend quality', 'Accepted business snapshot'];
+function ciEvidence(runId, headSha, isMain, at) {
+  return {
+    runId,
+    headSha,
+    branch: isMain ? 'main' : 'codex/a',
+    eventName: isMain ? 'push' : 'pull_request',
+    gatesFinishedAt: new Date(at).toISOString(),
+    attempt: 1,
+    conclusion: 'success',
+    jobs: productionGates.map((name) => ({ name, status: 'completed', conclusion: 'success' })),
+  };
+}
+
+function writeEngineeringManifest(root) {
+  writeFileSync(path.join(root, SCRIPT_INPUT_MANIFEST), JSON.stringify(captureReviewedScriptInputs(root)));
+}
+
+function fixture(
+  t,
+  { manifestConflict = false, reviewedConflict = false, cleanManifest = false, repairAlreadyInTask = false } = {},
+) {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), 'completion-parallel-'))),
     main = path.join(dir, 'main'),
     a = path.join(dir, 'a'),
@@ -36,6 +79,13 @@ function fixture(t) {
   writeFileSync(path.join(main, 'base.txt'), 'base');
   mkdirSync(path.join(main, 'scripts'));
   writeFileSync(path.join(main, 'scripts/check.mjs'), '// original verifier\n');
+  if (manifestConflict || cleanManifest) {
+    for (const input of ENGINEERING_EXTRA_INPUTS) {
+      mkdirSync(path.dirname(path.join(main, input)), { recursive: true });
+      writeFileSync(path.join(main, input), '{}');
+    }
+    writeEngineeringManifest(main);
+  }
   git(main, 'add', '.');
   git(main, 'commit', '-m', 'base');
   git(main, 'push', '-u', 'origin', 'main');
@@ -50,6 +100,11 @@ function fixture(t) {
   registry.register({ id: 'a', worktree: a, owner: 'chat-a' });
   registry.register({ id: 'b', worktree: b, owner: 'chat-b' });
   writeFileSync(path.join(a, 'feature-a.txt'), 'accepted A');
+  if (repairAlreadyInTask) writeFileSync(path.join(a, 'base.txt'), 'published correction');
+  if (manifestConflict) {
+    writeFileSync(path.join(a, 'scripts/check.mjs'), '// task verifier');
+    writeEngineeringManifest(a);
+  }
   git(a, 'add', '.');
   git(a, 'commit', '-m', 'task A');
   const head = git(a, 'rev-parse', 'HEAD'),
@@ -66,11 +121,59 @@ function fixture(t) {
   });
   writeFileSync(path.join(b, 'unfinished.txt'), 'unfinished B must survive');
   writeFileSync(path.join(main, 'published-b.txt'), 'independent published main change');
+  if (manifestConflict) {
+    writeFileSync(path.join(main, 'scripts/published.mjs'), '// main verifier');
+    if (reviewedConflict) writeFileSync(path.join(main, 'scripts/check.mjs'), '// published verifier');
+    writeEngineeringManifest(main);
+  }
   git(main, 'add', '.');
   git(main, 'commit', '-m', 'published independent change');
   git(main, 'push', 'origin', 'main');
   return { dir, main, a, b, git, registry, head, accepted, latest: git(main, 'rev-parse', 'HEAD') };
 }
+
+test('a separately bound real executor reopens frozen completion without replacing historical source or owner', async (t) => {
+  const f = fixture(t),
+    task = f.registry.readTask('a');
+  const worker = '33333333-3333-4333-8333-333333333333',
+    coordinator = '22222222-2222-4222-8222-222222222222';
+  const originalEnv = process.env.CODEX_THREAD_ID;
+  t.after(() => {
+    if (originalEnv === undefined) delete process.env.CODEX_THREAD_ID;
+    else process.env.CODEX_THREAD_ID = originalEnv;
+  });
+  const request = { messageId: 'fixture-takeover', roomId: coordinator, authorId: 'human', sequence: 5 };
+  const binding = {
+    version: 1,
+    revision: 1,
+    taskId: task.id,
+    historicalOwner: task.owner,
+    previousExecutor: task.owner,
+    executor: worker,
+    coordinator,
+    request,
+    worktree: task.worktree,
+    branch: task.branch,
+    commonDir: task.repository.commonDir,
+    monitoring: { worker, rootThreadId: coordinator, roomId: coordinator, authorizationRef: request.messageId },
+    boundAt: new Date().toISOString(),
+    quiescenceDigest: 'a'.repeat(64),
+  };
+  const originalAcceptance = readFileSync(path.join(f.registry.commonDir, 'task-delivery/a/accepted-source.json'));
+  f.registry.bindExecution(task.id, task.revision, binding, () => true); // Isolated downstream contract fixture.
+  process.env.CODEX_THREAD_ID = worker;
+  await completionCommand(f.a, ['begin']);
+  assert.deepEqual(
+    readFileSync(path.join(f.registry.commonDir, 'task-delivery/a/accepted-source.json')),
+    originalAcceptance,
+  );
+  const current = f.registry.readTask('a');
+  assert.equal(current.owner, task.owner);
+  assert.deepEqual(current.frozen, task.frozen);
+  assert.deepEqual(current.monitoring, task.monitoring);
+  process.env.CODEX_THREAD_ID = 'old-chat';
+  await assert.rejects(completionCommand(f.a, ['begin'], { owner: worker }), /Real bound executor/);
+});
 
 test('an interrupted composition resumes only its proven merge and keeps original freeze and unfinished B', (t) => {
   const f = fixture(t),
@@ -84,6 +187,254 @@ test('an interrupted composition resumes only its proven merge and keeps origina
   assert.equal(readFileSync(path.join(f.a, 'published-b.txt'), 'utf8'), 'independent published main change');
   assert.equal(readFileSync(path.join(f.b, 'unfinished.txt'), 'utf8'), 'unfinished B must survive');
   assert.equal(applyTaskComposition(f.a, 'a', undefined, { recover: true }).recordedHead, result.recordedHead);
+});
+
+test('an already merged task can release a technical follow-up through its original blocked delivery ticket', async (t) => {
+  const f = fixture(t);
+  const first = applyTaskComposition(f.a, 'a', f.latest).recordedHead;
+  f.git(f.a, 'push', 'origin', 'codex/a');
+  publishAcceptance(f.a, 'a');
+  f.git(f.main, 'merge', '--no-ff', '--no-edit', 'codex/a');
+  f.git(f.main, 'push', 'origin', 'main');
+  const firstMain = f.git(f.main, 'rev-parse', 'HEAD');
+  const queue = createTaskDeliveryQueue(f.registry.commonDir);
+  const order = createExecutionOrder(f.registry.commonDir);
+  const request = (sequence) => ({
+    messageId: 'fixture-' + sequence,
+    roomId: 'fixture-room',
+    authorId: 'fixture-user',
+    sequence,
+  });
+  const lane = { lane: 'delivery', task: 'a', owner: 'chat-a' };
+  order.initialize(request(1));
+  order.enqueue({ ...lane, request: request(2) });
+  order.direct({ ...lane, action: 'resume-only', request: request(3) });
+  const admission = { ...lane, admission: order.read().tickets[0].admission };
+  const previousAdmission = process.env.ZDM_EXECUTION_ADMISSION;
+  process.env.ZDM_EXECUTION_ADMISSION = admission.admission;
+  t.after(() => {
+    if (previousAdmission === undefined) delete process.env.ZDM_EXECUTION_ADMISSION;
+    else process.env.ZDM_EXECUTION_ADMISSION = previousAdmission;
+  });
+  const original = await queue.enqueue({ task: 'a', owner: 'chat-a', accepted: f.accepted.commit, head: first });
+  const originalTurn = await queue.wait(original);
+  await queue.markMainMutation(originalTurn);
+  await queue.finish(originalTurn, { success: false, error: Error('Original CI diagnosis remains unrecorded') });
+  f.registry.revise('a', f.registry.readTask('a').revision, (record) => {
+    record.stage = 'handoff-verified';
+    record.main = { local: firstMain, remote: firstMain, runId: '100' };
+  });
+
+  // Prepare against the already delivered main under the original identity.
+  applyTaskComposition(f.a, 'a', firstMain);
+  writeFileSync(path.join(f.a, 'scripts/check.mjs'), '// fixture-only closeout verifier\n');
+  f.git(f.a, 'add', 'scripts/check.mjs');
+  f.git(f.a, 'commit', '-m', 'technical follow-up');
+  const followUp = f.git(f.a, 'rev-parse', 'HEAD');
+  assert.equal(assertAcceptedSource(f.a, 'a', followUp).accepted, f.accepted.commit);
+  const stop = Error('fixture stops after published checkpoint adoption');
+  await assert.rejects(
+    completionCommand(f.a, ['deliver', 'a', followUp], {
+      owner: 'chat-a',
+      execute: (cwd, command, args) => {
+        if (command === 'git') return f.git(cwd, ...args);
+        assert.equal(command, 'gh');
+        throw stop;
+      },
+    }),
+    (error) => error === stop,
+  );
+  const task = f.registry.readTask('a');
+  assert.equal(task.recordedHead, followUp);
+  assert.equal(task.checkpoints.at(-1).commit, followUp);
+  assert.equal(task.frozen.accepted, f.accepted.commit);
+  assert.equal(queue.inspect().tickets[0].id, original.id);
+
+  const sessionDirectory = path.join(f.registry.commonDir, 'task-delivery', 'a');
+  const state = openCompletion(sessionDirectory, 'a');
+  const oldPull = { number: 1, state: 'MERGED', headRefOid: first, mergeCommit: { oid: firstMain } };
+  let pull;
+  const actions = [];
+  let publishedSettler = 'old';
+  let secondMain;
+  const historical = Date.now() - 60_000;
+  const originalFailure = {
+    id: 'original-failure',
+    name: 'ci',
+    key: f.head + ':98',
+    status: 'failure',
+    startedAt: historical,
+    finishedAt: historical + 1000,
+    failure: {
+      ci: {
+        runId: '98',
+        headSha: f.head,
+        attempt: 1,
+        failedJob: { id: 9, name: 'Frontend E2E 1/2', completedAt: new Date(historical + 1000).toISOString() },
+      },
+    },
+  };
+  const originalPrCi = {
+    id: 'first-pr-ci',
+    name: 'ci',
+    key: first + ':99',
+    status: 'success',
+    startedAt: historical + 1100,
+    finishedAt: historical + 2000,
+    result: ciEvidence('99', first, false, historical + 2000),
+  };
+  const originalMainCi = {
+    id: 'first-main-ci',
+    name: 'ci',
+    key: firstMain + ':100',
+    status: 'success',
+    startedAt: historical + 2100,
+    finishedAt: historical + 3000,
+    result: ciEvidence('100', firstMain, true, historical + 3000),
+  };
+  state.events.push(originalFailure, originalPrCi, originalMainCi);
+  const execute = (cwd, command, args) => {
+    if (command === 'git') return f.git(cwd, ...args);
+    if (command === process.execPath) {
+      assert.ok(pull && pull.state === 'OPEN');
+      assert.equal(queue.inspect().tickets[0].id, original.id);
+      actions.push('readiness');
+      return '';
+    }
+    assert.equal(command, 'gh');
+    if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'fixture/repo' });
+    if (args[0] === 'api')
+      return JSON.stringify({
+        enforce_admins: { enabled: true },
+        required_status_checks: { strict: true, contexts: productionGates },
+      });
+    if (args[1] === 'list')
+      return JSON.stringify([oldPull, ...(pull && (args.includes('all') || pull.state === 'MERGED') ? [pull] : [])]);
+    if (args[1] === 'create') {
+      assert.equal(pull, undefined);
+      assert.equal(f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a').split('\t')[0], followUp);
+      assert.equal(queue.inspect().tickets[0].status, 'blocked');
+      pull = { number: 2, headRefOid: followUp, baseRefOid: firstMain, state: 'OPEN' };
+      actions.push('new-pr');
+      return 'fixture://pr/2';
+    }
+    if (args[1] === 'view') {
+      assert.equal(args[2], '2');
+      return JSON.stringify(pull);
+    }
+    assert.deepEqual(args.slice(0, 4), ['pr', 'merge', '2', '--merge']);
+    assert.equal(args.at(-1), followUp);
+    assert.ok(actions.includes('ci:pr'));
+    assert.equal(queue.inspect().tickets[0].id, original.id);
+    actions.push('merge');
+    f.git(f.main, 'merge', '--no-ff', '--no-edit', 'codex/a');
+    f.git(f.main, 'push', 'origin', 'main');
+    secondMain = f.git(f.main, 'rev-parse', 'HEAD');
+    pull = { ...pull, state: 'MERGED', mergeCommit: { oid: secondMain } };
+    return '';
+  };
+  const dispatch = async (_cwd, args) => {
+    if (args[0] === 'wait') {
+      const isMain = args[1] === 'main';
+      assert.equal(args[2], isMain ? secondMain : followUp);
+      actions.push('ci:' + args[1]);
+      const evidence = ciEvidence(isMain ? '102' : '101', args[2], isMain, Date.now());
+      return (await completionStage(state, 'ci', args[2] + ':' + evidence.runId, async () => evidence)).result;
+    }
+    if (args[0] === 'final-handoff') {
+      assert.equal(args[1], secondMain);
+      assert.ok(actions.includes('ci:main'));
+      actions.push('handoff');
+      return (await completionStage(state, 'handoff', secondMain + ':final', async () => ({ main: secondMain })))
+        .result;
+    }
+    assert.deepEqual(args, ['settle', 'a', secondMain, '102']);
+    assert.equal(queue.inspect().tickets[0].id, original.id);
+    assert.equal(f.git(f.main, 'rev-parse', 'HEAD'), secondMain);
+    actions.push('settle:' + publishedSettler);
+    if (publishedSettler === 'old') throw Error('Old loaded settlement requires the historical diagnosis');
+    return { settled: true };
+  };
+  const run = () =>
+    runCompletionFlow(f.a, readActiveBatch(f.a), followUp, {
+      execute,
+      state,
+      save: () => {},
+      dispatch,
+      common: f.registry.commonDir,
+      assertCurrentAdmission: () => assert.ok(order.assertAdmission(admission).active),
+      checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+      inventoryAssets: () => [],
+      candidateRuntime: async (_task, _head, action) => action({}),
+      previewControl: { assertOwner: async () => {}, prepareComposition: async () => {} },
+    });
+  await assert.rejects(run(), /Old loaded settlement requires/);
+  assert.deepEqual(actions, ['new-pr', 'ci:pr', 'readiness', 'merge', 'ci:main', 'handoff', 'settle:old']);
+  assert.equal(queue.inspect().tickets[0].id, original.id);
+  assert.equal(queue.inspect().tickets[0].status, 'blocked');
+  assert.ok(state.events.some((event) => event.key === secondMain + ':102' && event.status === 'success'));
+
+  saveCompletion(sessionDirectory, state);
+  const evidenceDir = path.join(f.a, '.task-verification');
+  mkdirSync(evidenceDir);
+  const evidenceFile = path.join(evidenceDir, 'historical-diagnosis.json');
+  const source = path.join(evidenceDir, 'original-diagnosis.log');
+  const originalDiagnostic = 'Recorded test timeout with no known root cause';
+  writeFileSync(source, originalDiagnostic);
+  writeFileSync(
+    evidenceFile,
+    JSON.stringify({
+      task: 'a',
+      accepted: f.accepted.commit,
+      failedCI: originalFailure.failure.ci,
+      failureEventId: originalFailure.id,
+      candidate: first,
+      laterPRRun: '99',
+      mainCI: {
+        id: originalMainCi.id,
+        head: firstMain,
+        runId: '100',
+        startedAt: originalMainCi.startedAt,
+        finishedAt: originalMainCi.finishedAt,
+      },
+      rootCause: 'unproven',
+      observedFailure: originalDiagnostic,
+      historicalDiagnosisDurationMs: null,
+      diagnosedCodeRepairOfOriginalFailure: false,
+      diagnosticEvidence: [{ path: source, sha256: createHash('sha256').update(originalDiagnostic).digest('hex') }],
+    }),
+  );
+  const diagnosis = await completionCommand(f.a, ['record-ci-diagnosis', '98', evidenceFile], {
+    owner: 'chat-a',
+    execute,
+  });
+  assert.equal(diagnosis.formalDeliveryComplete, false);
+  assert.equal(diagnosis.diagnosis.settlement.head, secondMain);
+  assert.equal(diagnosis.diagnosis.repairDurationMs, null);
+  const subsequentPreflight = Error('fixture stops at exact remote settlement preflight');
+  await assert.rejects(
+    completionCommand(f.a, ['settle', 'a', secondMain, '102'], {
+      owner: 'chat-a',
+      execute: (cwd, command, args) => {
+        if (command === 'git' && args[0] === 'fetch') throw subsequentPreflight;
+        return execute(cwd, command, args);
+      },
+    }),
+    (error) => error === subsequentPreflight,
+  );
+  assert.equal(queue.inspect().tickets[0].id, original.id);
+  assert.deepEqual(
+    openCompletion(sessionDirectory, 'a').events.find((event) => event.id === originalFailure.id),
+    originalFailure,
+  );
+  publishedSettler = 'new';
+  assert.deepEqual(await run(), { settled: true });
+  assert.equal(actions.filter((item) => item === 'merge').length, 1);
+  assert.equal(actions.at(-1), 'settle:new');
+  assert.deepEqual(queue.inspect().tickets, []);
+  assert.equal(order.assertAdmission(admission).ticket.admission, admission.admission);
+  assert.equal(readAcceptance(f.a, 'a').commit, f.accepted.commit);
+  assert.equal(oldPull.headRefOid, first);
 });
 test('explicit defer cannot reclassify already-started closeout or settle a missing task carrier', async (t) => {
   const f = fixture(t),
@@ -228,7 +579,7 @@ test('v2 published integration rejects an unpublished combination before changin
   assert.equal(readFileSync(path.join(integration, 'unpublished.txt'), 'utf8'), 'must be retained');
 });
 
-for (const [failure, deferSettle] of [
+for (const [failure, deferSettle, preparationOnly = false] of [
   [null, false],
   ['composed-ci', false],
   ['handoff', false],
@@ -236,12 +587,26 @@ for (const [failure, deferSettle] of [
   ['main-ci', true],
   ['handoff', true],
   ['missing-handoff-proof', true],
+  [null, false, true],
+  ['reference-refresh', false],
 ])
-  test(`parallel delivery controller preserves exact ordering and ownership: ${failure ?? 'success'} defer=${deferSettle}`, async (t) => {
+  test(`parallel delivery controller preserves exact ordering and ownership: ${failure ?? 'success'} defer=${deferSettle}${preparationOnly ? ' preparation=true' : ''}`, async (t) => {
     const f = fixture(t),
       events = [],
       state = { events: [] },
       beforeB = f.registry.readTask('b');
+    if (failure === 'reference-refresh') {
+      const previous = process.env.ZDM_CLOSED_PREVIEW_REFERENCE;
+      t.after(() => {
+        if (previous === undefined) delete process.env.ZDM_CLOSED_PREVIEW_REFERENCE;
+        else process.env.ZDM_CLOSED_PREVIEW_REFERENCE = previous;
+      });
+      process.env.ZDM_CLOSED_PREVIEW_REFERENCE = JSON.stringify({
+        consumerWorktree: f.a,
+        consumerCandidate: f.head,
+        file: path.join(f.registry.commonDir, 'old-selection-not-used-after-source-changes.json'),
+      });
+    }
     let pullState = 'OPEN',
       prWaits = 0,
       handoffFailed = false;
@@ -284,6 +649,7 @@ for (const [failure, deferSettle] of [
       save: () => {},
       common: f.registry.commonDir,
       deferSettle,
+      preparationOnly,
       inventoryAssets: () => [],
       candidateRuntime: async (_task, _head, action) => action({}),
       checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
@@ -304,7 +670,7 @@ for (const [failure, deferSettle] of [
             assert.equal(queue.inspect().tickets.length, prWaits === 1 ? 0 : 1);
             if (failure === 'composed-ci' && prWaits === 2) throw Error('composed CI failed');
           }
-          return (
+          const result = (
             await completionStage(state, 'ci', args[2] + ':42', async () => ({
               runId: 42,
               headSha: args[2],
@@ -319,6 +685,11 @@ for (const [failure, deferSettle] of [
               })),
             }))
           ).result;
+          // The public wait command returns a summary; the typed original CI
+          // record remains in the session and must be used for preparation.
+          return preparationOnly
+            ? { runId: result.runId, headSha: result.headSha, conclusion: result.conclusion }
+            : result;
         }
         if (args[0] === 'final-handoff') {
           assert.equal(f.registry.readTask('a').stage, 'main-verified');
@@ -347,11 +718,29 @@ for (const [failure, deferSettle] of [
               ? 'main CI failed'
               : failure === 'missing-handoff-proof'
                 ? 'Defer settlement requires'
-                : 'composed CI failed',
+                : failure === 'reference-refresh'
+                  ? 'collect a new public reference-proof'
+                  : 'composed CI failed',
         ),
       );
     else {
       const result = await run();
+      if (preparationOnly) {
+        assert.equal(result.status, 'prepared');
+        assert.equal(result.formalDeliveryComplete, false);
+        assert.equal(result.finalMainAdmissionRequired, true);
+        assert.equal(result.head, f.head);
+        assert.equal(result.accepted, f.accepted.commit);
+        assert.equal(result.runId, '42');
+        assert.equal(prWaits, 1);
+        assert.deepEqual(queue.inspect().tickets, []);
+        assert.deepEqual(f.registry.readTask('b'), beforeB);
+        assert.equal(f.git(f.main, 'rev-parse', 'HEAD'), f.latest);
+        assert.ok(!events.some((event) => ['merge', 'handoff', 'settle', 'quiesce-a-preserve-b'].includes(event)));
+        assert.equal(createResourceLeases(f.registry.commonDir).inspect('main-delivery'), null);
+        assert.equal(f.registry.readTask('a').frozen.accepted, f.accepted.commit);
+        return;
+      }
       if (deferSettle) {
         assert.equal(result.status, 'deferred');
         assert.equal(result.formalDeliveryComplete, false);
@@ -371,6 +760,18 @@ for (const [failure, deferSettle] of [
     assert.deepEqual(f.registry.readTask('b'), beforeB);
     assert.equal(readFileSync(path.join(f.b, 'unfinished.txt'), 'utf8'), 'unfinished B must survive');
     assert.equal(f.registry.readTask('a').frozen.accepted, f.accepted.commit);
+    if (failure === 'reference-refresh') {
+      assert.equal(prWaits, 1, 'Reference refresh is required before a new composed candidate is published');
+      assert.ok(!events.some((event) => ['merge', 'handoff', 'settle'].includes(event)));
+      assert.notEqual(
+        f.git(f.a, 'rev-parse', 'HEAD'),
+        f.head,
+        'Keep the proven composed candidate for explicit refresh',
+      );
+      assert.equal(f.git(f.main, 'rev-parse', 'HEAD'), f.latest);
+      assert.equal(queue.inspect().tickets.length, 0);
+      return;
+    }
     assert.equal(prWaits, 2, 'A changed merged candidate always receives new exact PR checks');
     if (failure === 'composed-ci') {
       assert.ok(!events.includes('merge'));
@@ -404,3 +805,494 @@ for (const [failure, deferSettle] of [
       assert.equal(queue.inspect().tickets.length, deferSettle ? 1 : 0);
     }
   });
+
+function reviewedFixture(f) {
+  const directory = path.join(f.dir, 'review');
+  f.git(f.main, 'worktree', 'add', '--detach', directory, f.head);
+  assert.throws(() => f.git(directory, 'merge', '--no-ff', '--no-commit', f.latest));
+  const file = 'scripts/check.mjs';
+  writeFileSync(path.join(directory, file), '// task verifier\n// published verifier\n');
+  writeFileSync(
+    path.join(directory, SCRIPT_INPUT_MANIFEST),
+    formatEngineeringManifest(captureReviewedScriptInputs(directory)),
+  );
+  f.git(directory, 'add', '.');
+  f.git(directory, 'commit', '-m', 'Review both verifiers');
+  const candidate = f.git(directory, 'rev-parse', 'HEAD');
+  const base = f.git(f.a, 'merge-base', f.head, f.latest);
+  const version = (commit) => ({ mode: '100644', object: f.git(f.a, 'rev-parse', commit + ':' + file) });
+  return {
+    version: 1,
+    accepted: f.accepted.commit,
+    taskHead: f.head,
+    main: f.latest,
+    candidate,
+    files: [
+      {
+        file,
+        inputs: { base: version(base), task: version(f.head), main: version(f.latest) },
+        result: version(candidate),
+        reason: 'Keep both sets of verifier behavior.',
+      },
+    ],
+  };
+}
+
+for (const reviewedConflict of [false, true])
+  test(`preparation restores a persisted pre-CI composition and updates the original PR (reviewed=${reviewedConflict})`, async (t) => {
+    const f = fixture(t, { manifestConflict: true, reviewedConflict });
+    const review = reviewedConflict ? reviewedFixture(f) : undefined;
+    const reviewDirectory = path.join(f.a, '.task-verification');
+    if (review) {
+      mkdirSync(reviewDirectory);
+      writeFileSync(path.join(reviewDirectory, 'engineering-review.json'), JSON.stringify(review));
+    }
+    const frozen = readAcceptance(f.a, 'a');
+    const beforeB = f.registry.readTask('b');
+    f.git(f.a, 'push', 'origin', 'codex/a');
+    publishAcceptance(f.a, 'a');
+    const state = { events: [] };
+    const failure = await completionStage(state, 'ci', f.head + ':original', async () => {
+      throw Error('Original accepted-source CI failed');
+    }).catch((error) => {
+      assert.match(error.message, /Original accepted-source CI failed/);
+      return structuredClone(state.events.at(-1));
+    });
+    let interrupted = false,
+      quiesced = 0,
+      candidate;
+    const options = {
+      preparationOnly: true,
+      engineeringReviewFile: review ? path.join(reviewDirectory, 'engineering-review.json') : undefined,
+      common: f.registry.commonDir,
+      state,
+      save: () => {},
+      inventoryAssets: () => [],
+      checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+      runtimeReferences: async (task, { referenceEffect }) => {
+        assert.equal(referenceEffect, 'preparation');
+        assert.equal(task.worktree, f.a);
+      },
+      previewControl: {
+        assertOwner: async () => {},
+        prepareComposition: async (plan, { referenceEffect }) => {
+          assert.equal(referenceEffect, 'preparation');
+          quiesced++;
+          assert.equal(plan.main, f.latest);
+          assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+        },
+      },
+      execute(cwd, tool, args) {
+        if (tool === 'git') {
+          if (args[0] === 'merge' && args[1] === '--ff-only' && !interrupted) {
+            interrupted = true;
+            throw Error('Interrupted after durable composition proof');
+          }
+          return f.git(cwd, ...args);
+        }
+        assert.equal(tool, 'gh');
+        if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'fixture/repo' });
+        if (args[0] === 'api')
+          return JSON.stringify({
+            enforce_admins: { enabled: true },
+            required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+          });
+        assert.deepEqual(args.slice(0, 2), ['pr', 'list'], 'Reuse the existing PR');
+        return JSON.stringify([{ number: 149, state: 'OPEN', headRefOid: candidate }]);
+      },
+      async dispatch(_cwd, args) {
+        assert.deepEqual(args, ['wait', 'pr', candidate]);
+        assert.deepEqual(createTaskDeliveryQueue(f.registry.commonDir).inspect().tickets, []);
+        return (
+          await completionStage(state, 'ci', candidate + ':42', async () =>
+            ciEvidence('42', candidate, false, Date.now()),
+          )
+        ).result;
+      },
+    };
+    const run = () => runCompletionFlow(f.a, readActiveBatch(f.a), f.head, options);
+    await assert.rejects(run(), /Interrupted after durable composition proof/);
+    const proof = readAcceptedComposition(f.a, 'a', f.accepted.commit);
+    assert.equal(proof.taskHead, f.head);
+    assert.equal(proof.main, f.latest);
+    assert.deepEqual(storedPreCiReview(f.a, proof), review);
+    assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+    assert.equal(f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a').split('\t')[0], f.head);
+    const originalExecute = options.execute;
+    options.execute = (cwd, tool, args) => {
+      if (tool === 'gh' && args[1] === 'list') candidate = f.git(f.a, 'rev-parse', 'HEAD');
+      return originalExecute(cwd, tool, args);
+    };
+    const result = await run();
+    assert.equal(result.pullRequest, 149);
+    assert.equal(result.runId, '42');
+    assert.equal(result.head, candidate);
+    assert.equal(quiesced, 1);
+    assert.deepEqual(f.git(f.a, 'show', '-s', '--format=%P', candidate).split(' '), [f.head, f.latest]);
+    assert.equal(f.git(f.a, 'rev-parse', 'HEAD^{tree}'), proof.candidateTree);
+    assert.equal(
+      f.git(f.a, 'show', 'HEAD:scripts/check.mjs'),
+      review ? '// task verifier\n// published verifier' : '// task verifier',
+    );
+    if (review) assert.equal(candidate, review.candidate);
+    assert.equal(f.git(f.a, 'show', 'HEAD:scripts/published.mjs'), '// main verifier');
+    assert.equal(engineeringDomainProof(f.a).proven, true);
+    assert.deepEqual(readAcceptance(f.a, 'a'), frozen);
+    assert.deepEqual(readAcceptedComposition(f.a, 'a', frozen.commit), proof);
+    assert.deepEqual(
+      state.events.find((event) => event.id === failure.id),
+      failure,
+    );
+    assert.equal(f.registry.readTask('a').recordedHead, candidate);
+    assert.deepEqual(f.registry.readTask('b'), beforeB);
+  });
+
+test('public prepare refuses an unknown 5177 reference before writing the original composition', async (t) => {
+  const f = fixture(t, { manifestConflict: true, reviewedConflict: true });
+  const reviewFile = path.join(f.a, '.task-verification/engineering-review.json');
+  mkdirSync(path.dirname(reviewFile));
+  writeFileSync(reviewFile, JSON.stringify(reviewedFixture(f)));
+  const options = {
+    owner: 'chat-a',
+    checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+    previewControl: {
+      assertOwner: async () => {},
+      prepareComposition: async (plan, { referenceEffect }) => {
+        assert.equal(referenceEffect, 'preparation');
+        assert.equal(plan.task, f.a);
+        await taskRuntimeReferences(f.registry.readTask('a'), {
+          referenceEffect,
+          backendPorts: () => [],
+          readLeases: () => [{ task: 'b', port: 5177 }],
+          request: async () => ({ statusCode: 0, errorCode: 'ECONNREFUSED' }),
+        });
+      },
+    },
+    execute(cwd, tool, args) {
+      if (tool === 'git') return f.git(cwd, ...args);
+      assert.equal(tool, 'gh');
+      if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'fixture/repo' });
+      assert.equal(args[0], 'api', 'Unknown reference must block before any PR update');
+      return JSON.stringify({
+        enforce_admins: { enabled: true },
+        required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+      });
+    },
+  };
+  const base = ['prepare', 'a', f.head],
+    proof = ['--reference-proof', path.join(f.dir, 'missing-proof.json')],
+    review = ['--engineering-review', reviewFile];
+  for (const flags of [proof, [...proof, ...review], [...review, ...proof]])
+    await assert.rejects(completionCommand(f.a, [...base, ...flags], options), /ENOENT/);
+  await assert.rejects(completionCommand(f.a, [...base, ...review], options), /unknown on leased port 5177/);
+  assert.equal(readAcceptedComposition(f.a, 'a', f.accepted.commit), null);
+  assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+  assert.equal(f.registry.readTask('a').recordedHead, f.head);
+});
+
+test('manifest composition refuses an explicitly protected manifest or an unreviewed input', (t) => {
+  const f = fixture(t, { manifestConflict: true });
+  assert.throws(
+    () => preCiCompositionTree(f.a, { taskHead: f.head, main: f.latest, protectedPaths: [SCRIPT_INPUT_MANIFEST] }),
+    /Frozen engineering manifest cannot be replaced/,
+  );
+  writeFileSync(path.join(f.main, 'scripts/published.mjs'), '// stale engineering input');
+  f.git(f.main, 'commit', '-am', 'unreviewed main input');
+  const main = f.git(f.main, 'rev-parse', 'HEAD');
+  assert.throws(
+    () => preCiCompositionTree(f.a, { taskHead: f.head, main, protectedPaths: [] }),
+    /Parent engineering manifest is not current/,
+  );
+});
+
+test('pre-CI engineering review rejects uncovered conflicts, altered inputs and protected output', (t) => {
+  const f = fixture(t, { manifestConflict: true, reviewedConflict: true });
+  const review = reviewedFixture(f);
+  const inputs = { accepted: f.accepted.commit, taskHead: f.head, main: f.latest, protectedPaths: [] };
+  assert.equal(preCiCompositionTree(f.a, inputs), null);
+  assert.throws(() => preCiCompositionTree(f.a, inputs, { ...review, files: [] }), /cover exactly/);
+  const different = structuredClone(review);
+  different.files[0].inputs.main.object = f.head;
+  assert.throws(() => preCiCompositionTree(f.a, inputs, different), /inputs drifted/);
+  assert.throws(
+    () => preCiCompositionTree(f.a, { ...inputs, protectedPaths: ['scripts/check.mjs'] }, review),
+    /Frozen conflict cannot use engineering review/,
+  );
+  const unrelated = path.join(f.dir, 'review');
+  writeFileSync(path.join(unrelated, 'feature-a.txt'), 'changed business');
+  f.git(unrelated, 'add', '.');
+  f.git(unrelated, 'commit', '--amend', '--no-edit');
+  assert.throws(
+    () => preCiCompositionTree(f.a, inputs, { ...review, candidate: f.git(unrelated, 'rev-parse', 'HEAD') }),
+    /alters paths beyond/,
+  );
+});
+
+function publishedRepairFixture(t, fixtureOptions = {}) {
+  const f = fixture(t, { cleanManifest: true, ...fixtureOptions });
+  const repairWorktree = path.join(f.dir, 'repair');
+  f.git(f.main, 'worktree', 'add', '-b', 'codex/repair', repairWorktree);
+  f.registry.register({ id: 'repair', worktree: repairWorktree, owner: 'chat-repair' });
+  writeFileSync(path.join(repairWorktree, 'base.txt'), 'published correction');
+  f.git(repairWorktree, 'commit', '-am', 'Correct independent fixture');
+  const repairHead = f.git(repairWorktree, 'rev-parse', 'HEAD');
+  f.git(f.main, 'merge', '--no-ff', '--no-edit', 'codex/repair');
+  const main = f.git(f.main, 'rev-parse', 'HEAD');
+  f.git(f.main, 'push', 'origin', 'main');
+  f.git(f.a, 'push', 'origin', 'codex/a');
+  publishAcceptance(f.a, 'a');
+  const failedAt = '2026-07-01T00:00:00.000Z';
+  const repairedAt = Date.parse(failedAt) + 60000;
+  const repairDirectory = path.join(f.registry.commonDir, 'task-delivery/repair');
+  const repair = openCompletion(repairDirectory, 'repair', { now: repairedAt - 2000 });
+  const key = main + ':12';
+  repair.events = [
+    {
+      id: 'repair-ci',
+      name: 'ci',
+      key,
+      status: 'success',
+      startedAt: repairedAt - 1000,
+      finishedAt: repairedAt,
+      result: ciEvidence('12', main, true, repairedAt),
+    },
+    ...['evidence', 'handoff', 'preserve', 'cleanup', 'close'].map((name) => ({
+      id: name,
+      name,
+      key,
+      status: 'success',
+      startedAt: repairedAt,
+      finishedAt: repairedAt,
+    })),
+  ];
+  repair.closedAt = repairedAt;
+  saveCompletion(repairDirectory, repair);
+  f.registry.revise('repair', f.registry.readTask('repair').revision, (record) => {
+    record.stage = 'closed';
+    record.recordedHead = repairHead;
+    record.closedAt = new Date(repairedAt).toISOString();
+    record.main = { local: main, remote: main };
+  });
+  writeFileSync(
+    path.join(repairDirectory, 'completion-receipt.json'),
+    JSON.stringify({
+      results: { close: { result: { batch: 'repair', main: { local: main } } } },
+    }),
+  );
+
+  const job = { id: 10, name: 'Frontend static checks', completedAt: failedAt, conclusion: 'failure' };
+  const failure = {
+    id: 'original-failure',
+    name: 'ci',
+    key: f.head + ':11',
+    status: 'failure',
+    startedAt: Date.parse(failedAt) - 1000,
+    finishedAt: Date.parse(failedAt),
+    failure: { ci: { runId: '11', headSha: f.head, attempt: 1, conclusion: 'failure', failedJob: job } },
+  };
+  const state = {
+    events: [
+      {
+        id: 'original-pull',
+        name: 'pr',
+        key: f.head,
+        status: 'success',
+        finishedAt: failure.startedAt - 1,
+        result: { number: 123, headRefOid: f.head },
+      },
+      structuredClone(failure),
+    ],
+  };
+  let quiesced = 0;
+  const options = {
+    preparationOnly: true,
+    publishedRepairId: 'repair',
+    common: f.registry.commonDir,
+    state,
+    save: () => {},
+    inventoryAssets: () => [],
+    checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+    runtimeReferences: async () => {},
+    previewControl: {
+      assertOwner: async () => {},
+      prepareComposition: async (plan, { referenceEffect }) => {
+        assert.equal(referenceEffect, 'preparation');
+        assert.equal(plan.main, main);
+        assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+        quiesced++;
+      },
+    },
+    execute(cwd, tool, args) {
+      if (tool === 'git') return f.git(cwd, ...args);
+      assert.equal(tool, 'gh');
+      if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'fixture/repo' });
+      if (args[0] === 'pr') {
+        assert.deepEqual(args.slice(1, 3), ['view', '123'], 'Stay on the original PR');
+        return JSON.stringify({
+          number: 123,
+          state: 'OPEN',
+          headRefName: 'codex/a',
+          baseRefName: 'main',
+          isCrossRepository: false,
+          headRefOid: f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a').split('\t')[0],
+          url: 'https://example.invalid/pull/123',
+        });
+      }
+      assert.equal(args[0], 'api');
+      if (args[1].endsWith('/attempts/1')) {
+        return JSON.stringify({
+          id: 11,
+          run_attempt: 1,
+          repository: { full_name: 'fixture/repo' },
+          head_repository: { full_name: 'fixture/repo' },
+          path: '.github/workflows/quality.yml',
+          event: 'pull_request',
+          head_branch: 'codex/a',
+          head_sha: f.head,
+          status: 'completed',
+          conclusion: 'failure',
+          pull_requests: [{ number: 123 }],
+        });
+      }
+      if (args[1].endsWith('/jobs/10')) {
+        return JSON.stringify({
+          id: 10,
+          name: job.name,
+          completed_at: failedAt,
+          status: 'completed',
+          conclusion: 'failure',
+          head_sha: f.head,
+          run_attempt: 1,
+          run_id: 11,
+        });
+      }
+      assert.equal(args[1], 'repos/fixture/repo/branches/main/protection');
+      return JSON.stringify({
+        enforce_admins: { enabled: true },
+        required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+      });
+    },
+    async dispatch(_cwd, args) {
+      const head = f.git(f.a, 'rev-parse', 'HEAD');
+      assert.notEqual(head, f.head, 'Never wait for the old failed run');
+      assert.deepEqual(args, ['wait', 'pr', head]);
+      return (
+        await completionStage(state, 'ci', head + ':13', async () => ciEvidence('13', head, false, repairedAt + 60000))
+      ).result;
+    },
+  };
+  return {
+    ...f,
+    state,
+    mainSha: main,
+    failure,
+    repairedAt,
+    options,
+    quiesced: () => quiesced,
+    run: () => runCompletionFlow(f.a, readActiveBatch(f.a), f.registry.readTask('a').recordedHead, options),
+  };
+}
+
+test('published repair composes a clean tree, recovers its exact intent and updates only the original PR', async (t) => {
+  const f = publishedRepairFixture(t);
+  const before = f.registry.readTask('b');
+  const originalExecute = f.options.execute;
+  let interrupt = true;
+  f.options.execute = (cwd, tool, args) => {
+    if (interrupt && tool === 'git' && args[0] === 'merge' && args[1] === '--ff-only')
+      throw Error('interrupted after recording the exact intent');
+    return originalExecute(cwd, tool, args);
+  };
+  await assert.rejects(f.run(), /interrupted after recording the exact intent/);
+  assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+  const proof = readAcceptedComposition(f.a, 'a', f.accepted.commit);
+  assert.equal(proof.taskHead, f.head);
+  assert.equal(proof.main, f.mainSha);
+  interrupt = false;
+  delete f.options.publishedRepairId;
+  const prepared = await f.run();
+  assert.equal(prepared.pullRequest, 123);
+  assert.equal(prepared.runId, '13');
+  assert.equal(f.quiesced(), 1);
+  assert.deepEqual(f.git(f.a, 'show', '-s', '--format=%P', prepared.head).split(' '), [f.head, f.mainSha]);
+  assert.equal(f.git(f.a, 'show', prepared.head + ':base.txt'), 'published correction');
+  assert.equal(f.git(f.a, 'show', prepared.head + ':feature-a.txt'), 'accepted A');
+  assert.deepEqual(readAcceptance(f.a, 'a'), f.accepted);
+  assert.deepEqual(
+    f.state.events.find((event) => event.id === f.failure.id),
+    f.failure,
+  );
+  assert.deepEqual(f.registry.readTask('b'), before);
+  assert.deepEqual(createTaskDeliveryQueue(f.registry.commonDir).inspect().tickets, []);
+
+  const batch = readActiveBatch(f.a);
+  const git = (...args) => f.git(f.a, ...args);
+  assert.throws(
+    () => hasAppliedPublishedCiRepair(f.state, f.failure, batch, f.mainSha, '14', git),
+    /successful CI event/,
+  );
+  f.git(f.main, 'merge', '--no-ff', '--no-edit', prepared.head);
+  const main = f.git(f.main, 'rev-parse', 'HEAD');
+  await completionStage(f.state, 'ci', main + ':14', async () => ciEvidence('14', main, true, f.repairedAt + 120000));
+  assert.equal(hasAppliedPublishedCiRepair(f.state, f.failure, batch, main, '14', git), true);
+});
+
+for (const scenario of [
+  'no delta',
+  'bad first attempt',
+  'foreign PR',
+  'unpublished repair',
+  'foreign failed job',
+  'repair already in old tree',
+]) {
+  test('published repair rejects ' + scenario + ' before issuing a new candidate', async (t) => {
+    const f = publishedRepairFixture(t, { repairAlreadyInTask: scenario === 'repair already in old tree' });
+    let expected;
+    switch (scenario) {
+      case 'no delta':
+        applyTaskComposition(f.a, 'a', f.mainSha);
+        f.git(f.a, 'push', 'origin', 'codex/a');
+        expected = /must change the candidate tree/;
+        break;
+      case 'bad first attempt':
+        f.state.events[1].failure.ci.attempt = 2;
+        expected = /first-attempt/;
+        break;
+      case 'foreign PR': {
+        const execute = f.options.execute;
+        f.options.execute = (cwd, tool, args) =>
+          tool === 'gh' && args[1]?.endsWith('/attempts/1')
+            ? JSON.stringify({ ...JSON.parse(execute(cwd, tool, args)), pull_requests: [{ number: 999 }] })
+            : execute(cwd, tool, args);
+        expected = /another PR/;
+        break;
+      }
+      case 'unpublished repair':
+        f.options.publishedRepairId = 'missing-repair';
+        expected = /must be formally delivered/;
+        break;
+      case 'repair already in old tree':
+        expected = /Published repair inputs differ from the failed candidate/;
+        break;
+      case 'foreign failed job':
+        // Change the remote job SHA to a different input while leaving the local failure intact.
+        {
+          const execute = f.options.execute;
+          f.options.execute = (cwd, tool, args) =>
+            tool === 'gh' && args[1]?.endsWith('/jobs/10')
+              ? JSON.stringify({ ...JSON.parse(execute(cwd, tool, args)), head_sha: f.mainSha })
+              : execute(cwd, tool, args);
+        }
+        expected = new RegExp(f.head);
+        break;
+    }
+    const before = f.git(f.a, 'rev-parse', 'HEAD');
+    const remote = f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a');
+    const proof = readAcceptedComposition(f.a, 'a', f.accepted.commit);
+    await assert.rejects(f.run(), expected);
+    assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), before);
+    assert.equal(f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a'), remote);
+    assert.deepEqual(readAcceptedComposition(f.a, 'a', f.accepted.commit), proof);
+    assert.equal(f.quiesced(), 0);
+  });
+}

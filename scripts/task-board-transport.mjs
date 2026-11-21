@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { boardHttpFailureCategory } from './task-network.mjs';
 const boardURL = 'https://uj-task-board-preview-nov12.hanjian-uj.chatgpt.site';
 // In-memory owner credential; no argv/env/file logging. The only target is the existing417 service.
 export function createOwnerBoardCall({ url, token }, { request = fetch } = {}) {
@@ -18,16 +19,21 @@ export function createOwnerBoardCall({ url, token }, { request = fetch } = {}) {
     } catch {
       const error = Error('Board transport unavailable');
       error.code = 'transport_unavailable';
+      error.category = 'network';
       throw error;
     }
     if (!response.headers.get('content-type')?.includes('application/json')) {
-      const error = Error('Board returned non-JSON');
+      const category = boardHttpFailureCategory(response.status, '<html>');
+      const error = Error('Board returned non-JSON (' + category + ', HTTP ' + response.status + ')');
+      error.category = category;
       error.code = 'transport_http_' + response.status;
       throw error;
     }
     const body = await response.json();
     if (!response.ok || body.error) {
-      const error = Error('Board receipt operation failed');
+      const category = response.ok ? 'service-response' : boardHttpFailureCategory(response.status);
+      const error = Error('Board receipt operation failed (' + category + ', HTTP ' + response.status + ')');
+      error.category = category;
       error.code = body.code ?? 'transport_unavailable';
       error.boardResponse = body;
       throw error;

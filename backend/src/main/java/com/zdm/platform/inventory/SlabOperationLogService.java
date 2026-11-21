@@ -309,9 +309,9 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     CurrentIdentity identity = identityProvider.require();
     LocalDateTime now = LocalDateTime.now();
     SlabOperationLog log = new SlabOperationLog();
-    log.setBusinessClientCode(identity == null ? "admin" : identity.clientCode());
-    log.setOperatorClientCode(identity == null ? null : identity.clientCode());
-    log.setOperatorIdentityId(identity == null ? null : identity.identityId());
+    log.setBusinessClientCode(identity.clientCode());
+    log.setOperatorClientCode(identity.clientCode());
+    log.setOperatorIdentityId(identity.identityId());
     log.setProductCreatedByAccountId(slab.getCreatedByAccountId());
     log.setSlabId(slab.getId());
     log.setSlabSerialNo(slab.getSerialNo() == null ? "" : slab.getSerialNo());
@@ -323,7 +323,7 @@ public class SlabOperationLogService extends ServiceImpl<SlabOperationLogMapper,
     log.setStandardReason(standardReason);
     log.setDetailReason(detailReason);
     Map<String,Object> visibleChanges = new LinkedHashMap<>(changes);
-    if (identity != null && "supply-chain".equals(identity.clientCode())) {
+    if ("supply-chain".equals(identity.clientCode())) {
       visibleChanges.keySet().removeIf(key -> key.contains("指导价") || key.contains("价格") || key.endsWith("来源配置ID") || key.contains("加价"));
     }
     if (List.of("UPDATE", "PRICE_UPDATE").contains(operationType)) {

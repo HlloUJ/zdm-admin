@@ -1,11 +1,13 @@
 import { taskMavenVolume } from './task-maven.mjs';
 import assert from 'node:assert/strict';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, realpathSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  assertNoValidationBackendConsumers,
   createLatestChangeQueue,
+  retainedValidationBackend,
   taskBackendAction,
   taskBackendContainerIdentity,
   taskBackendSourceIdentity,
@@ -163,4 +165,96 @@ test('a failed backend update stops pending work and invokes its error handler o
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(calls, 1);
   assert.equal(failed, 1);
+});
+
+function retainedBackendFixture(t) {
+  const root = realpathSync(mkdtempSync(path.join(tmpdir(), 'validation-backend-')));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const task = {
+    id: 'retained-fixture',
+    owner: 'original-executor',
+    frozen: { accepted: 'a'.repeat(40) },
+    resources: { dataScope: 'isolated-task' },
+    repository: { commonDir: path.join(root, 'common') },
+    worktree: root,
+  };
+  const directory = path.join(root, '.task-runtime/candidate-runtime');
+  const receiptFolder = path.join(task.repository.commonDir, 'task-delivery', task.id, 'validation-backend-recovery');
+  mkdirSync(directory, { recursive: true });
+  mkdirSync(receiptFolder, { recursive: true });
+  writeFileSync(
+    path.join(receiptFolder, 'receipt.json'),
+    JSON.stringify({
+      containerRetained: true,
+      evidence: {
+        task: task.id,
+        worker: task.owner,
+        accepted: task.frozen.accepted,
+        backend: { id: 'f'.repeat(64), port: 8083 },
+      },
+    }),
+    { mode: 0o600 },
+  );
+  const lease = { task: task.id, token: 'temporary-lease-token', pid: process.pid, resource: 'temporary-port-5180' };
+  const delivery = { task: task.owner, pid: process.pid, token: 'delivery-lease-token' };
+  const leases = { inspect: (key) => (key === lease.resource ? lease : delivery) };
+  const head = 'b'.repeat(40);
+  const journal = { version: 1, task: task.id, port: 5180, head, lease };
+  const save = (state) =>
+    writeFileSync(
+      path.join(directory, '50955d02-f701-422a-8f3e-676ecb82c043.json'),
+      JSON.stringify({ ...journal, state }),
+      { mode: 0o600 },
+    );
+  const input = { task, leases, port: 5180, head, project: 'zdm-task-original' };
+  return { input, save, lease, delivery };
+}
+
+test('start, health check and stop share a temporary project even without a ready frontend', (t) => {
+  const { input, save } = retainedBackendFixture(t);
+  save('prepared');
+  const start = retainedValidationBackend({ ...input, starting: true });
+  assert.notEqual(start.project, input.project);
+  assert.equal(start.retainedPort, 8083);
+  assert.equal(start.retainedId, 'f'.repeat(64));
+  for (const stage of ['starting', 'ready']) {
+    save(stage);
+    assert.deepEqual(retainedValidationBackend(input), start);
+  }
+  assert.match(start.backendRecord, /candidate-runtime\/50955d02-f701-422a-8f3e-676ecb82c043\.backend\.json$/);
+});
+
+test('retained validation refuses foreign leases, wrong candidates and unjournaled partial starts', (t) => {
+  const { input, save, delivery } = retainedBackendFixture(t);
+  assert.throws(() => retainedValidationBackend({ ...input, starting: true }), /Exact candidate runtime journal/);
+  save('starting');
+  assert.throws(() => retainedValidationBackend({ ...input, head: 'c'.repeat(40) }));
+  assert.throws(() => retainedValidationBackend({ ...input, port: 5176, starting: true }), /private validation port/);
+  const pid = delivery.pid;
+  delivery.pid = pid + 1;
+  assert.throws(() => retainedValidationBackend(input), /different owners/);
+  delivery.pid = pid;
+  save('stopped');
+  assert.throws(() => retainedValidationBackend(input), /outside its live journal/);
+});
+
+test('cleanup only proceeds after its private backend has no known or unknown preview consumer', () => {
+  const frontend = (apiTarget) => ({ statusCode: 200, metadata: { apiTarget } });
+  const inactive = { statusCode: 0, errorCode: 'ECONNREFUSED' };
+  assert.doesNotThrow(() => assertNoValidationBackendConsumers([inactive, frontend('http://127.0.0.1:8082')], 8087));
+  for (const target of ['http://127.0.0.1:8087', 'http://localhost:8087/health'])
+    assert.throws(
+      () => assertNoValidationBackendConsumers([inactive, frontend(target)], 8087),
+      /possible preview consumer/,
+    );
+  assert.throws(() => assertNoValidationBackendConsumers([{ statusCode: 200 }], 8087), /Unrecognized preview/);
+  assert.doesNotThrow(() => assertNoValidationBackendConsumers([{ statusCode: 200, port: 5190, leased: false }], 8087));
+  assert.throws(
+    () => assertNoValidationBackendConsumers([{ statusCode: 200, port: 5190, leased: true }], 8087),
+    /Unrecognized preview/,
+  );
+  assert.throws(
+    () => assertNoValidationBackendConsumers([{ statusCode: 0, errorCode: 'ETIMEDOUT' }], 8087),
+    /Unrecognized preview/,
+  );
 });

@@ -18,7 +18,19 @@ function fixture(t) {
   git('config', 'user.name', 'Fixture');
   git('config', 'user.email', 'test@example.invalid');
   const here = path.dirname(fileURLToPath(import.meta.url));
-  for (const name of ['task-entry.mjs', 'task-registry.mjs', 'task-monitor-registration.mjs', 'task-board-intake.mjs'])
+  for (const name of [
+    'task-entry.mjs',
+    'task-registry.mjs',
+    'task-action-dependencies.mjs',
+    'parallel-task-timing.mjs',
+    'batch-timing-core.mjs',
+    'task-monitor-registration.mjs',
+    'task-board-intake.mjs',
+    'task-thread-titles.mjs',
+    'task-execution-binding.mjs',
+    'task-coordination.mjs',
+    'task-network.mjs',
+  ])
     copyFileSync(path.join(here, name), path.join(main, 'scripts', name));
   mkdirSync(path.join(main, '.codex'));
   writeFileSync(path.join(main, '.codex/zdm-project-workflow.yaml'), 'batch:\n  mode: parallel-independent\n');
@@ -28,7 +40,13 @@ function fixture(t) {
   const a = path.join(dir, 'a');
   git('worktree', 'add', '-b', 'codex/a', a);
   const run = (script = path.join(main, 'scripts/task-entry.mjs'), ...args) =>
-    spawnSync(process.execPath, [script, ...args], { cwd: a, encoding: 'utf8' });
+    spawnSync(process.execPath, [script, ...args], {
+      cwd: a,
+      encoding: 'utf8',
+      // These dependency-free Git/entry fixtures never access a network. The
+      // actual proxy-enabled Node 22/24 chain is covered by task-network tests.
+      env: { ...process.env, NODE_USE_ENV_PROXY: '0', ZDM_TASK_MONITOR_CONTEXT: '' },
+    });
   return { main, a, git, run };
 }
 test('published main entry reads exact old-task context without copying source over it', (t) => {
@@ -139,13 +157,55 @@ for (const surface of ['codex-thread', 'collaboration-agent'])
         'native-new',
         '--owner',
         owner,
-        '--monitor-context',
-        JSON.stringify(context),
+        ...(surface === 'codex-thread' ? [] : ['--monitor-context', JSON.stringify(context)]),
       ],
-      { cwd: f.a, env: { ...process.env, CODEX_THREAD_ID: owner }, encoding: 'utf8' },
+      {
+        cwd: f.a,
+        env: {
+          ...process.env,
+          CODEX_THREAD_ID: owner,
+          ZDM_TASK_MONITOR_CONTEXT: surface === 'codex-thread' ? JSON.stringify(context) : 'not valid JSON',
+        },
+        encoding: 'utf8',
+      },
     );
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /Board intake missing/);
     assert.equal(f.git('worktree', 'list', '--porcelain'), before);
     assert.throws(() => readFileSync(path.join(f.a, 'child-started')), { code: 'ENOENT' });
   });
+
+test('published dependency registration requires the actual worktree owner and exact task revision', (t) => {
+  const f = fixture(t);
+  const registry = createTaskRegistry(f.main);
+  registry.register({ id: 'a', worktree: f.a, owner: 'fixture-owner' });
+  const b = path.join(path.dirname(f.a), 'b');
+  f.git('worktree', 'add', '-b', 'codex/b', b);
+  registry.register({ id: 'b', worktree: b, owner: 'peer' });
+  const invoke = (owner, revision) =>
+    spawnSync(
+      process.execPath,
+      [
+        path.join(f.main, 'scripts/task-entry.mjs'),
+        '--worktree',
+        f.a,
+        'registry',
+        'action-dependencies',
+        '--task',
+        'a',
+        '--expected-revision',
+        String(revision),
+        '--requirements',
+        JSON.stringify([{ task: 'b', actions: ['final'], evidence: 'delivery' }]),
+      ],
+      { cwd: f.main, encoding: 'utf8', env: { ...process.env, CODEX_THREAD_ID: owner } },
+    );
+  assert.match(invoke('foreign-owner', 1).stderr, /must own this exact task/);
+  const result = invoke('fixture-owner', 1);
+  assert.equal(result.status, 0, result.stderr);
+  assert.deepEqual(registry.readTask('a').actionDependencies, [
+    { task: 'b', actions: ['final'], evidence: 'delivery' },
+  ]);
+  assert.match(invoke('fixture-owner', 1).stderr, /Task revision changed/);
+  assert.deepEqual(registry.readTask('a').dependsOn, []);
+});

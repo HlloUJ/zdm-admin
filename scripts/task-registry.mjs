@@ -1,4 +1,6 @@
+import { validateActionDependencies } from './task-action-dependencies.mjs';
 import { monitoringRegistration } from './task-monitor-registration.mjs';
+import { executionBinding, assertTaskExecutor } from './task-execution-binding.mjs';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -194,6 +196,8 @@ function shape(record) {
   );
   record.dependsOn.forEach(id);
   assert.ok(!record.dependsOn.includes(record.id), 'Task cannot depend on itself');
+  validateActionDependencies(record);
+  executionBinding(record);
   return record;
 }
 export function createTaskRegistry(root) {
@@ -470,15 +474,53 @@ export function createTaskRegistry(root) {
       const before = Object.fromEntries(identities.map((key) => [key, structuredClone(record[key])]));
       const frozen = record.frozen ? structuredClone(record.frozen) : null;
       const previewOnly = record.previewOnly ? structuredClone(record.previewOnly) : null;
+      const bindings = structuredClone(record.executionBindings);
+      const priorDependencies = structuredClone(record.actionDependencies);
+      const historicalMonitoring = record.executionBindings ? structuredClone(record.monitoring) : null;
       change(record);
+      assert.deepEqual(record.executionBindings, bindings, 'Execution bindings require the verified host entry');
+      if (bindings)
+        assert.deepEqual(
+          record.monitoring,
+          historicalMonitoring,
+          'Historical monitoring is immutable after execution binding',
+        );
       if (previewOnly) assert.deepEqual(record.previewOnly, previewOnly, 'Preview-only identity is immutable');
-      if (frozen) assert.deepEqual(record.frozen, frozen, 'Original accepted-source identity is immutable');
+      if (frozen) {
+        assert.deepEqual(record.frozen, frozen, 'Original accepted-source identity is immutable');
+        assert.deepEqual(record.actionDependencies, priorDependencies, 'Frozen action dependencies are immutable');
+      }
+      for (const dependency of validateActionDependencies(record))
+        assert.ok(readTask(dependency.task), 'Unknown task dependency: ' + dependency.task);
       assert.deepEqual(
         Object.fromEntries(identities.map((key) => [key, record[key]])),
         before,
         'Task identity and original baseline are immutable',
       );
       record.revision += 1;
+      record.updatedAt = new Date().toISOString();
+      return write(record);
+    });
+  }
+  function bindExecution(taskId, expectedRevision, binding, verify) {
+    return locked(() => {
+      const record = readTask(taskId);
+      assert.ok(
+        record && !record.compatibility?.readOnly && !record.previewOnly && record.stage !== 'closed',
+        'Exact unfinished writable task required',
+      );
+      const history = record.executionBindings ?? [];
+      const existing = history.find((entry) => entry.request.messageId === binding.request.messageId);
+      if (existing) {
+        assert.deepEqual(existing, binding, 'Replayed binding differs; never rebase a stale observation');
+        assert.equal(existing, history.at(-1), 'A later execution binding already exists');
+        return record;
+      }
+      assert.equal(record.revision, expectedRevision, 'Task revision changed; re-read exact task');
+      assert.equal(binding.revision, history.length + 1);
+      assert.equal(verify(record), true, 'Verified native host and quiescent resource evidence required');
+      record.executionBindings = [...history, structuredClone(binding)];
+      record.revision++;
       record.updatedAt = new Date().toISOString();
       return write(record);
     });
@@ -492,6 +534,7 @@ export function createTaskRegistry(root) {
     resolve,
     register,
     revise,
+    bindExecution,
     validateLive,
     legacy,
     inspectLegacy,
@@ -503,7 +546,7 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
   const [command, ...rest] = args;
   if (!command || ['help', '--help', '-h'].includes(command)) {
     console.log(
-      'Usage: task:registry list --json | status --task <id> | resolve --task <id> [--worktree <path>] | register --task <id> --worktree <path> --owner <owner> [--kind business|infrastructure|maintenance] | inspect-legacy | preserve-legacy --expected-record <sha256> [--expected-acceptance <sha256>]',
+      'Usage: task:registry list --json | status --task <id> | resolve --task <id> [--worktree <path>] | register --task <id> --worktree <path> --owner <owner> [--kind business|infrastructure|maintenance] | action-dependencies --task <id> --expected-revision <n> --requirements <json> | inspect-legacy | preserve-legacy --expected-record <sha256> [--expected-acceptance <sha256>]',
     );
     return;
   }
@@ -522,6 +565,7 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
     status: ['task'],
     resolve: ['task', 'worktree'],
     register: ['task', 'worktree', 'owner', 'kind'],
+    'action-dependencies': ['task', 'expected-revision', 'requirements'],
     'inspect-legacy': [],
     'preserve-legacy': ['expected-record', 'expected-acceptance'],
   };
@@ -540,7 +584,19 @@ export function main(args = process.argv.slice(2), root = process.cwd()) {
     id(options.task);
     result = registry.readTask(options.task);
   } else if (command === 'resolve') result = registry.resolve({ id: options.task, worktree: options.worktree });
-  else
+  else if (command === 'action-dependencies') {
+    const task = registry.resolve({ id: options.task, worktree: root });
+    assertTaskExecutor(task);
+    assert.ok(!task.frozen && task.stage === 'developing', 'Action dependencies can only be declared before freeze');
+    const revision = Number(options['expected-revision']);
+    assert.equal(revision, task.revision, 'Task revision changed');
+    const requirements = JSON.parse(options.requirements);
+    assert.ok(Array.isArray(requirements));
+    validateActionDependencies({ ...task, actionDependencies: requirements });
+    result = registry.revise(task.id, revision, (record) => {
+      record.actionDependencies = requirements;
+    });
+  } else
     result = registry.register({
       id: options.task,
       worktree: options.worktree,

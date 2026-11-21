@@ -3,7 +3,16 @@ import { setTimeout as delay } from 'node:timers/promises';
 import { assertProcessesGone, runCompletionProcess } from './completion-process.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, writeFileSync, existsSync, rmSync } from 'node:fs';
+import {
+  mkdtempSync,
+  readFileSync,
+  writeFileSync,
+  existsSync,
+  rmSync,
+  chmodSync,
+  symlinkSync,
+  unlinkSync,
+} from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { openCompletion, saveCompletion, completionStage, completionSummary } from './completion-session.mjs';
@@ -21,6 +30,126 @@ function fixture(t) {
 const gone = () => {
   throw Object.assign(new Error('gone'), { code: 'ESRCH' });
 };
+function historicalSealedFixture(t, exitCode = 0) {
+  const { dir, state } = fixture(t);
+  const token = 'e0223cf6-a8a8-4eb9-a41e-57237b294bef';
+  const event = {
+    id: '769c48eb-3025-4f46-b49a-33e31d4399a6',
+    name: 'prepare',
+    key: 'ca56ddfcd20647edd405716dc453332df37ba304',
+    startedAt: 1794858203587,
+    finishedAt: 1794858217508,
+    status: exitCode === 0 ? 'success' : 'failure',
+    processTracking: 1,
+    processes: [{ token }],
+    ...(exitCode === 0 ? {} : { failure: { category: 'interrupted' } }),
+  };
+  state.events.push(event);
+  saveCompletion(dir, state);
+  const record = { token, host: '192.168.1.88', pgid: 48914, status: 'quiescent', exitCode, signal: null };
+  const file = path.join(dir, 'process-' + token + '.json');
+  writeFileSync(file, JSON.stringify(record), { mode: 0o600 });
+  return { dir, state, event, record, file, sessionFile: path.join(dir, 'completion-session.json') };
+}
+
+test('sealed historical host recovery accepts the original session sample and preserves journal and failed outcomes', (t) => {
+  for (const exitCode of [0, 130]) {
+    const { dir, state, event, file } = historicalSealedFixture(t, exitCode);
+    const before = readFileSync(file, 'utf8');
+    recoverInterrupted(state, dir, {
+      host: 'ujs-mac.local',
+      probe: () => assert.fail('Never probe a sealed foreign PID'),
+    });
+    assert.equal(readFileSync(file, 'utf8'), before);
+    assert.equal(state.events[0].status, exitCode === 0 ? 'success' : 'failure');
+    assert.deepEqual(openCompletion(dir, 'example').events[0], event);
+    if (exitCode === 130) assert.equal(state.events[0].failure.category, 'interrupted');
+  }
+});
+
+test('sealed historical host recovery rejects incomplete identities, unsealed records and invalid outcomes', async (t) => {
+  for (const [name, change] of [
+    ['pending', { status: 'pending' }],
+    ['started foreign group', { status: 'started' }],
+    ['exited foreign group', { status: 'exited' }],
+    ['wrong token', { token: '11111111-1111-1111-1111-111111111111' }],
+    ['missing host', { host: undefined }],
+    ['empty host', { host: ' ' }],
+    ['invalid pgid', { pgid: 1 }],
+    ['string pgid', { pgid: '48914' }],
+    ['missing outcome', { exitCode: undefined }],
+    ['invalid outcome', { exitCode: -1 }],
+    ['string outcome', { exitCode: '0' }],
+    ['missing signal', { signal: undefined }],
+    ['invalid signal', { signal: 'unknown' }],
+  ])
+    await t.test(name, (t) => {
+      const { dir, state, record, file, sessionFile } = historicalSealedFixture(t);
+      writeFileSync(file, JSON.stringify({ ...record, ...change }));
+      const before = readFileSync(sessionFile, 'utf8'),
+        journal = readFileSync(file, 'utf8');
+      assert.throws(() =>
+        recoverInterrupted(state, dir, { host: 'ujs-mac.local', probe: () => assert.fail('Foreign probe') }),
+      );
+      assert.equal(readFileSync(sessionFile, 'utf8'), before);
+      assert.equal(readFileSync(file, 'utf8'), journal);
+    });
+});
+
+test('sealed historical host recovery rejects missing, damaged, linked or nonprivate evidence', async (t) => {
+  for (const name of [
+    'missing journal',
+    'damaged journal',
+    'linked journal',
+    'public journal',
+    'missing session',
+    'damaged session',
+    'linked session',
+    'public session',
+  ])
+    await t.test(name, (t) => {
+      const { dir, event, file, sessionFile } = historicalSealedFixture(t);
+      const target = name.endsWith('journal') ? file : sessionFile;
+      if (name.startsWith('missing')) unlinkSync(target);
+      if (name.startsWith('damaged')) writeFileSync(target, '{');
+      if (name.startsWith('public')) chmodSync(target, 0o644);
+      if (name.startsWith('linked')) {
+        const original = readFileSync(target);
+        unlinkSync(target);
+        writeFileSync(target + '.original', original, { mode: 0o600 });
+        symlinkSync(target + '.original', target);
+      }
+      assert.throws(() =>
+        assertProcessesGone(event, dir, { host: 'ujs-mac.local', probe: () => assert.fail('Foreign probe') }),
+      );
+    });
+});
+
+test('sealed historical host recovery requires one exact original session reference and rejects orphan journals', async (t) => {
+  for (const name of [
+    'no reference',
+    'duplicate reference',
+    'changed event',
+    'unknown stage identity',
+    'orphan journal',
+  ])
+    await t.test(name, (t) => {
+      const { dir, state, event, file, sessionFile } = historicalSealedFixture(t);
+      const journal = readFileSync(file, 'utf8');
+      if (name === 'no reference' || name === 'orphan journal') state.events = [];
+      if (name === 'duplicate reference') state.events.push({ ...event, id: 'another-event' });
+      if (name === 'unknown stage identity') delete event.id;
+      // Construct corrupted isolated fixture bytes, never live session state.
+      writeFileSync(sessionFile, JSON.stringify(state));
+      if (name === 'changed event') event.key = 'different-candidate';
+      if (name === 'orphan journal') assert.throws(() => recoverInterrupted(state, dir), /Unreferenced/);
+      else
+        assert.throws(() =>
+          assertProcessesGone(event, dir, { host: 'ujs-mac.local', probe: () => assert.fail('Foreign probe') }),
+        );
+      assert.equal(readFileSync(file, 'utf8'), journal);
+    });
+});
 test('live, unknown or foreign owners cannot be interrupted; only proven local dead owner becomes preserved failure', (t) => {
   const { dir, state } = fixture(t);
   state.events.push({
@@ -204,10 +333,22 @@ await completionStage(state,'push','candidate',()=>{runCompletionProcess(process
     }
     assert.fail('Isolated process did not reach expected state');
   };
-  await until(() => existsSync(ready));
-  const state = JSON.parse(readFileSync(path.join(dir, 'completion-session.json')));
-  const journal = JSON.parse(readFileSync(path.join(dir, 'process-' + state.events[0].processes[0].token + '.json')));
-  pgid = journal.pgid;
+  let state;
+  await until(() => {
+    if (!existsSync(ready)) return false;
+    state = JSON.parse(readFileSync(path.join(dir, 'completion-session.json')));
+    const { token } = state.events[0].processes[0];
+    const journal = JSON.parse(readFileSync(path.join(dir, 'process-' + token + '.json')));
+    assert.equal(journal.token, token);
+    // The child can publish ready before the supervisor's spawn callback
+    // publishes the group that this test intends to keep alive.
+    if (journal.status === 'pending') return false;
+    assert.equal(journal.status, 'started');
+    assert.equal(journal.host, os.hostname());
+    assert.ok(Number.isSafeInteger(journal.pgid) && journal.pgid > 1);
+    pgid = journal.pgid;
+    return true;
+  });
   const exited = new Promise((resolve) => owner.once('exit', resolve));
   owner.kill('SIGKILL');
   await exited;

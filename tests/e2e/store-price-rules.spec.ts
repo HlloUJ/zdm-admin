@@ -281,7 +281,25 @@ test('query and reset preserve drafts; blur never saves and mixed edits save tog
   const input = firstLeaf.locator('input:not([type=checkbox])');
   await expect(input).toHaveValue('2.00');
   const actions = page.locator('.zdm-standard-query .filter-actions');
-  await expect(actions).toHaveCSS('justify-content', 'flex-end');
+  // Compare the browser's canonical serialization of the unchanged flex-end rule.
+  const expectedFlexEnd = await page.evaluate(() => {
+    const reference = document.createElement('div');
+    reference.style.cssText = 'position: absolute; display: flex; justify-content: flex-end';
+    document.body.append(reference);
+    const value = getComputedStyle(reference).justifyContent;
+    reference.remove();
+    return value;
+  });
+  await expect(actions).toHaveCSS('justify-content', expectedFlexEnd);
+  const alignment = await actions.evaluate((host) => {
+    const style = getComputedStyle(host);
+    return {
+      actualRight: host.lastElementChild!.getBoundingClientRect().right,
+      expectedRight:
+        host.getBoundingClientRect().right - parseFloat(style.borderRightWidth) - parseFloat(style.paddingRight),
+    };
+  });
+  expect(alignment.actualRight).toBeCloseTo(alignment.expectedRight, 1);
   const queryGap = await page.locator('.zdm-standard-query').evaluate((form) => {
     const input = form.querySelector('.t-form__item .t-input__wrap')!.getBoundingClientRect();
     const checkbox = form.querySelector('.t-checkbox')!.getBoundingClientRect();

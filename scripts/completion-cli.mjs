@@ -1,7 +1,8 @@
+import { assertTaskExecutor } from './task-execution-binding.mjs';
 import { handoffCreatedArtifacts } from './task-cleanup-created-artifacts.mjs';
 import { handoffAuditedDependencies } from './delivery-repairs/task-cleanup-npm.mjs';
 import { createTaskDeliveryQueue } from './task-delivery-queue.mjs';
-import { assertCleanupUnreferenced } from './task-cleanup-cli.mjs';
+import { assertCleanupUnreferenced, loadCleanupPolicy } from './task-cleanup-cli.mjs';
 import { captureCiProgress } from './task-delivery-status-sync.mjs';
 import { drainProgressHost } from './task-progress-host.mjs';
 import {
@@ -10,13 +11,19 @@ import {
   recordCloseoutCleanupInventory,
 } from './task-cleanup-handoff.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
-import { freezeAcceptedSource, assertAcceptedSource, readAcceptance } from './accepted-source.mjs';
+import {
+  freezeAcceptedSource,
+  assertAcceptedSource,
+  readAcceptance,
+  verifyRemoteAcceptance,
+} from './accepted-source.mjs';
+import { applyTaskComposition } from './task-composition.mjs';
 import { requireBatchTimingForCleanup, reconcileInterruptedValidationTiming } from './batch-timing-runtime.mjs';
 import { readTimingSummary, readTimeline, refreshTimeline } from './batch-timing-store.mjs';
 import { deliveryStatus, backfillDeliveryStatus } from './completion-status.mjs';
 import { createHash, randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
-import { runCompletionProcess } from './completion-process.mjs';
+import { runCompletionProcess, completionPermission } from './completion-process.mjs';
 import { existsSync, lstatSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import {
@@ -31,6 +38,7 @@ import {
   settleCompletion,
 } from './completion-session.mjs';
 import { assertCompletionQuality, verifyCompletionEvidence } from './completion-ci-evidence.mjs';
+import { hasHistoricalCiDiagnosis, recordHistoricalCiDiagnosis } from './delivery-repairs/completion-ci-diagnosis.mjs';
 import {
   readActiveBatch,
   closeBatch,
@@ -50,6 +58,7 @@ import {
 } from './completion-recovery.mjs';
 import { inventoryAssets } from './task-completion.mjs';
 import { runCompletionFlow } from './completion-flow.mjs';
+import { hasAppliedPublishedCiRepair } from './delivery-repairs/published-ci-repair.mjs';
 import { finalHandoffPlan, finalHandoff } from './completion-handoff.mjs';
 import { createCompletionPreviewControl } from './completion-preview.mjs';
 import { parseWorktreePorcelain } from './git-workflow-core.mjs';
@@ -61,7 +70,7 @@ import {
 import { retainedPublishedPreview } from './start-micro-task.mjs';
 import { createTaskRegistry } from './task-registry.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
-import { selectedTaskBatch, withTaskContext } from './task-context.mjs';
+import { closeTaskBatch, selectedTaskBatch, withTaskContext } from './task-context.mjs';
 import { verifyRetainedDependencies } from './task-dependency-retention.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
 
@@ -93,14 +102,29 @@ async function completionCommandLocked(
     previewControl = createCompletionPreviewControl({ execute }),
     runtimeReferences = taskRuntimeReferences,
     deferSettle = false,
+    assertCurrentAdmission,
   },
 ) {
+  const preparationOnly = args[0] === 'prepare';
+  let engineeringReviewFile;
+  if (preparationOnly && args.length === 5 && args[3] === '--engineering-review') {
+    engineeringReviewFile = args[4];
+    args = args.slice(0, 3);
+  }
+  let publishedRepairId;
+  if (preparationOnly && args.length === 5 && args[3] === '--published-repair') {
+    publishedRepairId = args[4];
+    assert.match(publishedRepairId, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
+    args = args.slice(0, 3);
+  }
+  if (preparationOnly) args = ['deliver', ...args.slice(1)];
   assert.equal(typeof deferSettle, 'boolean');
   assert.ok(!deferSettle || args[0] === 'deliver', 'deferSettle only applies to deliver');
   const limits = {
     begin: [0, 1],
     freeze: [0, 0],
     'check-source': [1, 1],
+    'compose-reviewed': [2, 2],
     deliver: [2, 2],
     recover: [0, 0],
     status: [1, 1],
@@ -114,6 +138,7 @@ async function completionCommandLocked(
     wait: [2, 2],
     'repair-start': [4, 5],
     'repair-finish': [1, 1],
+    'record-ci-diagnosis': [2, 2],
     measure: [3, Infinity],
   };
   const command = args[0],
@@ -210,6 +235,7 @@ async function completionCommandLocked(
     assertBatchModulesReady(batch);
   }
   if (['begin', 'freeze', 'deliver'].includes(mode)) {
+    assertCurrentAdmission?.();
     const acceptance = freezeAcceptedSource(batch.worktree, batch);
     if (batch.taskRegistryVersion === 2) {
       const tasks = createTaskRegistry(root),
@@ -261,6 +287,7 @@ async function completionCommandLocked(
       saveCompletion(directory, s);
       finishStageRestorations(s, directory);
     };
+  if (assertCurrentAdmission) Object.defineProperty(state, completionPermission, { value: assertCurrentAdmission });
   if (mode === 'pause-record' || mode === 'resume-record') {
     const marker = mode === 'pause-record' ? pauseCompletion(state) : resumeCompletion(state);
     save(state);
@@ -274,6 +301,59 @@ async function completionCommandLocked(
   if (mode === 'deliver' && resumeCompletion(state)) save(state);
   if (['recover', 'deliver'].includes(mode)) recoverInterrupted(state, directory);
   trackStageRestoration(state, directory);
+  if (mode === 'compose-reviewed') {
+    assert.equal(batch.taskRegistryVersion, 2, 'Exact registered task required');
+    assert.equal(path.resolve(root), path.resolve(batch.worktree), 'Use the owned task worktree');
+    assert.ok(
+      state.startedAt !== null && !state.closedAt && !state.deferredSettlement,
+      'Active formal delivery required',
+    );
+    const [main, candidate] = rest;
+    for (const commit of [main, candidate]) assert.match(commit, /^[a-f0-9]{40}$/);
+    assert.equal(git('rev-parse', 'origin/main'), main, 'Use the exact published origin/main');
+    assert.equal(git('rev-parse', 'HEAD'), batch.recordedHead, 'Exact checkpointed task parent required');
+    assert.equal(git('status', '--porcelain'), '', 'Composition requires a clean owned task');
+    const acceptance = readAcceptance(root, batch.id);
+    assert.ok(acceptance, 'Original task freeze required');
+    const verified = verifyRemoteAcceptance(root, {
+      candidate,
+      accepted: acceptance.commit,
+      branch: batch.branch,
+      trustedMain: main,
+    });
+    assert.equal(verified.reviewedMerge?.commit, candidate, 'Exact reviewed merge commit required');
+    assert.equal(verified.reviewedMerge.main, main, 'Reviewed merge must use the exact published main parent');
+    assert.equal(verified.reviewedMerge.taskHead, batch.recordedHead, 'Exact checkpointed task parent required');
+    return (
+      await completionStage(
+        state,
+        'prepare',
+        'reviewed-composition:' + main + ':' + candidate,
+        async () => {
+          assertCurrentAdmission?.();
+          const worktrees = parseWorktreePorcelain(git('worktree', 'list', '--porcelain'));
+          await previewControl.prepareComposition({
+            anchor: batch.repository.anchor,
+            task: batch.worktree,
+            preview: worktrees.find((entry) => entry.branch === 'codex/preview-current')?.path,
+            common,
+            main,
+            taskRegistryVersion: 2,
+          });
+          assertCurrentAdmission?.();
+          const composed = applyTaskComposition(root, batch.id, main, { reviewedCandidate: candidate });
+          return {
+            task: batch.id,
+            head: composed.recordedHead,
+            accepted: acceptance.commit,
+            main,
+            review: verified.review,
+          };
+        },
+        { save },
+      )
+    ).result;
+  }
   if (mode === 'recover') return { batch: batch.id, summary: completionSummary(state) };
   if (['begin', 'deliver'].includes(mode) && !state.previewFingerprint) {
     const profile = path.join(common, 'preview-environment/environment.json');
@@ -286,6 +366,10 @@ async function completionCommandLocked(
   if (mode === 'deliver') {
     assert.equal(rest[1], batch.recordedHead, 'Exact frozen task head required');
     return runCompletionFlow(root, batch, rest[1], {
+      preparationOnly,
+      engineeringReviewFile,
+      publishedRepairId,
+      assertCurrentAdmission,
       execute,
       state,
       save,
@@ -294,6 +378,7 @@ async function completionCommandLocked(
       common,
       inventoryAssets,
       previewControl,
+      runtimeReferences,
       deferSettle,
       readState: () => openCompletion(directory, batch.id, { formal: false }),
       dispatch: (cwd, args) =>
@@ -307,6 +392,7 @@ async function completionCommandLocked(
           verifyEvidence,
           previewControl,
           runtimeReferences,
+          assertCurrentAdmission,
         }),
     });
   }
@@ -359,6 +445,20 @@ async function completionCommandLocked(
     finishRepair(state, rest[0]);
     save(state);
     return { repair: rest[0], status: 'verified' };
+  }
+  if (mode === 'record-ci-diagnosis') {
+    assertCurrentAdmission?.();
+    assert.equal(batch.taskRegistryVersion, 2, 'Exact independent task required');
+    assert.equal(readAcceptance(batch.worktree, batch.id)?.commit, batch.frozen.accepted);
+    const anchor = batch.repository.anchor;
+    const main = batch.main?.local;
+    assert.match(main ?? '', /^[a-f0-9]{40}$/);
+    assert.equal(execute(anchor, 'git', ['rev-parse', 'HEAD']), main);
+    assert.equal(git('ls-remote', 'origin', 'refs/heads/main'), main + '\trefs/heads/main');
+    assertAcceptedSource(batch.worktree, batch.id, main);
+    const diagnosis = recordHistoricalCiDiagnosis(state, batch, rest[0], path.resolve(root, rest[1]));
+    save(state);
+    return { diagnosis, formalDeliveryComplete: false };
   }
   if (mode === 'wait') {
     let [runId, head] = rest;
@@ -447,7 +547,12 @@ async function completionCommandLocked(
   assert.ok(
     state.events
       .filter((e) => e.failure?.ci)
-      .every((e) => state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId))),
+      .every(
+        (e) =>
+          state.repairs.some((r) => r.failureRun === String(e.failure.ci.runId)) ||
+          hasHistoricalCiDiagnosis(state, e, batch.frozen?.accepted, rest[1], rest[2]) ||
+          hasAppliedPublishedCiRepair(state, e, batch, rest[1], rest[2], git),
+      ),
     'Record diagnosed repair cost for each failed CI before closing',
   );
   const [, expectedMain, runId] = rest;
@@ -459,6 +564,17 @@ async function completionCommandLocked(
     preview = entries.find((e) => e.branch === 'codex/preview-current')?.path;
   assert.ok(anchor && integration && preview, 'Required retained worktrees missing');
   const key = expectedMain + ':' + runId;
+  const cleanupPolicy = path.join(common, 'task-cleanup/policy.json');
+  const deferCleanup =
+    batch.taskRegistryVersion === 2 && existsSync(cleanupPolicy) && loadCleanupPolicy(common).ownershipV2 === true;
+  const cleanupDisposition = {
+    state: 'deferred-to-scheduled-cleanup',
+    task: batch.id,
+    worktree: batch.worktree,
+    branch: batch.branch,
+    head: batch.recordedHead,
+    main: expectedMain,
+  };
   for (const repair of state.repairs.filter((r) => !r.finishedAt && r.isCiFailure !== false))
     finishRepair(state, repair.id);
   save(state);
@@ -555,6 +671,7 @@ async function completionCommandLocked(
               main: expectedMain,
             });
           if (!existsSync(batch.worktree)) return preserved.result;
+          if (deferCleanup) return { state: 'evidence-retained-for-scheduled-cleanup' };
           const cleanupHandoff =
             batch.taskRegistryVersion === 2
               ? await handoffBuiltDist({
@@ -722,6 +839,7 @@ async function completionCommandLocked(
           requireBatchTimingForCleanup(common, batch.id);
           if (existsSync(batch.worktree)) assert.equal(execute(batch.worktree, 'git', ['status', '--porcelain']), '');
           process.chdir(anchor);
+          if (deferCleanup) return cleanupDisposition;
           if (existsSync(batch.worktree)) execute(anchor, 'git', ['worktree', 'remove', batch.worktree]);
           if (git('for-each-ref', '--format=%(objectname)', 'refs/heads/' + batch.branch))
             execute(anchor, 'git', ['branch', '-d', batch.branch]);
@@ -736,7 +854,9 @@ async function completionCommandLocked(
       },
       close: {
         run: () => {
-          const result = closeBatch(anchor);
+          const result = deferCleanup
+            ? closeTaskBatch(anchor, batch, { deferredCleanup: cleanupDisposition })
+            : closeBatch(anchor);
           return { batch: result.id, main: result.main };
         },
       },
@@ -781,10 +901,54 @@ export function verifyPreservation(file, directory) {
 }
 
 export async function completionCommand(root, args, options = {}) {
+  if (args[0] === 'reference-proof') {
+    const { parseReferenceProofArguments } = await import('./delivery-repairs/preview-reference-source.mjs');
+    const selected = parseReferenceProofArguments(args.slice(1));
+    const { collectPreviewReferenceProof } = await import('./delivery-repairs/preview-reference-proof.mjs');
+    return collectPreviewReferenceProof(root, selected.foreignTask, selected.historyFile, {
+      publishedBaseline: selected.publishedBaseline,
+      effect: selected.effect,
+    });
+  }
+  const proofFlag = args.indexOf('--reference-proof');
+  if (proofFlag >= 0) {
+    const [command, task] = args;
+    assert.ok(
+      ['prepare', 'deliver', 'settle'].includes(command),
+      'Reference selection requires prepare, deliver or settle',
+    );
+    const effect = command === 'prepare' ? 'preparation' : 'final';
+    const baseLength = command === 'settle' ? 4 : 3;
+    const base = args.slice(0, baseLength);
+    const flags = args.slice(baseLength);
+    const preparationFlag = flags.includes('--engineering-review') ? '--engineering-review' : '--published-repair';
+    const reviewIndex = flags.indexOf(preparationFlag);
+    assert.ok(
+      flags.length === 2 || (command === 'prepare' && flags.length === 4 && [0, 2].includes(reviewIndex)),
+      'Unexpected reference-proof arguments',
+    );
+    assert.ok([0, 2].includes(proofFlag - baseLength) && args[proofFlag + 1], 'Unexpected reference-proof arguments');
+    if (flags.length === 4) {
+      assert.equal(reviewIndex + proofFlag - baseLength, 2, 'Exact preparation option and reference proof required');
+      assert.ok(flags[reviewIndex + 1], 'Preparation option value required');
+      base.push(preparationFlag, flags[reviewIndex + 1]);
+    }
+    const { withPreviewReferenceProof } = await import('./delivery-repairs/preview-reference-proof.mjs');
+    return withPreviewReferenceProof(root, args[proofFlag + 1], { task, effect }, () =>
+      completionCommand(root, base, options),
+    );
+  }
   const registry = createTaskRegistry(root);
-  const explicit = ['report', 'settle', 'deliver', 'status', 'backfill', 'pause-record', 'resume-record'].includes(
-    args[0],
-  )
+  const explicit = [
+    'report',
+    'settle',
+    'deliver',
+    'prepare',
+    'status',
+    'backfill',
+    'pause-record',
+    'resume-record',
+  ].includes(args[0])
     ? args[1]
     : null;
   const task = explicit ? registry.readTask(explicit) : selectedTaskBatch(root);
@@ -792,27 +956,56 @@ export async function completionCommand(root, args, options = {}) {
   // Before private-lease recovery, freeze, automatic session restoration, or any external effect.
   // Even legacy/unregistered mutation is denied when the explicit policy is active.
   const executionOrder = createExecutionOrder(registry.commonDir);
+  let effect = 'final';
+  if (task && !orderReadOnly)
+    assertTaskExecutor(
+      task,
+      options.owner ?? process.env.CODEX_THREAD_ID,
+      'Completion must belong to the exact current chat/task',
+    );
   if (!orderReadOnly && executionOrder.read()) {
     assert.ok(task, 'No registered execution-order task; do not adopt legacy work');
+    const preparationCommand =
+      ['prepare', 'freeze', 'begin', 'repair-start', 'repair-finish', 'compose-reviewed'].includes(args[0]) ||
+      (args[0] === 'wait' && args[1] === 'pr' && args[2] === task.recordedHead);
+    effect = preparationCommand ? 'preparation' : 'final';
     executionOrder.assertAdmission({
       lane: 'delivery',
       task: task.id,
-      owner: options.owner ?? process.env.CODEX_THREAD_ID,
+      owner: task.owner,
       admission: process.env.ZDM_EXECUTION_ADMISSION,
+      effect,
     });
   }
+  const guardedOptions = orderReadOnly
+    ? options
+    : {
+        ...options,
+        assertCurrentAdmission: () => {
+          if (!executionOrder.read()) return;
+          const current = registry.readTask(task.id);
+          assertTaskExecutor(current, options.owner ?? process.env.CODEX_THREAD_ID);
+          executionOrder.assertAdmission({
+            lane: 'delivery',
+            task: current.id,
+            owner: current.owner,
+            admission: process.env.ZDM_EXECUTION_ADMISSION,
+            effect,
+          });
+        },
+      };
   if (task) {
     assert.ok(!task.previewOnly, 'Temporary combined previews cannot enter formal completion');
     assert.ok(!task.compatibility?.readOnly, 'Legacy frozen task remains on its reviewed recovery path');
     const readOnly = ['report', 'status', 'handoff-plan', 'check-source'].includes(args[0]);
     if (!readOnly)
-      assert.equal(
+      assertTaskExecutor(
+        task,
         options.owner ?? process.env.CODEX_THREAD_ID,
-        task.owner,
         'Completion must belong to the exact current chat/task',
       );
     return withTaskContext({ id: task.id, commonDir: registry.commonDir, owner: task.owner }, async () => {
-      if (readOnly) return completionCommandLocked(root, args, options);
+      if (readOnly) return completionCommandLocked(root, args, guardedOptions);
       const leases = createResourceLeases(registry.commonDir);
       leases.recoverEndedTask('task-delivery-' + task.id, task.owner, () => {
         const directory = path.join(registry.commonDir, 'task-delivery', task.id);
@@ -830,7 +1023,7 @@ export async function completionCommand(root, args, options = {}) {
             args[0] === 'settle'
               ? queue.inspect().tickets.find((item) => item.task === task.id && item.deferred)
               : null;
-        if (!ticket) return completionCommandLocked(root, args, options);
+        if (!ticket) return completionCommandLocked(root, args, guardedOptions);
         assert.equal(ticket.owner, task.owner);
         assert.equal(ticket.accepted, task.frozen?.accepted);
         assert.equal(ticket.deferred.head, task.recordedHead);
@@ -838,7 +1031,7 @@ export async function completionCommand(root, args, options = {}) {
         assert.equal(ticket.deferred.runId, args[3]);
         const turn = await queue.wait(ticket);
         try {
-          const result = await completionCommandLocked(root, args, options);
+          const result = await completionCommandLocked(root, args, guardedOptions);
           assert.equal(
             result.deliveryStatus?.formalDeliveryComplete,
             true,

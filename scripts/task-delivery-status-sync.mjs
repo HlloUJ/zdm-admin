@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { isDeepStrictEqual } from 'node:util';
 import { existsSync, mkdirSync, readFileSync, writeFileSync, lstatSync } from 'node:fs';
 import { executionPausedFor } from './task-execution-scope.mjs';
 import { notifyProgressHost } from './task-progress-host.mjs';
@@ -58,14 +59,131 @@ export function captureCompletionProgress(directory, state, previous) {
     bestEffortProgress(outboxDirectory, state.batch, `completion:${event.id}:${event.status}`, payload);
   }
 }
+function deliveryWaitBasis(state, ticket) {
+  if (ticket.lane !== 'delivery' || !['queued', 'blocked'].includes(ticket.status)) return null;
+  const event = state.events?.findLast(
+    (item) =>
+      item.task === ticket.task &&
+      (['delivery-phase-enrolled', 'preparation-finished'].includes(item.action) ||
+        (item.action === 'dispatch-applied' && item.lane === 'delivery')),
+  );
+  let authorityId;
+  if (event?.action === 'delivery-phase-enrolled') {
+    const phase = ticket.phaseOrigin;
+    if (
+      ticket.status !== 'queued' ||
+      ticket.admission !== null ||
+      !phase?.phaseId ||
+      !phase.authorityId ||
+      event.phaseId !== phase.phaseId ||
+      event.authorityId !== phase.authorityId ||
+      event.owner !== ticket.owner ||
+      event.order !== ticket.order ||
+      event.developmentEvidenceDigest !== phase.developmentEvidenceDigest ||
+      event.phaseDigest !== createHash('sha256').update(JSON.stringify(phase)).digest('hex')
+    )
+      return null;
+    authorityId = phase.authorityId;
+  } else if (event?.action === 'preparation-finished') {
+    const decision = state.dynamicDecisions?.find((item) => item.id === event.decisionId);
+    if (
+      decision?.status !== 'finished' ||
+      !decision.prepared ||
+      !decision.input ||
+      decision.input.phase !== 'preparation' ||
+      decision.input.lane !== 'delivery' ||
+      decision.input.task !== ticket.task ||
+      decision.input.owner !== ticket.owner ||
+      !isDeepStrictEqual(decision.ticketBefore, ticket)
+    )
+      return null;
+    authorityId = decision.input.authorityId;
+  } else return null;
+  const grant = state.dynamicAuthorities?.find((item) => item.id === authorityId);
+  return grant && isDeepStrictEqual(event.request, grant.request)
+    ? { action: event.action, request: grant.request }
+    : null;
+}
+
+function blockedPreparationRequest(state, ticket) {
+  if (ticket.status !== 'blocked' || ticket.lane !== 'delivery' || !ticket.dynamicDecisionId) return null;
+  const relevant = (event) => event.task === ticket.task && event.lane === ticket.lane;
+  const event = state.events?.findLast((item) => relevant(item) && ['block', 'dispatch-applied'].includes(item.action));
+  if (event?.action !== 'block' || event.reason !== ticket.reason || event.decisionId !== ticket.dynamicDecisionId)
+    return null;
+  const decision = state.dynamicDecisions?.find((item) => item.id === event.decisionId);
+  if (
+    decision?.status !== 'consumed' ||
+    decision.input?.phase !== 'preparation' ||
+    decision.input.task !== ticket.task ||
+    decision.input.lane !== ticket.lane ||
+    decision.input.owner !== ticket.owner ||
+    !decision.admission ||
+    decision.admission !== ticket.admission ||
+    decision.ticketBefore?.order !== ticket.order ||
+    !isDeepStrictEqual(decision.ticketBefore?.request, ticket.request)
+  )
+    return null;
+  const applied = state.events.findLast((item) => relevant(item) && item.action === 'dispatch-applied');
+  if (
+    applied?.decisionId !== event.decisionId ||
+    applied.phase !== 'preparation' ||
+    applied.owner !== ticket.owner ||
+    applied.admission !== ticket.admission
+  )
+    return null;
+  const grant = state.dynamicAuthorities?.find((item) => item.id === decision.input.authorityId);
+  return grant && isDeepStrictEqual(applied.request, grant.request) ? grant.request : null;
+}
+
 export function captureQueueProgress(commonDir, state, previous) {
-  const pausedFor = executionPausedFor;
+  const pausedFor = (current, ticket) => {
+    if (!executionPausedFor(current, ticket)) return false;
+    const fence = current.events?.findLast((event) => ['initialize', 'pause-all'].includes(event.action))?.request;
+    // Binding a reserved new native worker does not start it or revoke its
+    // newer user instruction. A subsequent real pause still wins below.
+    const pendingNative =
+      ticket.awaitingNativeWorker === true ||
+      (ticket.lane === 'development' &&
+        ticket.nativeLaunchReserved === true &&
+        typeof ticket.nativeCoordinatorOwner === 'string' &&
+        ticket.nativeCoordinatorOwner.trim() &&
+        ticket.nativeCoordinatorOwner !== ticket.owner &&
+        current.events?.some(
+          (event) =>
+            event.action === 'bind-native-worker' &&
+            event.task === ticket.task &&
+            event.coordinatorOwner === ticket.nativeCoordinatorOwner &&
+            event.workerOwner === ticket.owner,
+        ));
+    const request =
+      ticket.status === 'queued' && pendingNative && ticket.admission === null
+        ? ticket.request
+        : (blockedPreparationRequest(current, ticket) ?? deliveryWaitBasis(current, ticket)?.request);
+    return !(
+      Number.isSafeInteger(fence?.sequence) &&
+      typeof fence.authorId === 'string' &&
+      fence.authorId.trim() &&
+      fence.authorId === ticket.request?.authorId &&
+      fence.authorId === request?.authorId &&
+      Number.isSafeInteger(request?.sequence) &&
+      request.sequence > fence.sequence
+    );
+  };
+  const lastPause = (ledger) => ledger?.events?.findLast((event) => event.action === 'pause-all')?.request;
+  const pause = lastPause(state);
   for (const ticket of state.tickets) {
     if (['completed', 'cancelled'].includes(ticket.status)) continue;
+    const parked = ticket.status === 'parked';
+    if (
+      parked &&
+      !(pause?.sequence > ticket.capacityRelease?.pauseSequence && pause.messageId !== lastPause(previous)?.messageId)
+    )
+      continue;
     const before = previous?.tickets.find((item) => item.task === ticket.task && item.lane === ticket.lane);
     // Admission is NOT proof of actual action start. No synthetic started event on claim.
-    const paused = pausedFor(state, ticket);
-    const changed = !before || before.status !== ticket.status || paused !== pausedFor(previous, before);
+    const paused = parked || pausedFor(state, ticket);
+    const changed = parked || !before || before.status !== ticket.status || paused !== pausedFor(previous, before);
     if (!changed || (!['queued', 'blocked'].includes(ticket.status) && !paused)) continue;
     const event = paused ? 'paused' : ticket.status;
     bestEffortProgress(

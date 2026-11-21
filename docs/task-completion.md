@@ -8,13 +8,29 @@
 
 ## 正常路径
 
+合并卡的并行候选准备使用 `task:entry -- --worktree <准确目录> complete prepare <task-id> <40位SHA>`，仅在真实委托的 preparation scope 中执行。它完成原冻结、发布及首次完整 PR CI 后返回，不进入最终 main 队列，不合并、交接或结项；普通 deliver/final-handoff/settle 仍须唯一 final scope。准备证明和 scope 交接见[持续委托与动态任务调度](engineering/dynamic-task-dispatch.md)。
+
+如果原 PR 的准确候选已在首轮质量检查失败，且对应修复已由独立任务合入并通过 main CI，原任务的准备委托可在原命令末尾加 `--published-repair <独立修复任务ID>`。执行人选择已经诊断对应的修复。入口核对原 PR、首轮运行及失败作业、修复任务正式回执和 main 祖先关系，要求修复前文件与旧候选吻合、组合树包含已验证的修复字节，且整个树确有变化。原候选与已发布 main 干净合并时登记准确双亲提交，快进原 PR 并等待新 SHA 的首次质量检查。可以同时附带现有 `--reference-proof`。有冲突时按现有工程或受保护来源复核流程处理。
+
+原冻结、原失败、原票及运行保护继续有效。正式收尾核对新候选的原 PR 首轮验证、最终 main 验证和修复字节；独立修复不计为原任务的本地补修耗时。
+
+并行准备会在原候选首次成功 Quality CI 前核对其与准确 `origin/main` 的组合。若唯一冲突是 `scripts/test-domain-manifest.json`，入口先核对双亲各自的工程登记，再用受信规划器从 Git 对象重算清单。入口核验原冻结、保护内容及组合树，保全证明后登记有准确双亲的合并提交。中断时恢复同一证明，准备继续按同一分支正常快进更新原 PR 并等待准确候选 CI。
+
+原任务父提交早于主线新增工程输入时，入口从准确 Git 合并基线读取其已发布清单。基线须在受信 main 的第一父链上，原任务只可缺少基线中尚不存在的后来新增输入。历史清单和原任务清单都按各自准确的输入文件重算。当前 main 和最终组合树继续核对当前工程输入全集。
+
+出现其他已知技术文件冲突时，原任务执行者可审阅准确双亲的组合提交，并为同一 `complete prepare` 追加 `--engineering-review <任务工作区 .task-verification 内的绝对路径>`。JSON 使用 `version: 1`、`accepted`、`taskHead`、`main`、`candidate` 和 `files`。每个实际冲突文件记录 `file`、`inputs: { base, task, main }`、`result`、`reason`，其中各版本记录 Git `mode` 和完整 blob `object`。原执行者在理由中说明保留两侧有效行为与测试的依据。入口从真实 Git 三方对象验证输入、候选双亲、输出和实际冲突清单，独立重算工程清单并核对完整候选树。业务、控制面、未知项、删除、模式变化、未经审阅的冲突或候选自行带入的其他变化继续拒绝。有效审阅随原组合证明留存供中断恢复，远端原有来源与 CI 门禁继续执行。
+
 独立任务获得准确“任务完成”授权后，首选 `npm run task:completion -- deliver <batch-id> <准确任务40位SHA>`。该入口绑定准确 task/owner/Worktree 并冻结实际源码；核对保护、备份与健康，推送并完成初始 PR CI，再进入 FIFO 正式交付队列。队列内刷新 main、按原始冻结与受信主线组合，在该准确组合候选自己的源码中执行本地就绪检查，必要运行验证使用当前任务独占的临时端口，不抢占正在展示其他任务的5175；变化候选重新推送和验证后才准确合并，随后完成本地 main 同步、main CI、最终交接和 settle；每个阶段直接await前一阶段，不靠人工休眠轮询再接命令。只有刚创建事件尚未出现时有限等待查询，绝不dispatch或重跑CI；多个候选、失败、重跑、主线变化或保护不符均停止。源码修改不授权调用deliver；PR创建输出URL后仍须由调用方附加到当前对话。
+
+启用 [已交付任务定时清理](engineering/delivered-task-cleanup.md) 的 V2 策略后，独立任务仍核对准确 CI、运行交接、计时和关闭回执；工作区及任务分支由正式定时器按任务归属清理，关闭时记录待清理。
 
 有真实外部周期验收的工程任务，可由可信宿主显式传 `completionOptions.deferSettle: true`；私有 `task-completion-progress-cli.mjs` 输入对应顶层布尔 `deferSettle: true`。默认是 false，普通交付仍完整 settle。该选项只有准确 main CI 与 `main:final` 运行交接的成功原记录齐全后才返回 `status=deferred`、`formalDeliveryComplete=false`、原因“外部周期验收待完成”；不执行保全/清理/关闭，也不生成 `delivery_complete`。原 main FIFO 票据以 waiting 加 deferred 明细保留 id、owner、冻结身份及顺序，正常释放本次 main 临界租约；集成交接自身在返回前释放其临界租约。任务归属与执行层交付票据仍保留，不用伪造失败或提前 done 来结束当前命令。
 
 可信宿主拿到真实周期、通知送达等所需外部证明后，只使用默认 `deferSettle=false` 调用既有 `settle <batch-id> <原main-sha> <原run-id>`。该入口按原 deferred 票据重新取得临界位，核对原候选/main/run 身份并完成现有收尾；不重新等待 CI 或调用 final-handoff。输入变化、健康或来源证明失效仍由原保护拒绝，不能凭 deferred 跳过。普通阶段回执只显示下一步等待，不作为任务完成事实；正常进程返回也不等于正式交付成功。外部证明由准确任务的可信宿主在 settle 前核验，这个本地布尔接口本身不构成不可绕过的验收保护。
 
 调用方直接等待同一进程（可恢复终端会话），进度变化由它输出；不要另开watch、查询相同API或用45秒固定sleep轮询日志。若进程中断，从原准确参数恢复，已通过检查只核验原运行。数据库高风险保护锁仍走原受保护入口，不被普通自动链接管。首次自升级从已审查的准确本地候选进入PR流程，运行交接与清理仍只由已发布且main CI通过的版本承担。
+
+首次工程自升级如被另一任务的旧关闭前端租约阻断，可按[只读运行引用证明](engineering/readonly-preview-reference-proof.md)通过公开 `reference-proof` 入口采集真实原生历史和两轮宿主证明。宿主核对准确候选及真实证明后，`prepare`、`deliver` 和 `settle` 可显式附加 `--reference-proof <当前任务私有证明文件>`；准备阶段采集附加 `--for-prepare`，可与既有工程审阅文件同时用于 `prepare`。每个引用边界仍重新独立核验。此入口只证明准确旧前端的当前引用状态，不恢复或释放另一任务租约，不跳过 unknown、冻结、CI、主线及交接保护。
 
 1. 只有用户已授权准确批次正式交付时，立即执行 `npm run task:completion -- begin [请求的准确ISO时间]`，再执行 `plan` 一次核对模块、差异、验证缺口和独立资产。`begin` 同时保全原始源码冻结和本仓库私有阶段索引；`plan` 仍只读，不联网、不启动服务，也不是通过证明。没有请求时间时明确以首个正式收尾命令为计时起点，不补造此前耗时。
 2. 按影响补必要本地检查并复用有效证据。验证工具/契约变化先 `npm run test:ci-reuse`：覆盖真实执行成功、严格复用成功、无法复用后原执行、真实执行失败四种路径，经过采集、路径选择、两份报告上传及最终汇总。源文件、报告缺失/损坏或未知模式均须阻断。定向通过后冻结准确候选，由可靠CI承担一次完整适用门禁，不先叠加本地相同全套。

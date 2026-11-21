@@ -44,6 +44,8 @@ public class StoreAccessorySalePriceService {
       return coefficient == null ? new Price(saved.amount(), "manual", saved.coefficient()) : new Price(calculate(partnerPrice, coefficient), "auto", coefficient);
     }
   }
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.zdm.platform.storeexit.StoreExitTargetService exitTargets;
   private final JdbcTemplate jdbc;
   public StoreAccessorySalePriceService(JdbcTemplate jdbc) { this.jdbc = jdbc; }
   public void lockCategories(Long storeId) {
@@ -92,6 +94,9 @@ public class StoreAccessorySalePriceService {
 
   /** Source product, category rules and listing are locked by the caller. */
   public String synchronizeSupplyEdit(Long listingId, JsonNode snapshot, Long accountId, LocalDateTime time) {
+    if (!exitTargets.lockParent("store_accessory_products", listingId)) {
+      throw new org.springframework.security.access.AccessDeniedException("门店已退出，不能同步售价");
+    }
     var listing = jdbc.queryForMap("SELECT * FROM store_accessory_products WHERE id=? FOR UPDATE", listingId);
     Long storeId = ((Number) listing.get("store_id")).longValue();
     Long categoryId = listing.get("store_category_id") instanceof Number n ? n.longValue() : null;

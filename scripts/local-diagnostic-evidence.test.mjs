@@ -108,3 +108,21 @@ test('failed diagnostics never seal success and a candidate change during remain
   assert.match(result.stderr, /Local diagnostic inputs changed/);
   assert.throws(() => localDiagnosticIdentity(process.cwd(), { CI: 'true' }), /cannot authorize CI/);
 });
+
+test('engineering attempt and inner diagnostic packet share identical Git input proof', async (t) => {
+  const f = fixture(t);
+  const { captureIdentity } = await import('./verification-evidence.mjs');
+  const outer = () =>
+    captureIdentity({
+      root: f.root,
+      command: process.execPath,
+      args: [runner, '--engineering'],
+      env: f.env,
+      reuse: false,
+    });
+  assert.deepEqual(outer().identity.environment.git, localDiagnosticIdentity(f.root, f.env).git);
+  const before = outer().fingerprint;
+  execFileSync('git', ['config', 'branch.codex/fixture.remote', 'origin'], { cwd: f.root });
+  assert.notEqual(outer().fingerprint, before);
+  assert.deepEqual(outer().identity.environment.git, localDiagnosticIdentity(f.root, f.env).git);
+});

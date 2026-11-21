@@ -1,6 +1,11 @@
+import { assertDeliveredDependencies } from './task-context.mjs';
+import { observeBinding, observeEntry } from './parallel-task-timing.mjs';
 import { createBoardIntake } from './task-board-intake.mjs';
+import './task-network.mjs';
+import { assertTaskExecutor, executionBinding } from './task-execution-binding.mjs';
 import { createExecutionOrder } from './task-execution-order.mjs';
 import {
+  parseStartMonitoringContext,
   requireStartMonitoring,
   verifyStartMonitoringReadback,
   verifyMonitoringInstruction,
@@ -15,6 +20,7 @@ import { fileURLToPath } from 'node:url';
 import { createTaskRegistry, registeredTaskWorktrees } from './task-registry.mjs';
 import { bindBatchTiming } from './batch-timing-store.mjs';
 import { createResourceLeases } from './resource-lease.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
 const runGit = (cwd, ...args) =>
   execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
 const safe = (file) => {
@@ -68,9 +74,24 @@ export function startParallelTask(
 ) {
   root = realpathSync(root);
   const owner = options.owner || process.env.CODEX_THREAD_ID;
+  const registered = options.slug ? registry.readTask(options.slug) : registry.resolve({ worktree: root });
+  if (!registered && !options.resume && options.monitorContext === undefined)
+    options = { ...options, monitorContext: parseStartMonitoringContext() };
+  const binding = registered && executionBinding(registered);
+  if (binding) {
+    assertTaskExecutor(registered);
+    assert.equal(owner, binding.executor, 'Start must name the actual bound executor');
+    assert.deepEqual(options.monitorContext, binding.monitoring, 'Exact current execution monitoring required');
+  }
   function ready(result) {
+    if (result.task.actionDependencies?.some(({ actions }) => actions.includes('development')))
+      assertDeliveredDependencies(root, result.task, 'development');
     result.task = verifyStartMonitoringReadback(registry, result.task, options.monitorContext);
-    result.artifacts = prepare(result.task);
+    result.artifacts = observeEntry(
+      { command: 'measure', originalArgs: ['dependencies'], cwd: result.task.worktree },
+      registry,
+      () => ({ status: 0, value: prepare(result.task) }),
+    ).value;
     try {
       const mains = registeredTaskWorktrees(root).filter((entry) => entry.branch === 'main');
       assert.equal(mains.length, 1);
@@ -82,32 +103,51 @@ export function startParallelTask(
     } catch (error) {
       result.timing = { status: 'unavailable', reason: error.message };
     }
+    observeBinding(result.task, result.timing);
     return result;
   }
   assert.ok(
     typeof owner === 'string' && owner.trim(),
     'Explicit task owner required when execution identity is unavailable',
   );
-  if (['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface))
+  const nativeIntake =
+    !binding && ['codex-thread', 'collaboration-agent'].includes(options.monitorContext?.executionSurface);
+  const delegatedContinuation = Boolean(
+    registered &&
+    createExecutionOrder(registry.commonDir)
+      .read()
+      ?.tickets.find((ticket) => ticket.task === registered.id && ticket.lane === 'development')?.dynamicDecisionId,
+  );
+  if (nativeIntake && !delegatedContinuation)
     createBoardIntake(registry.commonDir).require(options.monitorContext, options.slug, owner);
   // The explicit root-thread receipt/claim precedes worktree creation or restoration.
   const orderedTask = options.slug ?? registry.resolve({ worktree: root }).id;
   const admission = createExecutionOrder(registry.commonDir).assertAdmission({
     lane: 'development',
     task: orderedTask,
-    owner,
+    owner: binding ? registered.owner : owner,
     admission: process.env.ZDM_EXECUTION_ADMISSION,
   });
+  if (nativeIntake && delegatedContinuation) {
+    assert.ok(admission.ticket?.dynamicDecisionId, 'Consumed current continuation decision required');
+    const context = {
+      ...options.monitorContext,
+      coordinatorThreadId: readTaskCoordination(registry.commonDir).current.rootThreadId,
+    };
+    // Only an already enrolled task with a consumed current decision can use
+    // historical intake evidence; new starts retain the freshness requirement.
+    createBoardIntake(registry.commonDir).require(context, options.slug, owner, { fresh: false });
+  }
   if (admission.ticket?.executionKind !== undefined)
     assert.equal(options.kind, admission.ticket.executionKind, 'Start kind differs from the authorized task');
   if (!options.slug) {
     const task = registry.resolve({ worktree: root });
-    assert.equal(task.owner, owner, 'Another owner controls this task');
+    assertTaskExecutor(task, owner, 'Another owner controls this task');
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
   }
   const existing = registry.readTask(options.slug);
   if (existing) {
-    assert.equal(existing.owner, owner, 'Another owner controls this task');
+    assertTaskExecutor(existing, owner, 'Another owner controls this task');
     assert.equal(existing.kind, options.kind, 'Task kind differs');
     const task = registry.resolve({ id: options.slug });
     return ready({ task, resumed: true, previewSwitched: false, remoteFetched: false });
@@ -201,7 +241,7 @@ export function main(args = process.argv.slice(2)) {
   const options = parseTaskStart(args);
   if (options.help) {
     console.log(
-      'Usage: task:start -- --slug <task-id> --owner <owner> --monitor-context <json> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services.',
+      'Usage: task:start -- --slug <task-id> --owner <owner> --monitor-context <json> [--kind business|infrastructure|maintenance] [--resume] [--task-parent <persistent-directory>]\nEach task uses its own branch and worktree. Startup never switches 5175 or starts shared services. New starts may supply ZDM_TASK_MONITOR_CONTEXT for this invocation instead of --monitor-context.',
     );
     return;
   }

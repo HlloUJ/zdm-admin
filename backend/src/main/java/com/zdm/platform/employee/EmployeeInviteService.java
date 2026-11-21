@@ -135,6 +135,8 @@ public class EmployeeInviteService extends CreatorAwareService<EmployeeInviteMap
     if (invite == null) {
       throw new IllegalArgumentException("邀请链接不存在");
     }
+    // Expiry itself writes data, so it must not precede the store-exit fence.
+    inviteAccess.requireAvailable(invite);
     if (USED.equals(invite.getStatus())) {
       throw new IllegalArgumentException("邀请链接已使用");
     }

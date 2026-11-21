@@ -1,4 +1,5 @@
 import { createBoardIntake } from './task-board-intake.mjs';
+import { assertTaskExecutor, executionBinding, taskMonitoring, taskExecutor } from './task-execution-binding.mjs';
 import { requireStartMonitoring, verifyMonitoringInstruction } from './task-monitor-registration.mjs';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
@@ -12,7 +13,8 @@ import { verifyCancellation } from './task-cancellation-proof.mjs';
 import { deliveryStatus } from './completion-status.mjs';
 import { assertDeliveredDependencies } from './task-context.mjs';
 
-const git = (root, ...args) => execFileSync('git', ['-C', root, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
+const git = (root, ...args) =>
+  execFileSync('git', ['--no-optional-locks', '-C', root, ...args], { encoding: 'utf8', stdio: 'pipe' }).trim();
 export function verifyDevelopmentCompletion(task, evidence) {
   assert.equal(evidence?.task, task.id);
   assert.equal(evidence.owner, task.owner);
@@ -87,6 +89,18 @@ export function executionOrderCommand(root, [command, json]) {
   }
   assert.ok(json, 'Explicit JSON command required; credentials are not user authorization');
   const input = JSON.parse(json);
+  function verifyBoundItem(item) {
+    const task = item.task && registry.readTask(item.task);
+    if (task && executionBinding(task)) {
+      assert.equal(item.executor, taskExecutor(task), 'Explicit current executor required alongside historical owner');
+      assertTaskExecutor(task, item.executor);
+      assert.equal(item.owner, task.owner, 'Preserve historical queue owner; executor is separate');
+      return task;
+    }
+    return null;
+  }
+  if (input.task) verifyBoundItem(input);
+  if (input.members) input.members.forEach(verifyBoundItem);
   const dependenciesReady = (ticket) => {
     const task = registry.readTask(ticket.task);
     if (!task || task.owner !== ticket.owner) return false;
@@ -119,17 +133,19 @@ export function executionOrderCommand(root, [command, json]) {
         const current = queue
           .read()
           ?.tickets.find((t) => t.task === member.task && t.lane === member.lane && t.owner === member.owner);
-        requireStartMonitoring(member.owner, member.task, member.monitorContext);
-        if (['codex-thread', 'collaboration-agent'].includes(member.monitorContext?.executionSurface))
+        const bound = verifyBoundItem(member);
+        requireStartMonitoring(bound ? member.executor : member.owner, member.task, member.monitorContext);
+        if (!bound && ['codex-thread', 'collaboration-agent'].includes(member.monitorContext?.executionSurface))
           createBoardIntake(registry.commonDir).require(member.monitorContext, member.task, member.owner);
-        verifyMonitoringInstruction(member.monitorContext, current);
+        if (bound) assert.deepEqual(member.monitorContext, taskMonitoring(bound));
+        else verifyMonitoringInstruction(member.monitorContext, current);
         const registered = registry.readTask(member.task);
         if (registered) {
           assert.equal(registered.owner, member.owner);
           if (member.kind !== undefined) assert.equal(registered.kind, member.kind, 'Registered task kind differs');
           for (const key of ['taskStableId', 'taskNumber', 'rootThreadId', 'roomId', 'authorizationRef', 'worker'])
             assert.equal(
-              registered.monitoring?.[key],
+              taskMonitoring(registered)?.[key],
               member.monitorContext[key],
               'Registered monitoring differs: ' + key,
             );

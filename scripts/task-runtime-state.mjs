@@ -1,3 +1,5 @@
+import assert from 'node:assert/strict';
+import { taskExecutor } from './task-execution-binding.mjs';
 import { taskMavenVolume } from './task-maven.mjs';
 import { createHash } from 'node:crypto';
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from 'node:fs';
@@ -147,4 +149,76 @@ export function createLatestChangeQueue({ run, onError, delayMs = 700, schedule 
     },
     close,
   };
+}
+
+function readRegularJson(file) {
+  const stat = lstatSync(file, { throwIfNoEntry: false });
+  if (!stat) return null;
+  assert.ok(stat.isFile() && !stat.isSymbolicLink() && realpathSync(file) === file, 'Unsafe validation state');
+  return JSON.parse(readFileSync(file, 'utf8'));
+}
+
+// The published completion runner already owns and journals the exact temporary
+// frontend lease. Start, check and stop derive the same backend from that lease,
+// including when the frontend never became ready or has already exited.
+export function retainedValidationBackend({ task, leases, port, head, project, starting }) {
+  if (!task?.frozen) return null;
+  const receipt = readRegularJson(
+    path.join(task.repository.commonDir, 'task-delivery', task.id, 'validation-backend-recovery/receipt.json'),
+  );
+  if (!receipt) return null;
+  assert.ok(Number.isInteger(port) && port >= 5177 && port <= 5199, 'Retained backend needs a private validation port');
+  const lease = leases.inspect('temporary-port-' + port);
+  if (!lease && !starting) return null;
+  assert.notEqual(port, receipt.evidence.foreign?.port, 'Foreign preview port cannot host candidate validation');
+  assert.equal(lease?.task, task.id, 'Retained validation backend requires its exact temporary lease');
+  assert.equal(receipt.evidence.worker, taskExecutor(task));
+  assert.equal(receipt.evidence.task, task.id);
+  assert.equal(receipt.evidence.accepted, task.frozen.accepted);
+  assert.equal(receipt.containerRetained, true);
+  assert.match(receipt.evidence.backend.id, /^[a-f0-9]{64}$/);
+  const retainedPort = Number(receipt.evidence.backend.port);
+  assert.ok(retainedPort >= 8081 && retainedPort <= 8099 && Number.isInteger(retainedPort));
+  const delivery = leases.inspect('task-delivery-' + task.id);
+  assert.equal(delivery?.task, task.owner);
+  assert.equal(lease.pid, delivery.pid, 'Temporary validation and completion have different owners');
+  process.kill(delivery.pid, 0);
+  assert.equal(task.resources.dataScope, 'isolated-task', 'Validation requires the task’s own isolated data');
+
+  const directory = path.join(task.worktree, '.task-runtime/candidate-runtime');
+  assert.equal(realpathSync(directory), directory, 'Unsafe candidate runtime journal directory');
+  const entries = readdirSync(directory)
+    .filter((name) => /^[a-f0-9-]{36}\.json$/.test(name))
+    .map((name) => ({ name, value: readRegularJson(path.join(directory, name)) }))
+    .filter(({ value }) => value?.lease?.token === lease.token);
+  assert.equal(entries.length, 1, 'Exact candidate runtime journal required');
+  const [{ name, value }] = entries;
+  assert.deepEqual(value.lease, lease);
+  assert.equal(value.version, 1);
+  assert.equal(value.task, task.id);
+  assert.equal(value.head, head);
+  assert.equal(value.port, port);
+  assert.ok(['prepared', 'starting', 'ready'].includes(value.state), 'Validation runtime is outside its live journal');
+  const suffix = createHash('sha256').update(lease.token).digest('hex').slice(0, 16);
+  return {
+    project: project + '-validation-' + suffix,
+    retainedPort,
+    retainedId: receipt.evidence.backend.id,
+    retainedSource: receipt,
+    runtimeId: lease.token,
+    backendRecord: path.join(directory, name.replace(/\.json$/, '.backend.json')),
+  };
+}
+
+export function assertNoValidationBackendConsumers(observations, backendPort) {
+  for (const { metadata, statusCode, errorCode, port, leased } of observations) {
+    if (statusCode === 0 && errorCode === 'ECONNREFUSED') continue;
+    // Match the published consumer scan for an unrelated, responding
+    // temporary port without a managed preview identity or project lease.
+    if (!metadata && port >= 5177 && !leased && statusCode >= 200 && statusCode < 500) continue;
+    assert.ok(metadata && typeof metadata.apiTarget === 'string', 'Unrecognized preview could use temporary backend');
+    const api = new URL(metadata.apiTarget);
+    const local = ['localhost', '[::1]'].includes(api.hostname) || api.hostname.startsWith('127.');
+    assert.ok(!local || Number(api.port) !== backendPort, 'Temporary backend still has a possible preview consumer');
+  }
 }

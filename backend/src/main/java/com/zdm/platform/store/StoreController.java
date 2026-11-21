@@ -81,9 +81,28 @@ public class StoreController {
     return ApiResponse.ok(storeService.restoreStore(id));
   }
 
-  @DeleteMapping("/{id}")
-  public ApiResponse<Boolean> delete(@PathVariable Long id) {
+  @GetMapping("/{id}/purge-preview")
+  public ApiResponse<com.zdm.platform.storeexit.StoreExitPreview> previewDelete(@PathVariable Long id) {
     permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.delete");
-    return ApiResponse.ok(storeService.deleteStore(id));
+    return ApiResponse.ok(storeService.previewDelete(id));
+  }
+
+  @GetMapping("/{id}/purge-result")
+  public ApiResponse<com.zdm.platform.storeexit.StoreExitResult> purgeResult(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.delete");
+    return ApiResponse.ok(storeService.deleteResult(id));
+  }
+
+  @PostMapping("/{id}/purge-retry")
+  public ApiResponse<Boolean> retryPurge(@PathVariable Long id) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.delete");
+    storeService.retryDelete(id);
+    return ApiResponse.ok(true);
+  }
+
+  @DeleteMapping("/{id}")
+  public ApiResponse<com.zdm.platform.storeexit.StoreExitResult> delete(@PathVariable Long id, @RequestParam String planHash) {
+    permissionGuard.requirePermission(PERMISSION_PREFIX + ".archived.delete");
+    return ApiResponse.ok(storeService.deleteStore(id, planHash));
   }
 }

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { productWarehouseUrl } from './product-test-navigation';
 import { test, expect, type Page } from '@playwright/test';
 import { installAdminApiMocks } from './admin-api-mocks';
@@ -5,6 +6,19 @@ import { installPaymentNameMocks } from './store-payment-name-mocks';
 async function setup(page: Page, audience = 'store', permissions = ['all']) {
   await installAdminApiMocks(page);
   await installPaymentNameMocks(page);
+  await page.route('**/api/open/store-cache-exits', (route) => route.fulfill({ json: { code: 0, data: [] } }));
+  await page.route('**/api/admin/auth/contexts', (route) =>
+    route.fulfill({
+      json: {
+        code: 0,
+        message: 'success',
+        data:
+          audience === 'store'
+            ? [{ identityId: 7, tenantId: 1, storeId: 2, identityType: 'store_admin', clientCode: 'admin' }]
+            : [],
+      },
+    }),
+  );
   await page.addInitScript(
     ({ audience, permissions }) => {
       localStorage.setItem('zdm-admin-token', 'prototype-test-token');
@@ -33,7 +47,11 @@ test('store order prototype has five status views and drill-down without busines
   await setup(page);
   const writes: string[] = [];
   page.on('request', (r) => {
-    if (r.url().includes('/api/') && r.method() !== 'GET') writes.push(r.url());
+    if (new URL(r.url()).pathname === '/api/open/store-cache-exits' && r.method() === 'POST') {
+      expect(Object.keys(r.postDataJSON())).toEqual(['fingerprints']);
+      expect(r.postDataJSON().fingerprints).toEqual(expect.arrayContaining([expect.stringMatching(/^[a-f0-9]{64}$/)]));
+      expect(r.headers().authorization).toBeUndefined();
+    } else if (r.url().includes('/api/') && r.method() !== 'GET') writes.push(r.url());
   });
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
@@ -135,7 +153,7 @@ test('payment configuration starts empty and supports CRUD without rewriting his
   await row.getByText('停用', { exact: true }).click();
   await page.locator('.t-dialog:visible').getByRole('button', { name: '确认停用', exact: true }).click();
   await expect(page.getByText('已停用“成交款”', { exact: true })).toBeVisible();
-  await expect(row.getByText('停用', { exact: true })).toBeVisible();
+  await expect(row.locator('.t-tag')).toHaveText('停用');
   await row.getByText('启用', { exact: true }).click();
   await expect(row.locator('.t-tag')).toHaveText('停用');
   await page.locator('.t-dialog:visible').getByRole('button', { name: '确认启用', exact: true }).click();
@@ -407,6 +425,42 @@ test('payment configuration API failures never fall back to local names and can 
 test('payment name changes during receipt entry require explicit reselection and retain the old label', async ({
   page,
 }) => {
+  // PR121 Linux-only failure diagnosis; mock API metadata only, no payloads or credentials.
+  page.on('request', (request) => {
+    const path = new URL(request.url()).pathname;
+    if (path.includes('/payment-names') || path.endsWith('/auth/contexts'))
+      console.log('RECEIPT_REQUEST', request.method(), path);
+  });
+  page.on('response', (response) => {
+    const path = new URL(response.url()).pathname;
+    if (path.includes('/payment-names') || path.endsWith('/auth/contexts'))
+      console.log('RECEIPT_RESPONSE', response.status(), path);
+  });
+  page.on('pageerror', (error) => console.log('RECEIPT_PAGE_ERROR', error.message));
+  page.on('console', (message) => {
+    if (message.text().startsWith('RECEIPT_CLICK')) console.log(message.text());
+  });
+  await page.addInitScript(() => {
+    document.addEventListener(
+      'click',
+      (event) => {
+        const target = event.target;
+        if (!(target instanceof Element)) return;
+        const item = target.closest('.t-dropdown__item');
+        if (item)
+          console.log(
+            'RECEIPT_CLICK',
+            JSON.stringify({
+              tag: target.tagName,
+              targetClass: target.className,
+              itemClass: item.className,
+              text: item.textContent?.trim(),
+            }),
+          );
+      },
+      true,
+    );
+  });
   await setup(page);
   await page.goto(productWarehouseUrl('/store/order-management/sales'));
   await page.evaluate(async () => {
@@ -482,4 +536,137 @@ test('concurrent payment-name deletion refreshes the list and preserves the edit
   await expect(dialog.getByPlaceholder('请输入名称', { exact: true })).toHaveValue('填写中货款');
   await expect(page.getByRole('cell', { name: '待编辑货款', exact: true })).toHaveCount(0);
   expect(await page.evaluate(async () => (await (await fetch('/api/store/payment-names')).json()).data.total)).toBe(0);
+});
+
+test('a removed store identity cannot continue using cached prototype orders', async ({ page }) => {
+  await setup(page);
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
+  await expect(page.getByRole('button', { name: '新增订单', exact: true })).toBeVisible();
+  const before = await page.evaluate(() => localStorage.getItem('zdm-order-prototype-v1:1:2:7:7'));
+  expect(before).not.toBeNull();
+  await page.route('**/api/admin/auth/contexts', (route) => route.fulfill({ json: { code: 0, data: [] } }));
+  await page.getByRole('button', { name: '新增订单', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => localStorage.getItem('zdm-order-prototype-v1:1:2:7:7'))).toBe(before);
+});
+
+test('offline prototype actions stop and reconnection revalidates the store without deleting cached data', async ({
+  page,
+}) => {
+  await setup(page);
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
+  await expect(page.getByRole('button', { name: '新增订单', exact: true })).toBeVisible();
+  await page.context().setOffline(true);
+  await expect(page.getByText('门店状态待核验', { exact: true })).toBeVisible();
+  await expect(page.locator('.order-card')).toHaveCount(0);
+  await expect(page.getByText('请联网核验门店身份后再操作', { exact: true })).toBeVisible();
+  await expect(page.locator('.t-dialog:visible')).toHaveCount(0);
+  expect(await page.evaluate(() => localStorage.getItem('zdm-admin-token'))).toBe('prototype-test-token');
+  await page.route('**/api/admin/auth/contexts', (route) => route.fulfill({ json: { code: 0, data: [] } }));
+  await page.context().setOffline(false);
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => localStorage.getItem('zdm-order-prototype-v1:1:2:7:7'))).not.toBeNull();
+});
+
+for (const read of ['query', 'tab', 'expand', 'pagination'] as const) {
+  test(`cached order ${read} revalidates its store before exposing another local view`, async ({ page }) => {
+    await setup(page);
+    await page.goto(productWarehouseUrl('/store/order-management/sales'));
+    await expect(page.getByRole('button', { name: '新增订单', exact: true })).toBeVisible();
+    if (read === 'pagination') {
+      await page.evaluate(() => {
+        const key = 'zdm-order-prototype-v1:1:2:7:7';
+        const state = JSON.parse(localStorage.getItem(key)!);
+        const order = state.orders.find((o: { status: string }) => o.status === 'pending');
+        for (let i = 0; i < 11; i++) {
+          const copy = structuredClone(order);
+          copy.id = 'XS' + String(1234567890000 + i);
+          state.orders.push(copy);
+        }
+        localStorage.setItem(key, JSON.stringify(state));
+      });
+      await page.reload();
+      await expect(page.locator('.order-card')).toHaveCount(10);
+    }
+    const before = await page.evaluate(() => localStorage.getItem('zdm-order-prototype-v1:1:2:7:7'));
+    expect(before).not.toBeNull();
+    await page.route('**/api/admin/auth/contexts', (route) => route.fulfill({ json: { code: 0, data: [] } }));
+    if (read === 'query') await page.getByRole('button', { name: '查询', exact: true }).click();
+    else if (read === 'tab') await page.locator('.t-tabs__nav-item').filter({ hasText: '已确认' }).click();
+    else if (read === 'expand') await page.locator('.order-toggle').first().click();
+    else {
+      const next = page.locator('.sales-order-list > .zdm-admin-pagination .t-pagination__btn-next');
+      await expect(next).not.toHaveClass(/t-is-disabled/);
+      await next.click();
+    }
+    await expect(page).toHaveURL(/\/login$/);
+    await expect(page.locator('.order-card, .order-goods')).toHaveCount(0);
+    expect(await page.evaluate(() => localStorage.getItem('zdm-order-prototype-v1:1:2:7:7'))).toBe(before);
+  });
+}
+for (const path of ['sales', 'fulfillment']) {
+  test(`an already-open ${path} page invalidates periodically without a user action`, async ({ page }) => {
+    await setup(page);
+    await page.clock.install();
+    await page.goto(productWarehouseUrl('/store/order-management/' + path));
+    await expect(page.getByRole('main')).toBeVisible();
+    const before = await page.evaluate(() => localStorage.getItem('zdm-order-prototype-v1:1:2:7:7'));
+    expect(before).not.toBeNull();
+    await page.route('**/api/admin/auth/contexts', (route) => route.fulfill({ json: { code: 0, data: [] } }));
+    await page.clock.fastForward(15_000);
+    await expect(page).toHaveURL(/\/login$/);
+    expect(await page.evaluate(() => localStorage.getItem('zdm-order-prototype-v1:1:2:7:7'))).toBe(before);
+  });
+}
+
+test('permanent deletion proof clears only matching browser orders and blocks stale identity replies', async ({
+  page,
+}) => {
+  await setup(page);
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
+  await expect(page.getByRole('button', { name: '新增订单', exact: true })).toBeVisible();
+  const key = 'zdm-order-prototype-v1:1:2:7:7';
+  const unrelated = 'zdm-order-prototype-v1:1:3:7:7';
+  const fingerprint = createHash('sha256').update('zdm-store-cache-v1:1:2').digest('hex');
+  await page.evaluate(({ unrelated }) => localStorage.setItem(unrelated, 'other store snapshot'), { unrelated });
+  const checks: string[][] = [];
+  await page.route('**/api/open/store-cache-exits', async (route) => {
+    expect(route.request().headers().authorization).toBeUndefined();
+    const requested = route.request().postDataJSON().fingerprints as string[];
+    checks.push(requested);
+    await route.fulfill({ json: { code: 0, data: requested.filter((value) => value === fingerprint) } });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), key)).toBeNull();
+  await expect(page.locator('.order-card')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => localStorage.getItem('zdm-admin-token'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('zdm-admin-user'))).toBeNull();
+  expect(checks[0]).toContain(fingerprint);
+  expect(await page.evaluate((key) => localStorage.getItem(key), unrelated)).toBe('other store snapshot');
+  await page.reload();
+  await expect(page.locator('.order-card')).toHaveCount(0);
+  expect(await page.evaluate((key) => localStorage.getItem(key), key)).toBeNull();
+  // The setup deliberately reintroduces stale auth on reload; it must be cleared even without an order cache.
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate(() => localStorage.getItem('zdm-admin-token'))).toBeNull();
+  expect(await page.evaluate(() => localStorage.getItem('zdm-admin-user'))).toBeNull();
+});
+
+test('expired login still permits proof-based cleanup and never sends its expired token', async ({ page }) => {
+  await setup(page);
+  await page.goto(productWarehouseUrl('/store/order-management/sales'));
+  await expect(page.getByRole('button', { name: '新增订单', exact: true })).toBeVisible();
+  const key = 'zdm-order-prototype-v1:1:2:7:7';
+  const fingerprint = createHash('sha256').update('zdm-store-cache-v1:1:2').digest('hex');
+  await page.route('**/api/admin/auth/contexts', (route) => route.fulfill({ status: 401, json: { code: 401 } }));
+  await page.getByRole('button', { name: '新增订单', exact: true }).click();
+  await expect(page).toHaveURL(/\/login$/);
+  expect(await page.evaluate((key) => localStorage.getItem(key), key)).not.toBeNull();
+  await page.route('**/api/open/store-cache-exits', (route) => {
+    expect(route.request().headers().authorization).toBeUndefined();
+    return route.fulfill({ json: { code: 0, data: [fingerprint] } });
+  });
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect.poll(() => page.evaluate((key) => localStorage.getItem(key), key)).toBeNull();
 });

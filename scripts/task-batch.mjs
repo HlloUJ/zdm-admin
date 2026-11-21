@@ -509,9 +509,9 @@ export function assertBatchModulesReady(record) {
   );
 }
 
-export function planBatchDelivery(root) {
+export function planBatchDelivery(root, options) {
   const record = validateActiveBatch(root, readActiveBatch(root));
-  if (record.taskRegistryVersion === 2) return planTaskDelivery(root, record);
+  if (record.taskRegistryVersion === 2) return planTaskDelivery(root, record, options);
   demand(
     !git(record.worktree, ['status', '--porcelain=v1', '--untracked-files=normal']),
     'Batch worktree must be clean before delivery planning',

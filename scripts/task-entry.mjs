@@ -1,6 +1,8 @@
 import { createBoardIntake } from './task-board-intake.mjs';
+import './task-network.mjs';
 import { checkStartMonitoringArgs } from './task-monitor-registration.mjs';
 import assert from 'node:assert/strict';
+import { observeEntry } from './parallel-task-timing.mjs';
 import { execFileSync, spawnSync } from 'node:child_process';
 import { existsSync, lstatSync, realpathSync } from 'node:fs';
 import path from 'node:path';
@@ -18,6 +20,7 @@ const entries = {
   check: 'scripts/dev-task.mjs',
   temporary: 'scripts/dev-task.mjs',
   combination: 'scripts/task-preview-combination.mjs',
+  continuation: 'scripts/task-continuation-plan.mjs',
 };
 export function publishedTaskEntry(root, args) {
   const git = (cwd, ...flags) => execFileSync('git', ['-C', cwd, ...flags], { encoding: 'utf8', stdio: 'pipe' }).trim();
@@ -34,7 +37,7 @@ export function publishedTaskEntry(root, args) {
   const [command, ...rest] = args;
   assert.ok(
     entries[command],
-    'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination> [args]',
+    'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination|continuation> [args]',
   );
   const registry = createTaskRegistry(root),
     targetRegistry = createTaskRegistry(target);
@@ -56,19 +59,13 @@ export function publishedTaskEntry(root, args) {
   assert.ok(existsSync(script) && lstatSync(script).isFile() && !lstatSync(script).isSymbolicLink());
   git(main, 'cat-file', '-e', published + ':' + entries[command]);
   if (command === 'start') {
-    checkStartMonitoringArgs(rest, targetRegistry);
+    const context = checkStartMonitoringArgs(rest, targetRegistry);
     const option = (flag) => {
       const index = rest.indexOf(flag);
       return index < 0 ? undefined : rest[index + 1];
     };
-    const slug = option('--slug'),
-      raw = option('--monitor-context');
-    const context = raw === undefined ? undefined : JSON.parse(raw);
-    if (
-      slug &&
-      !targetRegistry.readTask(slug) &&
-      ['codex-thread', 'collaboration-agent'].includes(context?.executionSurface)
-    )
+    const slug = option('--slug');
+    if (['codex-thread', 'collaboration-agent'].includes(context?.executionSurface))
       createBoardIntake(targetRegistry.commonDir).require(
         context,
         slug,
@@ -90,21 +87,23 @@ export function publishedTaskEntry(root, args) {
         : command === 'registry' && rest[0] === 'register'
           ? [...rest, '--worktree', target]
           : rest;
-  return { script, cwd: target, args: forwarded, published, source: main };
+  return { script, cwd: target, args: forwarded, published, source: main, command, originalArgs: rest };
 }
 export function main(root = process.cwd(), args = process.argv.slice(2)) {
   if (args.includes('--help')) {
     console.log(
-      'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
+      'task:entry [--worktree <exact path>] <start|execution-order|registry|preview|data|work|complete|check|temporary|combination|continuation> [args]\nUse the clean published main entry for both new and restored task worktrees. No automatic adoption or preview takeover.',
     );
     return;
   }
   const plan = publishedTaskEntry(root, args);
-  const result = spawnSync(process.execPath, [plan.script, ...plan.args], {
-    cwd: plan.cwd,
-    env: process.env,
-    stdio: 'inherit',
-  });
+  const result = observeEntry(plan, createTaskRegistry(root), () =>
+    spawnSync(process.execPath, [plan.script, ...plan.args], {
+      cwd: plan.cwd,
+      env: process.env,
+      stdio: 'inherit',
+    }),
+  );
   assert.equal(
     result.status,
     0,

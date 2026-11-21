@@ -147,6 +147,18 @@ async function confirmedPlacement(box, adapter, task, entry, column) {
   assert.equal(read.task.status, column);
   return read;
 }
+async function drainPlacementReceipts(box, drain) {
+  let before = box.read();
+  while (true) {
+    await drain();
+    const after = box.read();
+    assert.equal((after.rejected ?? []).length, (before.rejected ?? []).length, 'Rejected receipt blocks placement');
+    if (!after.pending.length) return;
+    assert.ok(!after.pending.some((entry) => entry.failure?.retryable === false), 'Rejected receipt blocks placement');
+    assert.ok(after.pending.length < before.pending.length, 'Earlier unresolved receipt blocks placement');
+    before = after;
+  }
+}
 // A real next-card transition is confirmed before the next fact is created.
 // No manufactured review, old timestamp refresh, annotation clearing or source execution on failure.
 export async function ensureDeliveryPlacement(
@@ -168,7 +180,7 @@ export async function ensureDeliveryPlacement(
     ['active', 'review', 'merging'].includes(seen.task.status),
     'Paused/blocked/done task cannot be moved by delivery host',
   );
-  await drain();
+  await drainPlacementReceipts(box, drain);
   assert.equal(box.read().pending.length, 0, 'Earlier unresolved receipt blocks placement');
   seen = await adapter.read(task.id, probe, { signal: AbortSignal.timeout(5000) });
   assert.equal(seen.task?.id, task.id);
@@ -189,7 +201,7 @@ export async function ensureDeliveryPlacement(
         key,
         developmentReadyFact({ task, source, event, observedAt: new Date(now()).toISOString() }),
       );
-    await drain();
+    await drainPlacementReceipts(box, drain);
     seen = await confirmedPlacement(box, adapter, task.id, entry, 'review');
   }
   assert.equal(seen.task.board_column, 'review', 'Cannot skip the development review card');
@@ -203,7 +215,7 @@ export async function ensureDeliveryPlacement(
       key,
       beginDeliveryFact({ task, ticket, acceptance, event, observedAt: new Date(now()).toISOString() }),
     );
-  await drain();
+  await drainPlacementReceipts(box, drain);
   const read = await confirmedPlacement(box, adapter, task.id, entry, 'merging');
   return {
     state: 'confirmed',
