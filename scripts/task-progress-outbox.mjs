@@ -522,6 +522,10 @@ export async function flushProgress(outbox, adapter, { limit = 32 } = {}) {
           });
           break;
         }
+        if (receipt.stage_fact?.kind === 'development_ready') {
+          const { checkFixedAcceptanceReview } = await import('./task-fixed-acceptance.mjs');
+          await checkFixedAcceptanceReview(outbox.directory, receipt);
+        }
         const pending = outbox.prepare(receipt.receipt_id, seen.revision);
         try {
           await adapter.apply({ id: receipt.task_id, revision: pending.revision, receipt });

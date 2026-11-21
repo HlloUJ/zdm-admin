@@ -30,3 +30,16 @@
 统一新建入口（包括 `task:entry start`、`task:start`、`task:micro`）要求准确 `--monitor-context '<JSON>'`，或仅为本次命令提供 `ZDM_TASK_MONITOR_CONTEXT`。JSON 必须含 `taskNumber`、`taskName`、`taskStableId`、`worker`、`rootThreadId`、`roomId`、`authorizationRef`；原 worker 的真实 `CODEX_THREAD_ID` 必须与 owner 一致。由根线程使用真实任务卡片与平台身份提供，不猜测或复制另一任务字段。
 
 缺失、格式错误或身份不符时在任何 Git 修改前拒绝，不创建工作区。工作流模板调用可通过本次命令环境变量提供，不修改持久环境或受保护配置。已有任务的准确 resume 路径不要求补字段，也不会批量回填旧任务。底层 registry 的兼容登记仍可能明确显示 pending-context，不算统一新建监测已覆盖。
+
+## 固定 5179 验收
+
+固定入口接收已完成开发的业务任务。开发队列先写入准确候选、原执行者和验证报告，随后在 `fixed-acceptance/inbox` 留下提醒。提醒写入中断时仍可从已登记开发回执补处理。启用时登记既有完成回执作为起点，其他历史任务维持原状态。
+
+- `task:entry acceptance pending` 核对未完成验收的开发回执、原始报告和干净工作区。
+- `task:entry acceptance plan` 在实际 5179 承载版本上组合准确应用及相关测试变化。结果只供验收，保留各方原分支和上一版。源冲突时返回原错误。
+- `task:entry acceptance reconcile` 由登记的固定验收执行者消费最早一项回执，加载固定验收策略指定且摘要相符的本机宿主。宿主准备隔离候选、演练兼容回退、保全验收库与媒体，再持有原集成和 5179／8081 资源锁进行切换。涉及迁移时核对备份文件和摘要。功能验收失败后恢复并验证原载体，保留失败和回退记录。
+- `task:entry acceptance ready <工程任务 ID>` 只在实际 5179 运行版本、后端和绑定，以及对应候选的功能报告全部对上时登记待验收回执。宿主用看板原回执身份同步并读回。传输失败只补同步。
+
+固定模式由同仓库 Git 公共目录内的 `fixed-acceptance/policy.json` 启用。策略限定端口、正式执行者和初始开发回执。发布宿主 `fixed-acceptance/host.mjs` 由策略固定摘要，提供 `prepare`、`switchPreview`、`restorePreview` 和 `deliver`，沿用已授权的工具和看板身份。候选源码、测试夹具和配置存在本身均不能证明宿主已运行。
+
+实际发布载体的 `.task-runtime/acceptance/verified-release.json` 使用版本 2，记录准确运行提交、分支、后端 ID、配置摘要和成员。每个成员绑定工程任务、看板 ID、开发候选、开发回执和原始功能报告摘要。输出待验收回执、发送前复验和交付沿用现有看板原子协议。仅「待验收」的真假由固定预览证据决定，正式交付继续遵守各任务授权和现有队列。
