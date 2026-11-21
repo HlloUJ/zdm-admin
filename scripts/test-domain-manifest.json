@@ -525,7 +525,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-cli.mjs": {
-      "digest": "685f87c25257a279601869211ca1870c860c3cfa33ea6826bc64dd08c62c51c8",
+      "digest": "10c3f3de4d6f6535cbc9cebc6b759dd177549ef6bef17bd86b68828eb858fdea",
       "imports": [
         "scripts/accepted-source.mjs",
         "scripts/batch-timing-runtime.mjs",
@@ -588,7 +588,7 @@
       "dynamicImports": 1
     },
     "scripts/completion-flow.mjs": {
-      "digest": "deb91c900809ab36e85db4536ef8c254817807df3c9e2d97f0f0512a04459c60",
+      "digest": "3cfe4db3a8b60ecc8b82269581a98de0e1adad0c4bd02b422bab7a98e0b0d55b",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source.mjs",
@@ -625,7 +625,7 @@
       "dynamicImports": 0
     },
     "scripts/completion-parallel.test.mjs": {
-      "digest": "4ac723a76ddd0ee20b6eaaea1aca1338b1fcce94e36ae15fbec2bf3329e91800",
+      "digest": "f88aff1657d1402ee744256ca8aca34c9f69dbb0083472f5709309bb1c60cbc5",
       "imports": [
         "scripts/accepted-source-composition.mjs",
         "scripts/accepted-source-policy.mjs",
@@ -1012,7 +1012,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/published-ci-repair.mjs": {
-      "digest": "fcd39292569ae727598ae071bd6abeec01d32ceae6fa9f98abf5dc8340d7a40a",
+      "digest": "17ac754a47df911cf6b8e8da0f3bb7f25038690cc092ddbede900622cfbd4399",
       "imports": ["scripts/completion-ci-evidence.mjs", "scripts/completion-status.mjs"],
       "dynamicImports": 0
     },
@@ -2753,7 +2753,7 @@
       "dynamicImports": 1
     },
     "scripts/task-completion.mjs": {
-      "digest": "9be04811b828bd2af3163d7a68842a5097ff8bbbce7b0d803dcb72f767c64571",
+      "digest": "bf2f8b3154ce2a9d812af10349dc5ff1469f2189002ee17fe2d59195495241e8",
       "imports": [
         "scripts/completion-cli.mjs",
         "scripts/completion-fixed-preview.mjs",

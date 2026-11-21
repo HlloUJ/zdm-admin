@@ -118,6 +118,12 @@ async function completionCommandLocked(
     assert.match(publishedRepairId, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     args = args.slice(0, 3);
   }
+  let recomposeManifestMain;
+  if (preparationOnly && args.length === 5 && args[3] === '--recompose-manifest') {
+    recomposeManifestMain = args[4];
+    assert.match(recomposeManifestMain, /^[a-f0-9]{40}$/, 'Exact published main SHA required');
+    args = args.slice(0, 3);
+  }
   if (preparationOnly) args = ['deliver', ...args.slice(1)];
   assert.equal(typeof deferSettle, 'boolean');
   assert.ok(!deferSettle || args[0] === 'deliver', 'deferSettle only applies to deliver');
@@ -234,6 +240,10 @@ async function completionCommandLocked(
   }
   if (['begin', 'freeze', 'deliver', 'final-handoff', 'settle'].includes(mode) && batch.taskRegistryVersion !== 2) {
     assertBatchModulesReady(batch);
+  }
+  if (recomposeManifestMain) {
+    assert.ok(batch.taskRegistryVersion === 2 && batch.frozen?.accepted, 'Original registered freeze required');
+    assert.equal(rest[1], batch.recordedHead, 'Recomposition requires the original recorded candidate');
   }
   if (['begin', 'freeze', 'deliver'].includes(mode)) {
     assertCurrentAdmission?.();
@@ -381,6 +391,7 @@ async function completionCommandLocked(
       preparationOnly,
       engineeringReviewFile,
       publishedRepairId,
+      recomposeManifestMain,
       assertCurrentAdmission,
       execute,
       state,
@@ -933,7 +944,9 @@ export async function completionCommand(root, args, options = {}) {
     const baseLength = command === 'settle' ? 4 : 3;
     const base = args.slice(0, baseLength);
     const flags = args.slice(baseLength);
-    const preparationFlag = flags.includes('--engineering-review') ? '--engineering-review' : '--published-repair';
+    const preparationFlag = ['--engineering-review', '--published-repair', '--recompose-manifest'].find((flag) =>
+      flags.includes(flag),
+    );
     const reviewIndex = flags.indexOf(preparationFlag);
     assert.ok(
       flags.length === 2 || (command === 'prepare' && flags.length === 4 && [0, 2].includes(reviewIndex)),

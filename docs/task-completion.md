@@ -18,6 +18,8 @@
 
 原任务父提交早于主线新增工程输入时，入口从准确 Git 合并基线读取其已发布清单。基线须在受信 main 的第一父链上，原任务只可缺少基线中尚不存在的后来新增输入。历史清单和原任务清单都按各自准确的输入文件重算。当前 main 和最终组合树继续核对当前工程输入全集。
 
+原候选首轮 PR Quality CI 已成功且随后发布主线前进时，可在真实 preparation 准入下调用 `complete prepare <任务ID> <原登记HEAD> --recompose-manifest <准确origin/main SHA>`。入口核对原冻结、开放的原 PR、首轮成功 CI 和其原基线，只接受唯一工程清单冲突。沿用原引用保护、受信清单生成器和双亲组合登记，只追加一个自有 checkpoint，快进原 PR 并等待新 SHA 的首轮 CI。可附加 `--reference-proof`；组合变更 HEAD 后按原流程重新采集。已有组合证明的中断用普通 `complete prepare` 从准确登记 HEAD 接续。
+
 出现其他已知技术文件冲突时，原任务执行者可审阅准确双亲的组合提交，并为同一 `complete prepare` 追加 `--engineering-review <任务工作区 .task-verification 内的绝对路径>`。JSON 使用 `version: 1`、`accepted`、`taskHead`、`main`、`candidate` 和 `files`。每个实际冲突文件记录 `file`、`inputs: { base, task, main }`、`result`、`reason`，其中各版本记录 Git `mode` 和完整 blob `object`。原执行者在理由中说明保留两侧有效行为与测试的依据。入口从真实 Git 三方对象验证输入、候选双亲、输出和实际冲突清单，独立重算工程清单并核对完整候选树。业务、控制面、未知项、删除、模式变化、未经审阅的冲突或候选自行带入的其他变化继续拒绝。有效审阅随原组合证明留存供中断恢复，远端原有来源与 CI 门禁继续执行。
 
 独立任务获得准确“任务完成”授权后，首选 `npm run task:completion -- deliver <batch-id> <准确任务40位SHA>`。该入口绑定准确 task/owner/Worktree 并冻结实际源码；核对保护、备份与健康，推送并完成初始 PR CI，再进入 FIFO 正式交付队列。队列内刷新 main、按原始冻结与受信主线组合，在该准确组合候选自己的源码中执行本地就绪检查，必要运行验证使用当前任务独占的临时端口，不抢占正在展示其他任务的5175；变化候选重新推送和验证后才准确合并，随后完成本地 main 同步、main CI、最终交接和 settle；每个阶段直接await前一阶段，不靠人工休眠轮询再接命令。只有刚创建事件尚未出现时有限等待查询，绝不dispatch或重跑CI；多个候选、失败、重跑、主线变化或保护不符均停止。源码修改不授权调用deliver；PR创建输出URL后仍须由调用方附加到当前对话。

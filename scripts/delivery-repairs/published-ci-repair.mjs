@@ -43,6 +43,47 @@ export function originalRepairPull(gh, repository, number, branch, heads) {
   return pull;
 }
 
+export function verifyPreparedManifestSource({ batch, head, main, accepted, state, git, gh, repository }) {
+  const prepared = state.preparedCandidates?.find((entry) => entry.head === head);
+  assert.equal(prepared?.task, batch.id, 'Original prepared candidate required for manifest recomposition');
+  assert.equal(prepared.accepted, accepted, 'Original prepared freeze changed');
+  assert.ok(Number.isSafeInteger(prepared.pullRequest) && prepared.pullRequest > 0);
+  const ci = successfulCi(state, head, batch.branch, 'pull_request');
+  assert.equal(String(ci.runId), prepared.runId);
+  assert.match(prepared.runId, /^\d+$/);
+  originalRepairPull(gh, repository, prepared.pullRequest, batch.branch, [head]);
+  const run = gh('api', 'repos/' + repository + '/actions/runs/' + prepared.runId + '/attempts/1');
+  assert.equal(String(run.id), prepared.runId);
+  assert.equal(run.run_attempt, 1);
+  assert.equal(run.repository?.full_name, repository);
+  assert.equal(run.head_repository?.full_name, repository);
+  assert.equal(run.path, '.github/workflows/quality.yml');
+  assert.equal(run.event, 'pull_request');
+  assert.equal(run.head_branch, batch.branch);
+  assert.equal(run.head_sha, head);
+  assert.equal(run.status, 'completed');
+  assert.equal(run.conclusion, 'success');
+  const pulls = run.pull_requests.filter(({ number }) => number === prepared.pullRequest);
+  assert.equal(pulls.length, 1, 'Exact original PR association required');
+  const [pull] = pulls;
+  assert.equal(pull.base.ref, 'main');
+  assert.equal(pull.head.ref, batch.branch);
+  assert.equal(pull.head.sha, head);
+  const originalMain = pull.base.sha;
+  assert.match(originalMain, sha);
+  assert.notEqual(originalMain, main, 'Published main must have advanced since the original PR CI');
+  git('merge-base', '--is-ancestor', originalMain, head);
+  git('merge-base', '--is-ancestor', originalMain, main);
+  return {
+    taskHead: head,
+    main,
+    accepted,
+    pullRequest: prepared.pullRequest,
+    originalMain,
+    originalRunId: prepared.runId,
+  };
+}
+
 // Bind the source delta to the delivered repair and to both candidate trees.
 // A repair already in the old tree, subsequently overwritten, or applied on
 // top of different inputs cannot grant this preparation path.
