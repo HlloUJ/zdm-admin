@@ -27,6 +27,7 @@ import {
   freezeAcceptedSource,
   assertAcceptedSource,
   readAcceptance,
+  verifyLocalAcceptedContinuation,
   verifyRemoteAcceptance,
 } from './accepted-source.mjs';
 import { applyTaskComposition } from './task-composition.mjs';
@@ -149,13 +150,19 @@ async function completionCommandLocked(
     assert.match(publishedRepairId, /^[a-z0-9]+(?:-[a-z0-9]+)*$/);
     args = args.slice(0, 3);
   }
+  let recomposeManifestMain;
+  if (preparationOnly && args.length === 5 && args[3] === '--recompose-manifest') {
+    recomposeManifestMain = args[4];
+    assert.match(recomposeManifestMain, /^[a-f0-9]{40}$/, 'Exact published main SHA required');
+    args = args.slice(0, 3);
+  }
   if (preparationOnly) args = ['deliver', ...args.slice(1)];
   assert.equal(typeof deferSettle, 'boolean');
   assert.ok(!deferSettle || args[0] === 'deliver', 'deferSettle only applies to deliver');
   const limits = {
     begin: [0, 1],
     freeze: [0, 0],
-    'check-source': [1, 1],
+    'check-source': [1, 3],
     'compose-reviewed': [2, 2],
     deliver: [2, 2],
     recover: [0, 0],
@@ -267,6 +274,10 @@ async function completionCommandLocked(
   if (['begin', 'freeze', 'deliver', 'final-handoff', 'settle'].includes(mode) && batch.taskRegistryVersion !== 2) {
     assertBatchModulesReady(batch);
   }
+  if (recomposeManifestMain) {
+    assert.ok(batch.taskRegistryVersion === 2 && batch.frozen?.accepted, 'Original registered freeze required');
+    assert.equal(rest[1], batch.recordedHead, 'Recomposition requires the original recorded candidate');
+  }
   if (['begin', 'freeze', 'deliver'].includes(mode)) {
     assertCurrentAdmission?.();
     const acceptance = freezeAcceptedSource(batch.worktree, batch);
@@ -310,7 +321,18 @@ async function completionCommandLocked(
     if (mode === 'freeze')
       return { acceptance, protection: 'local-content-addressed; remote-independent-enforcement-not-implied' };
   }
-  if (mode === 'check-source') return assertAcceptedSource(batch.worktree, batch.id, rest[0]);
+  if (mode === 'check-source') {
+    if (rest.length === 1) return assertAcceptedSource(batch.worktree, batch.id, rest[0]);
+    assert.equal(rest.length, 3, 'Use check-source <candidate> --continuation-main <exact-main>');
+    assert.equal(rest[1], '--continuation-main');
+    const main = rest[2];
+    assert.match(main, /^[a-f0-9]{40}$/);
+    assert.equal(git('rev-parse', 'refs/remotes/origin/main'), main, 'Exact fetched origin/main required');
+    assert.equal(git('ls-remote', 'origin', 'refs/heads/main'), main + '\trefs/heads/main', 'Published main moved');
+    const claims = verifyLocalAcceptedContinuation(batch.worktree, batch.id, rest[0], main);
+    assert.equal(claims.accepted, batch.frozen?.accepted, 'Registered original freeze changed');
+    return claims;
+  }
   if (['recover', 'deliver'].includes(mode)) recoverWriter(directory);
   const state = openCompletion(directory, batch.id, {
       requestedAt: mode === 'begin' ? rest[0] : undefined,
@@ -402,6 +424,7 @@ async function completionCommandLocked(
       preparationOnly,
       engineeringReviewFile,
       publishedRepairId,
+      recomposeManifestMain,
       assertCurrentAdmission,
       execute,
       state,
@@ -1093,7 +1116,9 @@ export async function completionCommand(root, args, options = {}) {
     const baseLength = command === 'settle' ? 4 : 3;
     const base = args.slice(0, baseLength);
     const flags = args.slice(baseLength);
-    const preparationFlag = flags.includes('--engineering-review') ? '--engineering-review' : '--published-repair';
+    const preparationFlag = ['--engineering-review', '--published-repair', '--recompose-manifest'].find((flag) =>
+      flags.includes(flag),
+    );
     const reviewIndex = flags.indexOf(preparationFlag);
     assert.ok(
       flags.length === 2 || (command === 'prepare' && flags.length === 4 && [0, 2].includes(reviewIndex)),

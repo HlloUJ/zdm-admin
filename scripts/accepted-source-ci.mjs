@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { acceptedGit, acceptedRef, verifyRemoteAcceptance } from './accepted-source.mjs';
+import { CONTINUATION_BATCH } from './accepted-source-continuation.mjs';
 import { ACCEPTED_SOURCE_CHECK } from './accepted-source-policy.mjs';
 
 const publicReasons = new Map([
@@ -89,15 +90,15 @@ export async function runAcceptedSourceCI(root, event, { repository, token, requ
     status: 'in_progress',
   });
   try {
-    const batch = pull.head.ref.slice('codex/'.length),
-      ref = acceptedRef(batch);
-    acceptedGit(root, ['fetch', '--no-tags', 'origin', pull.head.sha, ref + ':' + ref]);
-    const accepted = acceptedGit(root, ['rev-parse', ref]);
+    const batch = pull.head.ref.slice('codex/'.length);
+    const continuation = batch === CONTINUATION_BATCH;
+    const ref = acceptedRef(batch);
+    acceptedGit(root, ['fetch', '--no-tags', 'origin', pull.head.sha, ...(continuation ? [] : [ref + ':' + ref])]);
     const result = verifyRemoteAcceptance(root, {
       candidate: pull.head.sha,
-      accepted,
       branch: pull.head.ref,
       trustedMain: pull.base.sha,
+      ...(continuation ? {} : { accepted: acceptedGit(root, ['rev-parse', ref]) }),
     });
     await api('complete-success', 'PATCH', '/check-runs/' + check.id, {
       status: 'completed',

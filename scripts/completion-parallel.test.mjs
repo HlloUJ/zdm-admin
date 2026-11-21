@@ -1296,3 +1296,177 @@ for (const scenario of [
     assert.equal(f.quiesced(), 0);
   });
 }
+
+for (const scenario of [
+  'success',
+  'wrong-main',
+  'wrong-run',
+  'clean-merge',
+  'other-conflict',
+  'protected-conflict',
+  'unknown-preview',
+])
+  test('public post-CI manifest recomposition: ' + scenario, async (t) => {
+    const f = fixture(t, {
+      manifestConflict: scenario !== 'clean-merge',
+      cleanManifest: scenario === 'clean-merge',
+      reviewedConflict: scenario === 'other-conflict',
+    });
+    let latest = f.latest;
+    if (scenario === 'protected-conflict') {
+      writeFileSync(path.join(f.main, 'feature-a.txt'), 'independent conflicting business');
+      f.git(f.main, 'add', 'feature-a.txt');
+      f.git(f.main, 'commit', '-m', 'Published protected conflict');
+      f.git(f.main, 'push', 'origin', 'main');
+      latest = f.git(f.main, 'rev-parse', 'HEAD');
+    }
+    const base = f.git(f.a, 'merge-base', f.head, latest);
+    const directory = path.join(f.registry.commonDir, 'task-delivery', 'a');
+    const state = openCompletion(directory, 'a');
+    const originalCi = await completionStage(state, 'ci', f.head + ':41', () =>
+      ciEvidence('41', f.head, false, Date.now()),
+    );
+    const oldEvent = structuredClone(state.events.at(-1));
+    state.preparedCandidates = [
+      {
+        version: 1,
+        task: 'a',
+        head: f.head,
+        accepted: f.accepted.commit,
+        runId: originalCi.result.runId,
+        pullRequest: 149,
+        url: 'https://example.invalid/pull/149',
+      },
+    ];
+    saveCompletion(directory, state);
+    f.git(f.a, 'push', 'origin', 'codex/a');
+    publishAcceptance(f.a, 'a');
+    const before = f.registry.readTask('a');
+    const remoteHead = () => f.git(f.a, 'ls-remote', 'origin', 'refs/heads/codex/a').split('\t')[0];
+    const waited = [];
+    let quiesced = false;
+    let shock = scenario === 'success';
+    const options = {
+      owner: 'chat-a',
+      checkRuntime: async () => ({ integrationHealthy: true, backupRetained: true }),
+      runtimeReferences: async () => {},
+      previewControl: {
+        assertOwner: async () => {},
+        prepareComposition: async (plan, { referenceEffect }) => {
+          assert.equal(referenceEffect, 'preparation');
+          assert.equal(plan.main, latest);
+          assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+          quiesced = true;
+          if (scenario === 'unknown-preview')
+            await taskRuntimeReferences(f.registry.readTask('a'), {
+              referenceEffect,
+              backendPorts: () => [],
+              readLeases: () => [{ task: 'b', port: 5177 }],
+              request: async () => ({ statusCode: 0, errorCode: 'ECONNREFUSED' }),
+            });
+        },
+      },
+      execute(cwd, program, args) {
+        if (program === 'git') {
+          if (shock && args[0] === 'merge' && args[1] === '--ff-only') {
+            shock = false;
+            throw new Error('Fixture interruption after durable manifest intent');
+          }
+          return f.git(cwd, ...args);
+        }
+        assert.equal(program, 'gh');
+        if (args[0] === 'repo') return JSON.stringify({ nameWithOwner: 'fixture/repo' });
+        if (args[0] === 'pr') {
+          assert.deepEqual(args.slice(1, 3), ['view', '149']);
+          return JSON.stringify({
+            number: 149,
+            state: 'OPEN',
+            headRefName: 'codex/a',
+            baseRefName: 'main',
+            isCrossRepository: false,
+            headRefOid: remoteHead(),
+            url: 'https://example.invalid/pull/149',
+          });
+        }
+        if (args[0] === 'run') {
+          assert.equal(args[args.indexOf('--commit') + 1], remoteHead());
+          assert.notEqual(remoteHead(), f.head);
+          return JSON.stringify([
+            { databaseId: 42, headSha: remoteHead(), event: 'pull_request', headBranch: 'codex/a' },
+          ]);
+        }
+        assert.equal(args[0], 'api');
+        if (args[1] === 'repos/fixture/repo/actions/runs/41/attempts/1')
+          return JSON.stringify({
+            id: 41,
+            run_attempt: 1,
+            repository: { full_name: 'fixture/repo' },
+            head_repository: { full_name: 'fixture/repo' },
+            path: '.github/workflows/quality.yml',
+            event: 'pull_request',
+            head_branch: 'codex/a',
+            head_sha: scenario === 'wrong-run' ? base : f.head,
+            status: 'completed',
+            conclusion: 'success',
+            pull_requests: [{ number: 149, base: { ref: 'main', sha: base }, head: { ref: 'codex/a', sha: f.head } }],
+          });
+        assert.equal(args[1], 'repos/fixture/repo/branches/main/protection');
+        return JSON.stringify({
+          enforce_admins: { enabled: true },
+          required_status_checks: { strict: true, contexts: ['Frontend quality', 'Backend quality'] },
+        });
+      },
+      waitQuality: async (_cwd, runId, head) => {
+        waited.push({ runId, head });
+        return ciEvidence(String(runId), head, false, Date.now());
+      },
+    };
+    const args = ['prepare', 'a', f.head, '--recompose-manifest', scenario === 'wrong-main' ? base : latest];
+    if (scenario === 'success') {
+      await assert.rejects(completionCommand(f.a, args, options), /Fixture interruption/);
+      assert.equal(f.git(f.a, 'rev-parse', 'HEAD'), f.head);
+      assert.equal(remoteHead(), f.head);
+      assert.ok(readAcceptedComposition(f.a, 'a', f.accepted.commit));
+      await assert.rejects(completionCommand(f.a, args, options), /existing composition/);
+      const result = await completionCommand(f.a, ['prepare', 'a', f.head], options);
+      assert.equal(result.pullRequest, 149);
+      assert.equal(result.runId, '42');
+      assert.deepEqual(waited, [{ runId: '42', head: result.head }]);
+      assert.deepEqual(f.git(f.a, 'show', '-s', '--format=%P', result.head).split(' '), [f.head, latest]);
+      assert.equal(remoteHead(), result.head);
+      assert.equal(engineeringDomainProof(f.a).proven, true);
+      assert.deepEqual(
+        f.registry
+          .readTask('a')
+          .checkpoints.slice(before.checkpoints.length)
+          .map(({ commit }) => commit),
+        [result.head],
+      );
+      assert.equal(quiesced, true);
+      await assert.rejects(
+        completionCommand(f.a, ['prepare', 'a', result.head, '--recompose-manifest', latest], options),
+        /existing composition/,
+      );
+    } else {
+      const reasons = {
+        'wrong-main': /not current origin\/main/,
+        'wrong-run': new RegExp(f.head),
+        'clean-merge': /requires an actual manifest conflict/,
+        'other-conflict': /Exact engineering review required/,
+        'protected-conflict': /Exact engineering review required/,
+        'unknown-preview': /unknown on leased port 5177/,
+      };
+      await assert.rejects(completionCommand(f.a, args, options), reasons[scenario]);
+      assert.deepEqual(f.registry.readTask('a'), before);
+      assert.equal(readAcceptedComposition(f.a, 'a', f.accepted.commit), null);
+      assert.equal(remoteHead(), f.head);
+      assert.deepEqual(waited, []);
+      assert.equal(quiesced, scenario === 'unknown-preview');
+    }
+    assert.deepEqual(
+      openCompletion(directory, 'a', { formal: false }).events.find(({ id }) => id === oldEvent.id),
+      oldEvent,
+    );
+    assert.deepEqual(readAcceptance(f.a, 'a'), f.accepted);
+    assert.deepEqual(createTaskDeliveryQueue(f.registry.commonDir).inspect().tickets, []);
+  });
