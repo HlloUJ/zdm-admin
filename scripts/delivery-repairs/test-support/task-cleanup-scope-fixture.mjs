@@ -248,7 +248,6 @@ export async function scopeFixture(t) {
         hostTimezone: 'Asia/Shanghai',
         verifyRuntime: () => ({ root, commonDir: common, sourceHead: task.main.local }),
         runCleanup: (_root, args, options) => run(args, options),
-        notify: async () => ({ status: 'unconfigured' }),
       }),
   };
 }

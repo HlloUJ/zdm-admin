@@ -505,13 +505,15 @@ export function createCleanupQueue(commonDir) {
       release();
     }
   }
-  function pendingNotifications({ limit = 20 } = {}) {
+  function pendingNotifications({ limit = 20, scope = null } = {}) {
     assert.ok(Number.isSafeInteger(limit) && limit > 0 && limit <= 100);
+    if (scope) requireExactScope(scope).recheck();
     const release = lock();
     try {
       const i = index(),
         events = [];
-      for (const [id, key] of Object.entries(i.notifications ?? {}).slice(0, limit)) {
+      const notifications = Object.entries(i.notifications ?? {}).filter(([, key]) => !scope || scope.has(key));
+      for (const [id, key] of notifications.slice(0, limit)) {
         assert.match(id, UUID);
         assert.match(key, HEX);
         const notice = read(path.join(folders.notifications, id + '.json'));
@@ -527,6 +529,7 @@ export function createCleanupQueue(commonDir) {
       }
       for (const [key, id] of Object.entries(i.integrity ?? {})) {
         if (events.length >= limit) break;
+        if (scope && !scope.has(key)) continue;
         assert.match(key, HEX);
         const notice = read(path.join(folders['system-notices'], key + '.json'));
         assert.equal(notice.key, key);

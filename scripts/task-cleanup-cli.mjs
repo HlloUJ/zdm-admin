@@ -172,10 +172,13 @@ export async function cleanupCommand(
   }
   if (args[0] === 'pending-notifications') {
     assert.equal(args.length, 1);
+    const policyFile = path.join(registry.commonDir, 'task-cleanup', 'policy.json');
+    const policy = existsSync(policyFile) ? loadCleanupPolicy(registry.commonDir) : null;
+    const scope = policy?.scope ? loadExactCleanupScope(registry.commonDir, policy) : null;
     return {
       status: 'pending',
       notifications: queue
-        .pendingNotifications()
+        .pendingNotifications({ scope })
         .map((event) => ({ ...cleanupNotice(event), delivery: cleanupNoticeState(queue, event) })),
       delivery: 'unverified',
     };
@@ -184,12 +187,14 @@ export async function cleanupCommand(
     assert.equal(args.length, 2);
     safePath(path.resolve(args[1]));
     const envelope = JSON.parse(readFileSync(args[1], 'utf8'));
+    const policy = loadCleanupPolicy(registry.commonDir);
+    const scope = policy.scope ? loadExactCleanupScope(registry.commonDir, policy) : null;
     const event = queue
-      .pendingNotifications({ limit: 100 })
+      .pendingNotifications({ limit: 100, scope })
       .find((r) => r.key === envelope.key && r.id === envelope.id);
     assert.ok(event, 'Exact pending notification no longer available');
     assert.equal(envelope.eventId, cleanupNotice(event).eventId);
-    const destination = loadCleanupPolicy(registry.commonDir).notification?.destination;
+    const destination = policy.notification?.destination;
     assert.ok(destination, 'Fixed notification destination not configured');
     return args[0] === 'claim-notification'
       ? claimCleanupNotice(queue, event, destination)

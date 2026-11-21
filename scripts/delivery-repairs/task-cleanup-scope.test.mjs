@@ -75,6 +75,36 @@ test('manual and scheduled routes reject mixing exact scope with whole-task clea
   assert.deepEqual(outsideState(f), outside);
 });
 
+test('manual notice lookup and scheduled cleanup retain the indices and receipts of acknowledged out-of-scope notices', async (t) => {
+  const f = await scopeFixture(t);
+  const noticeId = '99dbe518-c348-485b-a403-e40b6a36f5f3';
+  const integrityId = '457461ab-5ce9-456a-aa0a-c03d074b3d27';
+  const indexFile = path.join(f.base, 'index.json');
+  const index = JSON.parse(fs.readFileSync(indexFile));
+  index.notifications = { [noticeId]: f.outside.key };
+  index.integrity = { [f.outside.key]: integrityId };
+  const noticeFiles = [
+    [path.join(f.base, 'notifications', noticeId + '.json'), noticeId],
+    [path.join(f.base, 'system-notices', f.outside.key + '.json'), integrityId],
+  ];
+  for (const [file, id] of noticeFiles)
+    fs.writeFileSync(file, JSON.stringify({ id, key: f.outside.key, state: 'acknowledged' }), { mode: 0o600 });
+  fs.writeFileSync(indexFile, JSON.stringify(index));
+  const before = noticeFiles.map(([file]) => fs.readFileSync(file));
+  assert.deepEqual((await f.run(['pending-notifications'])).notifications, []);
+  assert.deepEqual(JSON.parse(fs.readFileSync(indexFile)), index);
+  const result = await f.schedule(Date.parse('2026-01-02T05:00:00Z'));
+  assert.equal(result.status, 'completed', result.reason);
+  assert.equal(result.notification, 'idle');
+  const after = JSON.parse(fs.readFileSync(indexFile));
+  assert.deepEqual(after.notifications, index.notifications);
+  assert.deepEqual(after.integrity, index.integrity);
+  assert.deepEqual(
+    noticeFiles.map(([file]) => fs.readFileSync(file)),
+    before,
+  );
+});
+
 test('missing original paths preserve historical records and never write a new cleanup receipt', async (t) => {
   const f = await scopeFixture(t);
   const outside = outsideState(f);

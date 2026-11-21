@@ -126,8 +126,7 @@ export async function runScheduledCleanup(
       const notificationQueue = scope
         ? {
             ...queue,
-            pendingNotifications: (options) =>
-              queue.pendingNotifications(options).filter((event) => scope.has(event.key)),
+            pendingNotifications: (options) => queue.pendingNotifications({ ...options, scope }),
           }
         : queue;
       const notices = await notify(notificationQueue, { ...adapter, destination: policy.notification?.destination });
