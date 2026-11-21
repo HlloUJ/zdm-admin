@@ -1112,7 +1112,7 @@
       "dynamicImports": 0
     },
     "scripts/delivery-repairs/reference-repair-release.mjs": {
-      "digest": "ee8898c7605ab82149342ade99353f0cb8377470b2ee5ab2c1028b651b0af18c",
+      "digest": "81c63d036e96318917b9fb7ea314f76aaa557b6b1a6f8b98040a7cd3aed3a816",
       "imports": [
         "scripts/completion-flow.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
@@ -1122,10 +1122,11 @@
       "dynamicImports": 1
     },
     "scripts/delivery-repairs/reference-repair-release.test.mjs": {
-      "digest": "affbe4d5030282508d971ca53c28a36e3e532c1f3b2005e4350fe5a5c45f7126",
+      "digest": "f2972c62e263be704c56d9d9309501d839d6a7afae59d42d627a837af452e98a",
       "imports": [
         "scripts/accepted-source-continuation.mjs",
         "scripts/accepted-source.mjs",
+        "scripts/completion-ci-evidence.mjs",
         "scripts/delivery-repairs/preview-reference-proof.mjs",
         "scripts/delivery-repairs/reference-repair-release.mjs",
         "scripts/future-engineering.mjs"

@@ -5,12 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import { acceptedGit, freezeAcceptedSource, readAcceptance, sourceEntries } from '../accepted-source.mjs';
+import { assertCompletionQuality } from '../completion-ci-evidence.mjs';
 import { verifyReferenceConsumerSource } from './preview-reference-proof.mjs';
 import {
   assertReferenceRepairMerge,
   assertReferenceRepairReview,
   assertReferenceRepairStart,
   assertReferenceRepairTree,
+  checkApproval,
   referenceRepairApproval,
 } from './reference-repair-release.mjs';
 
@@ -134,7 +136,7 @@ function repair(t) {
   const head = f.commit();
   const task = { checkpoints: [{ commit: first }, { commit: head }] };
   const ok = (candidate = head) => assertReferenceRepairTree(f.git, task, base, candidate, f.head);
-  return { ...f, base, first, head, task, ok };
+  return { ...f, originalMain: f.head, base, first, head, task, ok };
 }
 
 test('maintenance may extend a later published base using only owned linear repair commits', (t) => {
@@ -228,4 +230,113 @@ test('approval must be an independent native observation for this exact candidat
   );
   grant.review.threadId = task.owner;
   assert.throws(() => assertReferenceRepairReview(grant, task, { current: { rootThreadId: task.owner } }));
+});
+
+test('the full approval gate accepts exact preparation and refuses another coordinator', () => {
+  const id = 'historical-acceptance-postmerge-recovery-590';
+  const branch = 'codex/' + id;
+  const original = {
+    head: '8342a2122c73925b3e9e2e3b64caa82dde0f7fbb',
+    main: '879bd045eb6b104e7417b90771b64141ca0d74c6',
+    pr: 166,
+    prRun: '44907343460',
+    mainRun: '44909383673',
+  };
+  const accepted = '38ae5a147c8c7fec7f0239866a6de81953116f98';
+  const failureDigest = '4d8350038f38e318b525ab3fcded8e254d210c807bbad476ffa99279ee195462';
+  const grant = {
+    version: 1,
+    task: id,
+    accepted,
+    pr: 199,
+    prRun: '456',
+    head: '1'.repeat(40),
+    base: original.main,
+    hostDigest: '3'.repeat(64),
+    failureDigest,
+    preparation: '66bb58e4-a03d-4d9d-88f3-ce08fd454748',
+  };
+  const coordinator = 'synthetic-coordinator',
+    owner = 'synthetic-executor';
+  grant.review = {
+    provider: 'codex-native-read_thread',
+    threadId: coordinator,
+    turnId: 'review-turn',
+    observedAt: new Date().toISOString(),
+    message: { id: 'review-message', phase: 'commentary', text: referenceRepairApproval(grant) },
+  };
+  const prepared = (entry) => ({
+    version: 1,
+    task: id,
+    accepted,
+    head: entry.head,
+    pullRequest: entry.pr,
+    runId: entry.prRun,
+  });
+  const ci = (head, runId, branch, eventName) => ({
+    name: 'ci',
+    status: 'success',
+    key: head + ':' + runId,
+    result: {
+      runId,
+      headSha: head,
+      attempt: 1,
+      conclusion: 'success',
+      branch,
+      eventName,
+      jobs: ['Frontend quality', 'Backend quality'].map((name) => ({
+        name,
+        status: 'completed',
+        conclusion: 'success',
+      })),
+    },
+  });
+  const decision = {
+    id: grant.preparation,
+    status: 'finished',
+    coordinator,
+    input: { expectedCoordinationRevision: 9, task: id, owner, executor: owner, phase: 'preparation' },
+    prepared: prepared(grant),
+  };
+  const opts = {
+    grant,
+    failureDigest,
+    assertQuality: assertCompletionQuality,
+    task: { id, branch, owner, recordedHead: grant.head, frozen: { accepted }, monitoring: { worker: owner } },
+    coordination: { revision: 9, current: { rootThreadId: coordinator } },
+    order: { dynamicDecisions: [decision] },
+    state: {
+      preparedCandidates: [prepared(original), prepared(grant)],
+      events: [
+        ci(original.head, original.prRun, branch, 'pull_request'),
+        ci(original.main, original.mainRun, 'main', 'push'),
+        ci(grant.head, grant.prRun, branch, 'pull_request'),
+      ],
+    },
+  };
+  assert.doesNotThrow(() => checkApproval(opts));
+  decision.coordinator = 'another-coordinator';
+  assert.throws(() => checkApproval(opts), /Preparation belongs to another coordinator/);
+  decision.coordinator = coordinator;
+  assert.throws(() => checkApproval({ ...opts, failureDigest: '5'.repeat(64) }), /First failure log differs/);
+});
+
+test('latest independent main can enter only as the independently recomputed clean composition', (t) => {
+  const f = repair(t);
+  f.git('checkout', '-b', 'later-main', f.base);
+  f.edit('src/independent.mjs', '// independently published source');
+  const later = f.commit();
+  f.git('checkout', 'codex/synthetic');
+  f.git('merge', '--no-ff', later, '-m', 'combine approved latest main');
+  const combined = f.git('rev-parse', 'HEAD');
+  f.task.checkpoints.push({ commit: combined });
+  const verify = (head) => assertReferenceRepairTree(f.git, f.task, later, head, f.originalMain);
+  assert.deepEqual(verify(combined), [collector, host]);
+  f.edit(collector, '// manually changed merge result');
+  f.git('add', '--all');
+  const mutated = acceptedGit(f.root, ['commit-tree', f.git('write-tree'), '-p', f.head, '-p', later], {
+    input: 'unreviewed merge result\n',
+  });
+  f.task.checkpoints.push({ commit: mutated });
+  assert.throws(() => verify(mutated), /differs from the exact clean Git merge/);
 });

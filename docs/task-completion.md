@@ -62,7 +62,7 @@ npm run task:entry -- --worktree <原590工作区> complete resume-post-merge tr
 
 ### 187 引用采集器的第二次维护发布
 
-限同一 187 任务、原冻结和原分支。原 #166、`879bd045eb6b104e7417b90771b64141ca0d74c6`、首次 PR CI `44907343460`、首次 main CI `44909383673` 及 590 原结项保留。准备仍从真实决定消费后调用常规 `complete prepare <187 task> <新候选>`，新候选仅含本任务已登记的线性维护提交。若其他任务已发布，新候选须按当时准确 main 重新准备、通过首轮 CI 并独立审阅。
+限同一 187 任务、原冻结和原分支。原 #166、`879bd045eb6b104e7417b90771b64141ca0d74c6`、首次 PR CI `44907343460`、首次 main CI `44909383673` 及 590 原结项保留。准备仍从真实决定消费后调用常规 `complete prepare <187 task> <新候选>`，新候选仅含本任务已登记的维护提交。若其他任务先发布，可保留原分支历史并合入一次最新受信 main；宿主须独立重算无冲突 Git 合并树。合并树与获批结果不同、主线已再次变化或新增受保护冲突时继续阻断。变化的候选重新准备、通过首轮 CI 并独立审阅。
 
 - 独立协调者检查该唯一准备决定、原冻结、第二个 PR 的准确最新 base/head、逐提交范围、三项必需检查、首轮 Quality CI 及实际严格分支保护。另审阅 `scripts/delivery-repairs/reference-repair-release.mjs` 的原始 Git blob 并计算 SHA-256。批准使用真实原生读回，正文为 `引用修复发布批准 187 PR #<新PR> <head> <base> CI <首轮PR run> 宿主 <宿主SHA-256> 初败 <首次采集日志SHA-256>`。原始首次失败私有留存在 187 交付目录的 `reference-repair-first-failure.log`。不使用候选评估自己。
 - 授权文件固定为 187 私有交付目录中的 `reference-repair-approval.json`，权限 `0600`。字段为 `{version:1,task,accepted,base,head,pr,prRun,preparation,hostDigest,failureDigest,review:{provider:"codex-native-read_thread",threadId,turnId,observedAt,message:{id,phase:"commentary",text}}}`，其中 `pr` 为数字，`prRun` 为字符串，`preparation` 为已完成的准备决定 ID。批准人须是当前总协调且独立于候选执行者。

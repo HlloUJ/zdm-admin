@@ -64,6 +64,7 @@ export function assertReferenceRepairReview(grant, task, coordination) {
   assert.equal(review.message.text.trim(), referenceRepairApproval(grant), 'Exact independent approval required');
   const observedAt = Date.parse(review.observedAt);
   assert.ok(Number.isFinite(observedAt) && observedAt <= Date.now());
+  return review.threadId;
 }
 
 function checkPreparation(state, entry, assertQuality) {
@@ -85,7 +86,11 @@ function checkCi(state, head, run, branch, event, assertQuality) {
   assert.equal(saved.result.eventName, event);
 }
 
-function checkApproval({ grant, task, common, order, coordination, state, assertQuality }) {
+function originalFailureDigest(common) {
+  return digest(privateFile(path.join(common, 'task-delivery', id, 'reference-repair-first-failure.log')));
+}
+
+export function checkApproval({ grant, task, failureDigest, order, coordination, state, assertQuality }) {
   assert.equal(grant.version, 1);
   assert.equal(grant.task, id);
   assert.equal(grant.accepted, original.accepted);
@@ -100,16 +105,13 @@ function checkApproval({ grant, task, common, order, coordination, state, assert
   assert.match(grant.prRun, runId);
   assert.match(grant.preparation, uuid);
   assert.match(grant.hostDigest, /^[a-f0-9]{64}$/);
-  assert.equal(
-    digest(privateFile(path.join(common, 'task-delivery', id, 'reference-repair-first-failure.log'))),
-    grant.failureDigest,
-  );
+  assert.equal(failureDigest, grant.failureDigest, 'First failure log differs from the approval');
   assert.equal(grant.failureDigest, firstFailure, 'Original first collection failure required');
-  assertReferenceRepairReview(grant, task, coordination);
+  const coordinator = assertReferenceRepairReview(grant, task, coordination);
 
   const decision = order.dynamicDecisions.find((item) => item.id === grant.preparation);
   assert.equal(decision?.status, 'finished');
-  assert.equal(decision.coordinator, review.threadId);
+  assert.equal(decision.coordinator, coordinator, 'Preparation belongs to another coordinator');
   assert.equal(decision.input.expectedCoordinationRevision, coordination.revision);
   assert.equal(decision.input.task, id);
   assert.equal(decision.input.owner, task.owner);
@@ -136,48 +138,56 @@ function entries(git, commit) {
   );
 }
 
+function approvedDelta(before, after) {
+  const changed = [];
+  for (const file of new Set([...before.keys(), ...after.keys()])) {
+    if (before.get(file) === after.get(file)) continue;
+    assert.ok(paths.has(file), 'Unapproved repair path: ' + file);
+    assert.ok(/^100644 blob [a-f0-9]{40}$/.test(after.get(file) ?? ''), 'Repair path removed or changed mode: ' + file);
+    assert.ok(!before.has(file) || before.get(file).startsWith('100644 blob '), 'Unexpected source mode: ' + file);
+    changed.push(file);
+  }
+  return changed.sort();
+}
+
 export function assertReferenceRepairTree(git, task, base, head, originalMain = original.main) {
   assert.match(base, sha);
   assert.match(head, sha);
-  assert.ok(
-    git('rev-list', '--first-parent', base).split('\n').includes(originalMain),
-    'Original merge is not on the base main lineage',
-  );
+  const baseLineage = new Set(git('rev-list', '--first-parent', base).split('\n'));
+  assert.ok(baseLineage.has(originalMain), 'Original merge is not on the base main lineage');
   git('merge-base', '--is-ancestor', base, head);
   const owned = new Set(task.checkpoints.map((item) => item.commit));
   const commits = git('rev-list', '--reverse', base + '..' + head)
     .split('\n')
     .filter(Boolean);
   assert.ok(commits.length, 'Exact owned repair delta required');
-  let parent = base;
-  const changed = new Set();
+  let parent = git('show', '-s', '--format=%P', commits[0]);
+  assert.ok(baseLineage.has(parent), 'Repair must start at a published main commit');
+  git('merge-base', '--is-ancestor', originalMain, parent);
+  let mergedBase = false;
   for (const commit of commits) {
-    assert.equal(git('show', '-s', '--format=%P', commit), parent, 'Repair must extend latest main linearly');
+    const parents = git('show', '-s', '--format=%P', commit).split(' ');
+    assert.equal(parents[0], parent, 'Repair must retain its registered first-parent chain');
     assert.ok(owned.has(commit), 'Unregistered repair commit');
-    const before = entries(git, parent),
-      after = entries(git, commit);
-    for (const file of new Set([...before.keys(), ...after.keys()])) {
-      if (before.get(file) === after.get(file)) continue;
-      assert.ok(paths.has(file), 'Unapproved repair path: ' + file);
-      assert.ok(
-        /^100644 blob [a-f0-9]{40}$/.test(after.get(file) ?? ''),
-        'Repair path removed or changed mode: ' + file,
+    if (parents.length === 1) approvedDelta(entries(git, parent), entries(git, commit));
+    else {
+      assert.deepEqual(parents, [parent, base], 'Only the approved current main may enter the repair');
+      assert.equal(mergedBase, false, 'Repeated candidate composition is not approved');
+      const clean = git('merge-tree', '--write-tree', parent, base).split('\n')[0];
+      assert.equal(
+        git('rev-parse', commit + '^{tree}'),
+        clean,
+        'Repair composition differs from the exact clean Git merge',
       );
-      assert.ok(!before.has(file) || before.get(file).startsWith('100644 blob '), 'Unexpected source mode: ' + file);
-      changed.add(file);
+      mergedBase = true;
     }
     parent = commit;
   }
   assert.equal(parent, head);
-  const originalEntries = entries(git, base),
-    finalEntries = entries(git, head);
+  const changed = approvedDelta(entries(git, base), entries(git, head));
   for (const required of [file, 'scripts/delivery-repairs/preview-reference-proof.mjs'])
-    assert.notEqual(
-      finalEntries.get(required),
-      originalEntries.get(required),
-      'Required repair is absent: ' + required,
-    );
-  return [...changed].sort();
+    assert.ok(changed.includes(required), 'Required repair is absent: ' + required);
+  return changed;
 }
 
 function github(anchor, execute) {
@@ -454,7 +464,7 @@ async function publish(anchor, grantFile) {
     checkApproval({
       grant,
       task,
-      common,
+      failureDigest: originalFailureDigest(common),
       order: order.read(),
       coordination: readTaskCoordination(common),
       state,
