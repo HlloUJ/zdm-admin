@@ -126,6 +126,10 @@ export function checkApproval({ grant, task, failureDigest, order, coordination,
   checkPreparation(state, grant, assertQuality);
 }
 
+function checkApprovalFromOriginalLog(options, common) {
+  checkApproval({ ...options, failureDigest: originalFailureDigest(common) });
+}
+
 function entries(git, commit) {
   return new Map(
     git('ls-tree', '-rz', commit)
@@ -342,7 +346,7 @@ export function verifyReferenceRepairCloseout({
   assert.match(ticket, uuid);
   assert.equal(grant.pr, pr.number);
   assert.equal(grant.head, head);
-  checkApproval({ grant, task: batch, common: registry.commonDir, order, coordination, state, assertQuality });
+  checkApprovalFromOriginalLog({ grant, task: batch, order, coordination, state, assertQuality }, registry.commonDir);
   const git = gitAdapter(anchor, execute);
   git('fetch', 'origin');
   assert.equal(git('status', '--porcelain'), '');
@@ -461,15 +465,17 @@ async function publish(anchor, grantFile) {
     recoverInterrupted(state, dir);
     Object.defineProperty(state, completionPermission, { value: assertCurrent });
     const save = (value) => saveCompletion(dir, value);
-    checkApproval({
-      grant,
-      task,
-      failureDigest: originalFailureDigest(common),
-      order: order.read(),
-      coordination: readTaskCoordination(common),
-      state,
-      assertQuality: assertCompletionQuality,
-    });
+    checkApprovalFromOriginalLog(
+      {
+        grant,
+        task,
+        order: order.read(),
+        coordination: readTaskCoordination(common),
+        state,
+        assertQuality: assertCompletionQuality,
+      },
+      common,
+    );
     git('fetch', 'origin');
     assert.equal(git('status', '--porcelain'), '');
     assert.equal(execute(task.worktree, 'git', ['status', '--porcelain']), '');
