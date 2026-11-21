@@ -11,7 +11,7 @@ import { collectActionDependencies, requireActionDependencies } from './task-act
 import { assertTaskCommitOwnership } from './task-commit-ownership.mjs';
 const context = new AsyncLocalStorage();
 export const withTaskContext = (identity, action) => context.run(identity, action);
-export function closeTaskBatch(root, batch, { deferredCleanup } = {}) {
+export function closeTaskBatch(root, batch, { deferredCleanup, historicalMain, liveMain } = {}) {
   const registry = createTaskRegistry(root),
     task = registry.readTask(batch.id);
   assert.ok(task && !task.compatibility?.readOnly, 'Exact current task required');
@@ -21,6 +21,12 @@ export function closeTaskBatch(root, batch, { deferredCleanup } = {}) {
   const local = git('rev-parse', 'main'),
     remote = git('rev-parse', 'origin/main');
   assert.equal(local, remote);
+  const delivered = historicalMain ?? local;
+  if (historicalMain) {
+    assert.equal(local, liveMain, 'Verified settlement main changed');
+    assert.equal(task.main?.local, historicalMain, 'Original delivered main changed');
+    git('merge-base', '--is-ancestor', historicalMain, local);
+  }
   git('merge-base', '--is-ancestor', task.recordedHead, local);
   if (deferredCleanup) {
     assert.deepEqual(deferredCleanup, {
@@ -29,7 +35,7 @@ export function closeTaskBatch(root, batch, { deferredCleanup } = {}) {
       worktree: task.worktree,
       branch: task.branch,
       head: task.recordedHead,
-      main: local,
+      main: delivered,
     });
   } else {
     assert.ok(
@@ -45,9 +51,14 @@ export function closeTaskBatch(root, batch, { deferredCleanup } = {}) {
       : registry.revise(task.id, task.revision, (record) => {
           record.stage = 'closed';
           record.closedAt = new Date().toISOString();
-          record.main = { local, remote, remoteFreshnessProven: false };
+          record.main = {
+            local: delivered,
+            remote: delivered,
+            remoteFreshnessProven: false,
+            ...(historicalMain ? { settledAtMain: local } : {}),
+          };
         });
-  assert.equal(closed.main.local, local, 'Closed task main identity changed');
+  assert.equal(closed.main.local, delivered, 'Closed task main identity changed');
   const archived = {
     ...taskBatch(closed, root),
     closureNote: deferredCleanup

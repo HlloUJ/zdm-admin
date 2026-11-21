@@ -26,7 +26,19 @@
 
 有真实外部周期验收的工程任务，可由可信宿主显式传 `completionOptions.deferSettle: true`；私有 `task-completion-progress-cli.mjs` 输入对应顶层布尔 `deferSettle: true`。默认是 false，普通交付仍完整 settle。该选项只有准确 main CI 与 `main:final` 运行交接的成功原记录齐全后才返回 `status=deferred`、`formalDeliveryComplete=false`、原因“外部周期验收待完成”；不执行保全/清理/关闭，也不生成 `delivery_complete`。原 main FIFO 票据以 waiting 加 deferred 明细保留 id、owner、冻结身份及顺序，正常释放本次 main 临界租约；集成交接自身在返回前释放其临界租约。任务归属与执行层交付票据仍保留，不用伪造失败或提前 done 来结束当前命令。
 
-可信宿主拿到真实周期、通知送达等所需外部证明后，只使用默认 `deferSettle=false` 调用既有 `settle <batch-id> <原main-sha> <原run-id>`。该入口按原 deferred 票据重新取得临界位，核对原候选/main/run 身份并完成现有收尾；不重新等待 CI 或调用 final-handoff。输入变化、健康或来源证明失效仍由原保护拒绝，不能凭 deferred 跳过。普通阶段回执只显示下一步等待，不作为任务完成事实；正常进程返回也不等于正式交付成功。外部证明由准确任务的可信宿主在 settle 前核验，这个本地布尔接口本身不构成不可绕过的验收保护。
+### 日程验收期间释放交付位
+
+原执行者仍持原最终准入时，从已发布 main 执行 `task:entry -- --worktree <原工作区> complete defer-release <批次ID> <原main> <原run> <已安装日程源码SHA> <第一时段UTC> <第二时段UTC>`。当前日程校验适配 `scheduled-manifest-cleanup` 的连续两次北京时间 01:00／13:00 实际日程。该入口核对原任务、冻结、main CI、最终运行交接和后继主线证据，检查 main 与集成资源并保全私有交接摘要。原票 UUID、顺位、冻结、候选、原 main、原 CI、接续权限及失败历史持续保留。两层记录写入期间由原 main 票据阻挡并发，按相同参数接续中断。释放成功后调度可选择下一项已就绪任务，验收卡继续等待两次日程。
+
+原执行者在两次真实运行及通知读回后，从原私有目录保存 `calendar-verification.json`。格式为 `{version:1,task,executor,main,observations:[{slot,nativeReadback}]}`。每条 `nativeReadback` 复用实际 `read_thread` 回执，包含 `provider:"codex-native-read_thread"`、`threadId`、`turnId`、`observedAt` 和原 `message:{id,phase,text}`。两条原生通知正文各包含所报告的 UTC 时段及对应真实 scheduler journal 条目的 `sha256(JSON.stringify(entry))`。`observations` 同时保留 `launchd.before/after:{observedAt,bootSession,output}`，分别在目标分钟开始前 2 分钟内和 journal 落盘后 5 分钟内读回。使用 `/bin/launchctl print "gui/$(id -u)/com.zdm.admin.manifest-cleanup"` 原输出及 `/usr/sbin/sysctl -n kern.bootsessionuuid`。实际起点必须落在目标分钟，前后同一启动会话、GUI 域和两条日历注册 ID，运行计数恰增 1，两时段之间没有额外执行。观察到的生命周期事件原样留在 `launchd.events`，已知重新加载或手动启动时拒绝。此组旁证与原验证宿主的现场判断一同使用，系统静止时无法读到直接启动原因。真实送达时另附 `notificationReceipts:[{eventId,receiptDigest}]` 供复核固定目的地和送达原件。idle 表示没有待发送的通知。通知原始观察和附带预览引用证明仅由原执行者保存在该任务私有目录；运行中断、通知未确认、调度范围变化或缺任一条回执继续等待。
+
+通过已发布的私有 `task-completion-progress-cli.mjs` 传 `args:["settle", "<批次ID>", "<原main>", "<原run>"]` 和 `externalAcceptanceFile` 的原私有绝对路径。既有预览引用选择仍可随 `args` 提供。原执行者持原准入，在空闲时取得短期 main 与集成互斥，用原 main/CI 归档结项，并核验当前 main 的连续合并链及每次发布各自的受保护来源、首轮 CI 和实际交接。当前 main 单列在关闭回执，旧任务的原冻结、原 CI 和原交接记录继续作为其归档来源。结项仍执行保全、清理和正式关闭检查，缺证与失败保留供原执行者接续。其他拥有可信外部验收宿主的旧 deferred 任务继续使用原本的 `settle`。
+
+### 初次维护发布
+
+100 通过已发布的准备准入冻结、提交 PR 并完成首轮候选 CI，随后正常结束准备准入。当前总协调另行独立核对准确变更、原待验收票据、候选、PR、父提交、首轮 CI 与实时分支保护。仅对该组证据出具一次性授权，保存在 100 的私有交付目录。授权经真实总协调对话回读，纳入对应的 `review` 观察及 `version,task,executor,base,head,accepted,preparation,pullRequest,prRunId`。赞同消息的正文为 `维护发布批准 <任务ID> PR #<编号> <head> <base> CI <候选run>`。本地宿主包装保留来源，实际 GitHub 保护继续独立执行。
+
+在原票为等待且主线、集成均空闲时，受审阅的宿主使用现有 main-delivery 资源互斥和普通 GitHub PR 合并校验，按准确 head 合并并快进 main。原 FIFO 票和执行账本未发生状态修改；候选源码在主线发布之前不能执行现场让位。主线快进后，以 100 原执行者从已发布入口运行 `complete handoff-deferred-maintenance <维护main> <授权文件绝对路径>`。入口独立核对准备记录、当前精确 PR/父提交、保护和首轮 main CI。随后在 main 和集成互斥内确认变更仅包含审阅过的交付源码，确认 100 无运行环境，并快进集成及保留预览源码。前后核验现有容器、实际健康、备份及固定 5179 运行身份。不启动或停止任务运行，不扫描或修改保留的 5177，100 的工作区与分支继续保全，待普通引用和清理条件满足后结项。之后由原 683 执行上面的 `defer-release`，待实际读回两层让位才派发下一项。
 
 调用方直接等待同一进程（可恢复终端会话），进度变化由它输出；不要另开watch、查询相同API或用45秒固定sleep轮询日志。若进程中断，从原准确参数恢复，已通过检查只核验原运行。数据库高风险保护锁仍走原受保护入口，不被普通自动链接管。首次自升级从已审查的准确本地候选进入PR流程，运行交接与清理仍只由已发布且main CI通过的版本承担。
 

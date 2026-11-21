@@ -28,6 +28,8 @@
 
 开发完成必须工作树干净、准确 HEAD、原 owner，并引用本任务的已成功验证报告，不以 checkpoint、工具退出或聊天总结作为完成。报告封装格式为 `{version:1, task, head, outcome:'passed', tests:正整数, skipped:0, retries:0, sourceReports:[{path,sha256}]}`，由原执行者从已有必要测试结果形成，不能制造测试结果。complete 的 evidence 为 `{task, owner, head, reports:[{path,sha256}]}`，原报告和封装都须保存在本任务目录并核对摘要。该适配器证明内容绑定，不提供独立防伪，也不决定测试范围；原项目适用门禁继续有效。
 
+确有外部日程验收的已交接任务可通过公布的 [交付让位入口](../task-completion.md#日程验收期间释放交付位) 保留原票并释放正式位置。执行层的 `deferred` 表示原任务还需外部验收，不占正式执行位，也不产生完成回执或新派发。同一原执行者凭原准入、日程事实与连续主线证明完成结项。普通暂停、失败和未完成交接仍按原占位规则。
+
 交付完成复用原 `deliveryStatus.formalDeliveryComplete` 的关闭登记、主线 CI、正式运行交接和回执证明，evidence 指明 `{task,main}`。仅合并、PR绿灯或暂停都不释放交付槽。用户验收仍是独立规则。
 
 ## 实际覆盖及限制
