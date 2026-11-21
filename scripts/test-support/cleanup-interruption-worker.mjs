@@ -2,9 +2,13 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { runScheduledCleanup } from '../task-cleanup-scheduled-cli.mjs';
+import { loadCleanupPolicy } from '../task-cleanup-cli.mjs';
 import { createCleanupQueue } from '../task-cleanup-queue.mjs';
 import { runCompletionProcess } from '../completion-process.mjs';
+import { loadExactCleanupScope } from '../delivery-repairs/task-cleanup-exact-scope.mjs';
 const config = JSON.parse(readFileSync(process.argv[2]));
+const policy = loadCleanupPolicy(config.common);
+const scope = loadExactCleanupScope(config.common, policy);
 const python = `import io,json,os,sys,time
 request=json.load(sys.stdin)
 namespace={'__name__':'isolated_partial_deletion'}
@@ -29,15 +33,17 @@ await runScheduledCleanup(config.root, {
   notify: async () => ({ status: 'idle' }),
   runCleanup: () =>
     createCleanupQueue(config.common).run({
+      ...policy,
+      scope,
       apply: true,
       verify: async () => ({ ready: true }),
       unreferenced: async () => {},
-      remove: (directory, entries) => {
+      remove: (directory, entries, scopeProof) => {
         const result = runCompletionProcess('python3', ['-I', '-c', python], {
           input: JSON.stringify({
             helper: fileURLToPath(new URL('../task-cleanup-delete.py', import.meta.url)),
             marker: config.marker,
-            deletion: { path: directory, entries },
+            deletion: { path: directory, entries, scopeProof },
           }),
           encoding: 'utf8',
         });

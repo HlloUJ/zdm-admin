@@ -5,6 +5,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createTaskRegistry } from './task-registry.mjs';
 import { deliveryStatus } from './completion-status.mjs';
+import { loadExactCleanupScope } from './delivery-repairs/task-cleanup-exact-scope.mjs';
 import { runOwnershipCleanup } from './task-cleanup-ownership.mjs';
 import { cleanupTestResources } from './task-cleanup-test-resources.mjs';
 import { createCleanupQueue, cleanupObjectId, safePath } from './task-cleanup-queue.mjs';
@@ -33,11 +34,16 @@ export function loadCleanupPolicy(commonDir) {
         'metadata',
         'notification',
         'ownershipV2',
+        'scope',
       ].includes(key),
     ),
   );
   assert.equal(policy.version, 1);
   assert.ok(policy.ownershipV2 === undefined || typeof policy.ownershipV2 === 'boolean');
+  if (Object.hasOwn(policy, 'scope')) {
+    assert.ok(policy.scope && typeof policy.scope === 'object' && !Array.isArray(policy.scope), 'Invalid exact scope');
+    assert.notEqual(policy.ownershipV2, true, 'Exact scope cannot activate whole-task ownership');
+  }
   assert.ok(Number.isSafeInteger(policy.limit) && policy.limit > 0 && policy.limit <= 100);
   assert.ok(Number.isSafeInteger(policy.budgetMs) && policy.budgetMs > 0 && policy.budgetMs <= 300000);
   assert.ok(Number.isSafeInteger(policy.maxLogicalBytes) && policy.maxLogicalBytes > 0);
@@ -71,6 +77,7 @@ export function loadCleanupPolicy(commonDir) {
   return {
     limit: policy.limit,
     ...(policy.ownershipV2 ? { ownershipV2: true } : {}),
+    ...(policy.scope ? { scope: policy.scope } : {}),
     budgetMs: policy.budgetMs,
     maxLogicalBytes: policy.maxLogicalBytes,
     ...(policy.scheduler ? { scheduler: policy.scheduler } : {}),
@@ -140,6 +147,7 @@ export async function cleanupCommand(
     registry = createTaskRegistry(root),
     queue = createCleanupQueue(registry.commonDir),
     unreferenced = assertCleanupUnreferenced,
+    expectedScope = null,
   } = {},
 ) {
   const verify = (r) => verifyCleanupDelivery(registry, r);
@@ -164,10 +172,13 @@ export async function cleanupCommand(
   }
   if (args[0] === 'pending-notifications') {
     assert.equal(args.length, 1);
+    const policyFile = path.join(registry.commonDir, 'task-cleanup', 'policy.json');
+    const policy = existsSync(policyFile) ? loadCleanupPolicy(registry.commonDir) : null;
+    const scope = policy?.scope ? loadExactCleanupScope(registry.commonDir, policy) : null;
     return {
       status: 'pending',
       notifications: queue
-        .pendingNotifications()
+        .pendingNotifications({ scope })
         .map((event) => ({ ...cleanupNotice(event), delivery: cleanupNoticeState(queue, event) })),
       delivery: 'unverified',
     };
@@ -176,12 +187,14 @@ export async function cleanupCommand(
     assert.equal(args.length, 2);
     safePath(path.resolve(args[1]));
     const envelope = JSON.parse(readFileSync(args[1], 'utf8'));
+    const policy = loadCleanupPolicy(registry.commonDir);
+    const scope = policy.scope ? loadExactCleanupScope(registry.commonDir, policy) : null;
     const event = queue
-      .pendingNotifications({ limit: 100 })
+      .pendingNotifications({ limit: 100, scope })
       .find((r) => r.key === envelope.key && r.id === envelope.id);
     assert.ok(event, 'Exact pending notification no longer available');
     assert.equal(envelope.eventId, cleanupNotice(event).eventId);
-    const destination = loadCleanupPolicy(registry.commonDir).notification?.destination;
+    const destination = policy.notification?.destination;
     assert.ok(destination, 'Fixed notification destination not configured');
     return args[0] === 'claim-notification'
       ? claimCleanupNotice(queue, event, destination)
@@ -204,6 +217,7 @@ export async function cleanupCommand(
   if (args[0] === 'ownership-plan' || args[0] === 'run-ownership') {
     assert.equal(args.length, 1);
     const policy = loadCleanupPolicy(registry.commonDir);
+    assert.ok(!policy.scope && !expectedScope, 'Exact scope cannot enter whole-task ownership');
     const apply = args[0] === 'run-ownership';
     if (apply) assert.equal(policy.ownershipV2, true, 'V2 scheduled cleanup must be explicitly enabled');
     return runOwnershipCleanup(root, {
@@ -218,8 +232,10 @@ export async function cleanupCommand(
     args.length === 1 && ['plan', 'run'].includes(args[0]),
     'cleanup <plan|run|pending-notifications|handoff exact-manifest.json|claim-notification event.json|ack-notification receipt.json|ack-native-commentary observation.json>',
   );
-  const policy = args[0] === 'run' ? loadCleanupPolicy(registry.commonDir) : {};
-  return queue.run({ ...policy, apply: args[0] === 'run', verify, unreferenced });
+  const policy = loadCleanupPolicy(registry.commonDir);
+  const scope = loadExactCleanupScope(registry.commonDir, policy);
+  if (expectedScope) scope.assertResume(expectedScope);
+  return queue.run({ ...policy, scope, apply: args[0] === 'run', verify, unreferenced });
 }
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {

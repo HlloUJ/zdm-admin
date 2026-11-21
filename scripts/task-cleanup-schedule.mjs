@@ -25,6 +25,7 @@ export function cleanupLaunchAgentPlan({
   commonDir,
   runtimeDirectory,
   gitSocksPort,
+  scopeOnly = false,
   hostTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone,
 }) {
   // launchd calendar rules use the host timezone, not the child's TZ environment.
@@ -38,6 +39,7 @@ export function cleanupLaunchAgentPlan({
   assert.match(path.basename(runtimeDirectory ?? ''), /^[a-f0-9]{40}$/);
   assert.equal(runtimeDirectory, path.join(commonDir, 'task-cleanup/runtime', path.basename(runtimeDirectory)));
   const command = [node, path.join(runtimeDirectory, 'scripts/task-cleanup-scheduled-cli.mjs'), runtimeDirectory];
+  if (scopeOnly) command.push('--exact-scope');
   const environment = { PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin:/opt/homebrew/bin' };
   if (gitSocksPort !== undefined) {
     assert.ok(Number.isInteger(gitSocksPort) && gitSocksPort > 0 && gitSocksPort <= 65535, 'Invalid local SOCKS port');
