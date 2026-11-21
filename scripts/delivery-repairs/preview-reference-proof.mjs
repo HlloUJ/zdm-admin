@@ -11,7 +11,7 @@ import { taskProjectName } from '../dev-task.mjs';
 import { assertTaskExecutor, taskExecutor } from '../task-execution-binding.mjs';
 import { createExecutionOrder } from '../task-execution-order.mjs';
 import { collectRetainedDockerDirectories } from './preview-docker-directories.mjs';
-import { readAcceptance } from '../accepted-source.mjs';
+import { assertAcceptedSource, readAcceptance } from '../accepted-source.mjs';
 import {
   assertMaintenanceNeighbor,
   readMaintenanceBackend,
@@ -61,7 +61,6 @@ const publishedFiles = [
   'scripts/task-data-environment.mjs',
   'scripts/dev-task.mjs',
   'scripts/preview-consumers.mjs',
-  'scripts/accepted-source.mjs',
 ];
 
 // Write each obtained observation before checking it. A rejected proof is still
@@ -548,6 +547,13 @@ function stoppedValidationContinuation(scope, foreignTask) {
   return { proof: maintenance.foreign, backend, reassigned: maintenance.reassigned };
 }
 
+// The collector is identified by currentCollector before this check. The
+// historical Git object remains the source of the runtime observer only.
+export function verifyReferenceConsumerSource(worktree, task, candidate, tree) {
+  assertReferenceConsumerCandidate(worktree, candidate, tree);
+  return assertAcceptedSource(worktree, task, candidate);
+}
+
 export async function collectPreviewReferenceProof(root, foreignTask, historyFile, options = {}) {
   assert.ok(
     Object.keys(options).every((key) => ['publishedBaseline', 'effect'].includes(key)),
@@ -571,8 +577,7 @@ export async function collectPreviewReferenceProof(root, foreignTask, historyFil
     publishedBaseline: referencePublishedBaseline(scope.anchor, options.publishedBaseline),
     collectorCandidate: collector.commit,
   };
-  const trusted = await publishedCore(scope, selector.publishedBaseline);
-  trusted['scripts/accepted-source.mjs'].assertAcceptedSource(scope.task.worktree, scope.task.id, candidate);
+  verifyReferenceConsumerSource(scope.task.worktree, scope.task.id, candidate, consumerSource.tree);
   const maintenance = stoppedValidationContinuation(scope, foreignTask);
   const live = await liveProof(scope, selector, null, [], maintenance);
   assert.deepEqual(stoppedValidationContinuation(scope, foreignTask), maintenance);

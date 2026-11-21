@@ -14,6 +14,9 @@ import { createResourceLeases } from './resource-lease.mjs';
 import { assertCompletionQuality } from './completion-ci-evidence.mjs';
 import { hasOriginalMergedReadiness } from './delivery-repairs/completion-legacy-readiness.mjs';
 import { verifyMaintenanceCloseoutReadiness } from './delivery-repairs/historical-post-merge.mjs';
+import { verifyReferenceRepairCloseout } from './delivery-repairs/reference-repair-release.mjs';
+import { createExecutionOrder } from './task-execution-order.mjs';
+import { readTaskCoordination } from './task-coordination.mjs';
 import { withCandidateRuntime } from './task-candidate-runtime.mjs';
 import { taskRuntimeReferences } from './task-runtime-references.mjs';
 import {
@@ -422,6 +425,19 @@ export async function runCompletionFlow(
               readCandidateCommand: () =>
                 JSON.parse(git(batch.worktree, 'show', head + ':package.json')).scripts['verify:delivery'],
             }) ||
+              verifyReferenceRepairCloseout({
+                anchor,
+                registry: tasks,
+                batch,
+                head,
+                pr: merged[0],
+                state,
+                execute,
+                assertQuality: assertCompletionQuality,
+                assertSource: assertAcceptedSource,
+                order: createExecutionOrder(common).read(),
+                coordination: readTaskCoordination(common),
+              }) ||
               verifyMaintenanceCloseoutReadiness({
                 anchor,
                 registry: tasks,
